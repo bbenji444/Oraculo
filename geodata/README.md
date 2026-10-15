@@ -15,6 +15,7 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 | Comando | Qué hace |
 |---|---|
 | `wsl make geo-download` | Descarga las fuentes a `raw/`. De INEGI baja **solo** el marco integrado nacional (≈249 MB) de dentro del ZIP de 2.9 GB, leyendo por partes (HTTP Range) y verificando el CRC. Si ya está descargado y su SHA-256 coincide, no lo vuelve a bajar. |
+| `wsl make geo-inspect` | Extrae solo las capas que se usan (`00ent`, `00mun`, `00l`, `00lpr`) y el catálogo municipal. Reporta registros, campos, proyección (EPSG), encoding de los nombres con su evidencia y claves repetidas; compara las claves de municipios con el catálogo oficial; muestra 5 nombres reales con Ñ y acentos para revisión humana. Guarda la decisión en `raw/inegi/INSPECCION.json`. |
 
 ## Fuentes y licencias
 

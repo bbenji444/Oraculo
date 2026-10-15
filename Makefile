@@ -26,7 +26,7 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build geo-download
+        format frontend-build geo-download geo-inspect
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -86,3 +86,6 @@ frontend-build: ## Compila el frontend en frontend/dist (lo sirve nginx)
 
 geo-download: ## Descarga INEGI y Natural Earth a geodata/raw (con manifiesto)
 	$(UV_RUN) python -m app.geodata.descargar
+
+geo-inspect: ## Revisa proyección, encoding y conteos; muestra 5 nombres reales con Ñ
+	$(UV_RUN) python -m app.geodata.inspeccionar
