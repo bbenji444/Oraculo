@@ -10,6 +10,7 @@ tablas. Se conectará a los modelos de ``adapters/persistence`` en F1.
 """
 
 import os
+from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import create_engine, pool
@@ -18,6 +19,12 @@ from app.core.config import get_settings
 
 config = context.config
 target_metadata = None
+
+# Usa la sección [loggers] de alembic.ini para que `make migrate` diga qué
+# migraciones aplicó. disable_existing_loggers=False respeta los logs JSON
+# de la aplicación cuando Alembic corre dentro de las pruebas.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 
 def _database_url() -> str:

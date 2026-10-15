@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Instala y configura en Ubuntu (WSL) todo lo que el proyecto necesita para
 # correr en desarrollo: PostgreSQL 16 + PostGIS, Redis, nginx, uv y
-# Python 3.12, más el usuario y las bases de datos de la aplicación.
+# Python 3.12 con las dependencias del backend, más el usuario y las bases
+# de datos de la aplicación.
 #
 # Quién lo usa: `make bootstrap` (o directamente:
 #   wsl bash scripts/dev/instalar_wsl.sh
@@ -10,8 +11,9 @@
 # Es idempotente: se puede correr varias veces; lo que ya está instalado o
 # creado se deja como está. Por qué existe y por qué sin Docker: ADR-0006.
 #
-# Qué NO hace: no instala Node ni el frontend (corren en Windows), no arranca
-# la API ni el worker (eso es `make up`) y no borra datos existentes.
+# Qué NO hace: no instala las dependencias del frontend (corren en Windows;
+# `make bootstrap` las instala aparte con el npm de Windows), no arranca la
+# API ni el worker (eso es `make up`) y no borra datos existentes.
 
 set -euo pipefail
 
@@ -102,6 +104,12 @@ instalar_uv_y_python() {
   ok "$("$("${UV_BIN}" python find "${PYTHON_VERSION}")" --version)"
 }
 
+instalar_dependencias_python() {
+  paso "Instalando dependencias de Python (versiones exactas de backend/uv.lock)"
+  (cd "${ROOT_DIR}/backend" && "${UV_BIN}" sync --frozen --python "${PYTHON_VERSION}" --quiet)
+  ok "Entorno virtual en ${UV_PROJECT_ENVIRONMENT}"
+}
+
 arrancar_postgres() {
   paso "Arrancando PostgreSQL ${PG_MAJOR}"
   # Sin systemd (WSL integrado de Windows), los servicios se manejan con
@@ -170,6 +178,7 @@ main() {
   configurar_repositorio_postgres
   instalar_servicios
   instalar_uv_y_python
+  instalar_dependencias_python
   arrancar_postgres
   crear_usuario_y_bases
   arrancar_redis

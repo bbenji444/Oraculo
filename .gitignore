@@ -5,9 +5,6 @@
 .env.*
 !.env.example
 
-# Procesos de desarrollo: PIDs y logs que generan `make up` / `make down`.
-.run/
-
 # Python
 __pycache__/
 *.py[cod]

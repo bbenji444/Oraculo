@@ -245,12 +245,19 @@ Antes de cargar shapefiles, CSV o DBF, detecta el encoding (probar `utf-8`, `cp1
 
 Mantén esta sección actualizada conforme se creen los comandos.
 
+Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl make <comando>` (ADR-0006).
+
 ```
-make up          # levanta todos los servicios de desarrollo
-make down        # los detiene
-make test        # pruebas backend + frontend
-make lint        # ruff + mypy + eslint
-make migrate     # aplica migraciones Alembic
-make seed        # carga conceptos de ejemplo
-make geo-load    # pipeline de geodatos INEGI → PostGIS + PMTiles
+make bootstrap       # instala servicios y dependencias (se puede repetir)
+make up              # levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+make down            # los detiene
+make status          # qué corre y resultado de /health
+make logs            # sigue los logs de la API y del worker
+make test            # pruebas backend (con cobertura) + frontend
+make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
+make format          # aplica el formato de ruff y Prettier
+make migrate         # aplica migraciones Alembic
+make frontend-build  # compila el frontend que sirve nginx
 ```
+
+Pendientes de su fase: `make geo-load` (F1, geodatos INEGI → PostGIS + PMTiles) y `make seed` (F2, conceptos de ejemplo).
