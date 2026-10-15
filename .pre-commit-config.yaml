@@ -1,0 +1,55 @@
+# Revisiones automáticas antes de cada commit (pre-commit, especificación F0).
+#
+# Se instala una vez en Windows (donde corre git):
+#   py -m pip install --user pre-commit==4.7.0
+#   py -m pre_commit install
+# Para revisar todo el repositorio a mano: py -m pre_commit run --all-files
+#
+# Qué NO hace: no corre mypy ni las pruebas (son lentas y necesitan los
+# servicios de WSL); eso es `wsl make lint` y `wsl make test`.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        # En Markdown dos espacios al final son un salto de línea.
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        # Refuerza .gitattributes: LF en todo salvo scripts de Windows.
+        args: [--fix=lf]
+        exclude: \.(ps1|bat|cmd)$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        # Los geodatos pesados nunca van al repositorio (geodata/raw y
+        # geodata/output están en .gitignore).
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Misma versión que fija backend/uv.lock, para que den el mismo resultado.
+    rev: v0.17.1
+    hooks:
+      # Sin --config: ruff usa el pyproject.toml más cercano a cada archivo
+      # (backend/pyproject.toml), con su carpeta como raíz del código. Con
+      # --config desde la raíz del repo, ruff no reconoce `app` como paquete
+      # propio y no aplica las excepciones de tests/.
+      - id: ruff-check
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: ESLint + Prettier (frontend)
+        # Usa el npm de Windows y las dependencias ya instaladas en frontend/.
+        entry: npm --prefix frontend run lint
+        language: system
+        files: ^frontend/
+        pass_filenames: false
