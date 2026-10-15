@@ -1,0 +1,125 @@
+# Configuración del backend de monitor-noticias: dependencias (uv), lint y
+# formato (ruff), tipos (mypy) y pruebas (pytest).
+#
+# Las versiones exactas quedan en uv.lock; aquí solo van los mínimos.
+# Las dependencias de fases futuras (trafilatura, google-genai, weasyprint,
+# rapidfuzz, respx...) se agregan en la fase que las usa.
+
+[project]
+name = "monitor-noticias-backend"
+version = "0.0.0"
+description = "API y worker del monitor de noticias geolocalizadas."
+readme = "README.md"
+# CLAUDE.md §6.1 fija Python 3.12.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "celery[redis]>=5.6.3",
+    "fastapi>=0.143.2",
+    "psycopg[binary]>=3.3.6",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.0",
+    "redis>=6.4.0",
+    "sqlalchemy[asyncio]>=2.1.4",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+[tool.uv]
+# No es una librería para publicar: uv solo administra el entorno.
+package = false
+
+# --- ruff ----------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["alembic/versions/*.py.mako"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # orden de imports
+  "N",        # nombres PEP 8
+  "UP",       # sintaxis moderna de Python
+  "B",        # errores probables (bugbear)
+  "S",        # seguridad (bandit)
+  "A",        # no tapar nombres internos de Python
+  "C4",       # comprensiones
+  "SIM",      # simplificaciones
+  "DTZ",      # fechas sin zona horaria (CLAUDE.md §6.3 exige UTC)
+  "T20",      # prohíbe print (CLAUDE.md §6.1)
+  "PL",       # pylint
+  "RUF",      # reglas propias de ruff
+  "D",        # docstrings (CLAUDE.md §5)
+]
+ignore = [
+  "D105",     # métodos mágicos (__repr__, __eq__) no requieren docstring
+  "D107",     # el docstring de __init__ va en la clase (estilo Google)
+  "RUF001", "RUF002", "RUF003",  # permite ¿, ¡, ñ y acentos en textos en español
+]
+
+[tool.ruff.lint.isort]
+# La carpeta backend/alembic/ (migraciones) hace creer a ruff que el paquete
+# alembic es nuestro; es la librería externa.
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# En pruebas: assert es la herramienta (S101), los valores fijos son datos de
+# prueba (S105/S106, PLR2004) y cada prueba se explica con su nombre (D1xx).
+"tests/**" = ["S101", "S105", "S106", "PLR2004", "D100", "D101", "D102", "D103", "D104"]
+# Las migraciones de Alembic se generan con una plantilla fija.
+"alembic/versions/*" = ["D103"]
+
+# --- mypy ----------------------------------------------------------------------
+# CLAUDE.md §6.1: type hints obligatorios en todo; --strict en domain/ y
+# application/ (eso lo corre `make lint` con una segunda pasada).
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "tests"]
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# Celery y kombu no publican tipos; sin esto mypy marca cada import como error.
+module = ["celery", "celery.*", "kombu", "kombu.*"]
+ignore_missing_imports = true
+
+# --- pytest --------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+  "integration: requiere PostgreSQL y Redis locales (base de pruebas separada)",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "\\.\\.\\.",
+]
