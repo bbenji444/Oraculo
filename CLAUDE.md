@@ -44,7 +44,7 @@ Si una petición puntual en el chat contradice algo de aquí, pregunta antes de 
 | Acción | Permiso |
 |---|---|
 | Leer archivos, correr tests y linters, comandos de solo lectura | Libre |
-| Levantar y bajar contenedores de desarrollo | Libre |
+| Levantar y bajar los servicios de desarrollo (`make up` / `make down`) | Libre |
 | Commits locales en la rama de trabajo (con lint y tests pasando) | Libre |
 | `git push`, merge a `develop` o `main`, crear tags | Requiere aprobación |
 | Borrar archivos o datos, migraciones destructivas | Requiere aprobación |
@@ -225,7 +225,7 @@ Antes de cargar shapefiles, CSV o DBF, detecta el encoding (probar `utf-8`, `cp1
 
 - Toda la lógica de `domain/` y `application/` lleva pruebas unitarias. Cobertura mínima del 85% en esas capas.
 - Los adaptadores externos se prueban con respuestas grabadas en `tests/fixtures/`, usando `respx`. **Las pruebas nunca llaman a internet ni gastan créditos.**
-- Las pruebas de integración corren contra PostGIS en Docker.
+- Las pruebas de integración corren contra el PostGIS local de WSL, en una base de pruebas separada (`monitor_noticias_test`), nunca contra la base de desarrollo (ver ADR-0006).
 - Todo bug corregido lleva primero una prueba que lo reproduce.
 - El frontend usa `vitest` para la lógica, más una prueba de humo del flujo principal.
 

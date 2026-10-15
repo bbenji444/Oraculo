@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.1 · Octubre 2026 · Responsable: Benji
+Versión 1.2 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -179,8 +179,9 @@ monitor-noticias/
 ├── README.md
 ├── CHANGELOG.md
 ├── Makefile
-├── docker-compose.yml
 ├── .env.example
+├── scripts/
+│   └── dev/                 # instalación y arranque de servicios en WSL (ver ADR-0006)
 ├── docs/
 │   ├── ESPECIFICACION.md
 │   ├── arquitectura.md
@@ -697,9 +698,9 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 ### F0 — Cimientos
 
 **Tareas**
-- **Verificar entorno:** SO, Docker, Docker Compose, Python, Node y espacio en disco. Si Docker no funciona, **detenerse y reportar**.
+- **Verificar entorno:** SO, WSL, Python, Node y espacio en disco. Si algo no funciona, **detenerse y reportar**.
 - **Repositorio:** estructura de carpetas, `pyproject.toml`, configuración de ruff, mypy y pytest, `package.json` con Vite, ESLint, Prettier y Tailwind, pre-commit, Makefile.
-- **Servicios:** `docker-compose.yml` con postgres+postgis, redis, api, worker y nginx.
+- **Servicios (sin Docker, ver ADR-0006):** script idempotente que instala en Ubuntu (WSL) PostgreSQL 16 + PostGIS, Redis, nginx y Python 3.12 (con `uv`), y comandos `make up` / `make down` / `make status` que arrancan y detienen postgres, redis, api, worker y nginx.
 - **Configuración y diagnóstico:** `.env.example` documentado y `/health` funcional.
 - **Documentación:** README con instrucciones de arranque desde cero y ADRs iniciales (ver sección 18).
 
@@ -808,6 +809,7 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 3. **ADR-0003** — Estrategia multiproveedor de noticias. Por qué no se usa la Custom Search JSON API de Google: cerrada a clientes nuevos y con fecha de descontinuación el 1 de enero de 2027.
 4. **ADR-0004** — MapLibre GL (globo) + PMTiles autoalojados frente a alternativas (CesiumJS, deck.gl, react-globe.gl).
 5. **ADR-0005** — Celery + Redis para procesamiento asíncrono.
+6. **ADR-0006** — Entorno de desarrollo sin Docker: servicios nativos en WSL, Python 3.12 con `uv` y PostgreSQL 16 del repositorio oficial.
 
 ---
 
@@ -815,7 +817,7 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 
 | Tema | Riesgo o pregunta | Mitigación |
 |---|---|---|
-| Entorno | ¿Desarrollo en Windows (VM 103) o en una VM Linux dedicada? Docker en Windows dentro de una VM requiere virtualización anidada. | Recomendado: VM Linux dedicada en Proxmox. Se decide en F0. |
+| Entorno | Docker no funciona en el equipo de desarrollo (Windows 11 21H2 con WSL integrado antiguo). | **Decidido en F0 (ADR-0006):** servicios nativos en Ubuntu dentro de WSL, código en Windows. Sin Docker se pierde el aislamiento, así que las versiones se fijan con el repositorio oficial de PostgreSQL y con `uv.lock`. El despliegue final (F8) puede usar contenedores o una VM Linux sin cambiar el código. |
 | Costos | Consumo de créditos de SearchApi y Gemini. | Estimación previa, presupuesto por búsqueda, caché, bitácora de créditos. |
 | Calidad geográfica | Las notas rara vez mencionan colonias; muchas solo dicen el estado. | La precisión es explícita y visible; nunca se finge más detalle del que hay. |
 | Proveedores | Cambios de API o precio. | Puertos y adaptadores; tres fuentes independientes. |
@@ -832,3 +834,4 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 |---|---|---|
 | 1.0 | Octubre 2026 | Versión inicial. |
 | 1.1 | 15 de octubre de 2026 | Campo `aliases`/`aliases_norm` en `regions`; filtro `sourcecountry` en GDELT y ventana de 3 meses; nota sobre los links de Google News RSS; riesgos de versiones del frontend. |
+| 1.2 | 15 de octubre de 2026 | Entorno de desarrollo sin Docker (ADR-0006): cambian la estructura del repositorio, las tareas de F0 y el riesgo de entorno. |
