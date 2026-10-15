@@ -8,6 +8,7 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 |---|---|---|
 | `raw/` | Descargas originales y `MANIFIESTO.json` (URL, edición, fecha, tamaño y SHA-256 de cada archivo). | No (pesadas) |
 | `scripts/` | Scripts que no son Python (mapa base). | Sí |
+| `aliases.csv` | Alias curados ("CDMX", "Edomex", "Neza"...) que usan la búsqueda y la geolocalización. Revisados por una persona. | Sí |
 | `output/` | PMTiles generados. nginx los sirve en `/tiles/`. | No (se regeneran) |
 
 ## Pasos
@@ -16,6 +17,8 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 |---|---|
 | `wsl make geo-download` | Descarga las fuentes a `raw/`. De INEGI baja **solo** el marco integrado nacional (≈249 MB) de dentro del ZIP de 2.9 GB, leyendo por partes (HTTP Range) y verificando el CRC. Si ya está descargado y su SHA-256 coincide, no lo vuelve a bajar. |
 | `wsl make geo-inspect` | Extrae solo las capas que se usan (`00ent`, `00mun`, `00l`, `00lpr`) y el catálogo municipal. Reporta registros, campos, proyección (EPSG), encoding de los nombres con su evidencia y claves repetidas; compara las claves de municipios con el catálogo oficial; muestra 5 nombres reales con Ñ y acentos para revisión humana. Guarda la decisión en `raw/inegi/INSPECCION.json`. |
+| `wsl make geo-load` | Carga a PostGIS lo inspeccionado (≈7 min) y corre la validación. Las capas se leen desde la carpeta de trabajo en el disco de Linux (`GEODATA_WORK_DIR`), nunca de `/mnt/d` (ADR-0008). Repetirla no duplica nada. |
+| `wsl make geo-validate` | Criterios de aceptación de §12: 32 entidades, municipios = catálogo oficial (clave por clave), 16 alcaldías en la CDMX, 0 geometrías inválidas, nombres con Ñ idénticos al catálogo y el Zócalo en 09 / 09015; más revisiones extra (sin huérfanos, puntos dentro de su polígono, conteos de localidades). Termina con error si algo falla. |
 
 ## Fuentes y licencias
 
