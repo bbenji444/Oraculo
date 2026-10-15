@@ -221,7 +221,8 @@ monitor-noticias/
 ├── geodata/
 │   ├── README.md
 │   ├── raw/                 # descargas originales (en .gitignore)
-│   ├── scripts/             # descarga, reproyección, simplificación, PMTiles, carga PostGIS
+│   ├── scripts/             # mapa base y envoltorios; la lógica del pipeline vive en
+│   │                        # backend/app/geodata/ (probada y tipada con el backend)
 │   └── output/              # PMTiles generados (en .gitignore)
 └── nginx/
 ```
@@ -840,4 +841,4 @@ ADRs de la Fase 1:
 | 1.0 | Octubre 2026 | Versión inicial. |
 | 1.1 | 15 de octubre de 2026 | Campo `aliases`/`aliases_norm` en `regions`; filtro `sourcecountry` en GDELT y ventana de 3 meses; nota sobre los links de Google News RSS; riesgos de versiones del frontend. |
 | 1.2 | 15 de octubre de 2026 | Entorno de desarrollo sin Docker (ADR-0006): cambian la estructura del repositorio, las tareas de F0 y el riesgo de entorno. |
-| 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007) y decisiones de geodatos (ADR-0008). |
+| 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007), decisiones de geodatos (ADR-0008) y lógica del pipeline en `backend/app/geodata/`. |

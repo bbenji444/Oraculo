@@ -26,7 +26,7 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build
+        format frontend-build geo-download
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -81,3 +81,8 @@ format: ## Aplica el formato de ruff y Prettier
 
 frontend-build: ## Compila el frontend en frontend/dist (lo sirve nginx)
 	$(NPM) run build
+
+# --- Geodatos (especificación §12, ADR-0008) ------------------------------------
+
+geo-download: ## Descarga INEGI y Natural Earth a geodata/raw (con manifiesto)
+	$(UV_RUN) python -m app.geodata.descargar
