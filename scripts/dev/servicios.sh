@@ -32,6 +32,10 @@ readonly NGINX_PORT=8080
 # Procesos del worker: dos bastan en desarrollo; en F4 se ajusta según el
 # límite de concurrencia por proveedor.
 readonly WORKER_CONCURRENCY=2
+# La API y el worker tardan más en arrancar cuando Ubuntu acaba de encender
+# (Python lee sus librerías por primera vez): 15 s no alcanzaron tras un
+# `wsl --shutdown`. Se les da más margen que a los servicios del sistema.
+readonly APP_READY_TIMEOUT_SECONDS=90
 # Segundos que se espera a que un proceso termine con SIGTERM antes de forzarlo.
 readonly STOP_GRACE_SECONDS=10
 
@@ -129,11 +133,11 @@ cmd_up() {
     --host 127.0.0.1 --port "${API_PORT}" --reload --reload-dir app --no-access-log
   arrancar_proceso worker "${UV_BIN}" run --frozen celery -A app.worker.celery_app worker \
     --loglevel=INFO --concurrency="${WORKER_CONCURRENCY}" --hostname="worker@%h"
-  esperar_listo "La API" curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/v1/openapi.json"
+  LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "La API" curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/v1/openapi.json"
   ok "API respondiendo en el puerto ${API_PORT}"
   # Celery escribe "ready" un poco antes de contestar pings; se espera a que
   # /health ya lo vea para no reportar un falso error recién arrancado.
-  esperar_listo "El worker" bash -c \
+  LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "El worker" bash -c \
     "curl -s http://127.0.0.1:${API_PORT}/api/v1/health | grep -q '\"workers\"'"
   ok "Worker respondiendo"
 
@@ -188,6 +192,9 @@ cmd_status() {
 
   paso "GET /api/v1/health (a través de nginx)"
   local codigo
+  # Se borra la respuesta anterior: si esta petición falla, no debe mostrarse
+  # un estado viejo como si fuera el actual.
+  rm -f "${RUN_DIR}/health.json"
   codigo="$(curl -s -o "${RUN_DIR}/health.json" -w '%{http_code}' "http://127.0.0.1:${NGINX_PORT}/api/v1/health" || true)"
   echo "    HTTP ${codigo}"
   if [[ -s "${RUN_DIR}/health.json" ]]; then

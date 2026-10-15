@@ -36,15 +36,18 @@ como_postgres() {
 
 # Repite un comando cada medio segundo hasta que tenga éxito o se acabe el
 # tiempo. Uso: esperar_listo "descripción" comando args...
+# El límite se puede ampliar para un caso puntual con
+#   LIMITE_ESPERA=<segundos> esperar_listo ...
 esperar_listo() {
   local descripcion="$1"; shift
-  local intentos=$((READY_TIMEOUT_SECONDS * 2))
+  local limite="${LIMITE_ESPERA:-${READY_TIMEOUT_SECONDS}}"
+  local intentos=$((limite * 2))
   local i
   for ((i = 0; i < intentos; i++)); do
     if "$@" >/dev/null 2>&1; then return 0; fi
     sleep 0.5
   done
-  fallo "${descripcion} no estuvo listo en ${READY_TIMEOUT_SECONDS} s."
+  fallo "${descripcion} no estuvo listo en ${limite} s."
 }
 
 # Carga .env (o lo crea desde .env.example). Se quitan los \r por si alguien
