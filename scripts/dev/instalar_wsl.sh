@@ -74,6 +74,18 @@ cargar_env() {
     cp "${ROOT_DIR}/.env.example" "${ROOT_DIR}/.env"
     aviso "No existía .env: se creó a partir de .env.example."
   fi
+  # Cuando el proyecto agrega variables a .env.example, un .env viejo no las
+  # tiene y la aplicación no arranca. Se agregan las que falten con su valor
+  # de ejemplo, sin tocar las que la persona ya configuró.
+  local linea clave
+  while IFS= read -r linea; do
+    [[ "${linea}" =~ ^([A-Z][A-Z0-9_]*)= ]] || continue
+    clave="${BASH_REMATCH[1]}"
+    if ! grep -q "^${clave}=" "${ROOT_DIR}/.env"; then
+      printf '%s\n' "${linea}" >> "${ROOT_DIR}/.env"
+      aviso "Se agregó a .env la variable nueva ${clave}."
+    fi
+  done < <(tr -d '\r' < "${ROOT_DIR}/.env.example")
   set -a
   # shellcheck disable=SC1090  # la ruta se conoce solo en tiempo de ejecución
   source <(tr -d '\r' < "${ROOT_DIR}/.env")
