@@ -17,8 +17,9 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 |---|---|
 | `wsl make geo-download` | Descarga las fuentes a `raw/`. De INEGI baja **solo** el marco integrado nacional (≈249 MB) de dentro del ZIP de 2.9 GB, leyendo por partes (HTTP Range) y verificando el CRC. Si ya está descargado y su SHA-256 coincide, no lo vuelve a bajar. |
 | `wsl make geo-inspect` | Extrae solo las capas que se usan (`00ent`, `00mun`, `00l`, `00lpr`) y el catálogo municipal. Reporta registros, campos, proyección (EPSG), encoding de los nombres con su evidencia y claves repetidas; compara las claves de municipios con el catálogo oficial; muestra 5 nombres reales con Ñ y acentos para revisión humana. Guarda la decisión en `raw/inegi/INSPECCION.json`. |
-| `wsl make geo-load` | Carga a PostGIS lo inspeccionado (≈7 min) y corre la validación. Las capas se leen desde la carpeta de trabajo en el disco de Linux (`GEODATA_WORK_DIR`), nunca de `/mnt/d` (ADR-0008). Repetirla no duplica nada. |
+| `wsl make geo-load` | Carga a PostGIS lo inspeccionado (≈7 min), corre la validación y genera los PMTiles. Las capas se leen desde la carpeta de trabajo en el disco de Linux (`GEODATA_WORK_DIR`), nunca de `/mnt/d` (ADR-0008). Repetirla no duplica nada. |
 | `wsl make geo-validate` | Criterios de aceptación de §12: 32 entidades, municipios = catálogo oficial (clave por clave), 16 alcaldías en la CDMX, 0 geometrías inválidas, nombres con Ñ idénticos al catálogo y el Zócalo en 09 / 09015; más revisiones extra (sin huérfanos, puntos dentro de su polígono, conteos de localidades). Termina con error si algo falla. |
+| `wsl make geo-tiles` | Genera un PMTiles por capa con tippecanoe en la carpeta de trabajo y los copia verificados a `output/`: `countries` (z0–6), `states` (z2–10), `municipalities` (z5–14) y `localities` (puntos, z10–14). Cada figura lleva `id`, `code`, `name`, `display_prefix` y `level`; el `id` numérico permite resaltarla en el mapa. Verificado con `pmtiles verify`. |
 
 ## Fuentes y licencias
 

@@ -21,7 +21,7 @@ Datos verificados el 15 de octubre de 2026:
 2. **Países:** Natural Earth 1:10m.
    - Nombre en español desde `NAME_ES`.
    - Código desde `ISO_A3`, y `ADM0_A3` cuando `ISO_A3` vale `-99`.
-3. **Geometría de México (país) = unión de los 32 estados de INEGI**, no el contorno de Natural Earth. Así la jerarquía es coherente: un punto en la costa que cae en un estado también cae en México. (En las teselas de países se mantiene el contorno de Natural Earth, solo para dibujar.)
+3. **Geometría de México (país) = unión de los 32 estados de INEGI**, no el contorno de Natural Earth. Así la jerarquía es coherente: un punto en la costa que cae en un estado también cae en México. Las teselas de países usan la misma geometría de la base, para que el borde de México coincida con el de sus estados en el mapa.
 4. **Punto representativo con `ST_PointOnSurface`** (columna `centroid`). El centroide geométrico de una forma cóncava o de media luna puede caer fuera del polígono, y el sistema nunca debe dibujar una noticia fuera de su región.
 5. **Geometrías:** se reparan con `ST_MakeValid`. Si la reparación produce una colección mixta, se conservan solo los polígonos (`ST_CollectionExtract(…, 3)`) y se guardan como MultiPolygon. Se cargan a resolución completa; la simplificación se hace solo al generar PMTiles.
 6. **Normalización de nombres:** una sola función de Python (`app.domain.names.normalize_name`): mayúsculas, sin acentos ni diéresis, **conservando la Ñ**, sin espacios repetidos. La usan el cargador, el buscador y el geocodificador. No se usa `unaccent` de PostgreSQL para `name_norm`.
