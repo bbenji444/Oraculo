@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.0 · Octubre 2026 · Responsable: Benji
+Versión 1.1 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -258,12 +258,13 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `parent_id` FK → regions
 - `country_code` (`MEX`, `COL`...)
 - `name` (original, con acentos) y `name_norm` (para comparar)
+- `aliases` text[] (variantes como se escriben en medios: `CDMX`, `Neza`, `Edomex`) y `aliases_norm` text[] (las mismas, normalizadas como `name_norm`). Las usan `build_queries` (sección 7.2) y el resolutor geográfico (sección 11).
 - `display_prefix` (`Alcaldía`, `Municipio`, `Estado`...)
 - `geom` geometry(MultiPolygon, 4326), nulo en localidades sin polígono
 - `centroid` geometry(Point, 4326)
 - `bbox` (para volar la cámara)
 - `population` (si la fuente la trae)
-- Índices: GIST(`geom`), GIST(`centroid`), GIN(`name_norm gin_trgm_ops`), BTREE(`level`, `parent_id`), BTREE(`code text_pattern_ops`)
+- Índices: GIST(`geom`), GIST(`centroid`), GIN(`name_norm gin_trgm_ops`), GIN(`aliases_norm`), BTREE(`level`, `parent_id`), BTREE(`code text_pattern_ops`)
 
 **Truco clave:** la jerarquía INEGI está en el prefijo del código. "¿La noticia ubicada en `09007` está dentro de `09`?" se resuelve con `code LIKE '09%'`, sin geometría.
 
@@ -393,7 +394,9 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 |---|---|
 | SearchApi (`google_news`) | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa -curso -webinar -diplomado` · país MX · idioma español · filtro de tiempo "última semana" (verificar nombres exactos de parámetros en la documentación) |
 | Google News RSS | La misma consulta + `when:7d` · `hl=es-419&gl=MX&ceid=MX:es-419` |
-| GDELT DOC 2.0 | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa` · `sourcelang:spanish` · `timespan=7d` · `mode=ArtList` · `format=json` · `maxrecords=250` (verificar operadores) |
+| GDELT DOC 2.0 | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa` · `sourcelang:spanish` · `sourcecountry:mexico` · `timespan=7d` · `mode=ArtList` · `format=json` · `maxrecords=250` |
+
+**Nota sobre GDELT:** `sourcelang:spanish` solo filtra por idioma, así que sin otro filtro entrarían medios de España, Argentina, etc. Por eso se agrega `sourcecountry:<país>`, que filtra por el país del medio. La documentación oficial confirma la sintaxis (nombre del país en inglés sin espacios, o código FIPS de 2 letras) y el máximo de 250 resultados ([GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)), pero no trae el ejemplo de México. `# VERIFICAR:` en F3 que `sourcecountry:mexico` devuelve resultados antes de fijarlo en el adaptador.
 
 **Reglas:**
 - **Una consulta por proveedor y concepto.** Las palabras clave se unen con `OR`. Si se excede el límite de longitud del proveedor, se reparten en grupos.
@@ -410,8 +413,10 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
-| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español | Gratis | Ventana móvil de meses recientes (verificar límite). Respetar su ritmo de peticiones. |
-| **Google News RSS** | Respaldo gratuito | Gratis | Sin garantía de servicio. Los links son redirecciones de `news.google.com` y hay que resolver la URL final del medio antes de deduplicar. |
+| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Respetar su ritmo de peticiones. |
+| **Google News RSS** | Respaldo gratuito | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. |
+
+**Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.
 
 **Contrato común — `RawArticle`:**
 
@@ -816,3 +821,14 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 | Proveedores | Cambios de API o precio. | Puertos y adaptadores; tres fuentes independientes. |
 | Derechos de autor | Contenido de los medios. | Solo metadatos, resumen propio y link; el texto completo no se expone. |
 | Integración | Autenticación del sistema principal. | La API queda versionada; la autenticación se diseña en F8. |
+| Versiones del frontend | Ya existe React 19 y Tailwind v4 cambió su forma de configurarse respecto a v3. | Se respeta React 18 tal como dice la sección 5.4. Subir a React 19 requiere un ADR. Tailwind se usa en su versión estable vigente. |
+| Links de Google News RSS | Son identificadores codificados, no redirecciones simples (ver sección 8). | Deduplicar por título y fecha si no se pueden resolver; se decide en F3. |
+
+---
+
+## 20. Historial del documento
+
+| Versión | Fecha | Cambios |
+|---|---|---|
+| 1.0 | Octubre 2026 | Versión inicial. |
+| 1.1 | 15 de octubre de 2026 | Campo `aliases`/`aliases_norm` en `regions`; filtro `sourcecountry` en GDELT y ventana de 3 meses; nota sobre los links de Google News RSS; riesgos de versiones del frontend. |
