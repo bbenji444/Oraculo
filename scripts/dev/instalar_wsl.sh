@@ -30,68 +30,10 @@ readonly PYTHON_VERSION=3.12
 readonly PGDG_KEY_URL="https://www.postgresql.org/media/keys/ACCC4CF8.asc"
 readonly PGDG_KEY_PATH="/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc"
 readonly PGDG_SOURCES_PATH="/etc/apt/sources.list.d/pgdg.sources"
-# `service ... start` regresa antes de que el servicio acepte conexiones
-# (medido: Redis tardó ~0.3 s). Se espera hasta este límite antes de fallar.
-readonly READY_TIMEOUT_SECONDS=15
 
-readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly UV_BIN="${HOME}/.local/bin/uv"
-
-# --- Utilidades ----------------------------------------------------------------
-
-paso() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
-ok() { printf '    \033[32m✔\033[0m %s\n' "$*"; }
-aviso() { printf '    \033[33m!\033[0m %s\n' "$*"; }
-fallo() { printf '\n\033[1;31m✘ %s\033[0m\n' "$*" >&2; exit 1; }
-
-# Corre un comando como root: directo si ya somos root, con sudo si no.
-como_root() {
-  if [[ ${EUID} -eq 0 ]]; then "$@"; else sudo "$@"; fi
-}
-
-# Corre un comando como el usuario `postgres`, dueño del servidor.
-como_postgres() {
-  if [[ ${EUID} -eq 0 ]]; then runuser -u postgres -- "$@"; else sudo -u postgres "$@"; fi
-}
-
-# Repite un comando cada medio segundo hasta que tenga éxito o se acabe el
-# tiempo. Uso: esperar_listo "descripción" comando args...
-esperar_listo() {
-  local descripcion="$1"; shift
-  local intentos=$((READY_TIMEOUT_SECONDS * 2))
-  local i
-  for ((i = 0; i < intentos; i++)); do
-    if "$@" >/dev/null 2>&1; then return 0; fi
-    sleep 0.5
-  done
-  fallo "${descripcion} no estuvo listo en ${READY_TIMEOUT_SECONDS} s."
-}
-
-# Carga .env (o lo crea desde .env.example). Se quitan los \r por si alguien
-# lo editó con un editor de Windows que guardó en CRLF.
-cargar_env() {
-  if [[ ! -f "${ROOT_DIR}/.env" ]]; then
-    cp "${ROOT_DIR}/.env.example" "${ROOT_DIR}/.env"
-    aviso "No existía .env: se creó a partir de .env.example."
-  fi
-  # Cuando el proyecto agrega variables a .env.example, un .env viejo no las
-  # tiene y la aplicación no arranca. Se agregan las que falten con su valor
-  # de ejemplo, sin tocar las que la persona ya configuró.
-  local linea clave
-  while IFS= read -r linea; do
-    [[ "${linea}" =~ ^([A-Z][A-Z0-9_]*)= ]] || continue
-    clave="${BASH_REMATCH[1]}"
-    if ! grep -q "^${clave}=" "${ROOT_DIR}/.env"; then
-      printf '%s\n' "${linea}" >> "${ROOT_DIR}/.env"
-      aviso "Se agregó a .env la variable nueva ${clave}."
-    fi
-  done < <(tr -d '\r' < "${ROOT_DIR}/.env.example")
-  set -a
-  # shellcheck disable=SC1090  # la ruta se conoce solo en tiempo de ejecución
-  source <(tr -d '\r' < "${ROOT_DIR}/.env")
-  set +a
-  ok ".env cargado"
-}
+# Mensajes, como_root, esperar_listo, cargar_env, ROOT_DIR y UV_BIN.
+# shellcheck source=scripts/dev/comun.sh
+source "$(dirname "${BASH_SOURCE[0]}")/comun.sh"
 
 # --- Pasos ---------------------------------------------------------------------
 
@@ -223,6 +165,7 @@ resumen() {
 main() {
   verificar_sistema
   cargar_env
+  ok ".env cargado"
   instalar_paquetes_base
   configurar_repositorio_postgres
   instalar_servicios
