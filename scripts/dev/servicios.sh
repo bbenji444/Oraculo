@@ -57,9 +57,13 @@ arrancar_proceso() {
   # proceso intermedio que termina de inmediato (pasó: PID guardado 10869,
   # real 10871). Por eso el propio proceso escribe su PID ($$) y luego se
   # reemplaza (exec) por el comando real, conservando ese PID.
-  (cd "${BACKEND_DIR}" \
-    && setsid bash -c 'echo $$ > "$0"; exec "$@"' "${pid_file}" "$@" \
-      >"${log_file}" 2>&1 </dev/null &)
+  # Las redirecciones van sobre todo el subproceso y este se reemplaza con
+  # exec: si quedara un bash intermedio con la salida original abierta,
+  # `make up | ...` nunca terminaría (pasó al guardar la salida en un tubo).
+  (
+    cd "${BACKEND_DIR}" || exit 1
+    exec setsid bash -c 'echo $$ > "$0"; exec "$@"' "${pid_file}" "$@"
+  ) >"${log_file}" 2>&1 </dev/null &
   esperar_listo "El PID de ${nombre}" test -s "${pid_file}"
   ok "${nombre} arrancado (PID $(cat "${pid_file}"), log en ${log_file})"
 }
