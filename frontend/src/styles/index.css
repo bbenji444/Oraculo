@@ -1,0 +1,21 @@
+/*
+ * Estilos globales: carga Tailwind CSS v4 y define el modo oscuro por clase.
+ * La especificación (14.5) pide modo oscuro por defecto con alternativa
+ * clara; por eso `dark` se activa con la clase .dark en <html> y no con la
+ * preferencia del sistema operativo.
+ */
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
