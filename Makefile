@@ -26,7 +26,7 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build geo-download geo-inspect
+        format frontend-build geo-download geo-inspect geo-load
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -89,3 +89,6 @@ geo-download: ## Descarga INEGI y Natural Earth a geodata/raw (con manifiesto)
 
 geo-inspect: ## Revisa proyección, encoding y conteos; muestra 5 nombres reales con Ñ
 	$(UV_RUN) python -m app.geodata.inspeccionar
+
+geo-load: ## Carga a PostGIS lo inspeccionado (requiere geo-inspect)
+	$(UV_RUN) python -m app.geodata.cargar

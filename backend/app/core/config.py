@@ -26,6 +26,11 @@ _DEFAULT_HEALTH_TIMEOUT_SECONDS = 2.0
 # Puerto estándar de PostgreSQL.
 _DEFAULT_POSTGRES_PORT = 5432
 
+# Carpeta de trabajo del pipeline de geodatos, en el disco de Linux. GDAL no
+# lee directamente de /mnt/d: en WSL con kernel 5.10 llegó a recibir bytes
+# basura de un archivo que Python y `head` leían bien (ADR-0008).
+_DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geodata"
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
 APP_VERSION = "0.0.0"
@@ -58,6 +63,8 @@ class Settings(BaseSettings):
     redis_test_url: str
 
     health_check_timeout_seconds: float = Field(default=_DEFAULT_HEALTH_TIMEOUT_SECONDS, gt=0)
+
+    geodata_work_dir: Path = _DEFAULT_GEODATA_WORK_DIR
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

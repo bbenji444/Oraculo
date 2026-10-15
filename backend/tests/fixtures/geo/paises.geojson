@@ -1,0 +1,113 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "ADM0_A3": "MEX",
+    "ISO_A3": "MEX",
+    "NAME_ES": "México",
+    "NAME": "Mexico"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -118,
+       14
+      ],
+      [
+       -86,
+       14
+      ],
+      [
+       -86,
+       33
+      ],
+      [
+       -118,
+       33
+      ],
+      [
+       -118,
+       14
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ADM0_A3": "COL",
+    "ISO_A3": "COL",
+    "NAME_ES": "Colombia",
+    "NAME": "Colombia"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -79,
+       -4
+      ],
+      [
+       -67,
+       -4
+      ],
+      [
+       -67,
+       12
+      ],
+      [
+       -79,
+       12
+      ],
+      [
+       -79,
+       -4
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "ADM0_A3": "FRA",
+    "ISO_A3": "-99",
+    "NAME_ES": "Francia",
+    "NAME": "France"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -5,
+       42
+      ],
+      [
+       8,
+       42
+      ],
+      [
+       8,
+       51
+      ],
+      [
+       -5,
+       51
+      ],
+      [
+       -5,
+       42
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

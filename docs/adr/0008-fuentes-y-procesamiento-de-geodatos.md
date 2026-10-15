@@ -28,6 +28,14 @@ Datos verificados el 15 de octubre de 2026:
 7. **Alias:** se mantienen en `geodata/aliases.csv`, revisado por una persona. Incluye los alias de la especificación §11 y los nombres cortos con que los medios escriben los estados ("Coahuila", "Michoacán", "Veracruz").
 8. **Población:** el Marco Geoestadístico no la incluye; queda `NULL` hasta que F4 decida si se carga el Censo 2020.
 
+### Hallazgos durante la implementación (15 de octubre de 2026)
+
+9. **GDAL no lee directamente de `/mnt/d`.** En el WSL de desarrollo (kernel 5.10), GDAL recibió bytes dañados al abrir un GeoJSON que `head`, `cat` y Python leían bien: 3 de 3 intentos fallaron, y el mismo archivo copiado a `/tmp` se leyó sin error. Con un shapefile, el mismo defecto podría corromper geometrías **sin dar error**. Por eso:
+   - las capas se extraen del ZIP a una carpeta de trabajo en el disco de Linux (`GEODATA_WORK_DIR`, por defecto `~/.cache/monitor-noticias/geodata`), y `zipfile` verifica el CRC de cada archivo al extraerlo;
+   - cualquier otra entrada se copia ahí y se compara su SHA-256 antes de usarla;
+   - a `/mnt/d` solo van los resultados finales (PMTiles), copiados y verificados.
+10. **Localidades en dos capas.** 46,894 localidades rurales amanzanadas vienen como polígono en `00l` y también como punto en `00lpr`, con la misma clave y el mismo nombre (`PLANO = "Si"`). Son la misma localidad: se cargan una sola vez, conservando el polígono. Total de localidades distintas: 296,850 (no 343,744). La validación comprueba ambos números.
+
 ## Alternativas consideradas
 
 | Alternativa | Por qué no |

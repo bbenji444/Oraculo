@@ -234,8 +234,8 @@ def pick_examples(
     return (with_enie[:enie_quota] + with_accent + with_enie[enie_quota:])[:count]
 
 
-def read_catalog_codes(csv_path: Path) -> tuple[set[str], str]:
-    """Lee las claves municipales (CVEGEO de 5 dígitos) del catálogo oficial.
+def read_catalog(csv_path: Path) -> tuple[dict[str, str], str]:
+    """Lee las claves y nombres de municipio del catálogo oficial.
 
     El CSV de INEGI trae líneas de título antes de la cabecera, así que no
     basta con contar filas: se toman solo las filas cuyas dos primeras
@@ -245,15 +245,17 @@ def read_catalog_codes(csv_path: Path) -> tuple[set[str], str]:
         csv_path: Ruta del CSV del catálogo.
 
     Returns:
-        (claves CVEGEO de municipio, encoding detectado del CSV).
+        (nombre de cada municipio por su CVEGEO de 5 dígitos, encoding
+        detectado del CSV).
     """
     raw = csv_path.read_bytes()
     report = detect_encoding(raw.splitlines())
-    codes: set[str] = set()
+    names: dict[str, str] = {}
     for row in csv.reader(io.StringIO(raw.decode(report.chosen))):
         if len(row) < _CATALOG_MIN_COLUMNS:
             continue
         state, municipality = row[0].strip(), row[2].strip()
         if state.isdigit() and municipality.isdigit():
-            codes.add(state.zfill(_STATE_CODE_DIGITS) + municipality.zfill(_MUN_CODE_DIGITS))
-    return codes, report.chosen
+            code = state.zfill(_STATE_CODE_DIGITS) + municipality.zfill(_MUN_CODE_DIGITS)
+            names[code] = row[3].strip()
+    return names, report.chosen

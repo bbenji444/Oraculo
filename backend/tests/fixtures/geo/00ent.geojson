@@ -1,0 +1,163 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "09",
+    "NOMGEO": "Ciudad de México"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -99.37,
+       19.04
+      ],
+      [
+       -99.0,
+       19.04
+      ],
+      [
+       -99.0,
+       19.59
+      ],
+      [
+       -99.37,
+       19.59
+      ],
+      [
+       -99.37,
+       19.04
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "15",
+    "NOMGEO": "México"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -100.6,
+       18.36
+      ],
+      [
+       -98.6,
+       18.36
+      ],
+      [
+       -98.6,
+       20.29
+      ],
+      [
+       -100.6,
+       20.29
+      ],
+      [
+       -100.6,
+       18.36
+      ]
+     ],
+     [
+      [
+       -99.37,
+       19.04
+      ],
+      [
+       -99.37,
+       19.59
+      ],
+      [
+       -99.0,
+       19.59
+      ],
+      [
+       -99.0,
+       19.04
+      ],
+      [
+       -99.37,
+       19.04
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "05",
+    "NOMGEO": "Coahuila de Zaragoza"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -103.97,
+       24.54
+      ],
+      [
+       -100.7,
+       24.54
+      ],
+      [
+       -100.7,
+       29.88
+      ],
+      [
+       -103.97,
+       29.88
+      ],
+      [
+       -103.97,
+       24.54
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "19",
+    "NOMGEO": "Nuevo León"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -100.6,
+       23.16
+      ],
+      [
+       -98.42,
+       23.16
+      ],
+      [
+       -98.42,
+       27.8
+      ],
+      [
+       -100.6,
+       27.8
+      ],
+      [
+       -100.6,
+       23.16
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

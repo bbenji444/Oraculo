@@ -21,17 +21,20 @@ from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
 
+from app.core.config import get_settings
 from app.geodata import dbf
 from app.geodata.consola import configure_cli_logging, heading
 from app.geodata.encoding import detect_encoding
 from app.geodata.fuentes import (
     INEGI_DATA_DIR,
-    INEGI_EXTRACT_DIR,
     INEGI_LAYERS,
     INEGI_MG,
     INEGI_MUNICIPAL_CATALOG_SUFFIX,
+    INEGI_WORK_SUBDIR,
     INSPECTION_PATH,
     NATURAL_EARTH_COUNTRIES,
+    NATURAL_EARTH_LAYER,
+    NATURAL_EARTH_WORK_SUBDIR,
     RAW_DIR,
     SHAPEFILE_PARTS,
 )
@@ -42,7 +45,7 @@ from app.geodata.inspeccion import (
     extract_layers,
     inspect_layer,
     pick_examples,
-    read_catalog_codes,
+    read_catalog,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +54,6 @@ logger = logging.getLogger(__name__)
 EXAMPLE_COUNT = 5
 # Capas de donde salen los ejemplos: municipios y localidades tienen más Ñ.
 _EXAMPLE_LAYERS = ("00mun", "00l", "00lpr")
-_NE_DIR_NAME = "ne_10m_admin_0_countries"
 # Campos de Natural Earth que usa el cargador (ADR-0008).
 NE_FIELDS = ("ADM0_A3", "ISO_A3", "NAME_ES")
 # Valor que Natural Earth pone en ISO_A3 cuando no aplica (Francia, Noruega...).
@@ -90,15 +92,15 @@ def inspect_natural_earth(zip_path: Path, destination: Path) -> dict[str, object
     """
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(destination)
-    dbf_path = destination / f"{_NE_DIR_NAME}.dbf"
+    dbf_path = destination / f"{NATURAL_EARTH_LAYER}.dbf"
     rows = list(dbf.iter_raw_values(dbf_path, NE_FIELDS))
-    cpg = destination / f"{_NE_DIR_NAME}.cpg"
+    cpg = destination / f"{NATURAL_EARTH_LAYER}.cpg"
     declared = cpg.read_text(encoding="ascii").strip() if cpg.exists() else None
     report = detect_encoding((name for _, _, name in rows), declared)
     missing_iso = sum(1 for _, iso, _ in rows if iso == NE_MISSING_ISO)
     heading(logger, "Natural Earth: países")
     logger.info(f"Registros: {len(rows)}; campos usados: {', '.join(NE_FIELDS)}")
-    logger.info(f"Proyección: {detect_epsg(destination / f'{_NE_DIR_NAME}.prj')}")
+    logger.info(f"Proyección: {detect_epsg(destination / f'{NATURAL_EARTH_LAYER}.prj')}")
     logger.info(f"Encoding: {report.chosen} (.cpg declara '{declared}')")
     logger.info(f"Países con ISO_A3 = -99 (se usará ADM0_A3): {missing_iso}")
     samples = [
@@ -110,17 +112,22 @@ def inspect_natural_earth(zip_path: Path, destination: Path) -> dict[str, object
     return {"encoding": report.chosen, "records": len(rows), "missing_iso_a3": missing_iso}
 
 
-def run(raw_dir: Path, extract_dir: Path, inspection_path: Path) -> dict[str, object]:
+def run(raw_dir: Path, work_dir: Path, inspection_path: Path) -> dict[str, object]:
     """Ejecuta la inspección completa y guarda ``INSPECCION.json``.
+
+    Las capas se extraen a la carpeta de trabajo en el disco de Linux: la
+    extracción verifica el CRC de cada archivo del ZIP y GDAL las leerá de
+    ahí, nunca de ``/mnt/d`` (ADR-0008).
 
     Args:
         raw_dir: Carpeta ``geodata/raw``.
-        extract_dir: Carpeta donde extraer las capas de INEGI.
+        work_dir: Carpeta de trabajo (``GEODATA_WORK_DIR``).
         inspection_path: Ruta del resultado.
 
     Returns:
         El contenido guardado en ``INSPECCION.json``.
     """
+    extract_dir = work_dir / INEGI_WORK_SUBDIR
     heading(logger, "Extrayendo capas del ZIP integrado de INEGI")
     plan = ExtractionPlan(
         layers=tuple(INEGI_LAYERS),
@@ -140,10 +147,11 @@ def run(raw_dir: Path, extract_dir: Path, inspection_path: Path) -> dict[str, ob
         _report_layer(result)
 
     heading(logger, "Catálogo oficial de municipios de la edición")
-    catalog_codes, catalog_encoding = read_catalog_codes(extract_dir / plan.catalog_relative_path)
+    catalog, catalog_encoding = read_catalog(extract_dir / plan.catalog_relative_path)
     layer_codes = {
         code.decode("ascii") for (code,) in dbf.iter_raw_values(shp_dir / "00mun.dbf", ("CVEGEO",))
     }
+    catalog_codes = set(catalog)
     logger.info(f"Municipios en el catálogo: {len(catalog_codes):,} (encoding {catalog_encoding})")
     missing_in_layer = sorted(catalog_codes - layer_codes)
     extra_in_layer = sorted(layer_codes - catalog_codes)
@@ -152,6 +160,16 @@ def run(raw_dir: Path, extract_dir: Path, inspection_path: Path) -> dict[str, ob
     else:
         logger.warning(f"En el catálogo pero sin polígono: {missing_in_layer or 'ninguno'}")
         logger.warning(f"Con polígono pero fuera del catálogo: {extra_in_layer or 'ninguno'}")
+
+    heading(logger, "Localidades: capa de polígonos (00l) y de puntos (00lpr)")
+    polygon_codes = {c for (c,) in dbf.iter_raw_values(shp_dir / "00l.dbf", ("CVEGEO",))}
+    point_codes = {c for (c,) in dbf.iter_raw_values(shp_dir / "00lpr.dbf", ("CVEGEO",))}
+    in_both = len(polygon_codes & point_codes)
+    distinct = len(polygon_codes | point_codes)
+    # Las localidades rurales amanzanadas vienen como polígono en 00l y también
+    # como punto en 00lpr (mismo nombre): son la misma localidad, no dos.
+    logger.info(f"Claves en ambas capas: {in_both:,} (se cargan una vez, con su polígono)")
+    logger.info(f"Localidades distintas: {distinct:,}")
 
     heading(logger, f"{EXAMPLE_COUNT} nombres reales con Ñ y acentos (para revisión humana)")
     example_rows = [
@@ -166,7 +184,7 @@ def run(raw_dir: Path, extract_dir: Path, inspection_path: Path) -> dict[str, ob
 
     natural_earth = inspect_natural_earth(
         raw_dir / NATURAL_EARTH_COUNTRIES.relative_path,
-        raw_dir / "natural_earth" / _NE_DIR_NAME,
+        work_dir / NATURAL_EARTH_WORK_SUBDIR,
     )
 
     summary: dict[str, object] = {
@@ -183,6 +201,12 @@ def run(raw_dir: Path, extract_dir: Path, inspection_path: Path) -> dict[str, ob
             "count": len(catalog_codes),
             "missing_in_layer": missing_in_layer,
             "extra_in_layer": extra_in_layer,
+        },
+        "localities": {
+            "polygons": len(polygon_codes),
+            "points": len(point_codes),
+            "in_both": in_both,
+            "distinct": distinct,
         },
         "examples": [asdict(e) for e in examples],
         "natural_earth": natural_earth,
@@ -201,7 +225,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     """
     argparse.ArgumentParser(description="Revisa los geodatos descargados.").parse_args(argv)
     configure_cli_logging()
-    run(RAW_DIR, INEGI_EXTRACT_DIR, INSPECTION_PATH)
+    run(RAW_DIR, get_settings().geodata_work_dir, INSPECTION_PATH)
     heading(logger, f"Listo. Resultado en {INSPECTION_PATH}")
 
 

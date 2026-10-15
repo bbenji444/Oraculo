@@ -104,9 +104,9 @@ def test_catalogo_ignora_titulos_y_arma_claves_completas(tmp_path: Path) -> None
         "5,Coahuila de Zaragoza,2,Acuña\n".encode("cp1252")
     )
 
-    codes, encoding = inspeccion.read_catalog_codes(csv_path)
+    names, encoding = inspeccion.read_catalog(csv_path)
 
-    assert codes == {"09007", "05002"}
+    assert names == {"09007": "Iztapalapa", "05002": "Acuña"}
     assert encoding == "cp1252"
 
 

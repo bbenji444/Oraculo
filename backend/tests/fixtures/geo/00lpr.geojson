@@ -1,0 +1,47 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "090150099",
+    "NOMGEO": "Peñón de los Baños"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -99.13,
+     19.45
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "050020050",
+    "NOMGEO": "La Cañada"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -101.2,
+     29.1
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "090070001",
+    "NOMGEO": "Iztapalapa (punto)"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -99.07,
+     19.35
+    ]
+   }
+  }
+ ]
+}

@@ -75,7 +75,7 @@ def test_reporta_capas_catalogo_ejemplos_y_natural_earth(
     raw_dir = build_inputs(tmp_path)
     inspection_path = tmp_path / "INSPECCION.json"
 
-    summary = inspeccionar.run(raw_dir, tmp_path / "extraido", inspection_path)
+    summary = inspeccionar.run(raw_dir, tmp_path / "trabajo", inspection_path)
 
     saved = json.loads(inspection_path.read_text(encoding="utf-8"))
     assert saved == summary
@@ -92,6 +92,7 @@ def test_reporta_capas_catalogo_ejemplos_y_natural_earth(
     }
     assert {e["name"] for e in saved["examples"]} >= {"Peñón Blanco", "La Cañada"}
     assert saved["natural_earth"] == {"encoding": "utf-8", "records": 3, "missing_iso_a3": 1}
+    assert saved["localities"] == {"polygons": 1, "points": 2, "in_both": 0, "distinct": 3}
     assert "Nombres en español de muestra: Francia, México, Perú" in caplog.text
 
 
@@ -100,7 +101,7 @@ def test_avisa_si_el_catalogo_no_coincide_con_los_poligonos(
 ) -> None:
     raw_dir = build_inputs(tmp_path, missing_municipality=True)
 
-    summary = inspeccionar.run(raw_dir, tmp_path / "extraido", tmp_path / "I.json")
+    summary = inspeccionar.run(raw_dir, tmp_path / "trabajo", tmp_path / "I.json")
 
     catalog = summary["inegi_municipal_catalog"]
     assert catalog == {

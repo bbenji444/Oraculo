@@ -84,7 +84,12 @@ SHAPEFILE_PARTS = (".shp", ".shx", ".dbf", ".prj", ".cpg")
 INEGI_MUNICIPAL_CATALOG_SUFFIX = "municipales.csv"
 INEGI_CODE_FIELD = "CVEGEO"
 INEGI_NAME_FIELD = "NOMGEO"
-# Carpeta donde se extraen las capas del ZIP integrado.
-INEGI_EXTRACT_DIR = RAW_DIR / "inegi" / "mg_integrado"
+# Subcarpetas dentro de GEODATA_WORK_DIR (disco de Linux, ADR-0008) donde se
+# extraen las capas: GDAL nunca lee directamente de /mnt/d.
+INEGI_WORK_SUBDIR = "inegi"
+NATURAL_EARTH_WORK_SUBDIR = "natural_earth"
+NATURAL_EARTH_LAYER = "ne_10m_admin_0_countries"
+# Lista curada de alias (ADR-0008), versionada en el repositorio.
+ALIASES_PATH = REPO_ROOT / "geodata" / "aliases.csv"
 # Resultado de la inspección (encoding y proyección), que usa el cargador.
 INSPECTION_PATH = RAW_DIR / "inegi" / "INSPECCION.json"
