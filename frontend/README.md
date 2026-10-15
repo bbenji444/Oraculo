@@ -13,7 +13,7 @@ Corre **solo en Windows** con Node 22; no instales sus dependencias desde Ubuntu
 | `src/styles/`     | Estilos globales y configuración de Tailwind.                                                 |
 | `public/`         | Archivos estáticos que se sirven tal cual (ícono).                                            |
 
-Más adelante: `src/stores/` (estado global con Zustand) y `src/hooks/`.
+Además, `src/hooks/` tiene los hooks que conectan los servicios con TanStack Query (por ejemplo, `useHealth`). Más adelante se agrega `src/stores/` (estado global con Zustand).
 
 ## Comandos (PowerShell, dentro de `frontend/`)
 
