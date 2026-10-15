@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.2 · Octubre 2026 · Responsable: Benji
+Versión 1.3 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -239,7 +239,7 @@ monitor-noticias/
 | LLM | Gemini 2.5 Flash vía SDK oficial vigente (`google-genai`; verificar), detrás de `LLMPort` | Ya se usa en el proyecto, es barato y rápido. El puerto permite cambiarlo. |
 | Reportes | Jinja2 + WeasyPrint | Una misma plantilla HTML sirve para vista web y para PDF. |
 | Frontend | React 18 + TypeScript + Vite | Ecosistema amplio, tipado. |
-| Globo y mapa | MapLibre GL JS v5 (proyección `globe`) | Globo 3D rotable que hace zoom continuo hasta nivel calle con la misma librería. Open source, sin llave ni costo. |
+| Globo y mapa | MapLibre GL JS v6 (proyección `globe`; ver ADR-0007) | Globo 3D rotable que hace zoom continuo hasta nivel calle con la misma librería. Open source, sin llave ni costo. |
 | Teselas | PMTiles autoalojados (mapa base Protomaps + capas INEGI) | No se depende de servidores de mapas externos, algo importante en un sistema institucional. Un solo archivo por capa, servido por nginx con HTTP Range. |
 | Estado UI | Zustand + TanStack Query | Simple y predecible; caché de datos del servidor. |
 | Estilos | Tailwind CSS | Rápido, consistente; modo oscuro sencillo. |
@@ -811,6 +811,11 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 5. **ADR-0005** — Celery + Redis para procesamiento asíncrono.
 6. **ADR-0006** — Entorno de desarrollo sin Docker: servicios nativos en WSL, Python 3.12 con `uv` y PostgreSQL 16 del repositorio oficial.
 
+ADRs de la Fase 1:
+
+7. **ADR-0007** — MapLibre GL JS v6 en lugar de v5.
+8. **ADR-0008** — Fuentes y procesamiento de geodatos (edición INEGI, geometría de México, punto representativo, nombres y códigos de países).
+
 ---
 
 ## 19. Riesgos y preguntas abiertas
@@ -835,3 +840,4 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 | 1.0 | Octubre 2026 | Versión inicial. |
 | 1.1 | 15 de octubre de 2026 | Campo `aliases`/`aliases_norm` en `regions`; filtro `sourcecountry` en GDELT y ventana de 3 meses; nota sobre los links de Google News RSS; riesgos de versiones del frontend. |
 | 1.2 | 15 de octubre de 2026 | Entorno de desarrollo sin Docker (ADR-0006): cambian la estructura del repositorio, las tareas de F0 y el riesgo de entorno. |
+| 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007) y decisiones de geodatos (ADR-0008). |
