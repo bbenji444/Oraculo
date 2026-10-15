@@ -1,0 +1,69 @@
+# Reglas de finales de línea y archivos binarios del repositorio.
+#
+# Por qué existe: el código se edita en Windows (que usa CRLF) pero se
+# ejecuta en Ubuntu dentro de WSL (que usa LF). Un script con CRLF falla en
+# Linux con "/bin/bash^M: bad interpreter", y los cambios de final de línea
+# ensucian los diffs. Estas reglas viajan con el repositorio, así que aplican
+# sin importar el core.autocrlf de cada persona (ver ADR-0006).
+#
+# Qué NO hace: no convierte archivos que ya estén en el disco; para eso se usa
+# `git add --renormalize .` una vez.
+
+# Por defecto: git detecta si es texto y lo guarda y extrae con LF.
+* text=auto eol=lf
+
+# Código, configuración y documentación: siempre LF, aunque git dude.
+*.py        text eol=lf
+*.pyi       text eol=lf
+*.sh        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+*.json      text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.md        text eol=lf
+*.toml      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.ini       text eol=lf
+*.cfg       text eol=lf
+*.conf      text eol=lf
+*.sql       text eol=lf
+*.j2        text eol=lf
+*.svg       text eol=lf
+*.csv       text eol=lf
+Makefile    text eol=lf
+.env.example text eol=lf
+.gitattributes text eol=lf
+.gitignore  text eol=lf
+.editorconfig text eol=lf
+
+# Scripts que solo ejecuta Windows: esperan CRLF.
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Binarios: git nunca debe convertirlos ni intentar mostrar diffs de texto.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.zip       binary
+*.gz        binary
+*.pmtiles   binary
+*.mbtiles   binary
+*.gpkg      binary
+*.shp       binary
+*.shx       binary
+*.dbf       binary
+*.prj       binary
+*.cpg       binary

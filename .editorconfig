@@ -1,0 +1,26 @@
+# Configuración común para editores (VS Code, JetBrains, etc.).
+# Complementa a .gitattributes: que el editor ya guarde en LF y UTF-8,
+# para no depender de que git convierta al hacer commit.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[Makefile]
+# make exige tabuladores para las recetas.
+indent_style = tab
+
+[*.md]
+# En Markdown dos espacios al final significan salto de línea.
+trim_trailing_whitespace = false
+
+[*.{ps1,bat,cmd}]
+end_of_line = crlf
