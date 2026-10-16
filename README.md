@@ -106,7 +106,7 @@ wsl make down
 |---|---|
 | Levantar o detener los servicios | `wsl make up` / `wsl make down` |
 | Ver qué está corriendo | `wsl make status` |
-| Ver los logs de la API y del worker | `wsl make logs` |
+| Ver los logs de la API, del worker y del reloj de Celery | `wsl make logs` |
 | Trabajar en el frontend con recarga automática | `cd frontend; npm run dev` → <http://localhost:5173> |
 | Aplicar migraciones de base de datos | `wsl make migrate` |
 | Consultar la base (psql) / respaldarla | `wsl make db-shell` / `wsl make db-dump` |

@@ -40,7 +40,7 @@ bootstrap: ## Instala todo: servicios en Ubuntu y dependencias de backend y fron
 	@echo "==> Instalando dependencias del frontend con el npm de Windows"
 	$(NPM) ci --no-fund --no-audit
 
-up: ## Levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+up: ## Levanta PostgreSQL, Redis, API, worker, reloj de Celery y nginx (http://localhost:8080)
 	bash scripts/dev/servicios.sh up
 
 down: ## Detiene todos los servicios
@@ -49,7 +49,7 @@ down: ## Detiene todos los servicios
 status: ## Muestra qué servicios corren y el resultado de /health
 	bash scripts/dev/servicios.sh status
 
-logs: ## Sigue los logs de la API y del worker (Ctrl+C para salir)
+logs: ## Sigue los logs de la API, del worker y del reloj (Ctrl+C para salir)
 	bash scripts/dev/servicios.sh logs
 
 migrate: ## Aplica las migraciones de Alembic a la base de desarrollo

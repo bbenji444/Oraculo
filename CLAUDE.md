@@ -249,10 +249,10 @@ Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl 
 
 ```
 make bootstrap       # instala servicios y dependencias (se puede repetir)
-make up              # levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta) y nginx (http://localhost:8080)
 make down            # los detiene
 make status          # qué corre y resultado de /health
-make logs            # sigue los logs de la API y del worker
+make logs            # sigue los logs de la API, del worker y del reloj
 make test            # pruebas backend (con cobertura) + frontend
 make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
 make format          # aplica el formato de ruff y Prettier
