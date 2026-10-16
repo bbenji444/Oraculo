@@ -102,6 +102,7 @@ def test_existen_los_indices(conn: Connection) -> None:
     assert {
         "news_index_url_hash_key",
         "news_index_text_trgm",
+        "news_index_body_trgm",
         "news_index_published_id",
         "news_index_gdelt_states",
         "news_index_source_published",
