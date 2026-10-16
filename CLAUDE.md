@@ -44,7 +44,7 @@ Si una petición puntual en el chat contradice algo de aquí, pregunta antes de 
 | Acción | Permiso |
 |---|---|
 | Leer archivos, correr tests y linters, comandos de solo lectura | Libre |
-| Levantar y bajar contenedores de desarrollo | Libre |
+| Levantar y bajar los servicios de desarrollo (`make up` / `make down`) | Libre |
 | Commits locales en la rama de trabajo (con lint y tests pasando) | Libre |
 | `git push`, merge a `develop` o `main`, crear tags | Requiere aprobación |
 | Borrar archivos o datos, migraciones destructivas | Requiere aprobación |
@@ -225,7 +225,7 @@ Antes de cargar shapefiles, CSV o DBF, detecta el encoding (probar `utf-8`, `cp1
 
 - Toda la lógica de `domain/` y `application/` lleva pruebas unitarias. Cobertura mínima del 85% en esas capas.
 - Los adaptadores externos se prueban con respuestas grabadas en `tests/fixtures/`, usando `respx`. **Las pruebas nunca llaman a internet ni gastan créditos.**
-- Las pruebas de integración corren contra PostGIS en Docker.
+- Las pruebas de integración corren contra el PostGIS local de WSL, en una base de pruebas separada (`monitor_noticias_test`), nunca contra la base de desarrollo (ver ADR-0006).
 - Todo bug corregido lleva primero una prueba que lo reproduce.
 - El frontend usa `vitest` para la lógica, más una prueba de humo del flujo principal.
 
@@ -245,12 +245,27 @@ Antes de cargar shapefiles, CSV o DBF, detecta el encoding (probar `utf-8`, `cp1
 
 Mantén esta sección actualizada conforme se creen los comandos.
 
+Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl make <comando>` (ADR-0006).
+
 ```
-make up          # levanta todos los servicios de desarrollo
-make down        # los detiene
-make test        # pruebas backend + frontend
-make lint        # ruff + mypy + eslint
-make migrate     # aplica migraciones Alembic
-make seed        # carga conceptos de ejemplo
-make geo-load    # pipeline de geodatos INEGI → PostGIS + PMTiles
+make bootstrap       # instala servicios y dependencias (se puede repetir)
+make up              # levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+make down            # los detiene
+make status          # qué corre y resultado de /health
+make logs            # sigue los logs de la API y del worker
+make test            # pruebas backend (con cobertura) + frontend
+make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
+make format          # aplica el formato de ruff y Prettier
+make migrate         # aplica migraciones Alembic
+make frontend-build  # compila el frontend que sirve nginx
+make geo-download    # descarga INEGI y Natural Earth (con manifiesto)
+make geo-inspect     # proyección, encoding, conteos y 5 nombres reales con Ñ
+make geo-load        # carga a PostGIS, valida (§12) y genera PMTiles
+make geo-validate    # solo los criterios de aceptación del catálogo
+make geo-tiles       # solo los PMTiles de las capas de INEGI
+make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
+make db-shell        # consola SQL (psql) en la base de desarrollo
+make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```
+
+Pendiente de su fase: `make seed` (F2, conceptos de ejemplo).
