@@ -33,7 +33,7 @@ _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geoda
 
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
-APP_VERSION = "0.0.0"
+APP_VERSION = "0.1.0"
 
 
 class Settings(BaseSettings):

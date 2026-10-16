@@ -6,6 +6,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-10-16
+
 ### Agregado
 
 - **Fase 1 — Geodatos.**
