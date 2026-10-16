@@ -273,3 +273,13 @@ async def test_pais_sin_fips_conserva_su_nombre_en_ingles(
 
 async def test_region_inexistente(test_engine: AsyncEngine) -> None:
     assert await PostgresRegionRepository(test_engine).place_facts(999_999_999) is None
+
+
+async def test_terminos_de_los_estados_para_reconocer_notas_de_mexico(
+    test_engine: AsyncEngine, sync_engine: Engine
+) -> None:
+    terms = await PostgresRegionRepository(test_engine).state_terms()
+
+    # Nombre oficial y términos curados, sin repetir (ADR-0014).
+    assert {"Ciudad de México", "CDMX", "Estado de México", "Edomex"} <= set(terms)
+    assert len(terms) == len(set(terms))

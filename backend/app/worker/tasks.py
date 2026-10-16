@@ -42,23 +42,25 @@ def ingest_news() -> dict[str, int]:
     """Corre una vez la ingesta de las fuentes encendidas.
 
     Returns:
-        Notas nuevas por fuente (``{"gdelt_gkg": 120, "rss:la-jornada": 4}``),
-        para verlas en el resultado de la tarea.
+        Notas nuevas por fuente (``{"gdelt_ngrams": 300, "rss:la-jornada": 4}``),
+        sumando los minutos de ngramas, para verlas en el resultado de la tarea.
     """
     summary = asyncio.run(run_ingest(get_settings()))
-    reports = [*([summary.gdelt] if summary.gdelt else []), *summary.media]
-    for report in reports:
+    new_by_source: dict[str, int] = {}
+    for report in summary.reports:
         _log_report(report)
-    return {report.source: report.items_new for report in reports}
+        new_by_source[report.source] = new_by_source.get(report.source, 0) + report.items_new
+    return new_by_source
 
 
 @celery_app.task(name=PURGE_TASK)
-def purge_news_index() -> int:
-    """Borra las notas más viejas que ``NEWS_INDEX_RETENTION_DAYS``.
+def purge_news_index() -> dict[str, int]:
+    """Aplica las retenciones: notas completas y frases del cuerpo.
 
     Returns:
-        Cuántas notas se borraron.
+        Cuántas notas se borraron y a cuántas se les quitó el cuerpo.
     """
-    deleted = asyncio.run(run_purge(get_settings()))
-    logger.info("Limpieza del índice local", extra={"deleted": deleted})
-    return deleted
+    report = asyncio.run(run_purge(get_settings()))
+    result = {"deleted": report.notes_deleted, "bodies_cleared": report.bodies_cleared}
+    logger.info("Limpieza del índice local", extra=result)
+    return result

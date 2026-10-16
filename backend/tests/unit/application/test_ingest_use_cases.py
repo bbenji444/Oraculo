@@ -1,6 +1,6 @@
 """Casos de uso de la ingesta con fuentes, índice y registro falsos."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -8,12 +8,14 @@ from app.application.ports.ingest import GkgFile, IngestSourceError, MediaFeed, 
 from app.application.use_cases.ingest import (
     SAMPLE_SIZE,
     IngestGdeltGkg,
+    IngestGdeltNgrams,
     IngestMediaRss,
     PlanGdeltHistory,
     PurgeNewsIndex,
+    recent_minutes,
 )
 from app.domain.errors import ProviderUnavailableError
-from tests.unit.fake_ingest import FILE, NOW, FakeGkg, FakeIndex, FakeRuns, parsed
+from tests.unit.fake_ingest import FILE, NOW, FakeGkg, FakeIndex, FakeNgrams, FakeRuns, parsed
 
 pytestmark = pytest.mark.anyio
 
@@ -125,13 +127,17 @@ async def test_sin_medios_activos_no_hace_nada() -> None:
     assert (reports, source.read) == ([], [])
 
 
-async def test_la_limpieza_borra_lo_anterior_a_la_retencion() -> None:
+async def test_la_limpieza_aplica_las_dos_retenciones() -> None:
     index = FakeIndex()
 
-    deleted = await PurgeNewsIndex(index, retention_days=90, clock=lambda: NOW).run()
+    report = await PurgeNewsIndex(
+        index, retention_days=90, body_retention_days=30, clock=lambda: NOW
+    ).run()
 
-    assert deleted == 7
+    assert (report.notes_deleted, report.bodies_cleared) == (7, 3)
     assert index.cutoff == NOW - timedelta(days=90)
+    # Las frases del cuerpo se van antes: son lo que más ocupa (ADR-0014).
+    assert index.body_cutoff == NOW - timedelta(days=30)
 
 
 # --- Historial (vista previa sin bajar) ---
@@ -190,3 +196,41 @@ async def test_el_plan_funciona_sin_aviso_de_avance() -> None:
     )
 
     assert plan.files == (file,)
+
+
+# --- Ngramas (ADR-0014) ---
+
+
+def at(minute: int) -> datetime:
+    return datetime(2026, 10, 16, 22, minute, tzinfo=UTC)
+
+
+async def test_ngramas_procesan_los_minutos_que_faltan_y_saltan_los_vacios() -> None:
+    source = FakeNgrams(
+        {
+            at(45): parsed(2, "gdelt_ngrams"),
+            at(46): None,  # GDELT no publicó ese minuto: normal, no se registra.
+            at(47): IngestSourceError("El archivo comprimido está dañado"),
+        }
+    )
+    runs = FakeRuns(processed=[source.key_for(at(44))])
+
+    reports = await IngestGdeltNgrams(source, FakeIndex(), runs, clock=lambda: NOW).run(
+        [at(44), at(45), at(46), at(47)]
+    )
+
+    assert [(r.item, r.status, r.items_new) for r in reports] == [
+        ("20261016224500.toc.json.gz", "ok", 2),
+        ("20261016224700.toc.json.gz", "error", 0),
+    ]
+    # Lo ya procesado ni se mide.
+    assert at(44) not in source.described
+    assert [run.bytes_downloaded for run in runs.runs] == [30, 0]
+    # El error no marca el minuto como hecho: la siguiente corrida reintenta.
+    assert source.key_for(at(47)) not in runs.processed
+
+
+def test_los_minutos_recientes_dejan_margen_para_gdelt() -> None:
+    minutes = recent_minutes(datetime(2026, 10, 16, 23, 0, 30, tzinfo=UTC), 3, 1)
+
+    assert minutes == [at(57), at(58), at(59)]

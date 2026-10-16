@@ -27,6 +27,8 @@ costo, citando al GDELT Project con un link.
 No hace: no guarda nada (eso es el caso de uso de ingesta).
 """
 
+import base64
+import binascii
 import csv
 import hashlib
 import html
@@ -35,6 +37,8 @@ import re
 import zipfile
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+
+import httpx2
 
 from app.adapters.providers.http import ProviderHttpClient
 from app.application.ports.ingest import GkgFile, IngestSourceError, ParseResult
@@ -66,6 +70,67 @@ GKG_BASE_URL = "https://data.gdeltproject.org/gdeltv2/"
 SLOT_MINUTES = 15
 _NOT_FOUND = 404
 _MD5 = re.compile(r"[0-9a-f]{32}")
+_GOOG_MD5 = re.compile(r"md5=([A-Za-z0-9+/=]+)")
+
+
+def file_from_headers(url: str, headers: httpx2.Headers) -> GkgFile:
+    """Tamaño y MD5 de un archivo de GDELT a partir de los encabezados de un HEAD.
+
+    El servidor de archivos de GDELT es Google Cloud Storage, que siempre
+    manda ``x-goog-stored-content-length`` y ``x-goog-hash: md5=<base64>``
+    (encabezados documentados de Cloud Storage). El ``ETag`` y
+    ``Content-Length`` no bastan: cuando el cliente acepta compresión, Google
+    recomprime los ``.json`` y ``.txt`` al vuelo y los quita (medido el
+    16/10/2026 con los ngramas). Medido también: ese MD5 coincide con el que
+    anuncia ``lastupdate-translation.txt``.
+
+    Args:
+        url: Dirección del archivo.
+        headers: Encabezados de la respuesta.
+
+    Returns:
+        El archivo con su tamaño y MD5 en hexadecimal.
+
+    Raises:
+        GkgFileError: Si no hay tamaño o MD5 usables.
+    """
+    size = headers.get("x-goog-stored-content-length") or headers.get("content-length") or ""
+    hashes = ",".join(headers.get_list("x-goog-hash"))
+    found = _GOOG_MD5.search(hashes)
+    md5 = ""
+    if found:
+        try:
+            md5 = base64.b64decode(found.group(1), validate=True).hex()
+        except binascii.Error:
+            md5 = ""
+    if not md5:
+        md5 = headers.get("etag", "").strip('"')
+    if not size.isdigit() or not _MD5.fullmatch(md5):
+        raise GkgFileError(f"{url}: GDELT no informó tamaño y MD5 usables.")
+    return GkgFile(url, int(size), md5)
+
+
+async def measure(http: ProviderHttpClient, url: str) -> GkgFile | None:
+    """Mide un archivo de GDELT con HEAD, sin bajarlo.
+
+    Args:
+        http: Cliente HTTP.
+        url: Dirección del archivo.
+
+    Returns:
+        El archivo con tamaño y MD5, o ``None`` si no existe (404).
+
+    Raises:
+        GkgFileError: Si la respuesta no trae tamaño o MD5 usables.
+        ProviderError: Si GDELT no responde.
+    """
+    try:
+        response = await http.head(url)
+    except ProviderResponseError as error:
+        if error.http_status == _NOT_FOUND:
+            return None
+        raise
+    return file_from_headers(url, response.headers)
 
 
 def history_urls(now: datetime, days: int) -> list[str]:
@@ -280,13 +345,6 @@ class GdeltGkgSource:
     async def describe(self, url: str) -> GkgFile | None:
         """Mide un archivo con HEAD, sin bajarlo (historial).
 
-        El servidor de archivos de GDELT (Google Cloud Storage) devuelve el
-        MD5 en el ``ETag``. Medido el 16/10/2026: el ``ETag`` de
-        ``20261016221500.translation.gkg.csv.zip`` era idéntico al MD5 que
-        anuncia ``lastupdate-translation.txt``. # VERIFICAR: GDELT no lo
-        documenta; si el ``ETag`` deja de ser un MD5, el archivo se rechaza
-        con un mensaje claro.
-
         Args:
             url: Dirección del archivo (``history_urls``).
 
@@ -298,17 +356,7 @@ class GdeltGkgSource:
             GkgFileError: Si la respuesta no trae tamaño o MD5 usables.
             ProviderError: Si GDELT no responde.
         """
-        try:
-            response = await self._http.head(url)
-        except ProviderResponseError as error:
-            if error.http_status == _NOT_FOUND:
-                return None
-            raise
-        size = response.headers.get("content-length", "")
-        etag = response.headers.get("etag", "").strip('"')
-        if not size.isdigit() or not _MD5.fullmatch(etag):
-            raise GkgFileError(f"{url}: GDELT no informó tamaño y MD5 (ETag {etag!r}).")
-        return GkgFile(url, int(size), etag)
+        return await measure(self._http, url)
 
     async def fetch(self, file: GkgFile) -> tuple[ParseResult, int]:
         """Baja, verifica y lee un archivo GKG.

@@ -221,6 +221,26 @@ class PostgresRegionRepository:
             ),
         )
 
+    async def state_terms(self) -> list[str]:
+        """Nombres y términos curados de los estados, para reconocer notas de México.
+
+        Lo usa la ingesta de ngramas (ADR-0014): una nota entra si nombra al
+        país o a alguno de sus estados. Solo México tiene estados en el
+        catálogo, así que no hace falta filtrar por país.
+
+        Returns:
+            Los textos sin repetir ("Ciudad de México", "CDMX", "Jalisco"...).
+        """
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text("SELECT name, search_terms FROM regions WHERE level = 'state' ORDER BY code")
+            )
+            terms: dict[str, None] = {}
+            for name, extra in rows:
+                terms[name] = None
+                terms.update(dict.fromkeys(extra))
+        return list(terms)
+
     async def find_at_point(self, point: GeoPoint, level: RegionLevel | None) -> Region | None:
         """Ver ``RegionRepositoryPort.find_at_point``."""
         rows = await self._fetch(

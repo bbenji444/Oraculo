@@ -61,6 +61,13 @@ _DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
 _DEFAULT_NEWS_INDEX_RETENTION_DAYS = 90
 # - GDELT publica un GKG cada 15 minutos; correr más seguido no trae nada nuevo.
 _DEFAULT_INGEST_INTERVAL_MINUTES = 15
+# - Frases del cuerpo (ngramas, ADR-0014): 30 días; son lo que más ocupa.
+_DEFAULT_NEWS_BODY_RETENTION_DAYS = 30
+# - Ngramas: cada corrida revisa los últimos 35 minutos (el intervalo de 15
+#   más margen por retrasos de GDELT) y deja los 3 más recientes para la
+#   siguiente: GDELT recomienda pedir el archivo de hace unos minutos.
+_DEFAULT_NGRAMS_LOOKBACK_MINUTES = 35
+_DEFAULT_NGRAMS_DELAY_MINUTES = 3
 
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
@@ -131,6 +138,12 @@ class Settings(BaseSettings):
     media_rss_enabled: bool = False
     news_index_retention_days: int = Field(default=_DEFAULT_NEWS_INDEX_RETENTION_DAYS, ge=1)
     ingest_interval_minutes: int = Field(default=_DEFAULT_INGEST_INTERVAL_MINUTES, ge=1)
+    # Ngramas de GDELT (ADR-0014): texto completo, ~1 GB de descarga al día.
+    # Apagados hasta que Benji vea 5 ejemplos reales y el consumo medido.
+    gdelt_ngrams_enabled: bool = False
+    news_body_retention_days: int = Field(default=_DEFAULT_NEWS_BODY_RETENTION_DAYS, ge=1)
+    ngrams_lookback_minutes: int = Field(default=_DEFAULT_NGRAMS_LOOKBACK_MINUTES, ge=1)
+    ngrams_delay_minutes: int = Field(default=_DEFAULT_NGRAMS_DELAY_MINUTES, ge=0)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

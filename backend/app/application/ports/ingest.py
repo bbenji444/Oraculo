@@ -28,7 +28,7 @@ class IngestSourceError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class GkgFile:
-    """Un archivo GKG anunciado por GDELT.
+    """Un archivo de GDELT con tamaño y huella (GKG o ngramas).
 
     Attributes:
         url: Dirección del ZIP.
@@ -145,6 +145,64 @@ class GkgSourcePort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class NgramsMinute:
+    """Un minuto de ngramas de GDELT: su índice de notas y sus frases (ADR-0014).
+
+    Attributes:
+        key: Identificador del minuto para no procesarlo dos veces (la URL
+            del índice).
+        toc: Índice de notas (``toc.json.gz``), con tamaño y huella.
+        ngrams: Frases de 4 palabras (``ngrams.txt.gz``), con tamaño y huella.
+    """
+
+    key: str
+    toc: GkgFile
+    ngrams: GkgFile
+
+    @property
+    def size(self) -> int:
+        """Bytes a descargar de los dos archivos."""
+        return self.toc.size + self.ngrams.size
+
+
+class NgramsSourcePort(Protocol):
+    """Archivos de ngramas de GDELT, uno por minuto."""
+
+    def key_for(self, moment: datetime) -> str:
+        """Identificador del minuto, sin preguntar nada a GDELT.
+
+        Args:
+            moment: Minuto (con zona).
+
+        Returns:
+            La llave con la que ``ingest_runs`` lo recuerda.
+        """
+        ...
+
+    async def describe(self, moment: datetime) -> NgramsMinute | None:
+        """Mide los dos archivos de un minuto sin bajarlos.
+
+        Args:
+            moment: Minuto (con zona).
+
+        Returns:
+            El minuto, o ``None`` si GDELT no publicó ese minuto.
+        """
+        ...
+
+    async def fetch(self, minute: NgramsMinute) -> tuple[ParseResult, int]:
+        """Baja, verifica y lee un minuto.
+
+        Args:
+            minute: Minuto medido.
+
+        Returns:
+            Las notas en español que mencionan México y los bytes descargados.
+        """
+        ...
+
+
 class FeedSourcePort(Protocol):
     """RSS de medios."""
 
@@ -182,6 +240,17 @@ class NewsIndexPort(Protocol):
 
         Returns:
             Cuántas se borraron.
+        """
+        ...
+
+    async def clear_bodies_before(self, cutoff: datetime) -> int:
+        """Quita las frases del cuerpo de las notas publicadas antes de una fecha.
+
+        Args:
+            cutoff: Fecha límite (UTC).
+
+        Returns:
+            A cuántas notas se les quitaron.
         """
         ...
 

@@ -28,7 +28,7 @@ COVERAGE_MIN := 85
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
-        ingesta-historial
+        ingesta-historial ngramas-muestra
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -122,6 +122,9 @@ ingesta: ## Corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-
 
 ingesta-historial: ## Historial de GDELT: vista previa con DIAS=N; baja todo solo con DESCARGAR=si
 	$(UV_RUN) python -m app.cli.ingesta_historial --dias $(or $(DIAS),1) $(if $(filter si,$(DESCARGAR)),--descargar,)
+
+ngramas-muestra: ## Prueba real de los ngramas de GDELT: consumo, espacio y 5 ejemplos (MINUTOS=60)
+	$(UV_RUN) python -m app.cli.muestra_ngramas --minutos $(or $(MINUTOS),60)
 
 seed: ## Carga los conceptos semilla que falten (nunca modifica los existentes)
 	$(UV_RUN) python -m app.seed.cargar_conceptos

@@ -6,9 +6,13 @@ from typing import Any
 import pytest
 
 from app.domain.news_index import (
+    BODY_SEPARATOR,
+    MAX_BODY_PHRASES,
     GdeltLocation,
     InvalidNewsError,
+    MexicoMentions,
     NewsItem,
+    body_terms_from,
     inegi_states,
     keep_gdelt_note,
 )
@@ -74,3 +78,49 @@ def test_ubicaciones_repetidas_se_guardan_una_vez() -> None:
     news = item(gdelt_locations=[COUNTRY, CDMX, COUNTRY, CDMX, COUNTRY])
 
     assert news.gdelt_locations == (COUNTRY, CDMX)
+
+
+# --- Ngramas (ADR-0014) ---
+
+
+def test_frases_del_cuerpo_normalizadas_sin_repetir_y_con_tope() -> None:
+    assert body_terms_from(["Robo en  Peñón", "robo en peñón", " ", "de los Baños"]) == (
+        "ROBO EN PEÑON | DE LOS BAÑOS"
+    )
+    assert body_terms_from([]) is None
+    many = body_terms_from(f"frase {n}" for n in range(MAX_BODY_PHRASES + 50))
+    assert many is not None
+    assert len(many.split(BODY_SEPARATOR)) == MAX_BODY_PHRASES
+
+
+def test_la_nota_guarda_su_cuerpo_aparte_del_texto_que_se_muestra() -> None:
+    news = item(body_phrases=["detienen en Iztapalapa a", "en Iztapalapa a un"])
+
+    assert news.body_terms == "DETIENEN EN IZTAPALAPA A | EN IZTAPALAPA A UN"
+    assert "IZTAPALAPA" not in news.text_norm
+
+
+MENTIONS = MexicoMentions(
+    ["Ciudad de México", "CDMX", "Nuevo León", "Baja California", "Baja California Sur"]
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "domain", "expected"),
+    [
+        ("ROBO EN UN BANCO DE NUEVO LEON", None, True),
+        ("EL GOBIERNO MEXICANO ANUNCIO", None, True),
+        ("CORTE DE LUZ EN LA CDMX", None, True),
+        ("BAJA CALIFORNIA SUR SIN AGUA", None, True),
+        # "LEON" solo (Guanajuato o España) no basta: el término es completo.
+        ("SUBE EL PRECIO EN LEON", None, False),
+        ("ROBOS EN CARTAGENA", None, False),
+        # "MEXICOS" no es "MEXICO": se compara la palabra completa.
+        ("LOS MEXICOSAURIOS", None, False),
+        ("ROBOS EN CARTAGENA", "vanguardia.com.mx", True),
+    ],
+)
+def test_reconoce_si_una_nota_menciona_mexico(
+    text: str, domain: str | None, expected: bool
+) -> None:
+    assert MENTIONS.found_in(text, domain) is expected

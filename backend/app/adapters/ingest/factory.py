@@ -6,9 +6,11 @@ No hace: no decide cuándo correr (eso es ``celery beat``).
 """
 
 from app.adapters.ingest.gdelt_gkg import GdeltGkgSource
+from app.adapters.ingest.gdelt_ngrams import GdeltNgramsSource
 from app.adapters.ingest.media_rss import MediaRssSource
 from app.adapters.providers.http import ProviderHttpClient
 from app.core.config import Settings
+from app.domain.news_index import MexicoMentions
 from app.domain.queries import Provider
 from app.geodata.fips import read_fips_to_inegi
 
@@ -51,3 +53,25 @@ def build_rss_source(settings: Settings) -> MediaRssSource:
         max_concurrency=settings.provider_max_concurrency,
     )
     return MediaRssSource(http)
+
+
+def build_ngrams_source(settings: Settings, state_terms: list[str]) -> GdeltNgramsSource:
+    """Fuente de ngramas de GDELT (texto completo por minuto, ADR-0014).
+
+    Args:
+        settings: Configuración.
+        state_terms: Nombres y términos de los estados (``state_terms`` del
+            repositorio de regiones), para reconocer notas de México.
+
+    Returns:
+        La fuente lista.
+    """
+    http = ProviderHttpClient(
+        Provider.GDELT,
+        # Un minuto de ngramas llegó a pesar 12 MB: mismo margen que el GKG.
+        timeout_seconds=max(settings.provider_timeout_seconds, GKG_DOWNLOAD_TIMEOUT_SECONDS),
+        max_attempts=settings.provider_max_attempts,
+        max_concurrency=1,
+        rate_limit_wait_seconds=settings.gdelt_rate_limit_wait_seconds,
+    )
+    return GdeltNgramsSource(http, MexicoMentions(state_terms))

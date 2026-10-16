@@ -14,7 +14,7 @@ No hace: no busca (eso es ``LocalIndexProvider``).
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 
 from sqlalchemy import text
@@ -26,10 +26,11 @@ from app.domain.news_index import NewsItem
 _INSERT = text(
     """
     INSERT INTO news_index (source, url, url_hash, title, snippet, source_name, source_domain,
-        published_at, language, text_norm, gdelt_states, gdelt_locations, gdelt_themes)
+        published_at, language, text_norm, gdelt_states, gdelt_locations, gdelt_themes,
+        body_terms)
     VALUES (:source, :url, :url_hash, :title, :snippet, :source_name, :source_domain,
         :published_at, :language, :text_norm, :gdelt_states, CAST(:gdelt_locations AS jsonb),
-        :gdelt_themes)
+        :gdelt_themes, :body_terms)
     ON CONFLICT (url_hash) DO NOTHING
     RETURNING id
     """
@@ -67,6 +68,7 @@ def _values(item: NewsItem) -> dict[str, object]:
             else None
         ),
         "gdelt_themes": list(item.gdelt_themes),
+        "body_terms": item.body_terms,
     }
 
 
@@ -97,6 +99,66 @@ class PostgresNewsIndex:
                 text("DELETE FROM news_index WHERE published_at < :cutoff"), {"cutoff": cutoff}
             )
             return result.rowcount
+
+    async def clear_bodies_before(self, cutoff: datetime) -> int:
+        """Ver ``NewsIndexPort.clear_bodies_before`` (usa el índice por fecha)."""
+        async with self._engine.begin() as conn:
+            result = await conn.execute(
+                text(
+                    "UPDATE news_index SET body_terms = NULL "
+                    "WHERE published_at < :cutoff AND body_terms IS NOT NULL"
+                ),
+                {"cutoff": cutoff},
+            )
+            return result.rowcount
+
+
+@dataclass(frozen=True, slots=True)
+class SourceStats:
+    """Cuánto hay de una fuente en el índice.
+
+    Attributes:
+        source: ``gdelt_gkg``, ``gdelt_ngrams`` o ``rss:<medio>``.
+        notes: Notas guardadas.
+        with_body: Notas que conservan frases del cuerpo.
+        body_bytes: Bytes que ocupan esas frases en disco (ya comprimidas).
+        oldest: Nota más vieja (UTC), o ``None``.
+        newest: Nota más nueva (UTC), o ``None``.
+    """
+
+    source: str
+    notes: int
+    with_body: int
+    body_bytes: int
+    oldest: datetime | None
+    newest: datetime | None
+
+
+async def index_stats(engine: AsyncEngine) -> tuple[list[SourceStats], int]:
+    """Resumen del índice por fuente y su tamaño total en disco.
+
+    Lo usan el comando de muestra de ngramas y la pestaña "Notas".
+
+    Args:
+        engine: Engine asíncrono.
+
+    Returns:
+        Las estadísticas por fuente y los bytes de la tabla con sus índices.
+    """
+    async with engine.connect() as conn:
+        rows = await conn.execute(
+            text(
+                """
+                SELECT source, count(*) AS notes, count(body_terms) AS with_body,
+                       coalesce(sum(pg_column_size(body_terms)), 0) AS body_bytes,
+                       min(published_at) AS oldest, max(published_at) AS newest
+                FROM news_index GROUP BY source ORDER BY source
+                """
+            )
+        )
+        stats = [SourceStats(**row) for row in rows.mappings()]
+        total = await conn.execute(text("SELECT pg_total_relation_size('news_index')"))
+        return stats, int(total.scalar_one())
 
 
 class PostgresIngestRunLog:

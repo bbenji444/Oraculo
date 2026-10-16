@@ -61,12 +61,11 @@ async def run() -> int:
     """
     settings = get_settings()
     summary = await run_ingest(settings)
-    reports: Sequence[IngestReport] = [
-        *([summary.gdelt] if summary.gdelt else []),
-        *summary.media,
-    ]
+    reports: Sequence[IngestReport] = summary.reports
     if not settings.gdelt_gkg_enabled:
-        logger.warning("GDELT apagado (GDELT_GKG_ENABLED=false).")
+        logger.warning("GKG de GDELT apagado (GDELT_GKG_ENABLED=false).")
+    if not settings.gdelt_ngrams_enabled:
+        logger.warning("Ngramas de GDELT apagados (GDELT_NGRAMS_ENABLED=false).")
     if not settings.media_rss_enabled:
         logger.warning("RSS de medios apagados (MEDIA_RSS_ENABLED=false).")
     for report in reports:

@@ -7,7 +7,10 @@ comandos ``make ingesta`` y ``make ingesta-historial``:
   se procesó ya) y guarda las notas en español sobre México.
 - ``IngestMediaRss``: lee los RSS de los medios **activos** de la lista
   curada y guarda sus notas.
-- ``PurgeNewsIndex``: borra las notas más viejas que la retención.
+- ``IngestGdeltNgrams``: baja los ngramas de GDELT (texto completo) de los
+  minutos pendientes y guarda las notas en español que mencionan México.
+- ``PurgeNewsIndex``: borra las notas más viejas que la retención y las
+  frases del cuerpo más viejas que su propia retención (ADR-0014).
 - ``PlanGdeltHistory``: mide los GKG de días anteriores **sin bajarlos**,
   para pedir permiso antes (los baja ``IngestGdeltGkg.run_file``).
 
@@ -30,10 +33,11 @@ from app.application.ports.ingest import (
     IngestSourceError,
     MediaFeed,
     NewsIndexPort,
+    NgramsSourcePort,
     RunStatus,
 )
 from app.domain.errors import ProviderError
-from app.domain.news_index import GDELT_SOURCE, NewsItem
+from app.domain.news_index import GDELT_NGRAMS_SOURCE, GDELT_SOURCE, NewsItem
 
 Clock = Callable[[], datetime]
 
@@ -178,6 +182,96 @@ class IngestGdeltGkg:
         )
 
 
+class IngestGdeltNgrams:
+    """Ingesta de los ngramas de GDELT: texto completo, por minuto (ADR-0014)."""
+
+    def __init__(
+        self,
+        source: NgramsSourcePort,
+        index: NewsIndexPort,
+        runs: IngestRunLogPort,
+        clock: Clock = _utc_now,
+    ) -> None:
+        """Recibe la fuente, el índice y el registro.
+
+        Args:
+            source: Archivos de ngramas de GDELT.
+            index: Índice local.
+            runs: Registro de corridas.
+            clock: Reloj (las pruebas lo fijan).
+        """
+        self._source = source
+        self._index = index
+        self._runs = runs
+        self._clock = clock
+
+    async def run(self, minutes: Sequence[datetime]) -> list[IngestReport]:
+        """Procesa los minutos que falten, en orden.
+
+        Un minuto ya procesado no se mide ni se baja; uno que GDELT no
+        publicó se salta sin registrar (es normal: publica en tandas).
+
+        Args:
+            minutes: Minutos a revisar (``recent_minutes``).
+
+        Returns:
+            Un reporte por minuto que se intentó bajar.
+        """
+        reports = []
+        for moment in minutes:
+            key = self._source.key_for(moment)
+            if await self._runs.already_processed(key):
+                continue
+            started = self._clock()
+            item = key.rsplit("/", 1)[-1]
+            try:
+                minute = await self._source.describe(moment)
+                if minute is None:
+                    continue
+                result, size = await self._source.fetch(minute)
+            except (ProviderError, IngestSourceError) as error:
+                report = IngestReport(GDELT_NGRAMS_SOURCE, item, "error", message=str(error))
+            else:
+                new = await self._index.add(result.items)
+                report = IngestReport(
+                    GDELT_NGRAMS_SOURCE,
+                    item,
+                    "ok",
+                    items_new=new,
+                    items_kept=len(result.items),
+                    items_seen=result.seen,
+                    bytes_downloaded=size,
+                    sample=result.items[:SAMPLE_SIZE],
+                )
+            reports.append(
+                await _record(
+                    self._runs, report, dedupe_key=key, started=started, finished=self._clock()
+                )
+            )
+        return reports
+
+
+def recent_minutes(now: datetime, lookback_minutes: int, delay_minutes: int) -> list[datetime]:
+    """Minutos a revisar en una corrida de los ngramas, del más viejo al más nuevo.
+
+    Args:
+        now: Momento actual (con zona).
+        lookback_minutes: Cuánto hacia atrás revisar (cubre el intervalo del
+            reloj y algún retraso de GDELT).
+        delay_minutes: Minutos recientes que se dejan para la siguiente
+            corrida (GDELT recomienda pedir el archivo de hace 5 minutos).
+
+    Returns:
+        Un ``datetime`` por minuto, con segundos en cero.
+
+    Example:
+        >>> recent_minutes(datetime(2026, 10, 16, 23, 0, 30, tzinfo=UTC), 3, 1)
+        [... 22:57, 22:58, 22:59]
+    """
+    last = now.replace(second=0, microsecond=0) - timedelta(minutes=delay_minutes)
+    return [last - timedelta(minutes=back) for back in range(lookback_minutes - 1, -1, -1)]
+
+
 @dataclass(frozen=True, slots=True)
 class HistoryPlan:
     """Qué bajaría el historial, antes de bajar nada.
@@ -310,25 +404,51 @@ class IngestMediaRss:
         return reports
 
 
-class PurgeNewsIndex:
-    """Borra del índice las notas más viejas que la retención."""
+@dataclass(frozen=True, slots=True)
+class PurgeReport:
+    """Qué borró la limpieza diaria.
 
-    def __init__(self, index: NewsIndexPort, retention_days: int, clock: Clock = _utc_now) -> None:
-        """Recibe el índice y la retención.
+    Attributes:
+        notes_deleted: Notas borradas por NEWS_INDEX_RETENTION_DAYS.
+        bodies_cleared: Notas a las que se les quitaron las frases del cuerpo
+            por NEWS_BODY_RETENTION_DAYS (la nota se queda).
+    """
+
+    notes_deleted: int
+    bodies_cleared: int
+
+
+class PurgeNewsIndex:
+    """Borra del índice lo que ya pasó su retención."""
+
+    def __init__(
+        self,
+        index: NewsIndexPort,
+        retention_days: int,
+        body_retention_days: int,
+        clock: Clock = _utc_now,
+    ) -> None:
+        """Recibe el índice y las dos retenciones.
 
         Args:
             index: Índice local.
-            retention_days: ``NEWS_INDEX_RETENTION_DAYS``.
+            retention_days: NEWS_INDEX_RETENTION_DAYS (la nota completa).
+            body_retention_days: NEWS_BODY_RETENTION_DAYS (solo las frases
+                del cuerpo, que son lo que más ocupa; ADR-0014).
             clock: Reloj.
         """
         self._index = index
         self._retention = timedelta(days=retention_days)
+        self._body_retention = timedelta(days=body_retention_days)
         self._clock = clock
 
-    async def run(self) -> int:
-        """Borra lo publicado antes de hoy menos la retención.
+    async def run(self) -> PurgeReport:
+        """Borra notas viejas y vacía las frases del cuerpo viejas.
 
         Returns:
-            Cuántas notas se borraron.
+            Cuántas notas se borraron y a cuántas se les quitó el cuerpo.
         """
-        return await self._index.purge_before(self._clock() - self._retention)
+        now = self._clock()
+        deleted = await self._index.purge_before(now - self._retention)
+        cleared = await self._index.clear_bodies_before(now - self._body_retention)
+        return PurgeReport(deleted, cleared)

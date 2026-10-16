@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from app.application.ports.ingest import GkgFile, IngestRun, ParseResult
+from app.application.ports.ingest import GkgFile, IngestRun, NgramsMinute, ParseResult
 from app.domain.news_index import NewsItem
 
 NOW = datetime(2026, 10, 16, 20, 0, tzinfo=UTC)
@@ -29,6 +29,7 @@ class FakeIndex:
     def __init__(self) -> None:
         self.urls: set[str] = set()
         self.cutoff: datetime | None = None
+        self.body_cutoff: datetime | None = None
 
     async def add(self, items: Sequence[NewsItem]) -> int:
         new = {item.url for item in items} - self.urls
@@ -38,6 +39,10 @@ class FakeIndex:
     async def purge_before(self, cutoff: datetime) -> int:
         self.cutoff = cutoff
         return 7
+
+    async def clear_bodies_before(self, cutoff: datetime) -> int:
+        self.body_cutoff = cutoff
+        return 3
 
 
 class FakeRuns:
@@ -85,3 +90,30 @@ class FakeGkg:
         if isinstance(found, Exception):
             raise found
         return found
+
+
+class FakeNgrams:
+    """Minutos de ngramas: cada minuto da un resultado, ``None`` (sin archivos) o un error."""
+
+    def __init__(self, minutes: dict[datetime, ParseResult | Exception | None]) -> None:
+        self.minutes = minutes
+        self.described: list[datetime] = []
+
+    def key_for(self, moment: datetime) -> str:
+        return f"https://data.gdeltproject.org/ngrams/{moment:%Y%m%d%H%M}00.toc.json.gz"
+
+    async def describe(self, moment: datetime) -> NgramsMinute | None:
+        self.described.append(moment)
+        value = self.minutes.get(moment)
+        if value is None:
+            return None
+        key = self.key_for(moment)
+        return NgramsMinute(key, GkgFile(key, 10, "a"), GkgFile(key + ".ng", 20, "b"))
+
+    async def fetch(self, minute: NgramsMinute) -> tuple[ParseResult, int]:
+        moment = next(m for m in self.minutes if self.key_for(m) == minute.key)
+        value = self.minutes[moment]
+        if isinstance(value, Exception):
+            raise value
+        assert value is not None
+        return value, minute.size

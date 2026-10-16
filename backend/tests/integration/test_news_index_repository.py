@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.adapters.persistence.news_index_repository import (
     PostgresIngestRunLog,
     PostgresNewsIndex,
+    index_stats,
     url_hash,
 )
 from app.application.ports.ingest import IngestRun
@@ -162,3 +163,60 @@ async def test_dos_corridas_ok_del_mismo_archivo_no_chocan(
     assert second == 0
     with sync_engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM ingest_runs")).scalar_one() == 1
+
+
+async def test_las_frases_del_cuerpo_se_guardan_y_se_vacian_a_su_tiempo(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    index = PostgresNewsIndex(test_engine)
+    old = NewsItem.create(
+        source="gdelt_ngrams",
+        url="https://medio.mx/vieja",
+        title="Robo en la colonia",
+        published_at=NOW - timedelta(days=31),
+        body_phrases=["detienen en Iztapalapa a", "en Iztapalapa a un"],
+    )
+    recent = NewsItem.create(
+        source="gdelt_ngrams",
+        url="https://medio.mx/nueva",
+        title="Robo en la colonia",
+        published_at=NOW,
+        body_phrases=["asalto en Tlalpan con"],
+    )
+    await index.add([old, recent])
+
+    cleared = await index.clear_bodies_before(NOW - timedelta(days=30))
+
+    assert cleared == 1
+    with sync_engine.connect() as conn:
+        rows = conn.execute(text("SELECT url, body_terms FROM news_index")).all()
+    bodies: dict[str, str | None] = {row.url: row.body_terms for row in rows}
+    # La nota vieja se queda (título y link), sin su cuerpo.
+    assert bodies == {
+        "https://medio.mx/vieja": None,
+        "https://medio.mx/nueva": "ASALTO EN TLALPAN CON",
+    }
+
+
+async def test_estadisticas_por_fuente(sync_engine: Engine, test_engine: AsyncEngine) -> None:
+    await PostgresNewsIndex(test_engine).add(
+        [
+            note("https://medio.mx/a"),
+            NewsItem.create(
+                source="gdelt_ngrams",
+                url="https://medio.mx/b",
+                title="Nota",
+                published_at=NOW,
+                body_phrases=["frase del cuerpo uno"],
+            ),
+        ]
+    )
+
+    stats, total = await index_stats(test_engine)
+
+    by_source = {s.source: s for s in stats}
+    assert by_source["gdelt_gkg"].notes == 1
+    assert by_source["gdelt_gkg"].with_body == 0
+    assert (by_source["gdelt_ngrams"].with_body, by_source["gdelt_ngrams"].newest) == (1, NOW)
+    assert by_source["gdelt_ngrams"].body_bytes > 0
+    assert total > 0

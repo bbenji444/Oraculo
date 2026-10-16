@@ -5,15 +5,20 @@ texto completo (CLAUDE.md §8). La ingesta la arma desde un archivo GKG de
 GDELT o desde un RSS de un medio; el proveedor ``indice_local`` busca sobre
 ``text_norm`` (título + fragmento normalizados, conservando la Ñ).
 
-Reglas de qué se guarda de GDELT: notas **en español** con **alguna
-ubicación en México**. Las ubicaciones de GDELT se guardan solo como pistas
-(``gdelt_states``): en la muestra real tenían errores, y la ubicación final la
-decide F4 con el catálogo INEGI.
+Reglas de qué se guarda de GDELT:
+
+- **GKG** (ADR-0013): notas **en español** con **alguna ubicación en México**.
+  Las ubicaciones de GDELT se guardan solo como pistas (``gdelt_states``): en
+  la muestra real tenían errores, y la ubicación final la decide F4 con INEGI.
+- **Ngramas** (ADR-0014): notas **en español** que **mencionan México** en el
+  título o el cuerpo (``MexicoMentions``). De ellas se guardan además las
+  frases del cuerpo (``body_terms``), solo para buscar: nunca se muestran.
 
 No hace: no lee formatos de archivo ni consulta la base.
 """
 
-from collections.abc import Sequence
+import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
@@ -26,8 +31,18 @@ SPANISH = "spa"
 # Código de país de México en las ubicaciones de GDELT (FIPS 10-4).
 MEXICO_FIPS = "MX"
 GDELT_SOURCE = "gdelt_gkg"
+GDELT_NGRAMS_SOURCE = "gdelt_ngrams"
 RSS_SOURCE_PREFIX = "rss:"
 _WEB_SCHEMES = frozenset({"http", "https"})
+# Separa las frases del cuerpo en body_terms: así una búsqueda de dos palabras
+# no "pega" el final de una frase con el inicio de otra.
+BODY_SEPARATOR = " | "
+# Tope de frases por nota. En la muestra real del 16/10/2026 el promedio fue
+# 437; el tope evita que una nota enorme infle la base.
+MAX_BODY_PHRASES = 2000
+# Palabras que nombran al país; se suman a los estados del catálogo.
+MEXICO_WORDS = ("México", "mexicano", "mexicana", "mexicanos", "mexicanas")
+_MEXICAN_TLD = ".mx"
 
 
 class InvalidNewsError(ValueError):
@@ -71,6 +86,8 @@ class NewsItem:
         gdelt_states: Claves INEGI de los estados donde GDELT la ubicó.
         gdelt_locations: Ubicaciones de GDELT (pistas).
         gdelt_themes: Temas de GDELT.
+        body_terms: Frases del cuerpo normalizadas y separadas por
+            ``BODY_SEPARATOR``, solo para buscar (ngramas, ADR-0014).
     """
 
     source: str
@@ -84,6 +101,7 @@ class NewsItem:
     gdelt_states: tuple[str, ...] = ()
     gdelt_locations: tuple[GdeltLocation, ...] = ()
     gdelt_themes: tuple[str, ...] = ()
+    body_terms: str | None = None
 
     @property
     def text_norm(self) -> str:
@@ -105,6 +123,7 @@ class NewsItem:
         gdelt_states: Sequence[str] = (),
         gdelt_locations: Sequence[GdeltLocation] = (),
         gdelt_themes: Sequence[str] = (),
+        body_phrases: Iterable[str] = (),
     ) -> "NewsItem":
         """Valida y limpia una nota.
 
@@ -120,6 +139,8 @@ class NewsItem:
             gdelt_states: Claves INEGI de estado.
             gdelt_locations: Ubicaciones de GDELT (las repetidas se guardan una vez).
             gdelt_themes: Temas de GDELT.
+            body_phrases: Frases del cuerpo (ngramas); se normalizan, se
+                quitan repetidas y se guardan hasta ``MAX_BODY_PHRASES``.
 
         Returns:
             La nota.
@@ -150,6 +171,7 @@ class NewsItem:
             # GDELT repite la ubicación por cada mención; basta una vez como pista.
             gdelt_locations=tuple(dict.fromkeys(gdelt_locations)),
             gdelt_themes=tuple(dict.fromkeys(gdelt_themes)),
+            body_terms=body_terms_from(body_phrases),
         )
 
 
@@ -185,3 +207,66 @@ def inegi_states(
         if loc.country == MEXICO_FIPS and loc.adm1 in fips_to_inegi
     ]
     return tuple(dict.fromkeys(states))
+
+
+def body_terms_from(phrases: Iterable[str]) -> str | None:
+    """Arma ``body_terms``: frases normalizadas, sin repetir, en su orden.
+
+    Args:
+        phrases: Frases del cuerpo tal como las da la fuente.
+
+    Returns:
+        Las frases unidas con ``BODY_SEPARATOR`` (hasta ``MAX_BODY_PHRASES``),
+        o ``None`` si no hay ninguna.
+
+    Example:
+        >>> body_terms_from(["Robo en  Peñón", "robo en peñón", "de los Baños"])
+        'ROBO EN PEÑON | DE LOS BAÑOS'
+    """
+    unique: dict[str, None] = {}
+    for phrase in phrases:
+        clean = normalize_name(phrase)
+        if clean:
+            unique[clean] = None
+            if len(unique) == MAX_BODY_PHRASES:
+                break
+    return BODY_SEPARATOR.join(unique) or None
+
+
+class MexicoMentions:
+    """Reconoce si una nota menciona México: el país, un estado o un dominio ``.mx``.
+
+    Es el filtro de los ngramas (ADR-0014): GDELT no da ubicaciones en ese
+    conjunto, así que se mira el texto. Los nombres se comparan completos y
+    normalizados ("NUEVO LEON" no coincide dentro de otra palabra). Deja pasar
+    algunas notas de otros países (por ejemplo, un apellido "Guerrero"): son
+    candidatas, y F4 decide su ubicación con el catálogo INEGI.
+    """
+
+    def __init__(self, state_terms: Iterable[str]) -> None:
+        """Arma el reconocedor.
+
+        Args:
+            state_terms: Nombres y términos curados de los 32 estados (del
+                catálogo ``regions``); se suman las palabras del país.
+        """
+        clean = {normalize_name(term) for term in (*MEXICO_WORDS, *state_terms)}
+        # Los más largos primero: "BAJA CALIFORNIA SUR" antes que "BAJA CALIFORNIA".
+        ordered = sorted((term for term in clean if term), key=len, reverse=True)
+        alternatives = "|".join(re.escape(term) for term in ordered)
+        self._pattern = re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)")
+
+    def found_in(self, text_norm: str, domain: str | None = None) -> bool:
+        """Dice si el texto (o el dominio del medio) apunta a México.
+
+        Args:
+            text_norm: Título y frases ya normalizados.
+            domain: Dominio del medio, si se conoce.
+
+        Returns:
+            ``True`` si el dominio termina en ``.mx`` o el texto nombra al
+            país o a un estado.
+        """
+        if domain is not None and domain.endswith(_MEXICAN_TLD):
+            return True
+        return self._pattern.search(text_norm) is not None

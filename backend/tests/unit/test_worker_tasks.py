@@ -5,7 +5,7 @@ import logging
 import pytest
 from celery.schedules import crontab
 
-from app.application.use_cases.ingest import IngestReport
+from app.application.use_cases.ingest import IngestReport, PurgeReport
 from app.core.config import Settings
 from app.worker import tasks
 from app.worker.celery_app import build_beat_schedule, celery_app
@@ -50,9 +50,9 @@ def test_la_ingesta_registra_cada_fuente_y_devuelve_las_nuevas(
 
 
 def test_la_limpieza_devuelve_cuantas_borro(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_purge(settings: Settings) -> int:
-        return 42
+    async def fake_purge(settings: Settings) -> PurgeReport:
+        return PurgeReport(notes_deleted=42, bodies_cleared=5)
 
     monkeypatch.setattr(tasks, "run_purge", fake_purge)
 
-    assert tasks.purge_news_index() == 42
+    assert tasks.purge_news_index() == {"deleted": 42, "bodies_cleared": 5}
