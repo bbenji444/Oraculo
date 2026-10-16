@@ -43,3 +43,31 @@ class InvalidRequestError(DomainError):
     """
 
     code = "invalid_request"
+
+
+class ConflictError(DomainError):
+    """La petición choca con lo que ya existe (por ejemplo, un nombre repetido)."""
+
+    code = "conflict"
+
+
+class ConceptNotFoundError(NotFoundError):
+    """No existe el concepto pedido (o fue borrado)."""
+
+    code = "concept_not_found"
+
+
+class ConceptNameTakenError(ConflictError):
+    """Ya hay otro concepto con ese nombre (sin importar mayúsculas ni acentos)."""
+
+    code = "concept_name_taken"
+
+
+class ConceptValidationError(InvalidRequestError):
+    """El concepto no cumple sus reglas.
+
+    ``details["problemas"]`` lista cada problema con el campo al que
+    pertenece, para que la interfaz lo muestre junto al campo correcto.
+    """
+
+    code = "invalid_concept"
