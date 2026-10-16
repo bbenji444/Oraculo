@@ -9,8 +9,9 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// Puerto de uvicorn definido en scripts/dev/servicios.sh.
+// Puertos de uvicorn y nginx definidos en scripts/dev/servicios.sh.
 const API_DEV_TARGET = 'http://localhost:8000';
+const NGINX_DEV_TARGET = 'http://localhost:8080';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -19,6 +20,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': { target: API_DEV_TARGET, changeOrigin: false },
+      // Teselas, fuentes y sprite: los sirve nginx con soporte de Range.
+      '/tiles': { target: NGINX_DEV_TARGET, changeOrigin: false },
     },
   },
   test: {

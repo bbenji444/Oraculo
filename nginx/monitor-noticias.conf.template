@@ -58,6 +58,23 @@ server {
         # en caché para siempre porque cambian de nombre al cambiar.
         include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
+
+        # El worker de MapLibre v6 es un módulo .mjs, y la tabla de tipos de
+        # nginx no conoce esa extensión: lo enviaba como octet-stream y el
+        # navegador lo rechazaba ("non-JavaScript MIME type").
+        location ~ \.mjs$ {
+            types { }
+            default_type text/javascript;
+            include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+        }
+    }
+
+    location = /index.html {
+        # Sin caché: así el navegador siempre ve qué archivos con hash cargar
+        # tras una actualización, en lugar de seguir con la versión vieja.
+        include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
+        add_header Cache-Control "no-cache" always;
     }
 
     location / {
