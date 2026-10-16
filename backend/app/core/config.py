@@ -31,6 +31,9 @@ _DEFAULT_POSTGRES_PORT = 5432
 # basura de un archivo que Python y `head` leían bien (ADR-0008).
 _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geodata"
 
+# Nombre del usuario de desarrollo en la bitácora de auditoría.
+_DEFAULT_DEV_USER = "desarrollo"
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
 APP_VERSION = "0.1.0"
@@ -65,6 +68,10 @@ class Settings(BaseSettings):
     health_check_timeout_seconds: float = Field(default=_DEFAULT_HEALTH_TIMEOUT_SECONDS, gt=0)
 
     geodata_work_dir: Path = _DEFAULT_GEODATA_WORK_DIR
+
+    # Usuario fijo que firma los cambios en la bitácora hasta que F8 agregue
+    # autenticación (especificación §16).
+    dev_user: str = Field(default=_DEFAULT_DEV_USER, min_length=1)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.
