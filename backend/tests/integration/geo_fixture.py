@@ -36,6 +36,7 @@ def fixture_inputs() -> LoadInputs:
         locality_points=layer("inegi_lpr", "00lpr.geojson", is_point=True),
         locality_polygons=layer("inegi_l", "00l.geojson"),
         aliases_csv=FIXTURES / "aliases.csv",
+        search_terms_csv=FIXTURES / "search_terms.csv",
         inegi_source=INEGI_SOURCE,
         natural_earth_source=NE_SOURCE,
     )

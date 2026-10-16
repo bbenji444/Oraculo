@@ -35,6 +35,7 @@ from app.geodata.fuentes import (
     NATURAL_EARTH_COUNTRIES,
     NATURAL_EARTH_LAYER,
     NATURAL_EARTH_WORK_SUBDIR,
+    SEARCH_TERMS_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ def build_inputs(inspection: dict[str, Any], work_dir: Path) -> LoadInputs:
         locality_points=layer("00lpr", "inegi_lpr", is_point=True),
         locality_polygons=layer("00l", "inegi_l"),
         aliases_csv=ALIASES_PATH,
+        search_terms_csv=SEARCH_TERMS_PATH,
         inegi_source=f"INEGI Marco Geoestadístico, edición {INEGI_MG.edition}",
         natural_earth_source=f"Natural Earth 1:10m, {NATURAL_EARTH_COUNTRIES.edition}",
     )
@@ -145,6 +147,8 @@ def report(summary: LoadSummary, seconds: float) -> None:
         if repaired:
             logger.warning(f"{table}: {repaired:,} geometrías inválidas reparadas con ST_MakeValid")
     logger.info(f"Alias aplicados: {summary.aliases}")
+    logger.info(f"Regiones con términos de búsqueda: {summary.search_terms}")
+    logger.info(f"Países con códigos para los proveedores: {summary.country_codes}")
 
 
 def main(argv: Sequence[str] | None = None) -> None:

@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.3 · Octubre 2026 · Responsable: Benji
+Versión 1.4 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -260,7 +260,9 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `parent_id` FK → regions
 - `country_code` (`MEX`, `COL`...)
 - `name` (original, con acentos) y `name_norm` (para comparar)
-- `aliases` text[] (variantes como se escriben en medios: `CDMX`, `Neza`, `Edomex`) y `aliases_norm` text[] (las mismas, normalizadas como `name_norm`). Las usan `build_queries` (sección 7.2) y el resolutor geográfico (sección 11).
+- `aliases` text[] (variantes como se escriben en medios: `CDMX`, `Neza`, `Edomex`) y `aliases_norm` text[] (las mismas, normalizadas como `name_norm`). Las usa el resolutor geográfico (sección 11).
+- `search_terms` text[] (términos con que se busca el lugar en los proveedores; si está vacío se usa `name`). Los usa `build_queries` (sección 7.2, ADR-0009).
+- `iso_a2` y `fips_code` (solo países): códigos que piden los proveedores para filtrar por país (ADR-0009).
 - `display_prefix` (`Alcaldía`, `Municipio`, `Estado`...)
 - `geom` geometry(MultiPolygon, 4326), nulo en localidades sin polígono
 - `centroid` geometry(Point, 4326)
@@ -272,13 +274,14 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 
 **`concepts`**
 - `id`
-- `name` (único)
+- `name` y `name_norm` (único entre los no borrados, sin importar mayúsculas ni acentos)
 - `description`
 - `keywords` text[]
 - `exclude_terms` text[]
 - `color` (hex)
 - `is_active`
 - `created_by`
+- `deleted_at` (borrado lógico)
 
 **`searches`**
 - `id` uuid
@@ -357,8 +360,9 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 **`audit_log`**
 - `id`
 - `user_id`
-- `action`
-- `payload` jsonb
+- `action` (por ejemplo `concept.created`)
+- `entity_type`, `entity_id`
+- `payload` jsonb (valores antes y después)
 - `ip`
 - `created_at`
 
@@ -396,13 +400,15 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 |---|---|
 | SearchApi (`google_news`) | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa -curso -webinar -diplomado` · país MX · idioma español · filtro de tiempo "última semana" (verificar nombres exactos de parámetros en la documentación) |
 | Google News RSS | La misma consulta + `when:7d` · `hl=es-419&gl=MX&ceid=MX:es-419` |
-| GDELT DOC 2.0 | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa` · `sourcelang:spanish` · `sourcecountry:mexico` · `timespan=7d` · `mode=ArtList` · `format=json` · `maxrecords=250` |
+| GDELT DOC 2.0 | `(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) Iztapalapa -curso -webinar -diplomado sourcelang:spanish sourcecountry:MX` · `timespan=7d` · `mode=ArtList` · `format=json` · `maxrecords=250` |
 
-**Nota sobre GDELT:** `sourcelang:spanish` solo filtra por idioma, así que sin otro filtro entrarían medios de España, Argentina, etc. Por eso se agrega `sourcecountry:<país>`, que filtra por el país del medio. La documentación oficial confirma la sintaxis (nombre del país en inglés sin espacios, o código FIPS de 2 letras) y el máximo de 250 resultados ([GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)), pero no trae el ejemplo de México. `# VERIFICAR:` en F3 que `sourcecountry:mexico` devuelve resultados antes de fijarlo en el adaptador.
+**Nota sobre GDELT:** `sourcelang:spanish` solo filtra por idioma, así que sin otro filtro entrarían medios de España, Argentina, etc. Por eso se agrega `sourcecountry:<país>`, que filtra por el país del medio. La documentación oficial confirma la sintaxis (nombre del país en inglés sin espacios, o código FIPS de 2 letras), que el signo menos excluye palabras y el máximo de 250 resultados ([GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)). Se usa el código FIPS de Natural Earth (`MX`) y, si un país no lo tiene, su nombre en inglés sin espacios (ADR-0009). `# VERIFICAR:` en F3 que `sourcecountry:MX` devuelve resultados.
 
 **Reglas:**
 - **Una consulta por proveedor y concepto.** Las palabras clave se unen con `OR`. Si se excede el límite de longitud del proveedor, se reparten en grupos.
-- **El nombre de la región se usa tal cual se escribe en medios.** Se usa `name` (con acentos). Para CDMX se agregan variantes conocidas (`CDMX`, `Ciudad de México`) en un campo `aliases` de la región.
+- **El nombre de la región se usa tal cual se escribe en medios.** Se usa `search_terms` de la región o, si está vacío, `name` (con acentos). Para CDMX: `("Ciudad de México" OR CDMX)`; para el estado 15, `("Estado de México" OR Edomex)`, nunca "México" solo. La lista curada vive en `geodata/search_terms.csv` (ADR-0009).
+- **Nombres repetidos.** Si un municipio comparte nombre con otro, la consulta exige también su estado (`"Benito Juárez" ("Quintana Roo")`). Las localidades siempre llevan su estado.
+- **Exclusiones** con signo menos en los tres proveedores. Las palabras no pueden contener comillas, paréntesis, dos puntos, guion inicial ni `OR`/`AND` sueltos.
 - **País seleccionado:** no se agrega lugar a la consulta; se usan los filtros de país e idioma del proveedor.
 - **Presupuesto:** máximo de consultas por búsqueda configurable (`MAX_QUERIES_PER_SEARCH`, por defecto 10). La UI muestra la estimación antes de ejecutar.
 - **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos.
@@ -595,6 +601,7 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | GET | `/regions/search?q=izta` | Búsqueda difusa por nombre |
 | GET | `/regions/at?lon=&lat=&level=` | Región en un punto |
 | GET/POST/PATCH/DELETE | `/concepts` | CRUD (DELETE es borrado lógico si el concepto tiene búsquedas) |
+| POST | `/concepts/preview?region_id=&days=` | Lo mismo con un concepto sin guardar (en el cuerpo), para "Probar concepto" antes de guardar (H2) |
 | POST | `/concepts/{id}/preview?region_id=&days=` | Consultas que se generarían, sin gastar créditos |
 | POST | `/searches/estimate` | Estimación de consultas y créditos |
 | POST | `/searches` | Crea búsqueda → `202 {search_id}` |
@@ -817,6 +824,10 @@ ADRs de la Fase 1:
 7. **ADR-0007** — MapLibre GL JS v6 en lugar de v5.
 8. **ADR-0008** — Fuentes y procesamiento de geodatos (edición INEGI, geometría de México, punto representativo, nombres y códigos de países).
 
+ADR de la Fase 2:
+
+9. **ADR-0009** — Construcción de consultas a los proveedores (dialectos, términos de búsqueda de cada lugar, nombres repetidos, códigos de país).
+
 ---
 
 ## 19. Riesgos y preguntas abiertas
@@ -842,3 +853,4 @@ ADRs de la Fase 1:
 | 1.1 | 15 de octubre de 2026 | Campo `aliases`/`aliases_norm` en `regions`; filtro `sourcecountry` en GDELT y ventana de 3 meses; nota sobre los links de Google News RSS; riesgos de versiones del frontend. |
 | 1.2 | 15 de octubre de 2026 | Entorno de desarrollo sin Docker (ADR-0006): cambian la estructura del repositorio, las tareas de F0 y el riesgo de entorno. |
 | 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007), decisiones de geodatos (ADR-0008) y lógica del pipeline en `backend/app/geodata/`. |
+| 1.4 | 16 de octubre de 2026 | Construcción de consultas (ADR-0009): `search_terms` y códigos de país en `regions`, nombres repetidos con su estado, exclusiones también en GDELT; `name_norm` y `deleted_at` en `concepts`; columnas de entidad en `audit_log`; endpoint `POST /concepts/preview`. |

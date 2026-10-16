@@ -2,7 +2,10 @@
 
 from app.application.pagination import NameCursor
 from app.domain.names import normalize_name
+from app.domain.queries import CountryFilter, PlaceFacts
 from app.domain.region import BoundingBox, GeoPoint, Region, RegionLevel, RegionRef
+
+MEXICO_FILTER = CountryFilter("México", "MX", "MX", "Mexico")
 
 
 def make_region(
@@ -56,6 +59,8 @@ class FakeRegionRepository:
         self.last_search: tuple[str, int] | None = None
         self.last_point: tuple[GeoPoint, RegionLevel | None] | None = None
         self.point_result: Region | None = None
+        # Términos curados por clave, como geodata/search_terms.csv.
+        self.search_terms: dict[str, tuple[str, ...]] = {"09": ("Ciudad de México", "CDMX")}
 
     def _page(self, items: list[Region], after: NameCursor | None, limit: int) -> list[Region]:
         ordered = sorted(items, key=lambda r: (r.name_norm, r.id))
@@ -89,6 +94,32 @@ class FakeRegionRepository:
     async def search(self, query_norm: str, limit: int) -> list[Region]:
         self.last_search = (query_norm, limit)
         return [r for r in self.regions.values() if query_norm in r.name_norm][:limit]
+
+    async def place_facts(self, region_id: int) -> PlaceFacts | None:
+        region = self.regions.get(region_id)
+        if region is None:
+            return None
+        state = next(
+            (
+                self.regions[ref.id]
+                for ref in await self.ancestors(region_id)
+                if ref.level is RegionLevel.STATE
+            ),
+            None,
+        )
+        repeated = any(
+            r.id != region.id and r.level is region.level and r.name_norm == region.name_norm
+            for r in self.regions.values()
+        )
+        return PlaceFacts(
+            level=region.level,
+            name=region.name,
+            search_terms=self.search_terms.get(region.code, ()),
+            name_is_repeated=repeated,
+            state_name=state.name if state else None,
+            state_search_terms=self.search_terms.get(state.code, ()) if state else (),
+            country=MEXICO_FILTER,
+        )
 
     async def find_at_point(self, point: GeoPoint, level: RegionLevel | None) -> Region | None:
         self.last_point = (point, level)

@@ -91,5 +91,7 @@ NATURAL_EARTH_WORK_SUBDIR = "natural_earth"
 NATURAL_EARTH_LAYER = "ne_10m_admin_0_countries"
 # Lista curada de alias (ADR-0008), versionada en el repositorio.
 ALIASES_PATH = REPO_ROOT / "geodata" / "aliases.csv"
+# Lista curada de términos de búsqueda de cada lugar (ADR-0009).
+SEARCH_TERMS_PATH = REPO_ROOT / "geodata" / "search_terms.csv"
 # Resultado de la inspección (encoding y proyección), que usa el cargador.
 INSPECTION_PATH = RAW_DIR / "inegi" / "INSPECCION.json"

@@ -7,7 +7,10 @@
     "ADM0_A3": "MEX",
     "ISO_A3": "MEX",
     "NAME_ES": "México",
-    "NAME": "Mexico"
+    "NAME": "Mexico",
+    "ISO_A2_EH": "MX",
+    "FIPS_10": "MX",
+    "NAME_EN": "Mexico"
    },
    "geometry": {
     "type": "Polygon",
@@ -43,7 +46,10 @@
     "ADM0_A3": "COL",
     "ISO_A3": "COL",
     "NAME_ES": "Colombia",
-    "NAME": "Colombia"
+    "NAME": "Colombia",
+    "ISO_A2_EH": "CO",
+    "FIPS_10": "CO",
+    "NAME_EN": "Colombia"
    },
    "geometry": {
     "type": "Polygon",
@@ -79,7 +85,10 @@
     "ADM0_A3": "FRA",
     "ISO_A3": "-99",
     "NAME_ES": "Francia",
-    "NAME": "France"
+    "NAME": "France",
+    "ISO_A2_EH": "FR",
+    "FIPS_10": "-99",
+    "NAME_EN": "France"
    },
    "geometry": {
     "type": "Polygon",

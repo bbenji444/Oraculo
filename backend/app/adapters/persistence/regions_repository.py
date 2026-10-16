@@ -21,6 +21,7 @@ from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.pagination import NameCursor
+from app.domain.queries import CountryFilter, PlaceFacts
 from app.domain.region import BoundingBox, GeoPoint, Region, RegionLevel, RegionRef
 
 # Columnas que arman una Region. La geometría completa nunca se lee aquí.
@@ -34,6 +35,8 @@ _LEVEL_DEPTH = (
     "array_position(ARRAY['country', 'state', 'municipality', 'locality']::region_level[], r.level)"
 )
 _AFTER = "AND (CAST(:after_name AS text) IS NULL OR (r.name_norm, r.id) > (:after_name, :after_id))"
+# Clave INEGI de estado: los 2 primeros dígitos de cualquier clave (ADR-0002).
+_STATE_CODE_LENGTH = 2
 
 
 def _escape_like(value: str) -> str:
@@ -162,6 +165,50 @@ class PostgresRegionRepository:
                 "contains": f"%{escaped}%",
                 "limit": limit,
             },
+        )
+
+    async def place_facts(self, region_id: int) -> PlaceFacts | None:
+        """Ver ``RegionRepositoryPort.place_facts``.
+
+        El estado se encuentra por el prefijo de la clave INEGI (ADR-0002) y
+        el país por ``country_code``. "Nombre repetido" usa el índice
+        (``level``, ``name_norm``, ``id``).
+        """
+        sql = f"""
+            SELECT r.level::text AS level, r.name, r.search_terms,
+                   EXISTS (
+                       SELECT 1 FROM regions o
+                       WHERE o.level = r.level AND o.name_norm = r.name_norm
+                         AND o.country_code = r.country_code AND o.id <> r.id
+                   ) AS repeated,
+                   s.name AS state_name, s.search_terms AS state_terms,
+                   c.name AS country_name, c.iso_a2, c.fips_code,
+                   COALESCE(c.name_en, c.name) AS country_name_en
+            FROM regions r
+            LEFT JOIN regions s
+                   ON r.level IN ('municipality', 'locality') AND s.level = 'state'
+                  AND s.code = left(r.code, {_STATE_CODE_LENGTH})
+                  AND s.country_code = r.country_code
+            JOIN regions c ON c.level = 'country' AND c.code = r.country_code
+            WHERE r.id = :id
+        """  # noqa: S608 — fragmentos SQL constantes del módulo
+        async with self._engine.connect() as conn:
+            row = (await conn.execute(text(sql), {"id": region_id})).mappings().one_or_none()
+        if row is None:
+            return None
+        return PlaceFacts(
+            level=RegionLevel(row["level"]),
+            name=row["name"],
+            search_terms=tuple(row["search_terms"]),
+            name_is_repeated=row["repeated"],
+            state_name=row["state_name"],
+            state_search_terms=tuple(row["state_terms"] or ()),
+            country=CountryFilter(
+                name=row["country_name"],
+                iso_a2=row["iso_a2"],
+                fips_code=row["fips_code"],
+                name_en=row["country_name_en"],
+            ),
         )
 
     async def find_at_point(self, point: GeoPoint, level: RegionLevel | None) -> Region | None:

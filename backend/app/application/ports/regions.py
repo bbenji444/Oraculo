@@ -10,6 +10,7 @@ No hace: no modifica el catálogo (eso lo hace el pipeline de geodatos).
 from typing import Protocol
 
 from app.application.pagination import NameCursor
+from app.domain.queries import PlaceFacts
 from app.domain.region import GeoPoint, Region, RegionLevel, RegionRef
 
 
@@ -77,6 +78,18 @@ class RegionRepositoryPort(Protocol):
 
         Returns:
             Las mejores coincidencias, de la más a la menos relevante.
+        """
+        ...
+
+    async def place_facts(self, region_id: int) -> PlaceFacts | None:
+        """Datos de la región que importan para armar consultas (ADR-0009).
+
+        Args:
+            region_id: Identificador.
+
+        Returns:
+            Nombre, términos curados, si el nombre se repite en su nivel,
+            su estado y su país; ``None`` si la región no existe.
         """
         ...
 

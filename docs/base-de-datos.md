@@ -32,12 +32,14 @@ wsl make db-shell
 
 Abre `psql` ya conectado. Para salir: `\q`.
 
-## Qué hay en la base (Fase 1)
+## Qué hay en la base (Fase 2)
 
 | Tabla | Qué guarda |
 |---|---|
 | `regions` | Catálogo geográfico: 258 países, 32 estados, 2,478 municipios y 296,850 localidades. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0003`. |
+| `concepts` | Conceptos de búsqueda ("Ciberseguridad", "Secuestro"...) con sus palabras clave, exclusiones y color. `deleted_at` marca los borrados lógicos. |
+| `audit_log` | Bitácora de auditoría: quién cambió qué y cuándo (por ahora, crear, editar y borrar conceptos). Solo se agregan filas. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0006`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
@@ -50,7 +52,9 @@ Columnas principales de `regions`:
 | `name_norm` | `IZTAPALAPA` | Nombre para comparar: mayúsculas, sin acentos, **con Ñ**. |
 | `display_prefix` | `Alcaldía` | Para mostrar "Alcaldía Iztapalapa". |
 | `parent_id` | (id de CDMX) | Región que la contiene. |
-| `aliases` | `{CDMX,DF}` | Otros nombres (lista curada en `geodata/aliases.csv`). |
+| `aliases` | `{CDMX,DF}` | Otros nombres con que se reconoce el lugar en una nota (lista curada en `geodata/aliases.csv`). |
+| `search_terms` | `{"Ciudad de México",CDMX}` | Con qué palabras se busca el lugar en los proveedores de noticias; vacío = se usa `name` (`geodata/search_terms.csv`, ADR-0009). |
+| `iso_a2`, `fips_code`, `name_en` | `ES`, `SP`, `Spain` | Solo países: códigos para filtrar por país en cada proveedor (ADR-0009). |
 | `geom` | (polígono) | Forma completa. Vacía en localidades rurales que solo tienen punto. |
 | `centroid` | (punto) | Punto representativo, siempre dentro de la forma. |
 | `bbox` | `{-99.14,19.28,-98.96,19.40}` | Rectángulo [oeste, sur, este, norte]. |
@@ -89,6 +93,22 @@ SELECT name, level FROM cadena;
 -- Exportar municipios de un estado con su forma como GeoJSON
 SELECT code, name, ST_AsGeoJSON(geom) FROM regions
 WHERE level = 'municipality' AND code LIKE '10%';
+
+-- Conceptos vigentes (sin los borrados) con cuántas palabras clave tienen
+SELECT id, name, is_active, cardinality(keywords) AS palabras, color
+FROM concepts
+WHERE deleted_at IS NULL
+ORDER BY name_norm;
+
+-- Bitácora: los últimos 20 cambios, con qué campos cambiaron
+SELECT created_at AT TIME ZONE 'America/Mexico_City' AS cuando, user_id, action,
+       entity_id, payload->'changed' AS campos, host(ip) AS ip
+FROM audit_log
+ORDER BY id DESC
+LIMIT 20;
+
+-- Con qué palabras se busca cada lugar (vacío = su nombre oficial)
+SELECT code, name, search_terms FROM regions WHERE cardinality(search_terms) > 0;
 ```
 
 > Consejo: compara siempre con `name_norm` (y escribe la búsqueda en mayúsculas sin acentos), no con `name`. Así "Peñón" y "PEÑON" coinciden, pero "Penon" no.

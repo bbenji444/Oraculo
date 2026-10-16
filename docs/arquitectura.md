@@ -56,6 +56,19 @@ Protomaps (OSM) ── pmtiles extract ───► geodata/output/basemap_*.pmt
 - **GDAL nunca lee de `/mnt/d`:** en WSL recibió bytes dañados. Todo se procesa en el disco de Linux y a `D:` solo se copian resultados verificados.
 - **El navegador nunca baja GeoJSON pesados:** las formas llegan por PMTiles; la API solo entrega punto y rectángulo.
 
+## Conceptos y consultas (Fase 2)
+
+```
+Pantalla "Conceptos" ──► /api/v1/concepts ──► casos de uso ──► concepts + audit_log (una transacción)
+                                    │
+             "Probar concepto" ─────┘──► place_for(región) + build_queries ──► texto exacto por proveedor
+                                                                                (sin llamar a nadie)
+```
+
+- **Reglas del concepto en el dominio** (`app/domain/concept.py`): nombre único sin importar mayúsculas ni acentos, palabras sin repetir y sin caracteres que los buscadores tomen como órdenes. La API solo traduce sus errores (422 por campo, 409 por nombre repetido).
+- **Consultas** ([ADR-0009](adr/0009-construccion-de-consultas.md)): el dominio arma el texto con un dialecto por proveedor (`query_dialects.py`); los adaptadores de F3 traducirán país, idioma y fechas a los parámetros de cada API. Cada lugar se busca por sus `search_terms` curados o por su nombre, y un municipio con nombre repetido lleva su estado.
+- **Bitácora:** cada cambio a un concepto queda en `audit_log` con usuario, IP, antes y después.
+
 ## Frontend
 
 React 18 + TypeScript. Las llamadas HTTP viven en `src/services/`, los datos del servidor se administran con TanStack Query (`src/hooks/`) y los componentes solo muestran.
