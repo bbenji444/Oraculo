@@ -4,6 +4,7 @@ import logging
 
 import pytest
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.adapters.providers.factory import build_provider
 from app.core.config import Settings
@@ -55,3 +56,17 @@ def test_searchapi_con_llave_y_gdelt_habilitado_estan_configurados() -> None:
 def test_gdelt_esta_desactivado_por_defecto() -> None:
     assert Settings.model_fields["gdelt_enabled"].default is False
     assert build_provider(Provider.GDELT, settings()).is_configured() is False
+
+
+def test_el_indice_local_necesita_la_base() -> None:
+    with pytest.raises(ValueError, match="engine"):
+        build_provider(Provider.LOCAL_INDEX, settings())
+
+
+def test_el_indice_local_siempre_esta_disponible_y_es_gratis() -> None:
+    engine = create_async_engine("postgresql+psycopg://x@localhost/no_se_conecta")
+
+    provider = build_provider(Provider.LOCAL_INDEX, settings(), engine)
+
+    assert provider.provider is Provider.LOCAL_INDEX
+    assert provider.is_configured() is True

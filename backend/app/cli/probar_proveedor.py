@@ -77,6 +77,8 @@ NOT_CONFIGURED = {
     Provider.SEARCHAPI: "SearchApi no está configurado: falta SEARCHAPI_API_KEY en .env.",
     Provider.GOOGLE_NEWS_RSS: DISABLED_MESSAGE,
     Provider.GDELT: GDELT_DISABLED_MESSAGE,
+    # El índice local siempre está disponible; se deja por completitud.
+    Provider.LOCAL_INDEX: "El índice local no está disponible.",
 }
 
 
@@ -388,12 +390,12 @@ async def run(args: argparse.Namespace, settings: Settings, ask: Callable[[str],
     Returns:
         Código de salida: 0 bien, 1 cancelado o con error.
     """
-    provider = build_provider(Provider(args.proveedor), settings)
-    if not provider.is_configured():
-        logger.error(NOT_CONFIGURED[provider.provider])
-        return 1
     engine = create_async_engine(settings.database_url())
     try:
+        provider = build_provider(Provider(args.proveedor), settings, engine)
+        if not provider.is_configured():
+            logger.error(NOT_CONFIGURED[provider.provider])
+            return 1
         plan = await build_plan(
             provider=provider,
             concepts=PostgresConceptRepository(engine),

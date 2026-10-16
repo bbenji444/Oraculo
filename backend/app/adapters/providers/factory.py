@@ -8,9 +8,12 @@ No hace: no decide qué proveedores usar en una búsqueda.
 
 import logging
 
+from sqlalchemy.ext.asyncio import AsyncEngine
+
 from app.adapters.providers.gdelt import GdeltProvider
 from app.adapters.providers.google_news_rss import GoogleNewsRssProvider
 from app.adapters.providers.http import ProviderHttpClient
+from app.adapters.providers.local_index import LocalIndexProvider
 from app.adapters.providers.searchapi import SearchApiProvider
 from app.application.ports.providers import NewsProviderPort
 from app.core.config import Settings
@@ -43,17 +46,27 @@ def build_gdelt(settings: Settings, *, enabled: bool) -> GdeltProvider:
     )
 
 
-def build_provider(provider: Provider, settings: Settings) -> NewsProviderPort:
+def build_provider(
+    provider: Provider, settings: Settings, engine: AsyncEngine | None = None
+) -> NewsProviderPort:
     """Crea el adaptador de un proveedor.
 
     Args:
         provider: Proveedor.
         settings: Configuración de la aplicación.
+        engine: Conexión a la base; la necesita el índice local.
 
     Returns:
         El adaptador listo para consultar. SearchApi sin llave devuelve un
         adaptador que responde ``is_configured() == False``.
+
+    Raises:
+        ValueError: Si se pide el índice local sin ``engine``.
     """
+    if provider is Provider.LOCAL_INDEX:
+        if engine is None:
+            raise ValueError("El índice local necesita la conexión a la base (engine).")
+        return LocalIndexProvider(engine)
     if provider is Provider.GDELT:
         return build_gdelt(settings, enabled=settings.gdelt_enabled)
     if provider is Provider.GOOGLE_NEWS_RSS:

@@ -40,6 +40,9 @@ class Provider(StrEnum):
     SEARCHAPI = "searchapi"
     GOOGLE_NEWS_RSS = "google_news_rss"
     GDELT = "gdelt"
+    # Índice propio que llena la ingesta periódica (ADR-0013): GDELT por
+    # archivos y RSS de medios. Gratis y sin límite de consultas.
+    LOCAL_INDEX = "indice_local"
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +167,9 @@ class PlaceFacts:
             estados).
         state_search_terms: Términos curados de ese estado.
         country: País de la región.
+        state_code: Clave INEGI del estado: la propia si la región es un
+            estado, la de su estado si es municipio o localidad, ``None`` en
+            un país.
     """
 
     level: RegionLevel
@@ -173,6 +179,7 @@ class PlaceFacts:
     state_name: str | None
     state_search_terms: tuple[str, ...]
     country: CountryFilter
+    state_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,11 +191,16 @@ class QueryPlace:
         required_terms: Palabras del estado que también deben aparecer, para
             distinguir nombres repetidos. Vacío si no hace falta.
         country: País por el que filtran los proveedores.
+        state_code: Clave INEGI si el lugar **es** un estado; ``None`` en
+            otros niveles. El índice local la usa para aceptar notas que
+            GDELT ubicó en ese estado aunque el texto no lo nombre
+            (ADR-0013). En un municipio no se usa: traería todo su estado.
     """
 
     terms: tuple[str, ...]
     required_terms: tuple[str, ...]
     country: CountryFilter
+    state_code: str | None = None
 
 
 def place_for(facts: PlaceFacts) -> QueryPlace:
@@ -213,7 +225,8 @@ def place_for(facts: PlaceFacts) -> QueryPlace:
     required: tuple[str, ...] = ()
     if needs_state and facts.state_name is not None:
         required = facts.state_search_terms or (facts.state_name,)
-    return QueryPlace(terms, required, facts.country)
+    state_code = facts.state_code if facts.level is RegionLevel.STATE else None
+    return QueryPlace(terms, required, facts.country, state_code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +242,11 @@ class PlannedQuery:
         language: Idioma (``es``).
         window: Rango de fechas.
         estimated_credits: Créditos que se espera gastar.
+        exclude_terms: Exclusiones del concepto, por separado del texto: el
+            índice local las evalúa una por una (ADR-0013).
+        place: Lugar ya resuelto, por la misma razón. ``None`` solo en
+            consultas armadas a mano (diagnóstico): equivale a no filtrar
+            por lugar.
     """
 
     provider: Provider
@@ -238,3 +256,5 @@ class PlannedQuery:
     language: str
     window: DateWindow
     estimated_credits: int
+    exclude_terms: tuple[str, ...] = ()
+    place: QueryPlace | None = None

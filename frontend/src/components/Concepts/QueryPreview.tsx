@@ -29,6 +29,7 @@ const PROVIDER_STYLE: Record<PlannedQuery['provider'], string> = {
   searchapi: 'bg-sky-500/15 text-sky-200 ring-sky-500/30',
   google_news_rss: 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30',
   gdelt: 'bg-violet-500/15 text-violet-200 ring-violet-500/30',
+  indice_local: 'bg-amber-500/15 text-amber-200 ring-amber-500/30',
 };
 
 function QueryCard({ query }: { query: PlannedQuery }) {

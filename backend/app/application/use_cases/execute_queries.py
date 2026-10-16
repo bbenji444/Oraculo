@@ -8,7 +8,8 @@ Recibe las consultas ya planeadas (``build_queries``) y, para cada una:
    está desactivado (Google News RSS, ADR-0011; GDELT, ADR-0012), la
    consulta se registra como ``skipped`` con el motivo.
 3. **Caché.** Una consulta idéntica reciente se responde desde la caché: no
-   se envía ni cuesta créditos.
+   se envía ni cuesta créditos. El índice local no usa caché: cambia cada
+   15 minutos y consultarlo es gratis (ADR-0013).
 4. **Tope mensual.** Si una consulta de pago haría pasar el tope de
    créditos del mes, se salta.
 5. **Envío y registro.** Cada consulta queda en ``provider_queries``.
@@ -40,6 +41,7 @@ from app.domain.articles import RawArticle
 from app.domain.budget import MonthlyCredits, check_query_count, month_start
 from app.domain.errors import ProviderError
 from app.domain.queries import PlannedQuery, Provider
+from app.domain.query_dialects import DIALECTS
 
 _MS_PER_SECOND = 1000
 _SECONDS_PER_HOUR = 3600
@@ -218,7 +220,8 @@ class ExecuteQueries:
             return await self._record(outcome, {}, search_id, started=started)
         params = provider.request_params(query)
         key = cache_key(query.provider.value, query.text, params)
-        cached = await self._cache.get(key)
+        cacheable = DIALECTS[query.provider].cacheable
+        cached = await self._cache.get(key) if cacheable else None
         if cached is not None:
             outcome = QueryOutcome(query, "ok", cached, from_cache=True)
             return await self._record(outcome, params, search_id, started=started)
@@ -245,7 +248,8 @@ class ExecuteQueries:
                 outcome, params, search_id, started=started, http_status=error.http_status
             )
         ttl = int(self._limits.cache_ttl_hours * _SECONDS_PER_HOUR)
-        await self._cache.set(key, response.articles, ttl)
+        if cacheable:
+            await self._cache.set(key, response.articles, ttl)
         outcome = QueryOutcome(query, "ok", response.articles, credits=cost)
         return await self._record(
             outcome,

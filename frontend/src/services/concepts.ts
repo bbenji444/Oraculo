@@ -38,7 +38,7 @@ export interface ConceptInput {
 /** Campos que cambian en una edición; los que faltan no cambian. */
 export type ConceptPatch = Partial<ConceptInput>;
 
-export type Provider = 'searchapi' | 'google_news_rss' | 'gdelt';
+export type Provider = 'searchapi' | 'google_news_rss' | 'gdelt' | 'indice_local';
 
 export interface PlannedQuery {
   provider: Provider;

@@ -153,6 +153,8 @@ def test_vista_previa_del_caso_de_la_especificacion(client: TestClient, engine: 
         base,
         f"{base} when:7d",
         f"{base} sourcelang:spanish sourcecountry:MX",
+        'contiene: ciberataque, hackeo, ransomware, "filtración de datos" o phishing'
+        " · lugar: Iztapalapa · sin: curso, webinar o diplomado",
     ]
     assert body["region"]["breadcrumb"] == "México › Ciudad de México › Iztapalapa"
 

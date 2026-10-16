@@ -190,6 +190,7 @@ class PostgresRegionRepository:
                          AND o.country_code = r.country_code AND o.id <> r.id
                    ) AS repeated,
                    s.name AS state_name, s.search_terms AS state_terms,
+                   CASE WHEN r.level = 'state' THEN r.code ELSE s.code END AS state_code,
                    c.name AS country_name, c.iso_a2, c.fips_code,
                    COALESCE(c.name_en, c.name) AS country_name_en
             FROM regions r
@@ -211,6 +212,7 @@ class PostgresRegionRepository:
             name_is_repeated=row["repeated"],
             state_name=row["state_name"],
             state_search_terms=tuple(row["state_terms"] or ()),
+            state_code=row["state_code"],
             country=CountryFilter(
                 name=row["country_name"],
                 iso_a2=row["iso_a2"],

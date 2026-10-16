@@ -15,7 +15,7 @@ from app.domain.queries import (
     place_for,
 )
 from app.domain.query_builder import build_queries
-from app.domain.query_dialects import GOOGLE_MAX_WORDS, gdelt_country
+from app.domain.query_dialects import DIALECTS, GOOGLE_MAX_WORDS, gdelt_country
 from app.domain.region import RegionLevel
 
 TODAY = date(2026, 10, 16)
@@ -85,7 +85,7 @@ def test_una_consulta_por_proveedor_con_pais_idioma_fechas_y_creditos() -> None:
     assert {q.language for q in queries} == {"es"}
     assert {q.country for q in queries} == {MEXICO}
     assert {q.window for q in queries} == {WEEK}
-    assert [q.estimated_credits for q in queries] == [1, 0, 0]
+    assert [q.estimated_credits for q in queries] == [1, 0, 0, 0]
     assert queries[0].keywords == CIBERSEGURIDAD.keywords
 
 
@@ -283,3 +283,47 @@ def test_un_momento_cae_o_no_dentro_del_rango_en_hora_local() -> None:
     assert window.contains(datetime(2026, 10, 15, 3, 0, tzinfo=UTC), mexico)
     assert not window.contains(datetime(2026, 10, 15, 7, 0, tzinfo=UTC), mexico)
     assert not window.contains(datetime(2026, 10, 7, 23, 0, tzinfo=mexico), mexico)
+
+
+# --- Índice local (ADR-0013) ---
+
+
+def test_indice_local_se_describe_en_palabras() -> None:
+    assert texts(IZTAPALAPA)[Provider.LOCAL_INDEX] == [
+        'contiene: ciberataque, hackeo, ransomware, "filtración de datos" o phishing'
+        " · lugar: Iztapalapa · sin: curso, webinar o diplomado"
+    ]
+
+
+def test_indice_local_con_estado_requerido_pista_de_gdelt_y_pais() -> None:
+    juarez = place_for(
+        facts(RegionLevel.MUNICIPALITY, "Benito Juárez", repeated=True, state="Quintana Roo")
+    )
+    jalisco = place_for(PlaceFacts(RegionLevel.STATE, "Jalisco", (), False, None, (), MEXICO, "14"))
+    mexico = place_for(facts(RegionLevel.COUNTRY, "México"))
+
+    assert 'lugar: "Benito Juárez" (y "Quintana Roo") ·' in texts(juarez)[Provider.LOCAL_INDEX][0]
+    assert (
+        "lugar: Jalisco, o GDELT la ubicó en el estado 14"
+        in texts(jalisco)[Provider.LOCAL_INDEX][0]
+    )
+    assert "lugar: México" in texts(mexico)[Provider.LOCAL_INDEX][0]
+
+
+def test_las_consultas_llevan_exclusiones_y_lugar_aparte() -> None:
+    [query] = build_queries(CIBERSEGURIDAD, IZTAPALAPA, WEEK, [Provider.LOCAL_INDEX])
+
+    assert query.exclude_terms == CIBERSEGURIDAD.exclude_terms
+    assert query.place == IZTAPALAPA
+    assert DIALECTS[Provider.LOCAL_INDEX].cacheable is False
+    assert DIALECTS[Provider.SEARCHAPI].cacheable is True
+
+
+def test_solo_un_estado_lleva_su_clave_para_la_pista_de_gdelt() -> None:
+    municipio = PlaceFacts(
+        RegionLevel.MUNICIPALITY, "Iztapalapa", (), False, "CDMX", (), MEXICO, "09"
+    )
+    estado = PlaceFacts(RegionLevel.STATE, "Ciudad de México", (), False, None, (), MEXICO, "09")
+
+    assert place_for(municipio).state_code is None
+    assert place_for(estado).state_code == "09"

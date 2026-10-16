@@ -238,6 +238,7 @@ async def test_datos_de_una_alcaldia_unica(test_engine: AsyncEngine, sync_engine
         ("Ciudad de México", "CDMX"),
     )
     assert facts.country == CountryFilter("México", "MX", "MX", "Mexico")
+    assert facts.state_code == "09"
 
 
 async def test_nombre_repetido_en_otro_estado(
@@ -256,6 +257,8 @@ async def test_estado_con_terminos_curados_y_sin_estado_padre(
     assert facts is not None
     assert facts.search_terms == ("Estado de México", "Edomex")
     assert facts.state_name is None
+    # Un estado lleva su propia clave (pista de GDELT del índice local).
+    assert facts.state_code == "15"
 
 
 async def test_pais_sin_fips_conserva_su_nombre_en_ingles(
@@ -265,6 +268,7 @@ async def test_pais_sin_fips_conserva_su_nombre_en_ingles(
 
     assert facts is not None
     assert facts.country == CountryFilter("Francia", "FR", None, "France")
+    assert facts.state_code is None
 
 
 async def test_region_inexistente(test_engine: AsyncEngine) -> None:

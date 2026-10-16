@@ -464,7 +464,7 @@ Cada adaptador debe:
 Lo ejecuta el worker. Cada etapa actualiza `searches.progress` para que la UI muestre avance real.
 
 1. **Planear.** `build_queries` por cada concepto × proveedor. Se guardan en `provider_queries`.
-2. **Consultar.** En paralelo, con límite de concurrencia por proveedor. Primero se revisa la caché. Incluye el índice local (ADR-0013), que responde al instante con lo que la ingesta periódica ya juntó.
+2. **Consultar.** En paralelo, con límite de concurrencia por proveedor. Primero se revisa la caché. Incluye el índice local (ADR-0013), que responde al instante con lo que la ingesta periódica ya juntó y no pasa por la caché (cambia cada 15 minutos).
 3. **Normalizar y deduplicar.**
    - URL canónica: resolver redirecciones, quitar parámetros de rastreo (`utm_*`, `fbclid`...), normalizar dominio.
    - Duplicado exacto: misma URL canónica.

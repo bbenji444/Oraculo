@@ -237,3 +237,17 @@ async def test_sin_cache_configurada_no_guarda() -> None:
 
     assert gdelt.calls == 2
     assert cache.store == {}
+
+
+async def test_el_indice_local_nunca_usa_la_cache() -> None:
+    # El índice cambia cada 15 minutos (ADR-0013): repetir la búsqueda debe
+    # ver las notas nuevas, y consultarlo no cuesta nada.
+    local = FakeProvider(Provider.LOCAL_INDEX)
+    execute, cache, log = use_case(local)
+
+    await execute.execute([planned(Provider.LOCAL_INDEX)])
+    await execute.execute([planned(Provider.LOCAL_INDEX)])
+
+    assert local.calls == 2
+    assert (cache.store, cache.ttls) == ({}, [])
+    assert [r.from_cache for r in log.records] == [False, False]

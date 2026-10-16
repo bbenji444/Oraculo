@@ -121,6 +121,9 @@ class FakeRegionRepository:
             name_is_repeated=repeated,
             state_name=state.name if state else None,
             state_search_terms=self.search_terms.get(state.code, ()) if state else (),
+            state_code=region.code
+            if region.level is RegionLevel.STATE
+            else (state.code if state else None),
             country=MEXICO_FILTER,
         )
 
