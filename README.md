@@ -136,6 +136,20 @@ Direcciones útiles con el sistema arriba:
 
 **Cómo funciona el índice local.** Es como una hemeroteca propia: cada 15 minutos el reloj de Celery baja el archivo más reciente de GDELT, se queda con las notas en español que mencionan México y guarda solo título, fragmento, medio, fecha y link (nunca el artículo completo). Al buscar, una nota responde si contiene alguna palabra clave **completa** (sin acentos, conservando la Ñ), ninguna exclusión y el lugar en su texto; si la región es un estado, también cuenta que GDELT la haya ubicado ahí. Ojo: "hackeo" no encuentra "hackeos"; pon las dos formas en el concepto si importan. Las ubicaciones de GDELT tienen errores, así que son solo pistas.
 
+**Notas de días anteriores.** El índice solo tiene notas desde que `make up` empezó a correr. Para traer días previos de GDELT, primero mira la vista previa: pide a GDELT solo el tamaño de cada archivo (sin bajarlo) y baja **un** archivo de muestra para enseñar 5 notas reales.
+
+```powershell
+wsl make ingesta-historial DIAS=7
+```
+
+Si te convence el tamaño (7 días ≈ 665 archivos, ~5.2 GB, ~2 horas; medido el 16/10/2026), baja el resto:
+
+```powershell
+wsl make ingesta-historial DIAS=7 DESCARGAR=si
+```
+
+Se puede interrumpir y repetir: lo ya bajado no se vuelve a bajar.
+
 > ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.
 
 Para probar un proveedor con **una** consulta real, que pide confirmación antes de enviarla:

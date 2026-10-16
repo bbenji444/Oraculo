@@ -1,6 +1,7 @@
 """Lectura del GKG translingual de GDELT con un recorte del archivo real (16/10/2026)."""
 
 import hashlib
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 from app.adapters.ingest.gdelt_gkg import (
     GdeltGkgSource,
     GkgFileError,
+    history_urls,
     parse_lastupdate,
     parse_locations,
     parse_rows,
@@ -18,6 +20,7 @@ from app.adapters.ingest.gdelt_gkg import (
 )
 from app.adapters.providers.http import ProviderHttpClient
 from app.application.ports.ingest import GkgFile
+from app.domain.errors import ProviderAuthError
 from app.domain.queries import Provider
 from app.geodata.fips import read_fips_to_inegi
 
@@ -125,3 +128,81 @@ async def test_baja_verifica_y_lee_con_transporte_simulado() -> None:
     assert size == len(zip_bytes())
     assert len(result.items) > 0
     await http.aclose()
+
+
+# --- Historial ---
+
+
+def test_un_dia_son_96_cuartos_de_hora_del_mas_nuevo_al_mas_viejo() -> None:
+    urls = history_urls(datetime(2026, 10, 16, 20, 7, 33, tzinfo=UTC), 1)
+
+    assert len(urls) == 96
+    assert urls[0].endswith("/20261016200000.translation.gkg.csv.zip")
+    assert urls[1].endswith("/20261016194500.translation.gkg.csv.zip")
+    assert urls[-1].endswith("/20261015201500.translation.gkg.csv.zip")
+
+
+def head_source(handler: Callable[[httpx2.Request], httpx2.Response]) -> GdeltGkgSource:
+    http = ProviderHttpClient(
+        Provider.GDELT,
+        timeout_seconds=5,
+        max_attempts=1,
+        max_concurrency=1,
+        transport=httpx2.MockTransport(handler),
+    )
+    return GdeltGkgSource(http, FIPS)
+
+
+# Encabezados reales del HEAD a 20261016221500.translation.gkg.csv.zip
+# (16/10/2026): el ETag de Google Cloud Storage es el MD5 que anuncia GDELT.
+REAL_HEAD = {
+    "content-length": "5295274",
+    "etag": '"506e2180f5f4d20885d1d8a4f1a0bd17"',
+    "content-type": "application/zip",
+}
+URL = "https://data.gdeltproject.org/gdeltv2/20261016221500.translation.gkg.csv.zip"
+
+
+@pytest.mark.anyio
+async def test_mide_un_archivo_con_head_sin_bajarlo() -> None:
+    methods: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        methods.append(request.method)
+        return httpx2.Response(200, headers=REAL_HEAD)
+
+    source = head_source(handler)
+
+    file = await source.describe(URL)
+
+    assert file == GkgFile(URL, 5_295_274, "506e2180f5f4d20885d1d8a4f1a0bd17")
+    assert methods == ["HEAD"]
+    await source.aclose()
+
+
+@pytest.mark.anyio
+async def test_un_cuarto_de_hora_sin_archivo_no_es_error() -> None:
+    source = head_source(lambda request: httpx2.Response(404))
+
+    assert await source.describe(URL) is None
+    await source.aclose()
+
+
+@pytest.mark.anyio
+async def test_sin_md5_en_el_etag_se_rechaza_con_mensaje_claro() -> None:
+    source = head_source(
+        lambda r: httpx2.Response(200, headers={"content-length": "10", "etag": '"x-1"'})
+    )
+
+    with pytest.raises(GkgFileError, match="tamaño y MD5"):
+        await source.describe(URL)
+    await source.aclose()
+
+
+@pytest.mark.anyio
+async def test_otro_error_al_medir_se_propaga() -> None:
+    source = head_source(lambda request: httpx2.Response(403))
+
+    with pytest.raises(ProviderAuthError):
+        await source.describe(URL)
+    await source.aclose()

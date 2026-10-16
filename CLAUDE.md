@@ -269,6 +269,7 @@ make seed            # carga los conceptos semilla que falten (no pisa ediciones
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
 make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
+make ingesta-historial DIAS=7  # mide días anteriores de GDELT y muestra 5 ejemplos; DESCARGAR=si baja todo
 make db-shell        # consola SQL (psql) en la base de desarrollo
 make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```

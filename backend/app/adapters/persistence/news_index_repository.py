@@ -123,9 +123,14 @@ class PostgresIngestRunLog:
             return bool(found.scalar_one())
 
     async def record(self, run: IngestRun) -> int:
-        """Ver ``IngestRunLogPort.record``."""
+        """Ver ``IngestRunLogPort.record``.
+
+        El reloj y el historial pueden terminar el mismo archivo casi a la
+        vez; el segundo "ok" no rompe la llave única, simplemente no se guarda
+        (las notas ya se deduplicaron por URL).
+        """
         async with self._engine.begin() as conn:
-            row_id: int = (
+            row_id: int | None = (
                 await conn.execute(
                     text(
                         """
@@ -135,10 +140,13 @@ class PostgresIngestRunLog:
                         VALUES (:source, :item, :dedupe_key, :status, :bytes_downloaded,
                             :items_seen, :items_kept, :items_new, :error_message,
                             :started_at, :finished_at)
+                        ON CONFLICT (dedupe_key)
+                            WHERE status = 'ok' AND dedupe_key IS NOT NULL
+                            DO NOTHING
                         RETURNING id
                         """
                     ),
                     asdict(run),
                 )
-            ).scalar_one()
-            return row_id
+            ).scalar_one_or_none()
+            return row_id or 0

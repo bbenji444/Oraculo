@@ -1,13 +1,15 @@
 """Ingesta periódica al índice local (ADR-0013).
 
-Tres casos de uso que dispara el reloj de Celery (``celery beat``) y el
-comando ``make ingesta``:
+Casos de uso que disparan el reloj de Celery (``celery beat``) y los
+comandos ``make ingesta`` y ``make ingesta-historial``:
 
 - ``IngestGdeltGkg``: baja el GKG translingual más reciente de GDELT (si no
   se procesó ya) y guarda las notas en español sobre México.
 - ``IngestMediaRss``: lee los RSS de los medios **activos** de la lista
   curada y guarda sus notas.
 - ``PurgeNewsIndex``: borra las notas más viejas que la retención.
+- ``PlanGdeltHistory``: mide los GKG de días anteriores **sin bajarlos**,
+  para pedir permiso antes (los baja ``IngestGdeltGkg.run_file``).
 
 Cada corrida queda en ``ingest_runs``, también si falla: una fuente caída no
 detiene a las demás.
@@ -21,6 +23,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.application.ports.ingest import (
     FeedSourcePort,
+    GkgFile,
     GkgSourcePort,
     IngestRun,
     IngestRunLogPort,
@@ -137,6 +140,19 @@ class IngestGdeltGkg:
             return await _record(
                 self._runs, report, dedupe_key=None, started=started, finished=self._clock()
             )
+        return await self.run_file(file)
+
+    async def run_file(self, file: GkgFile) -> IngestReport:
+        """Procesa un archivo concreto: el más reciente o uno del historial.
+
+        Args:
+            file: Archivo con tamaño y huella para verificarlo.
+
+        Returns:
+            El reporte. Un archivo ya procesado devuelve ``skipped`` sin
+            bajarlo ni registrar nada.
+        """
+        started = self._clock()
         if await self._runs.already_processed(file.url):
             return IngestReport(GDELT_SOURCE, file.name, "skipped", message="Ya procesado.")
         try:
@@ -160,6 +176,79 @@ class IngestGdeltGkg:
         return await _record(
             self._runs, report, dedupe_key=file.url, started=started, finished=self._clock()
         )
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryPlan:
+    """Qué bajaría el historial, antes de bajar nada.
+
+    Attributes:
+        files: Archivos pendientes, del más nuevo al más viejo.
+        already_done: Archivos que ya están en el índice.
+        missing: Cuartos de hora que GDELT no tiene.
+        failed: Archivos que no se pudieron medir, con el motivo.
+    """
+
+    files: tuple[GkgFile, ...]
+    already_done: int
+    missing: int
+    failed: tuple[str, ...]
+
+    @property
+    def total_bytes(self) -> int:
+        """Descarga total de los archivos pendientes."""
+        return sum(file.size for file in self.files)
+
+
+Progress = Callable[[int, int], None]
+
+
+def _no_progress(done: int, total: int) -> None:
+    return None
+
+
+class PlanGdeltHistory:
+    """Mide el historial de GDELT sin bajarlo, para pedir permiso antes (CLAUDE.md §2.6)."""
+
+    def __init__(self, source: GkgSourcePort, runs: IngestRunLogPort) -> None:
+        """Recibe la fuente y el registro.
+
+        Args:
+            source: Archivos GKG de GDELT.
+            runs: Registro de corridas (para saltar lo ya procesado).
+        """
+        self._source = source
+        self._runs = runs
+
+    async def plan(self, urls: Sequence[str], on_progress: Progress = _no_progress) -> HistoryPlan:
+        """Revisa cada archivo: ya procesado, inexistente o pendiente (con su tamaño).
+
+        Args:
+            urls: Direcciones candidatas, del más nuevo al más viejo.
+            on_progress: Avisa ``(revisados, total)`` después de cada archivo.
+
+        Returns:
+            El plan. Un archivo que no se pudo medir queda en ``failed`` y
+            no detiene a los demás.
+        """
+        files: list[GkgFile] = []
+        failed: list[str] = []
+        already_done = missing = 0
+        for done, url in enumerate(urls, start=1):
+            if await self._runs.already_processed(url):
+                already_done += 1
+            else:
+                try:
+                    file = await self._source.describe(url)
+                except (ProviderError, IngestSourceError) as error:
+                    failed.append(f"{url}: {error}")
+                else:
+                    if file is None:
+                        missing += 1
+                    else:
+                        files.append(file)
+            on_progress(done, len(urls))
+        return HistoryPlan(tuple(files), already_done, missing, tuple(failed))
 
 
 class IngestMediaRss:

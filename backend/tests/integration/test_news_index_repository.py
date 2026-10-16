@@ -147,3 +147,18 @@ async def test_caso_de_uso_completo_contra_la_base(
             text("SELECT (SELECT count(*) FROM news_index), (SELECT count(*) FROM ingest_runs)")
         ).one()
     assert tuple(counts) == (4, 1)
+
+
+async def test_dos_corridas_ok_del_mismo_archivo_no_chocan(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # El reloj y el historial pueden terminar el mismo archivo casi a la vez.
+    runs = PostgresIngestRunLog(test_engine)
+    ok = IngestRun("gdelt_gkg", FILE.name, FILE.url, "ok", NOW, NOW, items_new=3)
+
+    first, second = await runs.record(ok), await runs.record(ok)
+
+    assert first > 0
+    assert second == 0
+    with sync_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM ingest_runs")).scalar_one() == 1

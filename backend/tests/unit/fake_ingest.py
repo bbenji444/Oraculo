@@ -56,10 +56,17 @@ class FakeRuns:
 
 
 class FakeGkg:
-    def __init__(self, result: ParseResult | Exception, latest: GkgFile | Exception = FILE) -> None:
+    def __init__(
+        self,
+        result: ParseResult | Exception,
+        latest: GkgFile | Exception = FILE,
+        history: dict[str, GkgFile | Exception | None] | None = None,
+    ) -> None:
         self.result = result
         self.announced = latest
         self.fetched = 0
+        self.history = history or {}
+        self.described: list[str] = []
 
     async def latest(self) -> GkgFile:
         if isinstance(self.announced, Exception):
@@ -71,3 +78,10 @@ class FakeGkg:
         if isinstance(self.result, Exception):
             raise self.result
         return self.result, 8_000_000
+
+    async def describe(self, url: str) -> GkgFile | None:
+        self.described.append(url)
+        found = self.history.get(url)
+        if isinstance(found, Exception):
+            raise found
+        return found

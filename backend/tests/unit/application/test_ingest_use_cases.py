@@ -4,11 +4,12 @@ from datetime import timedelta
 
 import pytest
 
-from app.application.ports.ingest import IngestSourceError, MediaFeed, ParseResult
+from app.application.ports.ingest import GkgFile, IngestSourceError, MediaFeed, ParseResult
 from app.application.use_cases.ingest import (
     SAMPLE_SIZE,
     IngestGdeltGkg,
     IngestMediaRss,
+    PlanGdeltHistory,
     PurgeNewsIndex,
 )
 from app.domain.errors import ProviderUnavailableError
@@ -131,3 +132,61 @@ async def test_la_limpieza_borra_lo_anterior_a_la_retencion() -> None:
 
     assert deleted == 7
     assert index.cutoff == NOW - timedelta(days=90)
+
+
+# --- Historial (vista previa sin bajar) ---
+
+
+def gkg(stamp: str, size: int) -> GkgFile:
+    return GkgFile(
+        f"https://data.gdeltproject.org/gdeltv2/{stamp}.translation.gkg.csv.zip", size, "m"
+    )
+
+
+async def test_el_plan_mide_sin_bajar_y_salta_lo_ya_procesado() -> None:
+    nuevo, viejo = gkg("20261016200000", 7_000_000), gkg("20261016194500", 6_000_000)
+    hecho = "https://data.gdeltproject.org/gdeltv2/20261016193000.translation.gkg.csv.zip"
+    hueco = "https://data.gdeltproject.org/gdeltv2/20261016191500.translation.gkg.csv.zip"
+    roto = "https://data.gdeltproject.org/gdeltv2/20261016190000.translation.gkg.csv.zip"
+    source = FakeGkg(
+        parsed(1),
+        history={
+            nuevo.url: nuevo,
+            viejo.url: viejo,
+            hueco: None,
+            roto: IngestSourceError("sin MD5"),
+        },
+    )
+    progress: list[tuple[int, int]] = []
+
+    plan = await PlanGdeltHistory(source, FakeRuns(processed=[hecho])).plan(
+        [nuevo.url, viejo.url, hecho, hueco, roto], lambda d, t: progress.append((d, t))
+    )
+
+    assert plan.files == (nuevo, viejo)
+    assert (plan.already_done, plan.missing, plan.total_bytes) == (1, 1, 13_000_000)
+    assert plan.failed == (f"{roto}: sin MD5",)
+    # Lo ya procesado ni siquiera se mide, y nada se baja.
+    assert hecho not in source.described
+    assert source.fetched == 0
+    assert progress[-1] == (5, 5)
+
+
+async def test_un_archivo_del_historial_pasa_por_el_mismo_camino() -> None:
+    file, runs = gkg("20261009120000", 13_000_000), FakeRuns()
+    use_case = IngestGdeltGkg(FakeGkg(parsed(3)), FakeIndex(), runs)
+
+    first, second = await use_case.run_file(file), await use_case.run_file(file)
+
+    assert (first.status, first.items_new, second.status) == ("ok", 3, "skipped")
+    assert runs.runs[0].dedupe_key == file.url
+
+
+async def test_el_plan_funciona_sin_aviso_de_avance() -> None:
+    file = gkg("20261016200000", 1)
+
+    plan = await PlanGdeltHistory(FakeGkg(parsed(1), history={file.url: file}), FakeRuns()).plan(
+        [file.url]
+    )
+
+    assert plan.files == (file,)

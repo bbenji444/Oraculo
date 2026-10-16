@@ -34,10 +34,11 @@ import io
 import re
 import zipfile
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.adapters.providers.http import ProviderHttpClient
 from app.application.ports.ingest import GkgFile, IngestSourceError, ParseResult
+from app.domain.errors import ProviderResponseError
 from app.domain.news_index import (
     GDELT_SOURCE,
     GdeltLocation,
@@ -60,6 +61,36 @@ MAX_THEMES = 30
 _LOCATION_PARTS = 7
 # Cada línea del anuncio: "<bytes> <md5> <url>".
 _LASTUPDATE_FIELDS = 3
+# Historial: GDELT publica un GKG cada 15 minutos, en :00, :15, :30 y :45.
+GKG_BASE_URL = "https://data.gdeltproject.org/gdeltv2/"
+SLOT_MINUTES = 15
+_NOT_FOUND = 404
+_MD5 = re.compile(r"[0-9a-f]{32}")
+
+
+def history_urls(now: datetime, days: int) -> list[str]:
+    """Direcciones de los GKG de los últimos ``days`` días, del más nuevo al más viejo.
+
+    Args:
+        now: Momento actual (con zona).
+        days: Días hacia atrás.
+
+    Returns:
+        Una dirección por cuarto de hora. Puede incluir alguna que GDELT no
+        tenga: ``describe`` devuelve ``None`` para esas.
+
+    Example:
+        >>> history_urls(datetime(2026, 10, 16, 20, 7, tzinfo=UTC), 1)[0]
+        'https://data.gdeltproject.org/gdeltv2/20261016200000.translation.gkg.csv.zip'
+    """
+    utc = now.astimezone(UTC)
+    slot = utc.replace(minute=utc.minute - utc.minute % SLOT_MINUTES, second=0, microsecond=0)
+    oldest = utc - timedelta(days=days)
+    urls = []
+    while slot > oldest:
+        urls.append(f"{GKG_BASE_URL}{slot.strftime(_GKG_DATE)}{GKG_SUFFIX}")
+        slot -= timedelta(minutes=SLOT_MINUTES)
+    return urls
 
 
 class GkgFileError(IngestSourceError):
@@ -245,6 +276,39 @@ class GdeltGkgSource:
         """
         response = await self._http.get(LASTUPDATE_URL, {})
         return parse_lastupdate(response.text)
+
+    async def describe(self, url: str) -> GkgFile | None:
+        """Mide un archivo con HEAD, sin bajarlo (historial).
+
+        El servidor de archivos de GDELT (Google Cloud Storage) devuelve el
+        MD5 en el ``ETag``. Medido el 16/10/2026: el ``ETag`` de
+        ``20261016221500.translation.gkg.csv.zip`` era idéntico al MD5 que
+        anuncia ``lastupdate-translation.txt``. # VERIFICAR: GDELT no lo
+        documenta; si el ``ETag`` deja de ser un MD5, el archivo se rechaza
+        con un mensaje claro.
+
+        Args:
+            url: Dirección del archivo (``history_urls``).
+
+        Returns:
+            El archivo con tamaño y MD5, o ``None`` si GDELT no lo tiene
+            (a veces falta algún cuarto de hora).
+
+        Raises:
+            GkgFileError: Si la respuesta no trae tamaño o MD5 usables.
+            ProviderError: Si GDELT no responde.
+        """
+        try:
+            response = await self._http.head(url)
+        except ProviderResponseError as error:
+            if error.http_status == _NOT_FOUND:
+                return None
+            raise
+        size = response.headers.get("content-length", "")
+        etag = response.headers.get("etag", "").strip('"')
+        if not size.isdigit() or not _MD5.fullmatch(etag):
+            raise GkgFileError(f"{url}: GDELT no informó tamaño y MD5 (ETag {etag!r}).")
+        return GkgFile(url, int(size), etag)
 
     async def fetch(self, file: GkgFile) -> tuple[ParseResult, int]:
         """Baja, verifica y lee un archivo GKG.

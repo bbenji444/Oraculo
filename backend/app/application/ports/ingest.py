@@ -122,6 +122,17 @@ class GkgSourcePort(Protocol):
         """El archivo GKG que GDELT anuncia como el más reciente."""
         ...
 
+    async def describe(self, url: str) -> GkgFile | None:
+        """Mide un archivo anterior sin bajarlo (historial).
+
+        Args:
+            url: Dirección del archivo.
+
+        Returns:
+            El archivo con tamaño y huella, o ``None`` si GDELT no lo tiene.
+        """
+        ...
+
     async def fetch(self, file: GkgFile) -> tuple[ParseResult, int]:
         """Baja, verifica y lee un archivo.
 
@@ -196,6 +207,7 @@ class IngestRunLogPort(Protocol):
             run: La corrida.
 
         Returns:
-            Su id.
+            Su id, o 0 si otra corrida ya había registrado ese archivo como
+            procesado.
         """
         ...

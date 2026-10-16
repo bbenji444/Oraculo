@@ -211,12 +211,14 @@ class ProviderHttpClient:
             http_status=status,
         )
 
-    async def _attempt(self, url: str, params: Mapping[str, str]) -> httpx2.Response:
+    async def _attempt(
+        self, url: str, params: Mapping[str, str], method: str = "GET"
+    ) -> httpx2.Response:
         name = self._provider.value
         async with self._semaphore:
             await self._pace()
             try:
-                response = await self._client.get(url, params=dict(params))
+                response = await self._client.request(method, url, params=dict(params))
             except httpx2.TimeoutException as exc:
                 raise ProviderUnavailableError(
                     f"{name} no respondió a tiempo.", provider=name
@@ -246,7 +248,26 @@ class ProviderHttpClient:
         """
         return (await self.get_with_history(url, params)).response
 
-    async def get_with_history(self, url: str, params: Mapping[str, str]) -> HttpOutcome:
+    async def head(self, url: str) -> httpx2.Response:
+        """Pide solo los encabezados (tamaño, huella), sin descargar el contenido.
+
+        Lo usa el historial de la ingesta para medir los archivos de GDELT
+        antes de pedir permiso para bajarlos.
+
+        Args:
+            url: Dirección del archivo.
+
+        Returns:
+            La respuesta 2xx o 3xx, sin cuerpo.
+
+        Raises:
+            ProviderError: Igual que ``get`` (un 404 es ``ProviderResponseError``).
+        """
+        return (await self.get_with_history(url, {}, method="HEAD")).response
+
+    async def get_with_history(
+        self, url: str, params: Mapping[str, str], method: str = "GET"
+    ) -> HttpOutcome:
         """Como ``get``, pero también dice cuántos 429 hubo antes de la respuesta.
 
         Sirve para no confundir "sin resultados" con "me estaban limitando":
@@ -256,6 +277,7 @@ class ProviderHttpClient:
         Args:
             url: Dirección del proveedor.
             params: Parámetros de la URL (sin la llave).
+            method: Método HTTP (``GET`` o ``HEAD``).
 
         Returns:
             La respuesta y el número de rechazos 429 previos.
@@ -276,7 +298,7 @@ class ProviderHttpClient:
         async for attempt in retrying:
             with attempt:
                 try:
-                    response = await self._attempt(url, params)
+                    response = await self._attempt(url, params, method)
                 except ProviderRateLimitError:
                     rate_limited += 1
                     raise
