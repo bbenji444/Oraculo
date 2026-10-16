@@ -112,6 +112,9 @@ class Settings(BaseSettings):
     # Google News RSS: desactivado por defecto por sus términos de uso
     # (ADR-0011). Solo se activa a propósito en desarrollo; nunca en producción.
     news_rss_enabled: bool = False
+    # GDELT: desactivado por defecto mientras responda 429 de forma persistente
+    # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
+    gdelt_enabled: bool = False
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

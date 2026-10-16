@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.application.audit import Actor
-from app.application.ports.provider_log import ProviderQueryRecord
+from app.application.ports.provider_log import ProviderQueryRecord, QueryRun
 from app.application.ports.providers import ProviderResponse
 from app.cli.probar_proveedor import (
     LeakedSecretError,
@@ -69,6 +69,9 @@ class FakeLog:
 
     async def credits_used_since(self, provider: str, since: datetime) -> int:
         return 0
+
+    async def runs_of(self, provider: str, query_text: str) -> list[QueryRun]:
+        return []
 
 
 def concepts() -> FakeConceptRepository:

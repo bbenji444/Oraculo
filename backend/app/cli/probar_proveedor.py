@@ -39,6 +39,7 @@ from app.adapters.persistence.concepts_repository import PostgresConceptReposito
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.providers.factory import build_provider
+from app.adapters.providers.gdelt import DISABLED_MESSAGE as GDELT_DISABLED_MESSAGE
 from app.adapters.providers.google_news_rss import DISABLED_MESSAGE
 from app.application.audit import Actor
 from app.application.clock import MEXICO_CITY, mexico_city_today
@@ -72,7 +73,7 @@ _MS_PER_SECOND = 1000
 NOT_CONFIGURED = {
     Provider.SEARCHAPI: "SearchApi no está configurado: falta SEARCHAPI_API_KEY en .env.",
     Provider.GOOGLE_NEWS_RSS: DISABLED_MESSAGE,
-    Provider.GDELT: "GDELT no está configurado.",
+    Provider.GDELT: GDELT_DISABLED_MESSAGE,
 }
 
 

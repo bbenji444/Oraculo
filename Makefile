@@ -27,7 +27,7 @@ COVERAGE_MIN := 85
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
-        geo-terms geo-basemap db-shell db-dump seed probar-proveedor
+        geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -109,6 +109,9 @@ geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.3
 	$(UV_RUN) python -m app.geodata.mapa_base
 
 # --- Base de datos (docs/base-de-datos.md) ---------------------------------------
+
+gdelt-diagnostico: ## Reintento diario de D1 en GDELT (máximo una vez al día, ADR-0012)
+	$(UV_RUN) python -m app.cli.diagnostico_gdelt
 
 probar-proveedor: ## UNA consulta real a un proveedor, con confirmación (ARGS="--proveedor gdelt --nombre x")
 	$(UV_RUN) python -m app.cli.probar_proveedor $(ARGS)

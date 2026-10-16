@@ -48,6 +48,21 @@ class ProviderQueryRecord:
     search_id: UUID | None = field(default=None)
 
 
+@dataclass(frozen=True, slots=True)
+class QueryRun:
+    """Un envío registrado de una consulta.
+
+    Attributes:
+        created_at: Cuándo se registró (UTC).
+        status: ``ok``, ``error`` o ``skipped``.
+        results_count: Notas normalizadas que devolvió.
+    """
+
+    created_at: datetime
+    status: QueryStatus
+    results_count: int
+
+
 class ProviderQueryLogPort(Protocol):
     """Escritura y consultas del registro de peticiones."""
 
@@ -61,6 +76,19 @@ class ProviderQueryLogPort(Protocol):
 
         Returns:
             El id del registro.
+        """
+        ...
+
+    async def runs_of(self, provider: str, query_text: str) -> list[QueryRun]:
+        """Todas las veces que se envió una consulta exacta a un proveedor.
+
+        Args:
+            provider: Proveedor.
+            query_text: Texto exacto.
+
+        Returns:
+            Cada envío con su fecha, estado y número de notas, del más antiguo
+            al más reciente.
         """
         ...
 

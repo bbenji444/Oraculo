@@ -20,7 +20,11 @@ from app.adapters.providers.gdelt import (
     time_params,
 )
 from app.adapters.providers.http import ProviderHttpClient
-from app.domain.errors import ProviderResponseError
+from app.domain.errors import (
+    ProviderNotConfiguredError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+)
 from app.domain.queries import CountryFilter, DateWindow, PlannedQuery, Provider
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "providers"
@@ -106,7 +110,7 @@ async def test_search_envia_los_parametros_documentados() -> None:
         window=WEEK,
         estimated_credits=0,
     )
-    provider = GdeltProvider(http)
+    provider = GdeltProvider(http, enabled=True)
 
     response = await provider.search(query)
 
@@ -117,3 +121,83 @@ async def test_search_envia_los_parametros_documentados() -> None:
     assert response.articles == ()
     assert (provider.estimate_cost(query), provider.is_configured()) == (0, True)
     await http.aclose()
+
+
+def gdelt_with(
+    *responses: httpx2.Response, enabled: bool = True
+) -> tuple[GdeltProvider, list[httpx2.Request]]:
+    sent: list[httpx2.Request] = []
+    queue = list(responses)
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        return queue.pop(0)
+
+    async def no_wait(_seconds: float) -> None:
+        return None
+
+    http = ProviderHttpClient(
+        Provider.GDELT,
+        timeout_seconds=5,
+        max_attempts=3,
+        max_concurrency=1,
+        rate_limit_wait_seconds=15,
+        transport=httpx2.MockTransport(handler),
+        sleep=no_wait,
+    )
+    return GdeltProvider(http, enabled=enabled), sent
+
+
+def d1() -> PlannedQuery:
+    return PlannedQuery(
+        provider=Provider.GDELT,
+        text="gobierno sourcelang:spanish",
+        keywords=("gobierno",),
+        country=CountryFilter("Sin filtro", None, None, ""),
+        language="es",
+        window=DateWindow.last_days(1, date(2026, 10, 16)),
+        estimated_credits=0,
+    )
+
+
+@pytest.mark.anyio
+async def test_vacio_despues_de_un_429_es_falla_y_no_sin_resultados() -> None:
+    # Reproduce D2 del diagnóstico (ADR-0012): 429, 429 y luego 200 con {}.
+    provider, sent = gdelt_with(
+        httpx2.Response(429, text="Please limit requests to one every 5 seconds"),
+        httpx2.Response(429, text="Please limit requests to one every 5 seconds"),
+        httpx2.Response(200, text="{}"),
+    )
+
+    with pytest.raises(ProviderRateLimitError, match="vacío después de 2 rechazo"):
+        await provider.search(d1())
+    assert len(sent) == 3
+
+
+@pytest.mark.anyio
+async def test_vacio_sin_429_previo_si_es_sin_resultados() -> None:
+    provider, _ = gdelt_with(httpx2.Response(200, text="{}"))
+
+    response = await provider.search(d1())
+
+    assert response.articles == ()
+
+
+@pytest.mark.anyio
+async def test_notas_despues_de_un_429_si_se_aceptan() -> None:
+    body = json.dumps({"articles": [DOCUMENTED_ITEM]})
+    provider, _ = gdelt_with(httpx2.Response(429), httpx2.Response(200, text=body))
+
+    response = await provider.search(d1())
+
+    assert len(response.articles) == 1
+
+
+@pytest.mark.anyio
+async def test_desactivado_no_envia_nada() -> None:
+    provider, sent = gdelt_with(httpx2.Response(200, text="{}"), enabled=False)
+
+    assert provider.is_configured() is False
+    with pytest.raises(ProviderNotConfiguredError, match="ADR-0012"):
+        await provider.search(d1())
+    assert sent == []

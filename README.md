@@ -130,7 +130,7 @@ Direcciones útiles con el sistema arriba:
 | Proveedor | Estado | Cómo se activa |
 |---|---|---|
 | **SearchApi** (Google News) | Principal, de pago (1 crédito por búsqueda) | Tu llave en `.env`: `SEARCHAPI_API_KEY=…`. Tope mensual: `SEARCHAPI_MONTHLY_CREDIT_LIMIT` (100 por defecto). |
-| **GDELT** | Gratuito, **no garantizado**: si falla, la búsqueda sigue con los demás | Siempre activo. |
+| **GDELT** | Gratuito. ⚠️ **Desactivado por defecto**: respondió 429 de forma persistente ([ADR-0012](docs/adr/0012-gdelt-desactivado-por-limite.md)) | `GDELT_ENABLED=false`. `wsl make gdelt-diagnostico` reintenta una consulta de prueba una vez al día y avisa cuando hay evidencia para proponer reactivarlo. |
 | **Google News RSS** | ⚠️ **Fuera de producción** | Desactivado (`NEWS_RSS_ENABLED=false`). Ver la advertencia. |
 
 > ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.

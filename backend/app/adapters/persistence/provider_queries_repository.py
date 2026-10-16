@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.audit import Actor
-from app.application.ports.provider_log import ProviderQueryRecord
+from app.application.ports.provider_log import ProviderQueryRecord, QueryRun
 
 AUDIT_ACTION = "provider.query_executed"
 AUDIT_ENTITY = "provider_query"
@@ -87,6 +87,22 @@ class PostgresProviderQueryLog:
                     },
                 )
         return row_id
+
+    async def runs_of(self, provider: str, query_text: str) -> list[QueryRun]:
+        """Ver ``ProviderQueryLogPort.runs_of``.
+
+        Usa el índice (``provider``, ``created_at``); el texto se filtra
+        después, y una consulta de diagnóstico tiene pocas filas.
+        """
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text(
+                    "SELECT created_at, status, results_count FROM provider_queries "
+                    "WHERE provider = :provider AND query_text = :text ORDER BY created_at, id"
+                ),
+                {"provider": provider, "text": query_text},
+            )
+            return [QueryRun(r.created_at, r.status, r.results_count) for r in rows]
 
     async def credits_used_since(self, provider: str, since: datetime) -> int:
         """Ver ``ProviderQueryLogPort.credits_used_since``.

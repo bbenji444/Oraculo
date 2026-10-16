@@ -20,10 +20,20 @@ from app.adapters.providers.http import ProviderHttpClient
 from app.application.clock import MEXICO_CITY
 from app.application.ports.providers import ProviderResponse
 from app.domain.articles import InvalidArticleError, RawArticle
-from app.domain.errors import ProviderResponseError
+from app.domain.errors import (
+    ProviderNotConfiguredError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+)
 from app.domain.queries import DateWindow, PlannedQuery, Provider
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+DISABLED_MESSAGE = (
+    "GDELT está desactivado: respondió 429 de forma persistente y vacío después de "
+    "los rechazos (ADR-0012). Para el reintento diario: make gdelt-diagnostico."
+)
+# Cuerpos que GDELT usa para "sin resultados" (medido: "{}").
+_EMPTY_BODIES = frozenset({"", "{}"})
 # Máximo documentado de resultados en ArtList.
 MAX_RECORDS = 250
 # Más recientes primero: en monitoreo importa no perder lo nuevo.
@@ -120,15 +130,17 @@ def parse_articles(body: str) -> tuple[list[RawArticle], int]:
 
 
 class GdeltProvider:
-    """``NewsProviderPort`` para GDELT DOC 2.0."""
+    """``NewsProviderPort`` para GDELT DOC 2.0 (desactivado por defecto, ADR-0012)."""
 
-    def __init__(self, http: ProviderHttpClient) -> None:
+    def __init__(self, http: ProviderHttpClient, *, enabled: bool) -> None:
         """Recibe el cliente HTTP ya configurado (con la pausa entre peticiones).
 
         Args:
             http: Cliente HTTP de GDELT.
+            enabled: ``GDELT_ENABLED``. Si es ``False`` no consulta nada.
         """
         self._http = http
+        self._enabled = enabled
 
     @property
     def provider(self) -> Provider:
@@ -136,8 +148,8 @@ class GdeltProvider:
         return Provider.GDELT
 
     def is_configured(self) -> bool:
-        """GDELT no necesita llave."""
-        return True
+        """Solo con ``GDELT_ENABLED=true`` (desactivado por defecto, ADR-0012)."""
+        return self._enabled
 
     def request_params(self, query: PlannedQuery) -> dict[str, str]:
         """Ver ``NewsProviderPort.request_params``."""
@@ -155,9 +167,28 @@ class GdeltProvider:
         return 0
 
     async def search(self, query: PlannedQuery) -> ProviderResponse:
-        """Ver ``NewsProviderPort.search``."""
+        """Ver ``NewsProviderPort.search``.
+
+        Raises:
+            ProviderNotConfiguredError: Si está desactivado.
+            ProviderRateLimitError: Si respondió vacío después de rechazos
+                429: no se sabe si no hay notas o si nos estaba limitando.
+        """
+        if not self._enabled:
+            raise ProviderNotConfiguredError(DISABLED_MESSAGE, provider=Provider.GDELT.value)
         params = self.request_params(query)
-        response = await self._http.get(GDELT_URL, params)
+        outcome = await self._http.get_with_history(GDELT_URL, params)
+        response = outcome.response
+        if outcome.rate_limited and response.text.strip() in _EMPTY_BODIES:
+            # Decisión de Benji (ADR-0012): un {} tras un 429 es falla, nunca
+            # "sin resultados". En el diagnóstico del 16/10/2026, "gobierno"
+            # en notas en español de un día llegó vacío justo después de 429.
+            raise ProviderRateLimitError(
+                f"GDELT respondió vacío después de {outcome.rate_limited} rechazo(s) 429: "
+                "se registra como falla, no como 'sin resultados' (ADR-0012).",
+                provider=Provider.GDELT.value,
+                http_status=response.status_code,
+            )
         articles, discarded = parse_articles(response.text)
         return ProviderResponse(
             articles=tuple(articles),

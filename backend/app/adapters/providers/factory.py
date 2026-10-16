@@ -19,6 +19,30 @@ from app.domain.queries import Provider
 logger = logging.getLogger(__name__)
 
 
+def build_gdelt(settings: Settings, *, enabled: bool) -> GdeltProvider:
+    """Crea el adaptador de GDELT con su pausa y su espera tras un 429.
+
+    Args:
+        settings: Configuración de la aplicación.
+        enabled: Si puede consultar. Las búsquedas usan ``GDELT_ENABLED``; el
+            diagnóstico diario aprobado por Benji lo activa solo para su D1.
+
+    Returns:
+        El adaptador.
+    """
+    return GdeltProvider(
+        ProviderHttpClient(
+            Provider.GDELT,
+            timeout_seconds=settings.provider_timeout_seconds,
+            max_attempts=settings.provider_max_attempts,
+            max_concurrency=settings.provider_max_concurrency,
+            min_interval_seconds=settings.gdelt_min_interval_seconds,
+            rate_limit_wait_seconds=settings.gdelt_rate_limit_wait_seconds,
+        ),
+        enabled=enabled,
+    )
+
+
 def build_provider(provider: Provider, settings: Settings) -> NewsProviderPort:
     """Crea el adaptador de un proveedor.
 
@@ -31,16 +55,7 @@ def build_provider(provider: Provider, settings: Settings) -> NewsProviderPort:
         adaptador que responde ``is_configured() == False``.
     """
     if provider is Provider.GDELT:
-        return GdeltProvider(
-            ProviderHttpClient(
-                provider,
-                timeout_seconds=settings.provider_timeout_seconds,
-                max_attempts=settings.provider_max_attempts,
-                max_concurrency=settings.provider_max_concurrency,
-                min_interval_seconds=settings.gdelt_min_interval_seconds,
-                rate_limit_wait_seconds=settings.gdelt_rate_limit_wait_seconds,
-            )
-        )
+        return build_gdelt(settings, enabled=settings.gdelt_enabled)
     if provider is Provider.GOOGLE_NEWS_RSS:
         if settings.news_rss_enabled:
             # Que quede en el registro cada vez: no debe pasar en producción.

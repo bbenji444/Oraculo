@@ -21,6 +21,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass
 
 import httpx2
 from tenacity import (
@@ -59,6 +60,19 @@ _SERVER_ERROR = 500
 _CLIENT_ERROR = 400
 
 Sleep = Callable[[float], Awaitable[None]]
+
+
+@dataclass(frozen=True, slots=True)
+class HttpOutcome:
+    """Respuesta exitosa y lo que pasó antes de obtenerla.
+
+    Attributes:
+        response: La respuesta 2xx o 3xx.
+        rate_limited: Rechazos 429 recibidos en intentos anteriores.
+    """
+
+    response: httpx2.Response
+    rate_limited: int
 
 
 def _retryable(error: BaseException) -> bool:
@@ -230,6 +244,26 @@ class ProviderHttpClient:
             ProviderError: El último error, si todos los intentos fallaron, o
                 el primero que no conviene reintentar.
         """
+        return (await self.get_with_history(url, params)).response
+
+    async def get_with_history(self, url: str, params: Mapping[str, str]) -> HttpOutcome:
+        """Como ``get``, pero también dice cuántos 429 hubo antes de la respuesta.
+
+        Sirve para no confundir "sin resultados" con "me estaban limitando":
+        GDELT llegó a responder ``{}`` justo después de rechazos 429
+        (ADR-0012).
+
+        Args:
+            url: Dirección del proveedor.
+            params: Parámetros de la URL (sin la llave).
+
+        Returns:
+            La respuesta y el número de rechazos 429 previos.
+
+        Raises:
+            ProviderError: Igual que ``get``.
+        """
+        rate_limited = 0
         retrying = AsyncRetrying(
             retry=retry_if_exception(_retryable),
             stop=stop_after_attempt(self._max_attempts),
@@ -241,7 +275,11 @@ class ProviderHttpClient:
         response: httpx2.Response | None = None
         async for attempt in retrying:
             with attempt:
-                response = await self._attempt(url, params)
+                try:
+                    response = await self._attempt(url, params)
+                except ProviderRateLimitError:
+                    rate_limited += 1
+                    raise
         if response is None:  # pragma: no cover — tenacity siempre corre al menos un intento
             raise ProviderUnavailableError("Sin respuesta.", provider=self._provider.value)
-        return response
+        return HttpOutcome(response, rate_limited)

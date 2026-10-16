@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.6 · Octubre 2026 · Responsable: Benji
+Versión 1.7 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -422,7 +422,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
-| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. **No garantizado** (decisión de Benji, 16/10/2026): si falla, la búsqueda sigue con los otros dos y queda `partial`. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Pide "una petición cada 5 segundos", pero en la primera prueba real respondió 429 aun respetándolo; tras un 429 se espera al menos 15 s. |
+| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
 | **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
 
 **Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.
@@ -836,6 +836,7 @@ ADR de la Fase 3:
 
 10. **ADR-0010** — httpx2 (continuación mantenida de httpx) para las llamadas externas y `MockTransport` para sus pruebas, en lugar de httpx + respx.
 11. **ADR-0011** — Google News RSS fuera de producción por sus términos de uso (desactivado por defecto).
+12. **ADR-0012** — GDELT desactivado mientras responda 429 de forma persistente; criterio de reactivación con el reintento diario de D1.
 
 ---
 
@@ -854,7 +855,15 @@ ADR de la Fase 3:
 
 ---
 
-## 20. Historial del documento
+## 20. Pendientes y mejoras futuras
+
+Ideas registradas para evaluarlas después. **No están en el alcance de ninguna fase** hasta que Benji las apruebe.
+
+| Idea | Por qué podría servir | Qué habría que evaluar antes |
+|---|---|---|
+| **Ingerir los archivos GKG de GDELT** en lugar de su API DOC 2.0 (Benji, 16/10/2026) | GDELT publica sus datos como archivos descargables que se actualizan cada 15 minutos. El GKG (Global Knowledge Graph) trae cada nota con **temas ya clasificados** y **ubicaciones ya geocodificadas**. Podría evitar el límite de la API (ADR-0012) y adelantar parte del trabajo de clasificación y geolocalización de F4. | `# VERIFICAR:` en la documentación vigente de GDELT: formato y campos exactos del GKG, tamaño de los archivos y espacio en disco, cobertura de medios mexicanos en español, calidad de sus ubicaciones frente al catálogo INEGI (§11), términos de uso y si conviene un proceso programado (F8). |
+
+## 21. Historial del documento
 
 | Versión | Fecha | Cambios |
 |---|---|---|
@@ -865,3 +874,4 @@ ADR de la Fase 3:
 | 1.4 | 16 de octubre de 2026 | Construcción de consultas (ADR-0009): `search_terms` y códigos de país en `regions`, nombres repetidos con su estado, exclusiones también en GDELT; `name_norm` y `deleted_at` en `concepts`; columnas de entidad en `audit_log`; endpoint `POST /concepts/preview`. |
 | 1.5 | 16 de octubre de 2026 | httpx2 en lugar de httpx + respx (ADR-0010); `source_domain` en `RawArticle`; `search_id` opcional y `error_message` en `provider_queries`; comando `make probar-proveedor` en `backend/app/cli/`. |
 | 1.6 | 16 de octubre de 2026 | Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`); GDELT como proveedor no garantizado. |
+| 1.7 | 16 de octubre de 2026 | GDELT desactivado por defecto con criterio de reactivación (ADR-0012); un `{}` tras un 429 es falla; nueva sección 20, "Pendientes y mejoras futuras" (GKG de GDELT); el historial pasa a la sección 21. |
