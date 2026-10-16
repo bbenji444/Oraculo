@@ -9,8 +9,10 @@ Pasos:
 1. Arma la consulta con las mismas piezas que una búsqueda real: el concepto
    guardado, la región (por clave INEGI o ISO) y el rango (``build_queries``).
    Con ``--texto`` se puede reemplazar el texto para un experimento puntual.
-2. Muestra la consulta exacta, los parámetros y los créditos estimados, y
-   **pide escribir "si"** para enviarla. Cualquier otra respuesta cancela.
+2. Muestra la consulta exacta, los parámetros, los créditos estimados y los
+   créditos ya gastados en el mes; si se pasaría del tope mensual
+   (``SEARCHAPI_MONTHLY_CREDIT_LIMIT``) no envía nada. Luego **pide
+   escribir "si"** para enviarla. Cualquier otra respuesta cancela.
 3. Envía una sola consulta, la registra en ``provider_queries`` y en la
    bitácora, y muestra 5 resultados normalizados.
 4. Guarda la respuesta cruda en ``tests/fixtures/providers/`` **sin la
@@ -48,6 +50,7 @@ from app.application.ports.provider_log import ProviderQueryLogPort, ProviderQue
 from app.application.ports.providers import NewsProviderPort, ProviderResponse
 from app.application.ports.regions import RegionRepositoryPort
 from app.core.config import Settings, get_settings
+from app.domain.budget import MonthlyCredits, month_start
 from app.domain.concept import Concept
 from app.domain.errors import ProviderError
 from app.domain.names import normalize_name
@@ -402,13 +405,23 @@ async def run(args: argparse.Namespace, settings: Settings, ask: Callable[[str],
             text=args.texto,
         )
         show_plan(plan)
+        log = PostgresProviderQueryLog(engine)
+        if plan.credits:
+            used = await log.credits_used_since(
+                plan.query.provider.value, month_start(datetime.now(UTC), MEXICO_CITY)
+            )
+            limit = settings.searchapi_monthly_credit_limit
+            logger.info(f"Créditos de este mes: {used} de {limit}")
+            if not MonthlyCredits(used=used, limit=limit).try_reserve(plan.credits):
+                logger.error("Se alcanzaría el tope mensual de créditos: no se envió nada.")
+                return 1
         if not confirmed(ask):
             logger.warning("Cancelado: no se envió nada.")
             return 1
         response = await execute(
             provider=provider,
             plan=plan,
-            log=PostgresProviderQueryLog(engine),
+            log=log,
             actor=Actor(settings.dev_user),
         )
         if response is None:
