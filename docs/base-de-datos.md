@@ -39,7 +39,8 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `regions` | Catálogo geográfico: 258 países, 32 estados, 2,478 municipios y 296,850 localidades. |
 | `concepts` | Conceptos de búsqueda ("Ciberseguridad", "Secuestro"...) con sus palabras clave, exclusiones y color. `deleted_at` marca los borrados lógicos. |
 | `audit_log` | Bitácora de auditoría: quién cambió qué y cuándo (por ahora, crear, editar y borrar conceptos). Solo se agregan filas. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0006`. |
+| `provider_queries` | Cada petición a un proveedor de noticias (SearchApi, GDELT, Google News RSS): texto, resultado, si vino de caché y créditos gastados. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0007`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
