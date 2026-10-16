@@ -34,10 +34,10 @@ import io
 import re
 import zipfile
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from app.adapters.providers.http import ProviderHttpClient
+from app.application.ports.ingest import GkgFile, ParseResult
 from app.domain.news_index import (
     GDELT_SOURCE,
     GdeltLocation,
@@ -64,42 +64,6 @@ _LASTUPDATE_FIELDS = 3
 
 class GkgFileError(RuntimeError):
     """El archivo de GDELT no llegó completo o no tiene el formato esperado."""
-
-
-@dataclass(frozen=True, slots=True)
-class GkgFile:
-    """Un archivo GKG anunciado por GDELT.
-
-    Attributes:
-        url: Dirección del ZIP.
-        size: Tamaño en bytes que anuncia GDELT.
-        md5: Huella MD5 que anuncia GDELT.
-    """
-
-    url: str
-    size: int
-    md5: str
-
-    @property
-    def name(self) -> str:
-        """Nombre del archivo ("20261016191500.translation.gkg.csv.zip")."""
-        return self.url.rsplit("/", 1)[-1]
-
-
-@dataclass(frozen=True, slots=True)
-class GkgParseResult:
-    """Notas que salieron de un archivo GKG.
-
-    Attributes:
-        items: Notas en español con México, listas para el índice.
-        seen: Filas leídas.
-        discarded: Filas en español con México que no se pudieron usar
-            (sin título o sin URL web).
-    """
-
-    items: tuple[NewsItem, ...]
-    seen: int
-    discarded: int
 
 
 def parse_lastupdate(text: str) -> GkgFile:
@@ -188,7 +152,7 @@ def _date(value: str) -> datetime | None:
         return None
 
 
-def parse_rows(rows: Sequence[Sequence[str]], fips_to_inegi: dict[str, str]) -> GkgParseResult:
+def parse_rows(rows: Sequence[Sequence[str]], fips_to_inegi: dict[str, str]) -> ParseResult:
     """Convierte filas del GKG en notas del índice (solo español con México).
 
     Args:
@@ -222,7 +186,7 @@ def parse_rows(rows: Sequence[Sequence[str]], fips_to_inegi: dict[str, str]) -> 
             )
         except InvalidNewsError:
             discarded += 1
-    return GkgParseResult(tuple(items), len(rows), discarded)
+    return ParseResult(tuple(items), len(rows), discarded)
 
 
 def read_zip(data: bytes) -> list[list[str]]:
@@ -278,7 +242,7 @@ class GdeltGkgSource:
         response = await self._http.get(LASTUPDATE_URL, {})
         return parse_lastupdate(response.text)
 
-    async def fetch(self, file: GkgFile) -> tuple[GkgParseResult, int]:
+    async def fetch(self, file: GkgFile) -> tuple[ParseResult, int]:
         """Baja, verifica y lee un archivo GKG.
 
         Args:

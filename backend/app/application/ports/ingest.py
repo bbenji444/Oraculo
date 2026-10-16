@@ -1,0 +1,193 @@
+"""Puertos de la ingesta periódica al índice local (ADR-0013).
+
+Las fuentes (archivos GKG de GDELT, RSS de medios) y el almacenamiento
+(``news_index``, ``ingest_runs``) se implementan en ``adapters/``; los casos
+de uso de ``application/use_cases/ingest.py`` los reciben sin saber de HTTP
+ni de SQL.
+
+No hace: no busca en el índice (eso es el proveedor ``indice_local``).
+"""
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Literal, Protocol
+
+from app.domain.news_index import RSS_SOURCE_PREFIX, NewsItem
+
+RunStatus = Literal["ok", "error", "skipped"]
+
+
+@dataclass(frozen=True, slots=True)
+class GkgFile:
+    """Un archivo GKG anunciado por GDELT.
+
+    Attributes:
+        url: Dirección del ZIP.
+        size: Tamaño en bytes que anuncia GDELT.
+        md5: Huella MD5 que anuncia GDELT.
+    """
+
+    url: str
+    size: int
+    md5: str
+
+    @property
+    def name(self) -> str:
+        """Nombre del archivo ("20261016191500.translation.gkg.csv.zip")."""
+        return self.url.rsplit("/", 1)[-1]
+
+
+@dataclass(frozen=True, slots=True)
+class ParseResult:
+    """Notas que salieron de un archivo o un feed.
+
+    Attributes:
+        items: Notas listas para el índice.
+        seen: Filas o ``<item>`` leídos.
+        discarded: Notas que debían entrar pero no se pudieron usar (sin
+            título, URL web o fecha).
+    """
+
+    items: tuple[NewsItem, ...]
+    seen: int
+    discarded: int
+
+
+@dataclass(frozen=True, slots=True)
+class MediaFeed:
+    """Un medio de la lista curada ``fuentes/medios_rss.csv``.
+
+    Attributes:
+        slug: Nombre corto (va en ``rss:<slug>``).
+        name: Nombre del medio para mostrar.
+        url: Dirección del RSS.
+        active: Si se ingiere (solo tras revisar sus términos).
+    """
+
+    slug: str
+    name: str
+    url: str
+    active: bool
+
+    @property
+    def source(self) -> str:
+        """Origen en el índice: ``rss:la-jornada``."""
+        return f"{RSS_SOURCE_PREFIX}{self.slug}"
+
+
+@dataclass(frozen=True, slots=True)
+class IngestRun:
+    """Una corrida de la ingesta, para ``ingest_runs``.
+
+    Attributes:
+        source: ``gdelt_gkg`` o ``rss:<medio>``.
+        item: Archivo o feed leído.
+        dedupe_key: Archivo de GDELT (no se reprocesa); vacío en los feeds.
+        status: ``ok``, ``error`` o ``skipped``.
+        started_at: Inicio (UTC).
+        finished_at: Fin (UTC).
+        bytes_downloaded: Bytes bajados.
+        items_seen: Filas o notas leídas.
+        items_kept: Notas válidas para el índice.
+        items_new: Notas que no estaban en el índice.
+        error_message: Qué falló, en español.
+    """
+
+    source: str
+    item: str
+    dedupe_key: str | None
+    status: RunStatus
+    started_at: datetime
+    finished_at: datetime
+    bytes_downloaded: int = 0
+    items_seen: int = 0
+    items_kept: int = 0
+    items_new: int = 0
+    error_message: str | None = None
+
+
+class GkgSourcePort(Protocol):
+    """Archivos GKG de GDELT."""
+
+    async def latest(self) -> GkgFile:
+        """El archivo GKG que GDELT anuncia como el más reciente."""
+        ...
+
+    async def fetch(self, file: GkgFile) -> tuple[ParseResult, int]:
+        """Baja, verifica y lee un archivo.
+
+        Args:
+            file: Archivo anunciado.
+
+        Returns:
+            Las notas (solo español con México) y los bytes descargados.
+        """
+        ...
+
+
+class FeedSourcePort(Protocol):
+    """RSS de medios."""
+
+    async def fetch(self, feed: MediaFeed) -> tuple[ParseResult, int]:
+        """Baja y lee un feed.
+
+        Args:
+            feed: Medio.
+
+        Returns:
+            Las notas y los bytes descargados.
+        """
+        ...
+
+
+class NewsIndexPort(Protocol):
+    """Escritura y limpieza de ``news_index``."""
+
+    async def add(self, items: Sequence[NewsItem]) -> int:
+        """Guarda notas; las que ya estaban (misma URL) se ignoran.
+
+        Args:
+            items: Notas.
+
+        Returns:
+            Cuántas eran nuevas.
+        """
+        ...
+
+    async def purge_before(self, cutoff: datetime) -> int:
+        """Borra las notas publicadas antes de una fecha (retención).
+
+        Args:
+            cutoff: Fecha límite (UTC).
+
+        Returns:
+            Cuántas se borraron.
+        """
+        ...
+
+
+class IngestRunLogPort(Protocol):
+    """Registro de corridas (``ingest_runs``)."""
+
+    async def already_processed(self, dedupe_key: str) -> bool:
+        """Dice si un archivo ya se procesó con éxito.
+
+        Args:
+            dedupe_key: Archivo (por ejemplo, la URL del GKG).
+
+        Returns:
+            ``True`` si ya hay una corrida exitosa con esa llave.
+        """
+        ...
+
+    async def record(self, run: IngestRun) -> int:
+        """Guarda una corrida.
+
+        Args:
+            run: La corrida.
+
+        Returns:
+            Su id.
+        """
+        ...

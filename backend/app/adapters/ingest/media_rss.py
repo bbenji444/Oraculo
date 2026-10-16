@@ -16,7 +16,6 @@ No hace: no guarda nada (eso es el caso de uso de ingesta).
 import csv
 import html
 import re
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -25,7 +24,8 @@ from xml.etree.ElementTree import Element
 from defusedxml.ElementTree import ParseError, fromstring
 
 from app.adapters.providers.http import ProviderHttpClient
-from app.domain.news_index import RSS_SOURCE_PREFIX, InvalidNewsError, NewsItem
+from app.application.ports.ingest import MediaFeed, ParseResult
+from app.domain.news_index import InvalidNewsError, NewsItem
 from app.geodata.fuentes import REPO_ROOT
 
 MEDIA_FEEDS_PATH = REPO_ROOT / "fuentes" / "medios_rss.csv"
@@ -37,43 +37,6 @@ _TAGS = re.compile(r"<[^>]+>")
 
 class FeedError(RuntimeError):
     """El feed no respondió un RSS legible."""
-
-
-@dataclass(frozen=True, slots=True)
-class MediaFeed:
-    """Un medio de la lista curada.
-
-    Attributes:
-        slug: Nombre corto (va en ``rss:<slug>``).
-        name: Nombre del medio para mostrar.
-        url: Dirección del RSS.
-        active: Si se ingiere (solo tras revisar sus términos).
-    """
-
-    slug: str
-    name: str
-    url: str
-    active: bool
-
-    @property
-    def source(self) -> str:
-        """Origen en el índice: ``rss:la-jornada``."""
-        return f"{RSS_SOURCE_PREFIX}{self.slug}"
-
-
-@dataclass(frozen=True, slots=True)
-class FeedParseResult:
-    """Notas que salieron de un feed.
-
-    Attributes:
-        items: Notas listas para el índice.
-        seen: ``<item>`` leídos.
-        discarded: Notas sin título, URL web o fecha.
-    """
-
-    items: tuple[NewsItem, ...]
-    seen: int
-    discarded: int
 
 
 def read_feeds(path: Path = MEDIA_FEEDS_PATH) -> list[MediaFeed]:
@@ -129,7 +92,7 @@ def clean_snippet(value: str | None) -> str | None:
     return text[:SNIPPET_MAX_CHARS] or None
 
 
-def parse_feed(body: str | bytes, feed: MediaFeed) -> FeedParseResult:
+def parse_feed(body: str | bytes, feed: MediaFeed) -> ParseResult:
     """Convierte un RSS en notas del índice.
 
     Args:
@@ -164,7 +127,7 @@ def parse_feed(body: str | bytes, feed: MediaFeed) -> FeedParseResult:
             )
         except InvalidNewsError:
             discarded += 1
-    return FeedParseResult(tuple(items), len(entries), discarded)
+    return ParseResult(tuple(items), len(entries), discarded)
 
 
 class MediaRssSource:
@@ -178,7 +141,7 @@ class MediaRssSource:
         """
         self._http = http
 
-    async def fetch(self, feed: MediaFeed) -> tuple[FeedParseResult, int]:
+    async def fetch(self, feed: MediaFeed) -> tuple[ParseResult, int]:
         """Baja y lee un feed.
 
         Args:

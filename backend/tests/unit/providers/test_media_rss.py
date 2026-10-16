@@ -9,13 +9,13 @@ import pytest
 from app.adapters.ingest.media_rss import (
     SNIPPET_MAX_CHARS,
     FeedError,
-    MediaFeed,
     MediaRssSource,
     clean_snippet,
     parse_feed,
     read_feeds,
 )
 from app.adapters.providers.http import ProviderHttpClient
+from app.application.ports.ingest import MediaFeed
 from app.domain.queries import Provider
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "ingest"

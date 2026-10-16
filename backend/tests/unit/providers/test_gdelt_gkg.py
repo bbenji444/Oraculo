@@ -9,7 +9,6 @@ import pytest
 
 from app.adapters.ingest.gdelt_gkg import (
     GdeltGkgSource,
-    GkgFile,
     GkgFileError,
     parse_lastupdate,
     parse_locations,
@@ -18,6 +17,7 @@ from app.adapters.ingest.gdelt_gkg import (
     verify,
 )
 from app.adapters.providers.http import ProviderHttpClient
+from app.application.ports.ingest import GkgFile
 from app.domain.queries import Provider
 from app.geodata.fips import read_fips_to_inegi
 
