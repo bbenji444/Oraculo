@@ -37,7 +37,7 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | Tabla | Qué guarda |
 |---|---|
 | `regions` | Catálogo geográfico: 258 países, 32 estados, 2,478 municipios y 296,850 localidades. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0003`. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0004`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
@@ -50,7 +50,9 @@ Columnas principales de `regions`:
 | `name_norm` | `IZTAPALAPA` | Nombre para comparar: mayúsculas, sin acentos, **con Ñ**. |
 | `display_prefix` | `Alcaldía` | Para mostrar "Alcaldía Iztapalapa". |
 | `parent_id` | (id de CDMX) | Región que la contiene. |
-| `aliases` | `{CDMX,DF}` | Otros nombres (lista curada en `geodata/aliases.csv`). |
+| `aliases` | `{CDMX,DF}` | Otros nombres con que se reconoce el lugar en una nota (lista curada en `geodata/aliases.csv`). |
+| `search_terms` | `{"Ciudad de México",CDMX}` | Con qué palabras se busca el lugar en los proveedores de noticias; vacío = se usa `name` (`geodata/search_terms.csv`, ADR-0009). |
+| `iso_a2`, `fips_code`, `name_en` | `ES`, `SP`, `Spain` | Solo países: códigos para filtrar por país en cada proveedor (ADR-0009). |
 | `geom` | (polígono) | Forma completa. Vacía en localidades rurales que solo tienen punto. |
 | `centroid` | (punto) | Punto representativo, siempre dentro de la forma. |
 | `bbox` | `{-99.14,19.28,-98.96,19.40}` | Rectángulo [oeste, sur, este, norte]. |
