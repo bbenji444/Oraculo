@@ -1,0 +1,3 @@
+50458 88a30ecef9c6763f206a93f4c96ac21b http://data.gdeltproject.org/gdeltv2/20261016191500.translation.export.CSV.zip
+82705 c5b9934c2568102f80c88953856ca5a4 http://data.gdeltproject.org/gdeltv2/20261016191500.translation.mentions.CSV.zip
+146690 2d3aa47ba688dd3b76ad72207aa56e32 http://data.gdeltproject.org/gdeltv2/20261016191500.translation.gkg.csv.zip
