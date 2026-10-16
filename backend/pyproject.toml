@@ -78,8 +78,11 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 # En pruebas: assert es la herramienta (S101), los valores fijos son datos de
-# prueba (S105/S106, PLR2004) y cada prueba se explica con su nombre (D1xx).
-"tests/**" = ["S101", "S105", "S106", "PLR2004", "D100", "D101", "D102", "D103", "D104"]
+# prueba (S105/S106, PLR2004), cada prueba se explica con su nombre (D1xx) y
+# los constructores de datos de prueba aceptan muchos campos opcionales (PLR0913).
+"tests/**" = [
+  "S101", "S105", "S106", "PLR2004", "PLR0913", "D100", "D101", "D102", "D103", "D104",
+]
 # Las migraciones de Alembic se generan con una plantilla fija.
 "alembic/versions/*" = ["D103"]
 

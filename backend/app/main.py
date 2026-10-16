@@ -20,6 +20,8 @@ from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
 from app.adapters.health.postgres_probe import PostgresHealthProbe
 from app.adapters.health.redis_probe import RedisHealthProbe
+from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.api.errors import register_error_handlers
 from app.api.v1 import api_router
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.core.config import APP_VERSION, Settings, get_settings
@@ -69,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ],
             timeout_seconds=settings.health_check_timeout_seconds,
         )
+        app.state.region_repository = PostgresRegionRepository(engine)
         try:
             yield
         finally:
@@ -83,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url=f"{API_PREFIX}/docs",
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
+    register_error_handlers(app)
     app.include_router(api_router, prefix=API_PREFIX)
     return app
 
