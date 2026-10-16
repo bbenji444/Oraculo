@@ -268,6 +268,7 @@ make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
 make seed            # carga los conceptos semilla que falten (no pisa ediciones)
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
+make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 make db-shell        # consola SQL (psql) en la base de desarrollo
 make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```

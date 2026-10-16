@@ -24,7 +24,7 @@ from xml.etree.ElementTree import Element
 from defusedxml.ElementTree import ParseError, fromstring
 
 from app.adapters.providers.http import ProviderHttpClient
-from app.application.ports.ingest import MediaFeed, ParseResult
+from app.application.ports.ingest import IngestSourceError, MediaFeed, ParseResult
 from app.domain.news_index import InvalidNewsError, NewsItem
 from app.geodata.fuentes import REPO_ROOT
 
@@ -35,7 +35,7 @@ _ACTIVE = "si"
 _TAGS = re.compile(r"<[^>]+>")
 
 
-class FeedError(RuntimeError):
+class FeedError(IngestSourceError):
     """El feed no respondió un RSS legible."""
 
 
@@ -140,6 +140,10 @@ class MediaRssSource:
             http: Cliente HTTP (tiempos, reintentos, 429).
         """
         self._http = http
+
+    async def aclose(self) -> None:
+        """Cierra las conexiones HTTP."""
+        await self._http.aclose()
 
     async def fetch(self, feed: MediaFeed) -> tuple[ParseResult, int]:
         """Baja y lee un feed.

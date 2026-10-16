@@ -37,7 +37,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from app.adapters.providers.http import ProviderHttpClient
-from app.application.ports.ingest import GkgFile, ParseResult
+from app.application.ports.ingest import GkgFile, IngestSourceError, ParseResult
 from app.domain.news_index import (
     GDELT_SOURCE,
     GdeltLocation,
@@ -62,7 +62,7 @@ _LOCATION_PARTS = 7
 _LASTUPDATE_FIELDS = 3
 
 
-class GkgFileError(RuntimeError):
+class GkgFileError(IngestSourceError):
     """El archivo de GDELT no llegó completo o no tiene el formato esperado."""
 
 
@@ -228,6 +228,10 @@ class GdeltGkgSource:
         """
         self._http = http
         self._fips = fips_to_inegi
+
+    async def aclose(self) -> None:
+        """Cierra las conexiones HTTP."""
+        await self._http.aclose()
 
     async def latest(self) -> GkgFile:
         """Archivo GKG que GDELT anuncia como el más reciente.

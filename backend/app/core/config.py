@@ -56,6 +56,12 @@ _DEFAULT_QUERY_CACHE_TTL_HOURS = 6.0
 #   gratuita. Red de seguridad contra gastos por error.
 _DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
 
+# Ingesta al índice local (ADR-0013):
+# - 90 días de notas, igual que la ventana que cubre la API de GDELT.
+_DEFAULT_NEWS_INDEX_RETENTION_DAYS = 90
+# - GDELT publica un GKG cada 15 minutos; correr más seguido no trae nada nuevo.
+_DEFAULT_INGEST_INTERVAL_MINUTES = 15
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
 APP_VERSION = "0.2.0"
@@ -115,6 +121,16 @@ class Settings(BaseSettings):
     # GDELT: desactivado por defecto mientras responda 429 de forma persistente
     # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
     gdelt_enabled: bool = False
+
+    # --- Ingesta periódica al índice local (ADR-0013) ---
+    # Archivos GKG de GDELT: activos por defecto (servidor de archivos, sin el
+    # límite de la API). ~760 MB de descarga al día; se apaga con false.
+    gdelt_gkg_enabled: bool = True
+    # RSS de medios: apagados hasta que Benji revise los términos de cada uno.
+    # Además, cada medio se activa por separado en fuentes/medios_rss.csv.
+    media_rss_enabled: bool = False
+    news_index_retention_days: int = Field(default=_DEFAULT_NEWS_INDEX_RETENTION_DAYS, ge=1)
+    ingest_interval_minutes: int = Field(default=_DEFAULT_INGEST_INTERVAL_MINUTES, ge=1)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

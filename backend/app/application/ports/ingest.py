@@ -18,6 +18,14 @@ from app.domain.news_index import RSS_SOURCE_PREFIX, NewsItem
 RunStatus = Literal["ok", "error", "skipped"]
 
 
+class IngestSourceError(RuntimeError):
+    """Una fuente respondió algo inutilizable (archivo incompleto, RSS roto...).
+
+    Los adaptadores la especializan; los casos de uso la atrapan sin saber de
+    formatos.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class GkgFile:
     """Un archivo GKG anunciado por GDELT.

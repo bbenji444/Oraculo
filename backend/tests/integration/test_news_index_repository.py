@@ -1,0 +1,149 @@
+"""Índice local y registro de ingesta contra la base de pruebas."""
+
+import json
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.adapters.persistence.news_index_repository import (
+    PostgresIngestRunLog,
+    PostgresNewsIndex,
+    url_hash,
+)
+from app.application.ports.ingest import IngestRun
+from app.application.use_cases.ingest import IngestGdeltGkg
+from app.core.config import Settings
+from app.domain.news_index import GdeltLocation, NewsItem
+from tests.unit.fake_ingest import FILE, FakeGkg, parsed
+
+pytestmark = [pytest.mark.integration, pytest.mark.anyio]
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+NOW = datetime(2026, 10, 16, 20, 0, tzinfo=UTC)
+
+
+def _empty(engine: Engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM news_index"))
+        conn.execute(text("DELETE FROM ingest_runs"))
+
+
+@pytest.fixture
+def sync_engine(settings: Settings) -> Iterator[Engine]:
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("ALEMBIC_TARGET", "test")
+        command.upgrade(Config(str(BACKEND_DIR / "alembic.ini")), "head")
+    engine = create_engine(settings.database_url(test=True))
+    _empty(engine)
+    yield engine
+    _empty(engine)
+    engine.dispose()
+
+
+def note(url: str, published_at: datetime = NOW) -> NewsItem:
+    return NewsItem.create(
+        source="gdelt_gkg",
+        url=url,
+        title="Cayó extorsionador tras cateo en Iztapalapa",
+        snippet="Detienen a un hombre en la alcaldía.",
+        published_at=published_at,
+        language="es",
+        gdelt_states=("09",),
+        gdelt_locations=(
+            GdeltLocation(4, "Iztapalapa, Distrito Federal, Mexico", "MX", "MX09", 19.35, -99.06),
+        ),
+        gdelt_themes=("ARREST",),
+    )
+
+
+async def test_guarda_la_nota_con_texto_normalizado_y_pistas(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    new = await PostgresNewsIndex(test_engine).add([note("https://medio.mx/a")])
+
+    assert new == 1
+    with sync_engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT url_hash, text_norm, gdelt_states, gdelt_locations, gdelt_themes "
+                "FROM news_index"
+            )
+        ).one()
+    assert row.url_hash == url_hash("https://medio.mx/a")
+    assert row.text_norm.startswith("CAYO EXTORSIONADOR TRAS CATEO EN IZTAPALAPA")
+    assert row.gdelt_states == ["09"]
+    assert row.gdelt_themes == ["ARREST"]
+    assert row.gdelt_locations[0]["adm1"] == "MX09"
+    assert json.dumps(row.gdelt_locations, ensure_ascii=False).count("Iztapalapa") == 1
+
+
+async def test_reingerir_la_misma_url_no_duplica(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    index = PostgresNewsIndex(test_engine)
+
+    first = await index.add([note("https://medio.mx/a"), note("https://medio.mx/b")])
+    second = await index.add([note("https://medio.mx/b"), note("https://medio.mx/c")])
+
+    assert (first, second) == (2, 1)
+    with sync_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM news_index")).scalar_one() == 3
+
+
+async def test_la_limpieza_borra_solo_lo_viejo(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    index = PostgresNewsIndex(test_engine)
+    await index.add(
+        [note("https://medio.mx/vieja", NOW - timedelta(days=91)), note("https://medio.mx/nueva")]
+    )
+
+    deleted = await index.purge_before(NOW - timedelta(days=90))
+
+    assert deleted == 1
+    with sync_engine.connect() as conn:
+        assert (
+            conn.execute(text("SELECT url FROM news_index")).scalar_one()
+            == "https://medio.mx/nueva"
+        )
+
+
+async def test_registro_de_corridas_y_archivo_ya_procesado(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    runs = PostgresIngestRunLog(test_engine)
+    failed = IngestRun(
+        "gdelt_gkg", FILE.name, FILE.url, "error", NOW, NOW, error_message="incompleto"
+    )
+
+    await runs.record(failed)
+    assert not await runs.already_processed(FILE.url)
+
+    run_id = await runs.record(
+        IngestRun("gdelt_gkg", FILE.name, FILE.url, "ok", NOW, NOW, items_new=3)
+    )
+    assert run_id > 0
+    assert await runs.already_processed(FILE.url)
+
+
+async def test_caso_de_uso_completo_contra_la_base(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    use_case = IngestGdeltGkg(
+        FakeGkg(parsed(4)), PostgresNewsIndex(test_engine), PostgresIngestRunLog(test_engine)
+    )
+
+    first, second = await use_case.run(), await use_case.run()
+
+    assert (first.status, first.items_new, second.status) == ("ok", 4, "skipped")
+    with sync_engine.connect() as conn:
+        counts = conn.execute(
+            text("SELECT (SELECT count(*) FROM news_index), (SELECT count(*) FROM ingest_runs)")
+        ).one()
+    assert tuple(counts) == (4, 1)
