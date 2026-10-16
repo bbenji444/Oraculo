@@ -12,6 +12,7 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.news_index_repository import (
+    PostgresIndexStats,
     PostgresIngestRunLog,
     PostgresNewsIndex,
     index_stats,
@@ -220,3 +221,18 @@ async def test_estadisticas_por_fuente(sync_engine: Engine, test_engine: AsyncEn
     assert (by_source["gdelt_ngrams"].with_body, by_source["gdelt_ngrams"].newest) == (1, NOW)
     assert by_source["gdelt_ngrams"].body_bytes > 0
     assert total > 0
+
+
+async def test_resumen_con_la_ultima_corrida_exitosa(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    runs = PostgresIngestRunLog(test_engine)
+    await runs.record(IngestRun("gdelt_ngrams", "a", "k1", "ok", NOW, NOW))
+    later = NOW + timedelta(minutes=15)
+    await runs.record(IngestRun("gdelt_ngrams", "b", "k2", "error", later, later))
+
+    stats = await PostgresIndexStats(test_engine).stats()
+
+    # Una corrida con error no cuenta como "última corrida".
+    assert stats.last_run_at == NOW
+    assert stats.sources == ()

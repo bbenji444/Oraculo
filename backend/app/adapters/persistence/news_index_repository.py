@@ -14,13 +14,14 @@ No hace: no busca (eso es ``LocalIndexProvider``).
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.ports.ingest import IngestRun
+from app.application.ports.local_index import IndexStats, SourceStats
 from app.domain.news_index import NewsItem
 
 _INSERT = text(
@@ -113,27 +114,6 @@ class PostgresNewsIndex:
             return result.rowcount
 
 
-@dataclass(frozen=True, slots=True)
-class SourceStats:
-    """Cuánto hay de una fuente en el índice.
-
-    Attributes:
-        source: ``gdelt_gkg``, ``gdelt_ngrams`` o ``rss:<medio>``.
-        notes: Notas guardadas.
-        with_body: Notas que conservan frases del cuerpo.
-        body_bytes: Bytes que ocupan esas frases en disco (ya comprimidas).
-        oldest: Nota más vieja (UTC), o ``None``.
-        newest: Nota más nueva (UTC), o ``None``.
-    """
-
-    source: str
-    notes: int
-    with_body: int
-    body_bytes: int
-    oldest: datetime | None
-    newest: datetime | None
-
-
 async def index_stats(engine: AsyncEngine) -> tuple[list[SourceStats], int]:
     """Resumen del índice por fuente y su tamaño total en disco.
 
@@ -159,6 +139,28 @@ async def index_stats(engine: AsyncEngine) -> tuple[list[SourceStats], int]:
         stats = [SourceStats(**row) for row in rows.mappings()]
         total = await conn.execute(text("SELECT pg_total_relation_size('news_index')"))
         return stats, int(total.scalar_one())
+
+
+class PostgresIndexStats:
+    """``IndexStatsPort`` sobre PostgreSQL (pestaña temporal "Notas")."""
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        """Recibe el engine compartido.
+
+        Args:
+            engine: Engine asíncrono de SQLAlchemy (psycopg).
+        """
+        self._engine = engine
+
+    async def stats(self) -> IndexStats:
+        """Ver ``IndexStatsPort.stats``."""
+        sources, total = await index_stats(self._engine)
+        async with self._engine.connect() as conn:
+            last = await conn.execute(
+                text("SELECT max(finished_at) FROM ingest_runs WHERE status = 'ok'")
+            )
+            last_run_at: datetime | None = last.scalar_one()
+        return IndexStats(tuple(sources), total, last_run_at)
 
 
 class PostgresIngestRunLog:
