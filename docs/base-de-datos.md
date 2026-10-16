@@ -37,7 +37,8 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | Tabla | Qué guarda |
 |---|---|
 | `regions` | Catálogo geográfico: 258 países, 32 estados, 2,478 municipios y 296,850 localidades. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0004`. |
+| `concepts` | Conceptos de búsqueda ("Ciberseguridad", "Secuestro"...) con sus palabras clave, exclusiones y color. `deleted_at` marca los borrados lógicos. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0005`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
