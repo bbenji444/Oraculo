@@ -1,0 +1,14 @@
+{
+  "proveedor": "gdelt",
+  "texto": "hackeo sourcelang:spanish sourcecountry:MX",
+  "parametros": {
+    "query": "hackeo sourcelang:spanish sourcecountry:MX",
+    "mode": "ArtList",
+    "format": "json",
+    "maxrecords": "250",
+    "sort": "DateDesc",
+    "timespan": "7d"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-16T17:10:06+00:00"
+}
