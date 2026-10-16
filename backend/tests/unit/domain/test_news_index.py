@@ -66,3 +66,11 @@ def test_estados_inegi_sin_repetir_y_sin_el_nivel_pais() -> None:
     coahuila = GdeltLocation(4, "Saltillo", "MX", "MX07", None, None)
 
     assert inegi_states([COUNTRY, CDMX, coahuila, CDMX, MADRID], fips) == ("09", "05")
+
+
+def test_ubicaciones_repetidas_se_guardan_una_vez() -> None:
+    # GDELT repite la ubicación por cada mención: en el GKG del 16/10/2026 una
+    # nota del huracán Trudy traía "Mexico" 10 veces y la misma ciudad 5.
+    news = item(gdelt_locations=[COUNTRY, CDMX, COUNTRY, CDMX, COUNTRY])
+
+    assert news.gdelt_locations == (COUNTRY, CDMX)

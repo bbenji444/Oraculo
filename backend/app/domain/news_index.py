@@ -118,7 +118,7 @@ class NewsItem:
             source_domain: Dominio; si falta, se toma de la URL.
             language: Idioma.
             gdelt_states: Claves INEGI de estado.
-            gdelt_locations: Ubicaciones de GDELT.
+            gdelt_locations: Ubicaciones de GDELT (las repetidas se guardan una vez).
             gdelt_themes: Temas de GDELT.
 
         Returns:
@@ -147,7 +147,8 @@ class NewsItem:
             published_at=published_at.astimezone(UTC),
             language=language,
             gdelt_states=tuple(dict.fromkeys(gdelt_states)),
-            gdelt_locations=tuple(gdelt_locations),
+            # GDELT repite la ubicación por cada mención; basta una vez como pista.
+            gdelt_locations=tuple(dict.fromkeys(gdelt_locations)),
             gdelt_themes=tuple(dict.fromkeys(gdelt_themes)),
         )
 
