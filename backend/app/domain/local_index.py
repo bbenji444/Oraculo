@@ -4,10 +4,15 @@ Convierte una ``PlannedQuery`` en criterios concretos que el adaptador de
 ``indice_local`` traduce a SQL:
 
 - **Palabras clave:** al menos una aparece como palabra completa en el
-  título o el fragmento (``text_norm``), comparando con la misma
-  normalización del catálogo (mayúsculas, sin acentos, con Ñ).
-- **Exclusiones:** si aparece alguna, la nota se descarta.
-- **Lugar:** algún término del lugar aparece en el texto (y, si hace falta
+  título o el fragmento (``text_norm``), o en las frases del cuerpo
+  (``body_terms``, ngramas; ADR-0014), comparando con la misma
+  normalización del catálogo (mayúsculas, sin acentos, con Ñ). Las frases del
+  cuerpo tienen 4 palabras: un término más largo se busca ahí por sus
+  primeras 4 (``for_body``).
+- **Exclusiones:** si aparece alguna **en el título o el fragmento**, la nota
+  se descarta. En el cuerpo no se aplican: palabras como "curso" aparecen en
+  frases normales ("la investigación en curso") y tirarían notas buenas.
+- **Lugar:** algún término del lugar aparece en el texto o el cuerpo (y, si hace falta
   para distinguir nombres repetidos, también el estado), **o** la región es
   un estado y GDELT ubicó la nota ahí. En México a nivel país no se filtra
   por lugar: todo el índice es de México. En otro país se pide su nombre.
@@ -29,6 +34,25 @@ from app.domain.queries import PlannedQuery, QueryPlace
 MAX_LOCAL_RESULTS = 250
 # El índice solo guarda notas sobre México (filtro de la ingesta).
 INDEX_COUNTRY_ISO = "MX"
+# Las frases de los ngramas de GDELT tienen 4 palabras (ADR-0014).
+BODY_PHRASE_WORDS = 4
+
+
+def for_body(terms: tuple[str, ...]) -> tuple[str, ...]:
+    """Recorta los términos a lo que cabe en una frase del cuerpo.
+
+    Args:
+        terms: Términos ya normalizados.
+
+    Returns:
+        Cada término con a lo más ``BODY_PHRASE_WORDS`` palabras, sin repetir.
+
+    Example:
+        >>> for_body(("HEROICA CIUDAD DE JUCHITAN DE ZARAGOZA", "HACKEO"))
+        ('HEROICA CIUDAD DE JUCHITAN', 'HACKEO')
+    """
+    short = (" ".join(term.split()[:BODY_PHRASE_WORDS]) for term in terms)
+    return tuple(dict.fromkeys(short))
 
 
 @dataclass(frozen=True, slots=True)

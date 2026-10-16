@@ -122,3 +122,45 @@ async def test_la_enie_se_conserva_y_es_letra(provider: LocalIndexProvider) -> N
 def test_los_caracteres_especiales_se_escapan() -> None:
     assert word_pattern(["C.D.M.X.", "A|B"]) == r"\m(?:C\.D\.M\.X\.|A\|B)\M"
     assert word_pattern([]) is None
+
+
+def body_note(slug: str, title: str, phrases: list[str]) -> NewsItem:
+    return NewsItem.create(
+        source="gdelt_ngrams",
+        url=f"https://medio.mx/{slug}",
+        title=title,
+        published_at=NOON,
+        body_phrases=phrases,
+    )
+
+
+@pytest.fixture
+async def body_provider(sync_engine: Engine, test_engine: AsyncEngine) -> LocalIndexProvider:
+    await PostgresNewsIndex(test_engine).add(
+        [
+            # Palabra clave y lugar solo en el cuerpo: el título no dice nada.
+            body_note(
+                "cuerpo", "Detienen a un hombre", ["por el hackeo a", "en la alcaldía Iztapalapa"]
+            ),
+            # "curso" en el cuerpo no la tira: las exclusiones van al título.
+            body_note(
+                "en_curso", "Investigan robo", ["el hackeo sigue en", "en curso en Iztapalapa"]
+            ),
+            # Las palabras no se "pegan" entre dos frases distintas.
+            body_note("pegadas", "Otra nota", ["termina en hackeo", "Iztapalapa empieza aquí"]),
+            body_note("lejos", "Robo", ["hackeo en Monterrey hoy"]),
+        ]
+    )
+    return LocalIndexProvider(test_engine)
+
+
+async def test_tambien_busca_en_las_frases_del_cuerpo(body_provider: LocalIndexProvider) -> None:
+    response = await body_provider.search(query(IZTAPALAPA))
+
+    assert set(slugs([a.url for a in response.articles])) == {"cuerpo", "en_curso", "pegadas"}
+
+
+async def test_una_frase_de_dos_palabras_no_cruza_frases(body_provider: LocalIndexProvider) -> None:
+    response = await body_provider.search(query(None, keywords=("hackeo iztapalapa",), exclude=()))
+
+    assert response.articles == ()

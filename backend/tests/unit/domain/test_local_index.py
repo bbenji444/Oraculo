@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.domain.errors import InvalidRequestError
-from app.domain.local_index import MAX_LOCAL_RESULTS, criteria_for
+from app.domain.local_index import MAX_LOCAL_RESULTS, criteria_for, for_body
 from app.domain.queries import (
     CountryFilter,
     DateWindow,
@@ -83,3 +83,10 @@ def test_un_estado_acepta_la_pista_de_gdelt() -> None:
 def test_sin_palabras_clave_utiles_es_error() -> None:
     with pytest.raises(InvalidRequestError, match="palabras clave"):
         criteria_for(query(None, keywords=("  ",)), CDMX_TZ)
+
+
+def test_en_el_cuerpo_un_termino_largo_se_busca_por_sus_primeras_4_palabras() -> None:
+    assert for_body(("HEROICA CIUDAD DE JUCHITAN DE ZARAGOZA", "HACKEO", "HACKEO")) == (
+        "HEROICA CIUDAD DE JUCHITAN",
+        "HACKEO",
+    )

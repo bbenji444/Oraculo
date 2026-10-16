@@ -8,7 +8,10 @@ en ``app.domain.local_index``; aquí solo se traducen a SQL.
 Palabra completa: se usan los límites de palabra de PostgreSQL (``\m`` y
 ``\M``). Medido el 16/10/2026 con la base en ``C.UTF-8``: la Ñ cuenta como
 letra ("ESPA" no coincide dentro de "ESPAÑA"). Los trigramas de
-``text_norm`` aceleran estas expresiones.
+``text_norm`` y ``body_terms`` aceleran estas expresiones.
+
+Se busca en el título y en las frases del cuerpo (ngramas, ADR-0014); las
+exclusiones, solo en el título (ver ``app.domain.local_index``).
 
 No hace: no llama a internet ni gasta créditos; no confirma la ubicación
 (eso es F4 con el catálogo INEGI).
@@ -26,7 +29,7 @@ from app.application.clock import MEXICO_CITY
 from app.application.ports.providers import ProviderResponse
 from app.domain.articles import RawArticle
 from app.domain.errors import ProviderUnavailableError
-from app.domain.local_index import LocalIndexCriteria, criteria_for
+from app.domain.local_index import LocalIndexCriteria, criteria_for, for_body
 from app.domain.queries import PlannedQuery, Provider
 
 # No hay HTTP: 200 significa "la consulta a la base salió bien", para que el
@@ -41,12 +44,13 @@ _SEARCH = text(
            published_at, language, gdelt_states
     FROM news_index
     WHERE published_at >= :start AND published_at < :end
-      AND text_norm ~ :keywords
+      AND (text_norm ~ :keywords OR body_terms ~ :body_keywords)
       AND (CAST(:exclude AS text) IS NULL OR text_norm !~ :exclude)
       AND (
             CAST(:place AS text) IS NULL
-         OR (text_norm ~ :place
-             AND (CAST(:required AS text) IS NULL OR text_norm ~ :required))
+         OR ((text_norm ~ :place OR body_terms ~ :body_place)
+             AND (CAST(:required AS text) IS NULL
+                  OR text_norm ~ :required OR body_terms ~ :body_required))
          OR (CAST(:state AS text) IS NOT NULL
              AND gdelt_states @> ARRAY[CAST(:state AS text)])
       )
@@ -76,9 +80,12 @@ def _sql_params(criteria: LocalIndexCriteria) -> dict[str, object]:
         "start": criteria.start,
         "end": criteria.end,
         "keywords": word_pattern(criteria.keywords),
+        "body_keywords": word_pattern(for_body(criteria.keywords)),
         "exclude": word_pattern(criteria.exclusions),
         "place": word_pattern(criteria.place_terms),
+        "body_place": word_pattern(for_body(criteria.place_terms)),
         "required": word_pattern(criteria.required_terms),
+        "body_required": word_pattern(for_body(criteria.required_terms)),
         "state": criteria.state_code,
         "limit": criteria.limit,
     }
