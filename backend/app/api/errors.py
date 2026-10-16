@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.domain.errors import DomainError, InvalidRequestError, NotFoundError
+from app.domain.errors import ConflictError, DomainError, InvalidRequestError, NotFoundError
 
 
 class ErrorBody(BaseModel):
@@ -39,6 +39,7 @@ class ErrorOut(BaseModel):
 # Para documentar en OpenAPI las respuestas de error de cada router.
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     status.HTTP_404_NOT_FOUND: {"model": ErrorOut, "description": "No encontrado"},
+    status.HTTP_409_CONFLICT: {"model": ErrorOut, "description": "Choca con algo que ya existe"},
     status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorOut, "description": "Petición inválida"},
 }
 
@@ -69,6 +70,8 @@ def error_response(
 def _status_for(error: DomainError) -> int:
     if isinstance(error, NotFoundError):
         return status.HTTP_404_NOT_FOUND
+    if isinstance(error, ConflictError):
+        return status.HTTP_409_CONFLICT
     if isinstance(error, InvalidRequestError):
         return status.HTTP_422_UNPROCESSABLE_CONTENT
     return status.HTTP_400_BAD_REQUEST

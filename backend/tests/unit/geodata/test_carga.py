@@ -87,6 +87,7 @@ def test_entradas_fuera_de_la_carpeta_de_trabajo_se_copian_con_sus_hermanos(
         locality_points=layer(inside, is_point=True),
         locality_polygons=layer(inside),
         aliases_csv=tmp_path / "aliases.csv",
+        search_terms_csv=tmp_path / "search_terms.csv",
         inegi_source="x",
         natural_earth_source="y",
     )

@@ -1,24 +1,36 @@
 /**
  * Componente raíz: encabezado con pestañas y la pantalla activa.
  *
- * Pestañas: "Geodatos" (globo con el catálogo de regiones, F1) y "Estado del
- * sistema" (F0). La pestaña vive en la URL (#/geodatos, #/estado) para que se
- * pueda compartir o recargar sin perderla. No hace llamadas HTTP.
+ * Pestañas: "Geodatos" (globo con el catálogo de regiones, F1), "Conceptos"
+ * (administración y "Probar concepto", F2) y "Estado del sistema" (F0). La
+ * pestaña vive en la URL (#/geodatos, #/conceptos, #/estado) para que se pueda
+ * compartir o recargar sin perderla. No hace llamadas HTTP.
  */
 import { useEffect, useState } from 'react';
 
+import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { GeoExplorer } from './components/GeoExplorer/GeoExplorer';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'geodatos' | 'estado';
+type Tab = 'geodatos' | 'conceptos' | 'estado';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'geodatos', label: 'Geodatos' },
+  { id: 'conceptos', label: 'Conceptos' },
   { id: 'estado', label: 'Estado del sistema' },
 ];
 
 function tabFromHash(): Tab {
-  return window.location.hash === '#/estado' ? 'estado' : 'geodatos';
+  const hash = window.location.hash;
+  if (hash === '#/estado') return 'estado';
+  if (hash === '#/conceptos') return 'conceptos';
+  return 'geodatos';
+}
+
+function Screen({ tab }: { tab: Tab }) {
+  if (tab === 'conceptos') return <ConceptsPage />;
+  if (tab === 'estado') return <SystemStatusPanel />;
+  return <GeoExplorer />;
 }
 
 export function App() {
@@ -66,7 +78,7 @@ export function App() {
         </div>
       </header>
       <main className="min-h-0 flex-1 overflow-auto">
-        {tab === 'geodatos' ? <GeoExplorer /> : <SystemStatusPanel />}
+        <Screen tab={tab} />
       </main>
     </div>
   );

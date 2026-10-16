@@ -11,7 +11,15 @@ from sqlalchemy import Engine, create_engine, text
 
 from app.core.config import Settings
 from app.geodata.carga import GeodataLoadError, LoadSummary, apply_aliases, run_load
+from app.geodata.terminos import (
+    CountryCodes,
+    SearchTermsError,
+    apply_country_codes,
+    apply_search_terms,
+    read_search_terms,
+)
 from tests.integration.geo_fixture import (
+    FIXTURES,
     NE_SOURCE,
     fixture_inputs,
     fixture_target,
@@ -194,3 +202,53 @@ def test_volver_a_cargar_no_duplica_ni_cambia_ids(
 def test_alias_con_clave_inexistente_es_error(engine: Engine) -> None:
     with pytest.raises(GeodataLoadError, match="99999"):
         apply_aliases(engine, {"99999": ["Inventado"]})
+
+
+def search_terms_and_codes(engine: Engine, code: str) -> tuple[Any, ...]:
+    with engine.connect() as conn:
+        return tuple(
+            conn.execute(
+                text(
+                    "SELECT search_terms, iso_a2, fips_code, name_en FROM regions WHERE code = :c"
+                ),
+                {"c": code},
+            ).one()
+        )
+
+
+def test_terminos_de_busqueda_aplicados(summary: LoadSummary, engine: Engine) -> None:
+    assert summary.search_terms == 2
+    assert search_terms_and_codes(engine, "09")[0] == ["Ciudad de México", "CDMX"]
+    assert search_terms_and_codes(engine, "15")[0] == ["Estado de México", "Edomex"]
+    # Sin entrada en la lista: vacío, y la consulta usará su nombre.
+    assert search_terms_and_codes(engine, "09007")[0] == []
+
+
+def test_codigos_de_pais_aplicados_con_la_misma_clave_del_cargador(
+    summary: LoadSummary, engine: Engine
+) -> None:
+    assert summary.country_codes == 3
+    assert search_terms_and_codes(engine, "MEX")[1:] == ("MX", "MX", "Mexico")
+    assert search_terms_and_codes(engine, "COL")[1:] == ("CO", "CO", "Colombia")
+    # Francia entra con clave ADM0 (ISO_A3 = -99); su FIPS -99 del fixture queda vacío.
+    assert search_terms_and_codes(engine, "FRA")[1:] == ("FR", None, "France")
+
+
+def test_quitar_un_termino_del_csv_lo_quita_de_la_base(engine: Engine) -> None:
+    try:
+        apply_search_terms(engine, {"09": ["CDMX"]})
+
+        assert search_terms_and_codes(engine, "09")[0] == ["CDMX"]
+        assert search_terms_and_codes(engine, "15")[0] == []
+    finally:
+        apply_search_terms(engine, read_search_terms(FIXTURES / "search_terms.csv"))
+
+
+def test_termino_con_clave_inexistente_es_error(engine: Engine) -> None:
+    with pytest.raises(SearchTermsError, match="99999"):
+        apply_search_terms(engine, {"99999": ["Inventado"]})
+
+
+def test_pais_de_natural_earth_sin_region_es_error(engine: Engine) -> None:
+    with pytest.raises(SearchTermsError, match="ZZZ"):
+        apply_country_codes(engine, [CountryCodes("ZZZ", "ZZ", None, "Nowhere")])

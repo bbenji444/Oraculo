@@ -26,7 +26,8 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \n        geo-basemap db-shell db-dump
+        format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
+        geo-terms geo-basemap db-shell db-dump seed
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -101,10 +102,16 @@ geo-validate: ## Criterios de aceptación del catálogo geográfico (§12)
 geo-tiles: ## Genera los PMTiles de países, estados, municipios y localidades
 	$(UV_RUN) python -m app.geodata.generar_pmtiles
 
+geo-terms: ## Aplica términos de búsqueda y códigos de país sin recargar el catálogo (ADR-0009)
+	$(UV_RUN) python -m app.geodata.aplicar_terminos $(ARGS)
+
 geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
 	$(UV_RUN) python -m app.geodata.mapa_base
 
 # --- Base de datos (docs/base-de-datos.md) ---------------------------------------
+
+seed: ## Carga los conceptos semilla que falten (nunca modifica los existentes)
+	$(UV_RUN) python -m app.seed.cargar_conceptos
 
 db-shell: ## Abre una consola SQL (psql) en la base de desarrollo
 	bash scripts/dev/base_datos.sh shell

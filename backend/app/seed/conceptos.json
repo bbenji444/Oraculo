@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Ciberseguridad",
+    "description": "Ataques informáticos, robo de datos y fraudes digitales",
+    "keywords": ["ciberataque", "hackeo", "ransomware", "filtración de datos", "phishing", "robo de datos", "fraude cibernético"],
+    "exclude_terms": ["curso", "webinar", "diplomado", "vacante"],
+    "color": "#2E86DE"
+  },
+  {
+    "name": "Secuestro",
+    "description": "Privación ilegal de la libertad de personas",
+    "keywords": ["secuestro", "secuestrado", "secuestrada", "plagio", "privación ilegal de la libertad", "levantón"],
+    "exclude_terms": ["simulacro", "película", "serie"],
+    "color": "#E74C3C"
+  },
+  {
+    "name": "Extorsión",
+    "description": "Cobro de piso, extorsión telefónica y amenazas para obtener dinero",
+    "keywords": ["extorsión", "extorsionador", "cobro de piso", "derecho de piso", "extorsión telefónica", "montadeudas"],
+    "exclude_terms": ["simulacro"],
+    "color": "#F39C12"
+  },
+  {
+    "name": "Robo de vehículos",
+    "description": "Robo de autos, motocicletas y transporte de carga",
+    "keywords": ["robo de vehículo", "robo de auto", "robo de camioneta", "robo de motocicleta", "vehículo robado", "robo a transportista"],
+    "exclude_terms": ["seguro de auto"],
+    "color": "#9B59B6"
+  },
+  {
+    "name": "Desaparición de personas",
+    "description": "Personas desaparecidas, fichas y colectivos de búsqueda, fosas clandestinas",
+    "keywords": ["persona desaparecida", "desaparecido", "desaparecida", "ficha de búsqueda", "colectivo de búsqueda", "fosa clandestina", "Alerta Amber"],
+    "exclude_terms": [],
+    "color": "#1ABC9C"
+  }
+]

@@ -98,6 +98,54 @@ def test_updated_at_lo_pone_el_disparador_aunque_se_intente_otro_valor(conn: Con
     assert updated_at == now
 
 
+def test_search_terms_empieza_vacio(conn: Connection) -> None:
+    region_id = insert(conn, "TEST1", "locality")
+
+    terms = conn.execute(
+        text("SELECT search_terms FROM regions WHERE id = :id"), {"id": region_id}
+    ).scalar_one()
+
+    assert terms == []
+
+
+def test_un_pais_acepta_sus_codigos(conn: Connection) -> None:
+    region_id = insert(conn, "TEST1", "country")
+
+    conn.execute(
+        text(
+            "UPDATE regions SET iso_a2 = 'ES', fips_code = 'SP', name_en = 'Spain' WHERE id = :id"
+        ),
+        {"id": region_id},
+    )
+
+
+def test_un_municipio_no_puede_tener_codigos_de_pais(conn: Connection) -> None:
+    region_id = insert(conn, "TEST1", "municipality")
+
+    with pytest.raises(IntegrityError, match="regions_country_codes_only_in_countries"):
+        conn.execute(text("UPDATE regions SET iso_a2 = 'MX' WHERE id = :id"), {"id": region_id})
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "constraint"),
+    [
+        ("iso_a2", "mx", "regions_iso_a2_format"),
+        ("iso_a2", "-99", "regions_iso_a2_format"),
+        ("fips_code", "MEX", "regions_fips_code_format"),
+    ],
+)
+def test_los_codigos_de_pais_son_de_dos_letras_mayusculas(
+    conn: Connection, column: str, value: str, constraint: str
+) -> None:
+    region_id = insert(conn, "TEST1", "country")
+
+    with pytest.raises(IntegrityError, match=constraint):
+        conn.execute(
+            text(f"UPDATE regions SET {column} = :v WHERE id = :id"),  # noqa: S608 — columna de la lista fija de esta prueba
+            {"v": value, "id": region_id},
+        )
+
+
 def test_existen_los_indices_de_la_especificacion(conn: Connection) -> None:
     names = set(
         conn.execute(text("SELECT indexname FROM pg_indexes WHERE tablename = 'regions'")).scalars()
