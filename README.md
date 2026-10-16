@@ -6,8 +6,9 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Cómo se trabaja:** [CLAUDE.md](CLAUDE.md)
 - **Decisiones de arquitectura:** [docs/adr/](docs/adr/README.md)
 - **Historial de cambios:** [CHANGELOG.md](CHANGELOG.md)
+- **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
 
-> Estado actual: **Fase 0 (cimientos)**. Funcionan los servicios, el diagnóstico `/health` y una página que muestra el estado del sistema. El globo, la búsqueda y los reportes llegan en las fases siguientes.
+> Estado actual: **Fase 1 (geodatos)**. Además de los cimientos (servicios, `/health`), ya existen el catálogo geográfico de México (INEGI) en PostGIS, los endpoints `/regions` y un globo 3D para explorarlo. La búsqueda de noticias, la geolocalización y los reportes llegan en las fases siguientes.
 
 ---
 
@@ -25,7 +26,9 @@ El código vive en Windows; Ubuntu funciona como un "servidor de desarrollo" den
 | **Node.js 22** (≥ 22.12) | `node --version` | <https://nodejs.org> (versión LTS 22) |
 | **Python** para pre-commit | `py --version` | <https://www.python.org/downloads/windows/> |
 
-Todo lo demás (PostgreSQL 16 + PostGIS, Redis, nginx, Python 3.12 y las librerías) lo instala el paso 3.
+Todo lo demás (PostgreSQL 16 + PostGIS, Redis, nginx, Python 3.12, GDAL, tippecanoe, pmtiles y las librerías) lo instala el paso 3.
+
+Espacio: unos **2 GB en `D:`** (geodatos y mapas) y **3 GB en `C:`** (Ubuntu, base de datos y carpeta de trabajo).
 
 ### 2. Obtener el código
 
@@ -43,7 +46,7 @@ Todos los comandos siguientes se ejecutan **en esta carpeta**. `wsl make ...` co
 wsl make bootstrap
 ```
 
-Instala y configura PostgreSQL 16 + PostGIS, Redis, nginx, uv, Python 3.12, las librerías del backend y las del frontend.
+Instala y configura PostgreSQL 16 + PostGIS, Redis, nginx, uv, Python 3.12, las herramientas de geodatos (GDAL, tippecanoe, pmtiles), las librerías del backend y las del frontend.
 Crea el archivo `.env` a partir de `.env.example` y las bases de datos de desarrollo y de pruebas.
 La primera vez tarda varios minutos (descarga unos cientos de MB). Se puede repetir sin romper nada.
 
@@ -55,16 +58,28 @@ wsl make up
 
 Al terminar muestra el estado de cada servicio y la respuesta de `/health`. Debe decir `HTTP 200` y `"status": "ok"`.
 
-Abre <http://localhost:8080>: verás la página **Estado del sistema** con los cuatro componentes en verde.
+### 5. Cargar los geodatos (una sola vez, unos 30 min)
 
-### 5. Comprobar que todo funciona
+```powershell
+wsl make migrate       # crea las tablas
+wsl make geo-download  # INEGI (249 MB) y Natural Earth
+wsl make geo-inspect   # revisa proyección y encoding; muestra 5 nombres con Ñ
+wsl make geo-load      # carga a PostGIS (7 min), valida y genera los mapas
+wsl make geo-basemap   # mapa base de Protomaps (1.3 GB, 10 min)
+```
+
+`geo-inspect` muestra 5 nombres reales: revisa que la Ñ y los acentos se vean bien antes de `geo-load`. `geo-load` termina con **"Todas las revisiones pasaron"** (criterios de la especificación §12). Detalles en [geodata/README.md](geodata/README.md).
+
+Abre <http://localhost:8080>: verás el **globo** con México. Busca "Iztapalapa" o haz clic en un estado. La pestaña **Estado del sistema** muestra los cuatro componentes en verde.
+
+### 6. Comprobar que todo funciona
 
 ```powershell
 wsl make test    # pruebas del backend (con cobertura) y del frontend
 wsl make lint    # revisiones de estilo y de tipos
 ```
 
-### 6. Activar las revisiones automáticas de cada commit
+### 7. Activar las revisiones automáticas de cada commit
 
 ```powershell
 py -m pip install --user pre-commit==4.7.0
@@ -88,6 +103,8 @@ wsl make down
 | Ver los logs de la API y del worker | `wsl make logs` |
 | Trabajar en el frontend con recarga automática | `cd frontend; npm run dev` → <http://localhost:5173> |
 | Aplicar migraciones de base de datos | `wsl make migrate` |
+| Consultar la base (psql) / respaldarla | `wsl make db-shell` / `wsl make db-dump` |
+| Recargar los geodatos (por ejemplo, edición nueva de INEGI) | `wsl make geo-download geo-inspect geo-load` |
 | Correr pruebas / revisiones | `wsl make test` / `wsl make lint` |
 | Ver todos los comandos | `wsl make` |
 
@@ -95,7 +112,8 @@ Direcciones útiles con el sistema arriba:
 
 | Dirección | Qué es |
 |---|---|
-| <http://localhost:8080> | La aplicación (nginx). |
+| <http://localhost:8080> | La aplicación: globo de geodatos (nginx). |
+| <http://localhost:8080/api/v1/regions/search?q=izta> | Búsqueda de regiones en JSON. |
 | <http://localhost:8080/api/v1/health> | Diagnóstico en JSON. |
 | <http://localhost:8080/api/v1/docs> | Documentación interactiva de la API (OpenAPI). |
 
@@ -110,6 +128,8 @@ Direcciones útiles con el sistema arriba:
 | Errores de librerías de Node (`esbuild`, `rollup`) | Se instalaron dependencias del frontend desde Ubuntu. Borra `frontend/node_modules` y corre `npm ci` en PowerShell dentro de `frontend/`. |
 | `/bin/bash^M: bad interpreter` | Un script quedó con finales de línea de Windows. `.gitattributes` lo evita; si editaste a mano, guárdalo con LF. |
 | La aplicación dice que falta una variable de entorno | Corre `wsl make bootstrap`: agrega a `.env` las variables nuevas de `.env.example`. |
+| El globo sale gris o sin fronteras | Faltan los mapas: corre `wsl make geo-load` y `wsl make geo-basemap`. Si acabas de actualizar, recarga con Ctrl+Mayús+R. |
+| DBeaver no conecta | Usa `127.0.0.1` y no `localhost` (ver [docs/base-de-datos.md](docs/base-de-datos.md)). |
 
 ---
 
@@ -121,5 +141,5 @@ Direcciones útiles con el sistema arriba:
 | [`frontend/`](frontend/README.md) | Interfaz web (React 18 + TypeScript + Vite + Tailwind). |
 | [`nginx/`](nginx/README.md) | Servidor web que une frontend, API y teselas en <http://localhost:8080>. |
 | [`scripts/`](scripts/README.md) | Instalación y arranque de servicios en WSL. |
-| [`geodata/`](geodata/README.md) | Pipeline de geodatos INEGI (Fase 1). |
+| [`geodata/`](geodata/README.md) | Datos geográficos: descargas, mapas generados y alias. La lógica del pipeline está en `backend/app/geodata/`. |
 | [`docs/`](docs/) | Especificación, ADRs y documentación. |

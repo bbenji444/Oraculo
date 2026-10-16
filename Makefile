@@ -26,7 +26,7 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build
+        format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \n        geo-basemap db-shell db-dump
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -81,3 +81,33 @@ format: ## Aplica el formato de ruff y Prettier
 
 frontend-build: ## Compila el frontend en frontend/dist (lo sirve nginx)
 	$(NPM) run build
+
+# --- Geodatos (especificación §12, ADR-0008) ------------------------------------
+
+geo-download: ## Descarga INEGI y Natural Earth a geodata/raw (con manifiesto)
+	$(UV_RUN) python -m app.geodata.descargar
+
+geo-inspect: ## Revisa proyección, encoding y conteos; muestra 5 nombres reales con Ñ
+	$(UV_RUN) python -m app.geodata.inspeccionar
+
+geo-load: ## Carga a PostGIS lo inspeccionado, valida y genera PMTiles (requiere geo-inspect)
+	$(UV_RUN) python -m app.geodata.cargar
+	$(UV_RUN) python -m app.geodata.validar
+	$(UV_RUN) python -m app.geodata.generar_pmtiles
+
+geo-validate: ## Criterios de aceptación del catálogo geográfico (§12)
+	$(UV_RUN) python -m app.geodata.validar
+
+geo-tiles: ## Genera los PMTiles de países, estados, municipios y localidades
+	$(UV_RUN) python -m app.geodata.generar_pmtiles
+
+geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
+	$(UV_RUN) python -m app.geodata.mapa_base
+
+# --- Base de datos (docs/base-de-datos.md) ---------------------------------------
+
+db-shell: ## Abre una consola SQL (psql) en la base de desarrollo
+	bash scripts/dev/base_datos.sh shell
+
+db-dump: ## Respalda la base de desarrollo en backups/ (para migrarla a otro servidor)
+	bash scripts/dev/base_datos.sh dump

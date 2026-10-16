@@ -37,6 +37,27 @@ Ejemplo real de la Fase 0, el diagnóstico `GET /api/v1/health`:
 
 Gracias a esta separación, el caso de uso se prueba con revisores falsos (sin base de datos ni red) y cambiar una tecnología solo toca su adaptador.
 
+## Geodatos (Fase 1)
+
+```
+INEGI (ZIP 2.9 GB) ──Range──► solo el marco integrado (249 MB) ─► geodata/raw/
+Natural Earth ─────────────────────────────────────────────────► geodata/raw/
+                     │ extracción con CRC verificado (disco de Linux)
+                     ▼
+        ogr2ogr → staging_geo → (normalize_name, ST_MakeValid, ST_PointOnSurface)
+                     ▼
+                 regions (PostGIS) ──► /api/v1/regions/*   (búsqueda, punto, jerarquía)
+                     │
+                     └─ tippecanoe ──► geodata/output/*.pmtiles ──► nginx /tiles/ (Range)
+Protomaps (OSM) ── pmtiles extract ───► geodata/output/basemap_*.pmtiles     ──┘
+```
+
+- **Una sola normalización de nombres** (`app/domain/names.py`) para el cargador, el buscador y, en F4, el geocodificador ([ADR-0008](adr/0008-fuentes-y-procesamiento-de-geodatos.md)).
+- **GDAL nunca lee de `/mnt/d`:** en WSL recibió bytes dañados. Todo se procesa en el disco de Linux y a `D:` solo se copian resultados verificados.
+- **El navegador nunca baja GeoJSON pesados:** las formas llegan por PMTiles; la API solo entrega punto y rectángulo.
+
 ## Frontend
 
 React 18 + TypeScript. Las llamadas HTTP viven en `src/services/`, los datos del servidor se administran con TanStack Query (`src/hooks/`) y los componentes solo muestran.
+
+El globo usa MapLibre GL JS v6 con proyección `globe` ([ADR-0007](adr/0007-maplibre-v6.md)). Su estilo (`src/map/style.ts`) es una función pura y probada: mapa base de Protomaps en español y capas de INEGI encima, con resaltado por `feature-state`.

@@ -6,6 +6,33 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-10-16
+
+### Agregado
+
+- **Fase 1 — Geodatos.**
+  - Tabla `regions` (migraciones 0002 y 0003) con 258 países, 32 estados, 2,478 municipios y 296,850 localidades de INEGI (Marco Geoestadístico, Encuesta Intercensal 2025) y Natural Earth.
+  - Pipeline `make geo-download`, `geo-inspect`, `geo-load`, `geo-validate`, `geo-tiles` y `geo-basemap`:
+    - descarga por HTTP Range solo del marco integrado de INEGI, con manifiesto y SHA-256;
+    - detección de encoding con los bytes crudos;
+    - carga idempotente con reparación de geometrías;
+    - los 11 criterios de aceptación de §12;
+    - PMTiles por capa y mapa base de Protomaps autoalojado (mundo z6, México z14).
+  - Normalización de nombres que conserva la Ñ, compartida por el cargador y el buscador.
+  - Endpoints `/api/v1/regions`: listas por nivel, detalle con migas de pan, hijas, búsqueda por nombre o alias y región en un punto. Paginación por cursor y formato uniforme de errores en español.
+  - Explorador de geodatos: globo 3D con MapLibre v6, buscador con autocompletado, tooltip, tarjeta con migas de pan y vuelo a la región.
+  - `make db-shell`, `make db-dump` y guía para consultar y migrar la base (`docs/base-de-datos.md`).
+  - ADR-0007 (MapLibre v6) y ADR-0008 (fuentes y procesamiento de geodatos).
+
+### Cambiado
+
+- Especificación v1.3: MapLibre GL JS v6 y lógica del pipeline en `backend/app/geodata/`.
+- nginx: tipos correctos para sprite, fuentes y el worker `.mjs` de MapLibre; `index.html` sin caché; la CSP ya no permite `blob:` en `worker-src`.
+
+### Corregido
+
+- GDAL ya no lee directamente de `/mnt/d`, donde recibió bytes dañados en WSL. Ahora se extrae con verificación de CRC al disco de Linux.
+
 ## [0.0.0] - 2026-10-15
 
 ### Agregado

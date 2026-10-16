@@ -1,0 +1,73 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "090070001",
+    "NOMGEO": "Iztapalapa"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -99.1,
+       19.33
+      ],
+      [
+       -99.05,
+       19.33
+      ],
+      [
+       -99.05,
+       19.37
+      ],
+      [
+       -99.1,
+       19.37
+      ],
+      [
+       -99.1,
+       19.33
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "CVEGEO": "150580001",
+    "NOMGEO": "Ciudad Nezahualcóyotl"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -98.98,
+       19.39
+      ],
+      [
+       -98.92,
+       19.39
+      ],
+      [
+       -98.92,
+       19.44
+      ],
+      [
+       -98.98,
+       19.44
+      ],
+      [
+       -98.98,
+       19.39
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

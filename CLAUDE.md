@@ -258,6 +258,14 @@ make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
 make format          # aplica el formato de ruff y Prettier
 make migrate         # aplica migraciones Alembic
 make frontend-build  # compila el frontend que sirve nginx
+make geo-download    # descarga INEGI y Natural Earth (con manifiesto)
+make geo-inspect     # proyección, encoding, conteos y 5 nombres reales con Ñ
+make geo-load        # carga a PostGIS, valida (§12) y genera PMTiles
+make geo-validate    # solo los criterios de aceptación del catálogo
+make geo-tiles       # solo los PMTiles de las capas de INEGI
+make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
+make db-shell        # consola SQL (psql) en la base de desarrollo
+make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```
 
-Pendientes de su fase: `make geo-load` (F1, geodatos INEGI → PostGIS + PMTiles) y `make seed` (F2, conceptos de ejemplo).
+Pendiente de su fase: `make seed` (F2, conceptos de ejemplo).

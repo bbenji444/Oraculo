@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 
 from app.core.config import Settings
@@ -19,6 +20,7 @@ def test_migraciones_suben_bajan_y_vuelven_a_subir_en_la_base_de_pruebas(
 ) -> None:
     monkeypatch.setenv("ALEMBIC_TARGET", "test")
     config = Config(str(BACKEND_DIR / "alembic.ini"))
+    head = ScriptDirectory.from_config(config).get_current_head()
 
     command.upgrade(config, "head")
     command.downgrade(config, "base")
@@ -28,4 +30,4 @@ def test_migraciones_suben_bajan_y_vuelven_a_subir_en_la_base_de_pruebas(
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     engine.dispose()
-    assert version == "0001"
+    assert version == head

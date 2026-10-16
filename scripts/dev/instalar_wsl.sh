@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Instala y configura en Ubuntu (WSL) todo lo que el proyecto necesita para
 # correr en desarrollo: PostgreSQL 16 + PostGIS, Redis, nginx, uv y
-# Python 3.12 con las dependencias del backend, más el usuario y las bases
-# de datos de la aplicación.
+# Python 3.12 con las dependencias del backend, las herramientas de geodatos
+# (GDAL, tippecanoe y pmtiles), más el usuario y las bases de datos.
 #
 # Quién lo usa: `make bootstrap` (o directamente:
 #   wsl bash scripts/dev/instalar_wsl.sh
@@ -32,6 +32,12 @@ readonly PYTHON_VERSION=3.12
 readonly PGDG_KEY_URL="https://www.postgresql.org/media/keys/ACCC4CF8.asc"
 readonly PGDG_KEY_PATH="/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc"
 readonly PGDG_SOURCES_PATH="/etc/apt/sources.list.d/pgdg.sources"
+# CLI de PMTiles (extraer el mapa base y verificar archivos, ADR-0008).
+# Versión y SHA-256 publicados por GitHub para el binario de Linux x86_64:
+# https://github.com/protomaps/go-pmtiles/releases/tag/v1.31.2
+readonly PMTILES_VERSION=1.31.2
+readonly PMTILES_SHA256="3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"
+readonly PMTILES_BIN="${HOME}/.local/bin/pmtiles"
 
 # Mensajes, como_root, esperar_listo, cargar_env, ROOT_DIR y UV_BIN.
 # shellcheck source=scripts/dev/comun.sh
@@ -87,6 +93,30 @@ instalar_servicios() {
   ok "postgis $(dpkg-query -W -f='${Version}' "postgresql-${PG_MAJOR}-postgis-3")"
   ok "redis-server $(dpkg-query -W -f='${Version}' redis-server)"
   ok "nginx $(dpkg-query -W -f='${Version}' nginx)"
+}
+
+instalar_herramientas_geodatos() {
+  paso "Instalando herramientas de geodatos (GDAL, tippecanoe, pmtiles)"
+  export DEBIAN_FRONTEND=noninteractive
+  # GDAL (ogr2ogr) reproyecta y carga los shapefiles de INEGI a PostGIS;
+  # tippecanoe genera los PMTiles. Ambos vienen en los repositorios de Ubuntu.
+  como_root apt-get install -y -qq gdal-bin tippecanoe >/dev/null
+  ok "$(ogr2ogr --version)"
+  ok "tippecanoe $(dpkg-query -W -f='${Version}' tippecanoe)"
+
+  if [[ -x "${PMTILES_BIN}" ]] && "${PMTILES_BIN}" version 2>/dev/null | grep -q "${PMTILES_VERSION}"; then
+    ok "pmtiles ${PMTILES_VERSION} ya instalado"
+    return
+  fi
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL -o "${tmp}/pmtiles.tar.gz"     "https://github.com/protomaps/go-pmtiles/releases/download/v${PMTILES_VERSION}/go-pmtiles_${PMTILES_VERSION}_Linux_x86_64.tar.gz"
+  # Si el archivo no coincide con el hash publicado, no se instala.
+  echo "${PMTILES_SHA256}  ${tmp}/pmtiles.tar.gz" | sha256sum --check --status     || fallo "El SHA-256 del binario de pmtiles no coincide con el publicado."
+  tar -xzf "${tmp}/pmtiles.tar.gz" -C "${tmp}" pmtiles
+  install -D -m 0755 "${tmp}/pmtiles" "${PMTILES_BIN}"
+  rm -rf "${tmp}"
+  ok "pmtiles $("${PMTILES_BIN}" version 2>&1 | head -1) (SHA-256 verificado)"
 }
 
 instalar_uv_y_python() {
@@ -168,6 +198,9 @@ resumen() {
   ok "$(redis-server --version | cut -d' ' -f1-3)"
   ok "$(nginx -v 2>&1)"
   ok "$("${UV_BIN}" --version)"
+  ok "$(ogr2ogr --version)"
+  ok "tippecanoe $(tippecanoe --version 2>&1 | head -1)"
+  ok "pmtiles $("${PMTILES_BIN}" version 2>&1 | head -1)"
 }
 
 main() {
@@ -177,6 +210,7 @@ main() {
   instalar_paquetes_base
   configurar_repositorio_postgres
   instalar_servicios
+  instalar_herramientas_geodatos
   instalar_uv_y_python
   instalar_dependencias_python
   arrancar_postgres
