@@ -93,9 +93,11 @@ def _no_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
 
 
 def _google_news_rss_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
-    # VERIFICAR: when:, after: y before: no son operadores documentados de
-    # Google News RSS; se comprueban en F3. before: excluye su fecha, por eso
-    # se usa el día siguiente al último del rango.
+    # when:, after: y before: no son operadores documentados de Google News
+    # RSS. Medido el 16/10/2026: when:7d sí limita a 7 días; after:/before:
+    # NO se respetan (llegaron notas posteriores a before:), así que el
+    # adaptador descarta lo que cae fuera del rango. Se envían igual porque
+    # orientan la búsqueda. before: excluye su fecha: se usa el día siguiente.
     if window.relative_days is not None:
         return [f"when:{window.relative_days}d"]
     end = window.date_to + timedelta(days=1)

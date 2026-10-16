@@ -19,7 +19,7 @@ a ningún proveedor.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 from enum import StrEnum
 
 from app.domain.errors import InvalidRequestError
@@ -105,6 +105,22 @@ class DateWindow:
                 {"date_from": date_from.isoformat(), "date_to": date_to.isoformat()},
             )
         return cls(date_from, date_to, None)
+
+    def contains(self, moment: datetime, tz: tzinfo) -> bool:
+        """Dice si un momento cae dentro del rango (días contados en ``tz``).
+
+        Sirve para descartar notas que un proveedor devuelve fuera del rango
+        pedido: Google News RSS ignora ``after:``/``before:`` (medido el
+        16/10/2026: 4 de 38 notas fuera de un rango fijo).
+
+        Args:
+            moment: Fecha y hora con zona.
+            tz: Zona en que se cuentan los días (la de la Ciudad de México).
+
+        Returns:
+            ``True`` si su día local está entre ``date_from`` y ``date_to``.
+        """
+        return self.date_from <= moment.astimezone(tz).date() <= self.date_to
 
     def describe(self) -> str:
         """Descripción para la persona: "últimos 7 días" o "del 01/10/2026 al 15/10/2026"."""

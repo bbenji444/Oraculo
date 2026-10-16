@@ -1,6 +1,6 @@
 """Constructor de consultas: casos de la especificación §7.2 y del ADR-0009."""
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
@@ -273,3 +273,13 @@ def test_rango_fijo_al_reves_o_demasiado_largo() -> None:
         DateWindow.between(date(2026, 10, 15), date(2026, 10, 1))
     with pytest.raises(InvalidRequestError, match="90 días"):
         DateWindow.between(date(2026, 1, 1), date(2026, 10, 1))
+
+
+def test_un_momento_cae_o_no_dentro_del_rango_en_hora_local() -> None:
+    mexico = timezone(timedelta(hours=-6))
+    window = DateWindow.between(date(2026, 10, 8), date(2026, 10, 14))
+
+    # 15 de octubre a las 03:00 UTC sigue siendo 14 de octubre en la CDMX.
+    assert window.contains(datetime(2026, 10, 15, 3, 0, tzinfo=UTC), mexico)
+    assert not window.contains(datetime(2026, 10, 15, 7, 0, tzinfo=UTC), mexico)
+    assert not window.contains(datetime(2026, 10, 7, 23, 0, tzinfo=mexico), mexico)

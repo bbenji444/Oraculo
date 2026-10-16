@@ -112,6 +112,13 @@ warn_redundant_casts = true
 module = ["celery", "celery.*", "kombu", "kombu.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# defusedxml tampoco publica tipos (existen en un paquete aparte que no se
+# instala). Su resultado se trata como xml.etree.ElementTree.Element, que sí
+# tiene tipos, en el adaptador de Google News RSS.
+module = ["defusedxml", "defusedxml.*"]
+ignore_missing_imports = true
+
 # --- pytest --------------------------------------------------------------------
 
 [tool.pytest.ini_options]
