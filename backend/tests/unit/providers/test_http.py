@@ -39,6 +39,7 @@ def client(
     *,
     sleeps: list[float] | None = None,
     min_interval: float = 0.0,
+    rate_limit_wait: float = 0.0,
 ) -> ProviderHttpClient:
     async def fake_sleep(seconds: float) -> None:
         if sleeps is not None:
@@ -50,6 +51,7 @@ def client(
         max_attempts=3,
         max_concurrency=2,
         min_interval_seconds=min_interval,
+        rate_limit_wait_seconds=rate_limit_wait,
         headers={"Authorization": "Bearer secreta"},
         transport=httpx2.MockTransport(recorder),
         sleep=fake_sleep,
@@ -65,6 +67,8 @@ async def test_envia_parametros_y_encabezados() -> None:
     sent = recorder.requests[0]
     assert sent.url.params["q"] == "hackeo CDMX"
     assert sent.headers["Authorization"] == "Bearer secreta"
+    # Se presenta con nombre propio, no como "python-httpx2".
+    assert sent.headers["User-Agent"].startswith("monitor-noticias/")
 
 
 async def test_reintenta_un_500_con_espera_creciente_y_luego_responde() -> None:
@@ -84,6 +88,26 @@ async def test_reintenta_un_429_y_al_agotar_intentos_lanza_el_error() -> None:
     with pytest.raises(ProviderRateLimitError, match="más despacio"):
         await client(recorder).get(URL, {})
     assert len(recorder.requests) == 3
+
+
+async def test_tras_un_429_espera_al_menos_lo_configurado_y_conserva_el_aviso() -> None:
+    sleeps: list[float] = []
+    aviso = "Please limit requests to one every 5 seconds"
+    recorder = Recorder(
+        httpx2.Response(429, text=aviso), httpx2.Response(503), httpx2.Response(200)
+    )
+
+    await client(recorder, sleeps=sleeps, rate_limit_wait=15.0).get(URL, {})
+
+    # Tras el 429 espera 15 s; tras el 503, la espera normal (2 s).
+    assert sleeps == [15.0, 2.0]
+
+
+async def test_el_mensaje_del_429_incluye_el_texto_del_proveedor() -> None:
+    recorder = Recorder(*(httpx2.Response(429, text="one every 5 seconds") for _ in range(3)))
+
+    with pytest.raises(ProviderRateLimitError, match="one every 5 seconds"):
+        await client(recorder).get(URL, {})
 
 
 @pytest.mark.parametrize("status", [401, 403])

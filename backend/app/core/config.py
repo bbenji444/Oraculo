@@ -34,6 +34,28 @@ _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geoda
 # Nombre del usuario de desarrollo en la bitácora de auditoría.
 _DEFAULT_DEV_USER = "desarrollo"
 
+# Proveedores de noticias (plan aprobado de F3):
+# - 20 s por petición; SearchApi 30 s porque link=resolved sigue redirecciones.
+_DEFAULT_PROVIDER_TIMEOUT_SECONDS = 20.0
+_DEFAULT_SEARCHAPI_TIMEOUT_SECONDS = 30.0
+# - 3 intentos en total (esperas de 1 s y 2 s entre ellos).
+_DEFAULT_PROVIDER_MAX_ATTEMPTS = 3
+# - 2 peticiones simultáneas por proveedor: suficiente para pocas consultas
+#   por búsqueda sin parecer un ataque.
+_DEFAULT_PROVIDER_MAX_CONCURRENCY = 2
+# - GDELT: una petición cada 5 s. VERIFICAR: cifra que circula en la
+#   comunidad, no documentada en la página de DOC 2.0.
+_DEFAULT_GDELT_MIN_INTERVAL_SECONDS = 5.0
+# - GDELT: tras un 429, esperar al menos 15 s antes de reintentar. Medido el
+#   16/10/2026: reintentos a 1-5 s recibían 429 de nuevo (plan aprobado).
+_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS = 15.0
+# - Especificación §7.2: máximo 10 consultas por búsqueda; caché de 6 h.
+_DEFAULT_MAX_QUERIES_PER_SEARCH = 10
+_DEFAULT_QUERY_CACHE_TTL_HOURS = 6.0
+# - Tope mensual de créditos de SearchApi: las 100 búsquedas de la prueba
+#   gratuita. Red de seguridad contra gastos por error.
+_DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
 APP_VERSION = "0.2.0"
@@ -72,6 +94,21 @@ class Settings(BaseSettings):
     # Usuario fijo que firma los cambios en la bitácora hasta que F8 agregue
     # autenticación (especificación §16).
     dev_user: str = Field(default=_DEFAULT_DEV_USER, min_length=1)
+
+    # --- Proveedores de noticias (F3, especificación §7.2 y §8) ---
+    # Sin llave, SearchApi se salta con un aviso; GDELT y RSS no la necesitan.
+    searchapi_api_key: SecretStr | None = None
+    provider_timeout_seconds: float = Field(default=_DEFAULT_PROVIDER_TIMEOUT_SECONDS, gt=0)
+    searchapi_timeout_seconds: float = Field(default=_DEFAULT_SEARCHAPI_TIMEOUT_SECONDS, gt=0)
+    provider_max_attempts: int = Field(default=_DEFAULT_PROVIDER_MAX_ATTEMPTS, ge=1)
+    provider_max_concurrency: int = Field(default=_DEFAULT_PROVIDER_MAX_CONCURRENCY, ge=1)
+    gdelt_min_interval_seconds: float = Field(default=_DEFAULT_GDELT_MIN_INTERVAL_SECONDS, ge=0)
+    gdelt_rate_limit_wait_seconds: float = Field(
+        default=_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS, ge=0
+    )
+    max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
+    query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
+    searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

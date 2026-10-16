@@ -422,7 +422,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
-| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Respetar su ritmo de peticiones. |
+| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. **No garantizado** (decisión de Benji, 16/10/2026): si falla, la búsqueda sigue con los otros dos y queda `partial`. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Pide "una petición cada 5 segundos", pero en la primera prueba real respondió 429 aun respetándolo; tras un 429 se espera al menos 15 s. |
 | **Google News RSS** | Respaldo gratuito | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. |
 
 **Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.

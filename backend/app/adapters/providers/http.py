@@ -24,11 +24,13 @@ from collections.abc import Awaitable, Callable, Mapping
 import httpx2
 from tenacity import (
     AsyncRetrying,
+    RetryCallState,
     retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
 
+from app.core.config import APP_VERSION
 from app.domain.errors import (
     ProviderAuthError,
     ProviderError,
@@ -44,6 +46,10 @@ RETRY_WAIT_MAX_SECONDS = 8.0
 # Cuánto del cuerpo de un error se guarda en el mensaje: suficiente para
 # entender qué pasó sin llenar el registro.
 ERROR_BODY_CHARS = 300
+# Nombre con que el sistema se presenta a los proveedores. Sin él, httpx2
+# envía "python-httpx2/…", genérico; GDELT respondió 429 de forma
+# persistente a ese cliente (16/10/2026) aun respetando su pausa de 5 s.
+USER_AGENT = f"monitor-noticias/{APP_VERSION} (monitor de noticias geolocalizadas)"
 _AUTH_STATUSES = frozenset({401, 403})
 _TOO_MANY_REQUESTS = 429
 _SERVER_ERROR = 500
@@ -54,6 +60,31 @@ Sleep = Callable[[float], Awaitable[None]]
 
 def _retryable(error: BaseException) -> bool:
     return isinstance(error, ProviderError) and error.retryable
+
+
+def build_wait(rate_limit_wait_seconds: float) -> Callable[[RetryCallState], float]:
+    """Cuánto esperar antes del siguiente intento.
+
+    La espera normal crece 1 s, 2 s, 4 s... Si el proveedor respondió 429
+    ("ve más despacio"), se espera al menos ``rate_limit_wait_seconds``:
+    reintentar en 1 s solo empeora el bloqueo.
+
+    Args:
+        rate_limit_wait_seconds: Espera mínima tras un 429.
+
+    Returns:
+        La función de espera para tenacity.
+    """
+    exponential = wait_exponential(min=RETRY_WAIT_MIN_SECONDS, max=RETRY_WAIT_MAX_SECONDS)
+
+    def wait(state: RetryCallState) -> float:
+        base = exponential(state)
+        error = state.outcome.exception() if state.outcome else None
+        if isinstance(error, ProviderRateLimitError):
+            return max(base, rate_limit_wait_seconds)
+        return base
+
+    return wait
 
 
 class ProviderHttpClient:
@@ -67,6 +98,7 @@ class ProviderHttpClient:
         max_attempts: int,
         max_concurrency: int,
         min_interval_seconds: float = 0.0,
+        rate_limit_wait_seconds: float = 0.0,
         headers: Mapping[str, str] | None = None,
         transport: httpx2.AsyncBaseTransport | None = None,
         sleep: Sleep = asyncio.sleep,
@@ -80,6 +112,8 @@ class ProviderHttpClient:
             max_concurrency: Peticiones simultáneas permitidas.
             min_interval_seconds: Pausa mínima entre el inicio de dos
                 peticiones (0 = sin pausa).
+            rate_limit_wait_seconds: Espera mínima antes de reintentar
+                después de un 429.
             headers: Encabezados fijos (por ejemplo, la llave en
                 ``Authorization``; nunca se registran).
             transport: Transporte de ``httpx2``; las pruebas pasan un
@@ -89,13 +123,14 @@ class ProviderHttpClient:
         self._provider = provider
         self._max_attempts = max_attempts
         self._min_interval = min_interval_seconds
+        self._wait = build_wait(rate_limit_wait_seconds)
         self._sleep = sleep
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._pace_lock = asyncio.Lock()
         self._last_start = float("-inf")
         self._client = httpx2.AsyncClient(
             timeout=httpx2.Timeout(timeout_seconds),
-            headers=dict(headers or {}),
+            headers={"User-Agent": USER_AGENT, **dict(headers or {})},
             transport=transport,
             follow_redirects=True,
         )
@@ -127,8 +162,12 @@ class ProviderHttpClient:
                 http_status=status,
             )
         if status == _TOO_MANY_REQUESTS:
+            # El texto del proveedor dice qué ritmo espera (GDELT lo explica
+            # en el cuerpo); se conserva para ajustar la pausa con evidencia.
             return ProviderRateLimitError(
-                f"{name} pidió ir más despacio (HTTP 429).", provider=name, http_status=status
+                f"{name} pidió ir más despacio (HTTP 429): {body}",
+                provider=name,
+                http_status=status,
             )
         if status >= _SERVER_ERROR:
             return ProviderUnavailableError(
@@ -178,7 +217,7 @@ class ProviderHttpClient:
         retrying = AsyncRetrying(
             retry=retry_if_exception(_retryable),
             stop=stop_after_attempt(self._max_attempts),
-            wait=wait_exponential(min=RETRY_WAIT_MIN_SECONDS, max=RETRY_WAIT_MAX_SECONDS),
+            wait=self._wait,
             sleep=self._sleep,
             reraise=True,
         )
