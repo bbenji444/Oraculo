@@ -34,7 +34,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - días en hora de la Ciudad de México;
     - gratis y sin caché.
   - `make ingesta-historial DIAS=N`: vista previa del tamaño sin descargar y 5 ejemplos reales; solo baja todo con `DESCARGAR=si`.
-  - ADR-0010 a ADR-0013.
+  - **Ngramas de GDELT** (ADR-0014): notas en español que mencionan México, con frases del texto completo (`body_terms`, migración 0010) solo para buscar y conservadas 30 días. `indice_local` busca también en el cuerpo. `make ngramas-muestra` prueba una hora real.
+  - Pestaña **Notas** (vista temporal hasta F6) y endpoints temporales `/api/v1/local-index/search` y `/stats`.
+  - ADR-0010 a ADR-0014.
 
 ### Cambiado
 
@@ -46,6 +48,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ### Corregido
 
 - GDELT repetía la misma ubicación por cada mención; ahora se guarda una vez.
+- El tamaño y el MD5 de los archivos de GDELT se leen de `x-goog-hash` y `x-goog-stored-content-length`: Google quita el ETag cuando recomprime al vuelo.
 
 ### Desactivado
 

@@ -150,6 +150,16 @@ wsl make ingesta-historial DIAS=7 DESCARGAR=si
 
 Se puede interrumpir y repetir: lo ya bajado no se vuelve a bajar.
 
+**Texto completo con los ngramas de GDELT** ([ADR-0014](docs/adr/0014-ngramas-de-gdelt.md)). La API de búsqueda de GDELT está saturada (la mitad o más de las peticiones responden 429), así que el índice usa además sus "ngramas": archivos de cada minuto con frases de 4 palabras del texto completo de cada nota. Con ellos el índice encuentra notas que mencionan el lugar o el tema solo en el cuerpo. Las frases se guardan **solo para buscar**, nunca se muestran, y se borran a los 30 días. Para probarlos con una hora real (consumo, espacio y 5 ejemplos):
+
+```powershell
+wsl make ngramas-muestra
+```
+
+Se encienden con `GDELT_NGRAMS_ENABLED=true` (~1 GB de descarga al día).
+
+**Ver las notas en la interfaz.** La pestaña **Notas** (<http://localhost:8080/#/notas>) busca un concepto en el índice local: eliges concepto, región y rango, y ves las notas con medio, fecha y link. Es una vista de prueba hasta que llegue la búsqueda sobre el globo (Fase 6).
+
 > ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.
 
 Para probar un proveedor con **una** consulta real, que pide confirmación antes de enviarla:
