@@ -71,3 +71,13 @@ class ConceptValidationError(InvalidRequestError):
     """
 
     code = "invalid_concept"
+
+
+class QueryTooLongError(InvalidRequestError):
+    """La consulta no cabe en el límite del proveedor ni con una sola palabra clave.
+
+    Pasa cuando el lugar y las exclusiones, por sí solos, ya ocupan casi
+    todo el límite: repartir las palabras clave no lo arregla.
+    """
+
+    code = "query_too_long"
