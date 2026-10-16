@@ -40,7 +40,9 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `concepts` | Conceptos de búsqueda ("Ciberseguridad", "Secuestro"...) con sus palabras clave, exclusiones y color. `deleted_at` marca los borrados lógicos. |
 | `audit_log` | Bitácora de auditoría: quién cambió qué y cuándo (por ahora, crear, editar y borrar conceptos). Solo se agregan filas. |
 | `provider_queries` | Cada petición a un proveedor de noticias (SearchApi, GDELT, Google News RSS): texto, resultado, si vino de caché y créditos gastados. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0007`. |
+| `news_index` | Índice local de notas que junta la ingesta cada 15 minutos (GDELT por archivos y RSS de medios): título, fragmento, medio, fecha, link y pistas de ubicación de GDELT. Solo metadatos. |
+| `ingest_runs` | Cada corrida de la ingesta: qué archivo o feed se leyó, bytes descargados, notas vistas y guardadas, errores. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0009`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
