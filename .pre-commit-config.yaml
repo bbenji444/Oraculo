@@ -18,13 +18,13 @@ repos:
       - id: trailing-whitespace
         # En Markdown dos espacios al final son un salto de línea.
         args: [--markdown-linebreak-ext=md]
-        exclude: ^backend/tests/fixtures/providers/
+        exclude: ^backend/tests/fixtures/(providers|ingest)/
       - id: end-of-file-fixer
-        exclude: ^backend/tests/fixtures/providers/
+        exclude: ^backend/tests/fixtures/(providers|ingest)/
       - id: mixed-line-ending
         # Refuerza .gitattributes: LF en todo salvo scripts de Windows.
         args: [--fix=lf]
-        exclude: (\.(ps1|bat|cmd)$|^backend/tests/fixtures/providers/)
+        exclude: (\.(ps1|bat|cmd)$|^backend/tests/fixtures/(providers|ingest)/)
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
