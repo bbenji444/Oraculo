@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.8 · Octubre 2026 · Responsable: Benji
+Versión 1.9 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -422,7 +422,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
-| **Índice local** (`indice_local`, ADR-0013) | Notas que la ingesta periódica junta cada 15 minutos: archivos GKG de GDELT (español + México) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~760 MB de descarga al día) | Busca en título y fragmento. Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
+| **Índice local** (`indice_local`, ADR-0013 y ADR-0014) | Notas que la ingesta periódica junta cada 15 minutos: **ngramas de GDELT** (texto completo, español + México; ADR-0014), archivos GKG de GDELT (solo título; apagados por defecto cuando los ngramas funcionan) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~1 GB de descarga al día) | Busca en título, fragmento y frases del cuerpo (`body_terms`, solo para buscar; nunca se muestran). Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
 | **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
 | **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
 
@@ -753,6 +753,7 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 - Pruebas con fixtures.
 - Comando `make probar-proveedor` (`backend/app/cli/probar_proveedor.py`, con tipos y pruebas como el resto del backend) que ejecuta **una** consulta real con confirmación previa y guarda la respuesta como fixture, sin la llave.
 - Ingesta periódica (cada 15 min, `celery beat`) de archivos GKG de GDELT y RSS de medios mexicanos a un índice local, y proveedor `indice_local` que busca en él (ADR-0013).
+- Ngramas de GDELT (texto completo de las notas) como fuente del índice local, `make ingesta-historial` y una pestaña temporal "Notas" para ver el índice en la interfaz hasta F6 (ADR-0014).
 
 **Criterios de aceptación**
 - Pruebas sin red pasan.
@@ -841,6 +842,7 @@ ADR de la Fase 3:
 11. **ADR-0011** — Google News RSS fuera de producción por sus términos de uso (desactivado por defecto).
 12. **ADR-0012** — GDELT desactivado mientras responda 429 de forma persistente; criterio de reactivación con el reintento diario de D1.
 13. **ADR-0013** — Ingesta periódica e índice local de notas (archivos GKG de GDELT y RSS de medios mexicanos).
+14. **ADR-0014** — Ngramas de GDELT como fuente del índice local (la API DOC está saturada).
 
 ---
 
@@ -880,3 +882,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 1.6 | 16 de octubre de 2026 | Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`); GDELT como proveedor no garantizado. |
 | 1.7 | 16 de octubre de 2026 | GDELT desactivado por defecto con criterio de reactivación (ADR-0012); un `{}` tras un 429 es falla; nueva sección 20, "Pendientes y mejoras futuras" (GKG de GDELT); el historial pasa a la sección 21. |
 | 1.8 | 16 de octubre de 2026 | F3 se amplía a "Proveedores e ingesta": índice local alimentado cada 15 minutos por los archivos GKG de GDELT y RSS de medios mexicanos, consultado por el proveedor `indice_local` (ADR-0013). |
+| 1.9 | 16 de octubre de 2026 | Ngramas de GDELT (texto completo) como fuente del índice local, con frases del cuerpo conservadas 30 días; pestaña temporal "Notas" hasta F6 (ADR-0014). |
