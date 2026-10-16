@@ -263,6 +263,7 @@ make geo-inspect     # proyección, encoding, conteos y 5 nombres reales con Ñ
 make geo-load        # carga a PostGIS, valida (§12) y genera PMTiles
 make geo-validate    # solo los criterios de aceptación del catálogo
 make geo-tiles       # solo los PMTiles de las capas de INEGI
+make geo-terms       # términos de búsqueda y códigos de país (ARGS=--muestra para ver sin escribir)
 make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
 make db-shell        # consola SQL (psql) en la base de desarrollo
 make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)

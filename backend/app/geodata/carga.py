@@ -18,7 +18,9 @@ Cómo funciona (especificación §12, ADR-0008):
 
 Orden: países → México (unión de los estados INEGI) → estados → municipios
 → localidades (primero las puntuales y luego las de polígono, para que si
-una clave apareciera en ambas gane la que tiene polígono).
+una clave apareciera en ambas gane la que tiene polígono). Al final se
+aplican los alias, los términos de búsqueda y los códigos de país
+(``terminos``, ADR-0009).
 
 No hace: no descarga ni valida los criterios de aceptación (eso es
 ``descargar`` y ``validar``). No borra regiones que desaparezcan en una
@@ -40,6 +42,12 @@ from sqlalchemy import Connection, Engine, text
 
 from app.domain.names import normalize_name
 from app.geodata.descarga import sha256_file
+from app.geodata.terminos import (
+    apply_country_codes,
+    apply_search_terms,
+    read_country_codes,
+    read_search_terms,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +139,8 @@ class LoadInputs:
         locality_points: Localidades rurales puntuales (00lpr).
         locality_polygons: Localidades con polígono (00l).
         aliases_csv: Lista curada de alias (``geodata/aliases.csv``).
+        search_terms_csv: Lista curada de términos de búsqueda
+            (``geodata/search_terms.csv``, ADR-0009).
         inegi_source: Texto para la columna ``source`` de las filas de INEGI.
         natural_earth_source: Texto para ``source`` de los países.
     """
@@ -141,6 +151,7 @@ class LoadInputs:
     locality_points: LayerInput
     locality_polygons: LayerInput
     aliases_csv: Path
+    search_terms_csv: Path
     inegi_source: str
     natural_earth_source: str
 
@@ -178,11 +189,15 @@ class LoadSummary:
         counts: Regiones por nivel después de la carga.
         repaired: Geometrías inválidas que se repararon, por capa.
         aliases: Alias aplicados.
+        search_terms: Regiones con términos de búsqueda curados.
+        country_codes: Países con sus códigos para los proveedores.
     """
 
     counts: dict[str, int]
     repaired: dict[str, int]
     aliases: int
+    search_terms: int
+    country_codes: int
 
 
 def copy_verified(source: Path, destination: Path) -> None:
@@ -616,6 +631,10 @@ def run_load(
         f"left(s.cvegeo, {MUNICIPALITY_CODE_LENGTH})",
     )
     alias_count = apply_aliases(engine, read_aliases(inputs.aliases_csv))
+    terms_count = apply_search_terms(engine, read_search_terms(inputs.search_terms_csv))
+    codes_count = apply_country_codes(
+        engine, read_country_codes(inputs.countries.path, inputs.countries.encoding)
+    )
 
     with engine.begin() as conn:
         for layer in layers:
@@ -630,4 +649,10 @@ def run_load(
     # con estadísticas frescas desde la primera consulta.
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         conn.execute(text("ANALYZE regions"))
-    return LoadSummary(counts=counts, repaired=repaired, aliases=alias_count)
+    return LoadSummary(
+        counts=counts,
+        repaired=repaired,
+        aliases=alias_count,
+        search_terms=terms_count,
+        country_codes=codes_count,
+    )
