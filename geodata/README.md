@@ -7,7 +7,6 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 | Carpeta | Qué va ahí | ¿En git? |
 |---|---|---|
 | `raw/` | Descargas originales y `MANIFIESTO.json` (URL, edición, fecha, tamaño y SHA-256 de cada archivo). | No (pesadas) |
-| `scripts/` | Scripts que no son Python (mapa base). | Sí |
 | `aliases.csv` | Alias curados ("CDMX", "Edomex", "Neza"...) que usan la búsqueda y la geolocalización. Revisados por una persona. | Sí |
 | `output/` | PMTiles generados. nginx los sirve en `/tiles/`. | No (se regeneran) |
 
@@ -20,6 +19,7 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 | `wsl make geo-load` | Carga a PostGIS lo inspeccionado (≈7 min), corre la validación y genera los PMTiles. Las capas se leen desde la carpeta de trabajo en el disco de Linux (`GEODATA_WORK_DIR`), nunca de `/mnt/d` (ADR-0008). Repetirla no duplica nada. |
 | `wsl make geo-validate` | Criterios de aceptación de §12: 32 entidades, municipios = catálogo oficial (clave por clave), 16 alcaldías en la CDMX, 0 geometrías inválidas, nombres con Ñ idénticos al catálogo y el Zócalo en 09 / 09015; más revisiones extra (sin huérfanos, puntos dentro de su polígono, conteos de localidades). Termina con error si algo falla. |
 | `wsl make geo-tiles` | Genera un PMTiles por capa con tippecanoe en la carpeta de trabajo y los copia verificados a `output/`: `countries` (z0–6), `states` (z2–10), `municipalities` (z5–14) y `localities` (puntos, z10–14). Cada figura lleva `id`, `code`, `name`, `display_prefix` y `level`; el `id` numérico permite resaltarla en el mapa. Verificado con `pmtiles verify`. |
+| `wsl make geo-basemap` | Recorta el mapa base de Protomaps (OpenStreetMap) de la construcción fijada `20261015`: el mundo hasta zoom 6 (43 MB) y México con sus islas hasta zoom 14, todas las calles (1.26 GB). Baja también las fuentes Noto Sans y el sprite `dark` de una versión fija de `basemaps-assets`, para no depender de servidores externos. Deja `output/MAPA_BASE.json` con versiones, tamaños y SHA-256; si ya está todo igual, no vuelve a bajar. |
 
 ## Fuentes y licencias
 
@@ -27,5 +27,6 @@ La lógica vive en [`backend/app/geodata/`](../backend/app/geodata/), donde se p
 |---|---|---|
 | INEGI — Marco Geoestadístico, Encuesta Intercensal 2025 | 2026 (cobertura 2025-07-31 a 2025-11-14) | Términos de Libre Uso de la Información del INEGI: se debe citar la fuente. |
 | Natural Earth — Admin 0 Countries 1:10m | publicado 2022-05-13 | Dominio público. |
+| Protomaps (datos de OpenStreetMap) | construcción 2026-10-15 | ODbL 1.0: se debe atribuir a los colaboradores de OpenStreetMap. Fuentes Noto Sans bajo OFL 1.1. |
 
-Cualquier mapa o reporte que use estos datos debe citar: **© INEGI, Natural Earth**.
+Cualquier mapa o reporte que use estos datos debe citar: **© INEGI, Natural Earth, © colaboradores de OpenStreetMap, Protomaps**.

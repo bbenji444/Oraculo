@@ -84,7 +84,19 @@ class TileGenerationError(Exception):
     """Una herramienta externa (ogr2ogr, tippecanoe o pmtiles) falló."""
 
 
-def _run(command: list[str], env: dict[str, str] | None = None) -> str:
+def run_tool(command: list[str], env: dict[str, str] | None = None) -> str:
+    """Ejecuta una herramienta externa y devuelve su salida.
+
+    Args:
+        command: Comando como lista de argumentos (sin shell).
+        env: Variables de entorno (por defecto, las del proceso).
+
+    Returns:
+        Salida estándar y de error, concatenadas.
+
+    Raises:
+        TileGenerationError: Si la herramienta termina con error.
+    """
     result = subprocess.run(  # noqa: S603 — comandos armados sin shell, con rutas locales y constantes
         command,
         env=env,
@@ -220,15 +232,15 @@ def generate_layer(
     tiles_dir.mkdir(parents=True, exist_ok=True)
     geojson = tiles_dir / f"{layer.name}.geojsonl"
     pmtiles = tiles_dir / f"{layer.name}.pmtiles"
-    _run(
+    run_tool(
         build_export_command(layer, target, geojson),
         env={**os.environ, "PGPASSWORD": target.password},
     )
     with geojson.open("rb") as handle:
         features = sum(1 for _ in handle)
     logger.info(f"{layer.name}: {features:,} figuras exportadas; generando teselas")
-    _run(build_tippecanoe_command(layer, geojson, pmtiles))
-    verify_output = _run([str(PMTILES_BIN), "verify", str(pmtiles)])
+    run_tool(build_tippecanoe_command(layer, geojson, pmtiles))
+    verify_output = run_tool([str(PMTILES_BIN), "verify", str(pmtiles)])
     final = output_dir / pmtiles.name
     copy_verified(pmtiles, final)
     geojson.unlink()
@@ -244,4 +256,4 @@ def show_header(path: Path) -> str:
     Returns:
         La salida de ``pmtiles show``.
     """
-    return _run([str(PMTILES_BIN), "show", str(path)]).strip()
+    return run_tool([str(PMTILES_BIN), "show", str(path)]).strip()

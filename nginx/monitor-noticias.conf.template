@@ -37,7 +37,16 @@ server {
         alias __PROJECT_ROOT__/geodata/output/;
         # nginx atiende Range en archivos estáticos por sí solo; PMTiles lo
         # necesita para leer solo los bytes de cada tesela.
-        types { application/vnd.pmtiles pmtiles; }
+        # Un bloque `types` aquí reemplaza toda la tabla de tipos, así que se
+        # declaran todos los que se sirven en /tiles/: PMTiles y los recursos
+        # del mapa base (sprite en JSON y PNG, fuentes en PBF).
+        types {
+            application/vnd.pmtiles pmtiles;
+            application/json json;
+            image/png png;
+            application/x-protobuf pbf;
+            text/plain txt;
+        }
         default_type application/octet-stream;
         # add_header en un location anula los del server: se vuelven a incluir.
         include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;

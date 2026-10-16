@@ -71,4 +71,4 @@ def test_puntos_descartan_los_mas_densos_en_zoom_bajo() -> None:
 
 def test_herramienta_que_falla_reporta_su_mensaje() -> None:
     with pytest.raises(teselas.TileGenerationError, match="false falló"):
-        teselas._run(["false"])
+        teselas.run_tool(["false"])
