@@ -23,6 +23,9 @@ frontend/dist/
 frontend/coverage/
 *.tsbuildinfo
 
+# Respaldos de la base de datos (`make db-dump`): pesados y con datos.
+backups/
+
 # Geodatos pesados: se descargan y generan con `make geo-load`.
 geodata/raw/
 geodata/output/

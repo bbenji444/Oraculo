@@ -26,7 +26,7 @@ COVERAGE_MIN := 85
 
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \n        geo-basemap
+        format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \n        geo-basemap db-shell db-dump
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -103,3 +103,11 @@ geo-tiles: ## Genera los PMTiles de países, estados, municipios y localidades
 
 geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
 	$(UV_RUN) python -m app.geodata.mapa_base
+
+# --- Base de datos (docs/base-de-datos.md) ---------------------------------------
+
+db-shell: ## Abre una consola SQL (psql) en la base de desarrollo
+	bash scripts/dev/base_datos.sh shell
+
+db-dump: ## Respalda la base de desarrollo en backups/ (para migrarla a otro servidor)
+	bash scripts/dev/base_datos.sh dump
