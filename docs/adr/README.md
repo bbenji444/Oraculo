@@ -26,3 +26,4 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0010](0010-httpx2-para-llamadas-externas.md) | httpx2 para las llamadas HTTP externas y sus pruebas | Aceptado |
 | [0011](0011-google-news-rss-fuera-de-produccion.md) | Google News RSS fuera de producción por sus términos de uso | Aceptado (revisión legal pendiente) |
 | [0012](0012-gdelt-desactivado-por-limite.md) | GDELT desactivado mientras responda 429 de forma persistente | Aceptado |
+| [0013](0013-ingesta-periodica-e-indice-local.md) | Ingesta periódica e índice local de notas (GDELT por archivos y RSS de medios) | Aceptado |
