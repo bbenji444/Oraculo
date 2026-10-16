@@ -23,6 +23,9 @@ def conn(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> Iterator[Connec
     engine = create_engine(settings.database_url(test=True))
     with engine.connect() as connection:
         transaction = connection.begin()
+        # Parte de una bitácora vacía sin depender de otras pruebas; todo
+        # (también este borrado) se deshace al final.
+        connection.execute(text("DELETE FROM audit_log"))
         yield connection
         transaction.rollback()
     engine.dispose()

@@ -23,6 +23,9 @@ def conn(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> Iterator[Connec
     engine = create_engine(settings.database_url(test=True))
     with engine.connect() as connection:
         transaction = connection.begin()
+        # Parte de una tabla vacía sin depender de otras pruebas; el borrado
+        # también se deshace al final.
+        connection.execute(text("DELETE FROM concepts"))
         # Cada prueba deshace sus cambios: la base de pruebas queda limpia.
         yield connection
         transaction.rollback()
