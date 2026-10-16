@@ -8,7 +8,7 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Historial de cambios:** [CHANGELOG.md](CHANGELOG.md)
 - **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
 
-> Estado actual: **Fase 1 (geodatos)**. Además de los cimientos (servicios, `/health`), ya existen el catálogo geográfico de México (INEGI) en PostGIS, los endpoints `/regions` y un globo 3D para explorarlo. La búsqueda de noticias, la geolocalización y los reportes llegan en las fases siguientes.
+> Estado actual: **Fase 2 (conceptos)**. Además de los cimientos (servicios, `/health`) y el catálogo geográfico de México (INEGI) con su globo 3D, ya existen los conceptos de búsqueda: se crean, editan y prueban desde la pestaña **Conceptos**, que muestra las consultas exactas que se enviarían a cada proveedor sin gastar créditos. La búsqueda real de noticias, la geolocalización y los reportes llegan en las fases siguientes.
 
 ---
 
@@ -70,7 +70,13 @@ wsl make geo-basemap   # mapa base de Protomaps (1.3 GB, 10 min)
 
 `geo-inspect` muestra 5 nombres reales: revisa que la Ñ y los acentos se vean bien antes de `geo-load`. `geo-load` termina con **"Todas las revisiones pasaron"** (criterios de la especificación §12). Detalles en [geodata/README.md](geodata/README.md).
 
-Abre <http://localhost:8080>: verás el **globo** con México. Busca "Iztapalapa" o haz clic en un estado. La pestaña **Estado del sistema** muestra los cuatro componentes en verde.
+Carga también los conceptos de ejemplo (Ciberseguridad, Secuestro, Extorsión, Robo de vehículos y Desaparición de personas):
+
+```powershell
+wsl make seed      # solo crea los que falten; se puede repetir sin riesgo
+```
+
+Abre <http://localhost:8080>: verás el **globo** con México. Busca "Iztapalapa" o haz clic en un estado. En la pestaña **Conceptos** elige uno, busca "Jalisco" en "Probar concepto" y presiona **Ver consultas**. La pestaña **Estado del sistema** muestra los cuatro componentes en verde.
 
 ### 6. Comprobar que todo funciona
 

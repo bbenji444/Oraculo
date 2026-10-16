@@ -6,6 +6,39 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Fase 2 — Conceptos.**
+  - Tabla `concepts` (migración 0005) con nombre único sin importar mayúsculas ni acentos, borrado lógico y validaciones:
+    - al menos una palabra clave;
+    - sin palabras repetidas;
+    - ninguna exclusión igual a una palabra clave;
+    - sin caracteres que los buscadores toman como órdenes;
+    - color `#RRGGBB`.
+  - Bitácora de auditoría `audit_log` (migración 0006): cada alta, edición y borrado de un concepto queda con usuario, IP, antes y después, en la misma transacción que el cambio.
+  - Constructor de consultas `build_queries` con un dialecto por proveedor (SearchApi, Google News RSS y GDELT), probado con los casos de §7.2:
+    - términos de búsqueda curados por lugar (`geodata/search_terms.csv`, migración 0004);
+    - el estado cuando un municipio tiene nombre repetido;
+    - filtros por país con ISO-2 y FIPS de Natural Earth.
+  - Endpoints `/api/v1/concepts`: listar por cursor, detalle, crear, editar, borrar y "Probar concepto" para un concepto guardado o para un borrador sin guardar.
+  - `make seed` con los 5 conceptos semilla y `make geo-terms` para aplicar términos de búsqueda y códigos de país sin recargar el catálogo.
+  - Pantalla **Conceptos**: tabla con interruptor de activo, formulario con palabras como "chips" y errores por campo, y "Probar concepto" con las consultas exactas por proveedor.
+  - ADR-0009 (construcción de consultas).
+
+### Cambiado
+
+- Especificación v1.4: `search_terms` y códigos de país en `regions`, exclusiones también en GDELT, `name_norm` y `deleted_at` en `concepts`, `POST /concepts/preview`.
+- Frontend: cliente HTTP compartido (`services/http.ts`) con soporte de POST, PATCH, DELETE y detalles de error.
+
+### Corregido
+
+- `Makefile`: un `\n` literal en la lista `.PHONY`.
+
+### Pendiente
+
+- `is_used_in_searches` responde "no" hasta que F4 cree `search_concepts`; hasta entonces borrar un concepto siempre es físico.
+- Límites de largo y operadores no documentados de los proveedores (`when:`, varios bloques OR en GDELT), marcados `VERIFICAR` para F3.
+
 ## [0.1.0] - 2026-10-16
 
 ### Agregado

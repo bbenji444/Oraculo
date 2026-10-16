@@ -32,7 +32,7 @@ wsl make db-shell
 
 Abre `psql` ya conectado. Para salir: `\q`.
 
-## Qué hay en la base (Fase 1)
+## Qué hay en la base (Fase 2)
 
 | Tabla | Qué guarda |
 |---|---|
@@ -93,6 +93,22 @@ SELECT name, level FROM cadena;
 -- Exportar municipios de un estado con su forma como GeoJSON
 SELECT code, name, ST_AsGeoJSON(geom) FROM regions
 WHERE level = 'municipality' AND code LIKE '10%';
+
+-- Conceptos vigentes (sin los borrados) con cuántas palabras clave tienen
+SELECT id, name, is_active, cardinality(keywords) AS palabras, color
+FROM concepts
+WHERE deleted_at IS NULL
+ORDER BY name_norm;
+
+-- Bitácora: los últimos 20 cambios, con qué campos cambiaron
+SELECT created_at AT TIME ZONE 'America/Mexico_City' AS cuando, user_id, action,
+       entity_id, payload->'changed' AS campos, host(ip) AS ip
+FROM audit_log
+ORDER BY id DESC
+LIMIT 20;
+
+-- Con qué palabras se busca cada lugar (vacío = su nombre oficial)
+SELECT code, name, search_terms FROM regions WHERE cardinality(search_terms) > 0;
 ```
 
 > Consejo: compara siempre con `name_norm` (y escribe la búsqueda en mayúsculas sin acentos), no con `name`. Así "Peñón" y "PEÑON" coinciden, pero "Penon" no.
