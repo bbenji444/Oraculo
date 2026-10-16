@@ -1,4 +1,12 @@
-"""Adaptador de Google News RSS (especificación §8): respaldo gratuito.
+"""Adaptador de Google News RSS (especificación §8).
+
+⚠️ ADVERTENCIA — FUERA DE PRODUCCIÓN (ADR-0011). El propio feed declara en
+su elemento <copyright> que se ofrece "solely for the purpose of rendering
+Google News results within a personal feed reader for personal,
+non-commercial use" y que cualquier otro uso está prohibido. Por eso está
+**desactivado por defecto** (``NEWS_RSS_ENABLED=false``): solo se habilita a
+propósito en desarrollo y nunca en producción mientras la revisión legal no
+diga lo contrario. Las pruebas usan solo las respuestas grabadas.
 
 No es un servicio oficial ni documentado: puede cambiar o bloquear sin
 aviso, y por eso es el proveedor de respaldo. El texto de la consulta ya trae
@@ -27,10 +35,14 @@ from app.adapters.providers.http import ProviderHttpClient
 from app.application.clock import MEXICO_CITY
 from app.application.ports.providers import ProviderResponse
 from app.domain.articles import InvalidArticleError, RawArticle, domain_of
-from app.domain.errors import ProviderResponseError
+from app.domain.errors import ProviderNotConfiguredError, ProviderResponseError
 from app.domain.queries import CountryFilter, DateWindow, PlannedQuery, Provider
 
 RSS_URL = "https://news.google.com/rss/search"
+DISABLED_MESSAGE = (
+    "Google News RSS está desactivado: sus términos solo permiten uso personal y no "
+    "comercial (ADR-0011). Solo para desarrollo: NEWS_RSS_ENABLED=true en .env."
+)
 # Español latinoamericano: la edición de Google News que cubre a México.
 LANGUAGE = "es-419"
 # Si un país no tiene código ISO-2 (territorios en disputa), se usa la
@@ -142,15 +154,17 @@ def parse_items(body: str, window: DateWindow | None = None) -> tuple[list[RawAr
 
 
 class GoogleNewsRssProvider:
-    """``NewsProviderPort`` para Google News RSS."""
+    """``NewsProviderPort`` para Google News RSS (fuera de producción, ADR-0011)."""
 
-    def __init__(self, http: ProviderHttpClient) -> None:
-        """Recibe el cliente HTTP ya configurado.
+    def __init__(self, http: ProviderHttpClient, *, enabled: bool) -> None:
+        """Recibe el cliente HTTP y si está habilitado.
 
         Args:
             http: Cliente HTTP de Google News.
+            enabled: ``NEWS_RSS_ENABLED``. Si es ``False`` no consulta nada.
         """
         self._http = http
+        self._enabled = enabled
 
     @property
     def provider(self) -> Provider:
@@ -158,8 +172,8 @@ class GoogleNewsRssProvider:
         return Provider.GOOGLE_NEWS_RSS
 
     def is_configured(self) -> bool:
-        """El RSS no necesita llave."""
-        return True
+        """Solo con ``NEWS_RSS_ENABLED=true`` (por defecto está desactivado)."""
+        return self._enabled
 
     def request_params(self, query: PlannedQuery) -> dict[str, str]:
         """Ver ``NewsProviderPort.request_params``."""
@@ -170,7 +184,15 @@ class GoogleNewsRssProvider:
         return 0
 
     async def search(self, query: PlannedQuery) -> ProviderResponse:
-        """Ver ``NewsProviderPort.search``."""
+        """Ver ``NewsProviderPort.search``.
+
+        Raises:
+            ProviderNotConfiguredError: Si está desactivado (ADR-0011).
+        """
+        if not self._enabled:
+            raise ProviderNotConfiguredError(
+                DISABLED_MESSAGE, provider=Provider.GOOGLE_NEWS_RSS.value
+            )
         params = self.request_params(query)
         response = await self._http.get(RSS_URL, params)
         articles, discarded = parse_items(response.text, query.window)

@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.5 · Octubre 2026 · Responsable: Benji
+Versión 1.6 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -423,7 +423,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
 | **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. **No garantizado** (decisión de Benji, 16/10/2026): si falla, la búsqueda sigue con los otros dos y queda `partial`. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Pide "una petición cada 5 segundos", pero en la primera prueba real respondió 429 aun respetándolo; tras un 429 se espera al menos 15 s. |
-| **Google News RSS** | Respaldo gratuito | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. |
+| **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
 
 **Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.
 
@@ -835,6 +835,7 @@ ADR de la Fase 2:
 ADR de la Fase 3:
 
 10. **ADR-0010** — httpx2 (continuación mantenida de httpx) para las llamadas externas y `MockTransport` para sus pruebas, en lugar de httpx + respx.
+11. **ADR-0011** — Google News RSS fuera de producción por sus términos de uso (desactivado por defecto).
 
 ---
 
@@ -863,3 +864,4 @@ ADR de la Fase 3:
 | 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007), decisiones de geodatos (ADR-0008) y lógica del pipeline en `backend/app/geodata/`. |
 | 1.4 | 16 de octubre de 2026 | Construcción de consultas (ADR-0009): `search_terms` y códigos de país en `regions`, nombres repetidos con su estado, exclusiones también en GDELT; `name_norm` y `deleted_at` en `concepts`; columnas de entidad en `audit_log`; endpoint `POST /concepts/preview`. |
 | 1.5 | 16 de octubre de 2026 | httpx2 en lugar de httpx + respx (ADR-0010); `source_domain` en `RawArticle`; `search_id` opcional y `error_message` en `provider_queries`; comando `make probar-proveedor` en `backend/app/cli/`. |
+| 1.6 | 16 de octubre de 2026 | Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`); GDELT como proveedor no garantizado. |

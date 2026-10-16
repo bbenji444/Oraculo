@@ -88,3 +88,10 @@ def test_la_llave_de_searchapi_no_aparece_al_imprimir(env: pytest.MonkeyPatch) -
     assert "llave-super-secreta" not in repr(settings)
     assert settings.searchapi_api_key is not None
     assert settings.searchapi_api_key.get_secret_value() == "llave-super-secreta"
+
+
+def test_google_news_rss_desactivado_por_defecto(env: pytest.MonkeyPatch) -> None:
+    assert build_settings().news_rss_enabled is False
+
+    env.setenv("NEWS_RSS_ENABLED", "true")
+    assert build_settings().news_rss_enabled is True

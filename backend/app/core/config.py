@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
     query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
     searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
+    # Google News RSS: desactivado por defecto por sus términos de uso
+    # (ADR-0011). Solo se activa a propósito en desarrollo; nunca en producción.
+    news_rss_enabled: bool = False
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

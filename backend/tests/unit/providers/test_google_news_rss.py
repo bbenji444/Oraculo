@@ -14,7 +14,7 @@ from app.adapters.providers.google_news_rss import (
     strip_source_suffix,
 )
 from app.adapters.providers.http import ProviderHttpClient
-from app.domain.errors import ProviderResponseError
+from app.domain.errors import ProviderNotConfiguredError, ProviderResponseError
 from app.domain.queries import CountryFilter, DateWindow, PlannedQuery, Provider
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "providers"
@@ -115,7 +115,7 @@ async def test_search_envia_la_consulta_y_normaliza() -> None:
         max_concurrency=1,
         transport=httpx2.MockTransport(handler),
     )
-    provider = GoogleNewsRssProvider(http)
+    provider = GoogleNewsRssProvider(http, enabled=True)
 
     response = await provider.search(query())
 
@@ -125,4 +125,28 @@ async def test_search_envia_la_consulta_y_normaliza() -> None:
     assert (response.http_status, len(response.articles)) == (200, 39)
     assert provider.estimate_cost(query()) == 0
     assert provider.is_configured() is True
+    await http.aclose()
+
+
+@pytest.mark.anyio
+async def test_desactivado_no_envia_nada_y_explica_por_que() -> None:
+    sent: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        return httpx2.Response(200, text=fixture("cdmx_7d"))
+
+    http = ProviderHttpClient(
+        Provider.GOOGLE_NEWS_RSS,
+        timeout_seconds=5,
+        max_attempts=1,
+        max_concurrency=1,
+        transport=httpx2.MockTransport(handler),
+    )
+    provider = GoogleNewsRssProvider(http, enabled=False)
+
+    assert provider.is_configured() is False
+    with pytest.raises(ProviderNotConfiguredError, match="ADR-0011"):
+        await provider.search(query())
+    assert sent == []
     await http.aclose()

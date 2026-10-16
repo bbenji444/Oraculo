@@ -1,0 +1,47 @@
+"""Fábrica de adaptadores: banderas y llaves de la configuración."""
+
+import logging
+
+import pytest
+from pydantic import SecretStr
+
+from app.adapters.providers.factory import build_provider
+from app.core.config import Settings
+from app.domain.queries import Provider
+
+
+def settings(
+    *, news_rss_enabled: bool = False, searchapi_api_key: SecretStr | None = None
+) -> Settings:
+    # model_construct: solo los valores que importan aquí, sin leer .env.
+    return Settings.model_construct(
+        news_rss_enabled=news_rss_enabled, searchapi_api_key=searchapi_api_key
+    )
+
+
+def test_google_news_rss_esta_desactivado_por_defecto() -> None:
+    assert Settings.model_fields["news_rss_enabled"].default is False
+    assert build_provider(Provider.GOOGLE_NEWS_RSS, settings()).is_configured() is False
+
+
+def test_habilitar_rss_deja_una_advertencia(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        provider = build_provider(Provider.GOOGLE_NEWS_RSS, settings(news_rss_enabled=True))
+
+    assert provider.is_configured() is True
+    assert "ADR-0011" in caplog.text
+    assert "solo para desarrollo" in caplog.text
+
+
+@pytest.mark.parametrize("key", [None, SecretStr("")])
+def test_searchapi_sin_llave_no_esta_configurado(key: SecretStr | None) -> None:
+    assert (
+        build_provider(Provider.SEARCHAPI, settings(searchapi_api_key=key)).is_configured() is False
+    )
+
+
+def test_searchapi_con_llave_y_gdelt_siempre_configurados() -> None:
+    with_key = settings(searchapi_api_key=SecretStr("llave"))
+
+    assert build_provider(Provider.SEARCHAPI, with_key).is_configured() is True
+    assert build_provider(Provider.GDELT, settings()).is_configured() is True

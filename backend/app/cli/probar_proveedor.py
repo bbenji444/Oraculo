@@ -39,6 +39,7 @@ from app.adapters.persistence.concepts_repository import PostgresConceptReposito
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.providers.factory import build_provider
+from app.adapters.providers.google_news_rss import DISABLED_MESSAGE
 from app.application.audit import Actor
 from app.application.clock import MEXICO_CITY, mexico_city_today
 from app.application.ports.concepts import ConceptRepositoryPort
@@ -67,6 +68,12 @@ _EXTENSION = {
     Provider.GOOGLE_NEWS_RSS: "xml",
 }
 _MS_PER_SECOND = 1000
+# Por qué un proveedor no se puede consultar.
+NOT_CONFIGURED = {
+    Provider.SEARCHAPI: "SearchApi no está configurado: falta SEARCHAPI_API_KEY en .env.",
+    Provider.GOOGLE_NEWS_RSS: DISABLED_MESSAGE,
+    Provider.GDELT: "GDELT no está configurado.",
+}
 
 
 class LeakedSecretError(RuntimeError):
@@ -379,7 +386,7 @@ async def run(args: argparse.Namespace, settings: Settings, ask: Callable[[str],
     """
     provider = build_provider(Provider(args.proveedor), settings)
     if not provider.is_configured():
-        logger.error(f"{args.proveedor} no está configurado (falta su llave en .env).")
+        logger.error(NOT_CONFIGURED[provider.provider])
         return 1
     engine = create_async_engine(settings.database_url())
     try:
