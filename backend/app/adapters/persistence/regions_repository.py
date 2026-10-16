@@ -114,6 +114,14 @@ class PostgresRegionRepository:
         )
         return rows[0] if rows else None
 
+    async def get_by_code(self, code: str) -> Region | None:
+        """Ver ``RegionRepositoryPort.get_by_code``."""
+        rows = await self._fetch(
+            f"SELECT {_COLUMNS} FROM regions r WHERE r.code = :code",  # noqa: S608 — fragmentos SQL constantes del módulo
+            {"code": code},
+        )
+        return rows[0] if rows else None
+
     async def ancestors(self, region_id: int) -> list[RegionRef]:
         """Ver ``RegionRepositoryPort.ancestors``."""
         sql = """
