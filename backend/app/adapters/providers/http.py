@@ -18,6 +18,7 @@ y nunca registra la llave de un proveedor.
 """
 
 import asyncio
+import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping
 
@@ -39,6 +40,8 @@ from app.domain.errors import (
     ProviderUnavailableError,
 )
 from app.domain.queries import Provider
+
+logger = logging.getLogger(__name__)
 
 # Espera entre reintentos: 1 s, 2 s, 4 s... con tope de 8 s (backoff exponencial).
 RETRY_WAIT_MIN_SECONDS = 1.0
@@ -135,6 +138,19 @@ class ProviderHttpClient:
             follow_redirects=True,
         )
 
+    def _log_retry(self, state: RetryCallState) -> None:
+        """Deja en el registro cada intento fallido y la espera antes del siguiente.
+
+        Sin esto, una respuesta final "200 sin resultados" no deja ver que
+        antes hubo rechazos (diagnóstico de GDELT, 16/10/2026).
+        """
+        error = state.outcome.exception() if state.outcome else None
+        wait = state.next_action.sleep if state.next_action else 0.0
+        logger.warning(
+            f"{self._provider.value}: intento {state.attempt_number} falló "
+            f"({error}); siguiente intento en {wait:.0f} s"
+        )
+
     async def aclose(self) -> None:
         """Cierra las conexiones abiertas."""
         await self._client.aclose()
@@ -221,6 +237,7 @@ class ProviderHttpClient:
             sleep=self._sleep,
             reraise=True,
         )
+        retrying.before_sleep = self._log_retry
         response: httpx2.Response | None = None
         async for attempt in retrying:
             with attempt:

@@ -153,3 +153,17 @@ async def test_respeta_la_pausa_minima_entre_peticiones() -> None:
     assert len(sleeps) == 1
     assert 4.5 < sleeps[0] <= 5.0
     await http.aclose()
+
+
+async def test_cada_intento_fallido_queda_en_el_registro(caplog: pytest.LogCaptureFixture) -> None:
+    recorder = Recorder(
+        httpx2.Response(429, text="one every 5 seconds"), httpx2.Response(200, text="{}")
+    )
+
+    with caplog.at_level("WARNING"):
+        response = await client(recorder, rate_limit_wait=15.0).get(URL, {})
+
+    assert response.text == "{}"
+    assert "gdelt: intento 1 falló" in caplog.text
+    assert "one every 5 seconds" in caplog.text
+    assert "siguiente intento en 15 s" in caplog.text
