@@ -29,16 +29,19 @@ def conn(monkeypatch: pytest.MonkeyPatch, settings: Settings) -> Iterator[Connec
 
 
 def region_id(conn: Connection) -> int:
-    # Cualquier región sirve; si el catálogo de pruebas está vacío, se crea una.
+    # Cualquier región sirve; si el catálogo de pruebas está vacío, se crea una
+    # localidad (el único nivel que puede existir sin polígono).
     found = conn.execute(text("SELECT id FROM regions LIMIT 1")).scalar()
     if found is not None:
         return int(found)
     return int(
         conn.execute(
             text(
-                "INSERT INTO regions (level, code, country_code, name, name_norm, centroid) "
-                "VALUES ('country', 'ZZZ', 'ZZZ', 'Prueba', 'PRUEBA', "
-                "ST_SetSRID(ST_MakePoint(0, 0), 4326)) RETURNING id"
+                "INSERT INTO regions (level, code, country_code, name, name_norm, display_prefix, "
+                "source, centroid, bbox) "
+                "VALUES ('locality', '999999999', 'MEX', 'Prueba', 'PRUEBA', 'Localidad', "
+                "'prueba', "
+                "ST_SetSRID(ST_MakePoint(0, 0), 4326), '{0,0,0,0}') RETURNING id"
             )
         ).scalar_one()
     )
