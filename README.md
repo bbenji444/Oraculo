@@ -159,7 +159,7 @@ wsl make ngramas-muestra
 
 Se encienden con `GDELT_NGRAMS_ENABLED=true` (~1 GB de descarga al día).
 
-**Ver las notas en la interfaz.** La pestaña **Notas** (<http://localhost:8080/#/notas>) busca un concepto en el índice local: eliges concepto, región y rango, y ves las notas con medio, fecha y link. Es una vista de prueba hasta que llegue la búsqueda sobre el globo (Fase 6).
+**Ver las notas en la interfaz.** Las notas del índice local aparecen en las búsquedas de la pantalla **Explorar** (<http://localhost:8080/>), junto con las de los demás proveedores. La pestaña temporal "Notas" se retiró en la Fase 6.
 
 > ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.
 
