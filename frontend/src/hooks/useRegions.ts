@@ -6,7 +6,13 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
-import { getRegion, searchRegions } from '../services/regions';
+import type { RegionLevel } from '../map/style';
+import {
+  getRegion,
+  listChildRegions,
+  listRegionsByLevel,
+  searchRegions,
+} from '../services/regions';
 import { useDebouncedValue } from './useDebouncedValue';
 
 // Espera entre teclas antes de buscar: se siente inmediato y evita una
@@ -37,6 +43,25 @@ export function useRegionDetail(id: number | null) {
     queryKey: ['regions', 'detail', id],
     queryFn: ({ signal }) => getRegion(id ?? 0, signal),
     enabled: id !== null,
+    staleTime: CATALOG_STALE_MS,
+  });
+}
+
+/** Todas las regiones de un nivel (para el primer filtro: los estados). */
+export function useRegionsByLevel(level: RegionLevel) {
+  return useQuery({
+    queryKey: ['regions', 'level', level],
+    queryFn: ({ signal }) => listRegionsByLevel(level, signal),
+    staleTime: CATALOG_STALE_MS,
+  });
+}
+
+/** Hijas de una región (para el siguiente filtro encadenado). */
+export function useChildRegions(regionId: number | null) {
+  return useQuery({
+    queryKey: ['regions', 'children', regionId],
+    queryFn: ({ signal }) => listChildRegions(regionId ?? 0, signal),
+    enabled: regionId !== null,
     staleTime: CATALOG_STALE_MS,
   });
 }
