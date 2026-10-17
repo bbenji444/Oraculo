@@ -36,6 +36,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - `make ingesta-historial DIAS=N`: vista previa del tamaño sin descargar y 5 ejemplos reales; solo baja todo con `DESCARGAR=si`.
   - **Ngramas de GDELT** (ADR-0014): notas en español que mencionan México, con frases del texto completo (`body_terms`, migración 0010) solo para buscar y conservadas 30 días. `indice_local` busca también en el cuerpo. `make ngramas-muestra` prueba una hora real.
   - Pestaña **Notas** (vista temporal hasta F6) y endpoints temporales `/api/v1/local-index/search` y `/stats`.
+  - Primera consulta real a SearchApi (1 crédito): 10 notas normalizadas; confirma `iso_date`, `link=resolved` y `time_period`. También quedó grabada la primera respuesta de GDELT DOC con notas.
+  - Globo: gira solo (una vuelta cada 90 s, se detiene al tocarlo) con el eje inclinado 15°, como un globo de escritorio. Se endereza al acercarse a una región.
   - ADR-0010 a ADR-0014.
 
 ### Cambiado
