@@ -34,6 +34,7 @@ from app.application.ports.search_store import (
     StoredSearch,
 )
 from app.domain.dedupe import DedupedArticle, url_hash
+from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import Resolution
 from app.domain.search import SearchStatus
@@ -47,6 +48,27 @@ _INSERT_AUDIT = (
     "VALUES (:user_id, :action, :entity_type, :entity_id, "
     "CAST(:payload AS jsonb), CAST(:ip AS inet))"
 )
+
+
+@dataclass(frozen=True, slots=True)
+class SearchSnapshot:
+    """Cómo va (o cómo terminó) una búsqueda.
+
+    Attributes:
+        status: Estado.
+        progress: Etapa actual y conteos (``RunSearch``).
+        credits_used: Créditos gastados.
+        llm_usage: Tokens de la IA.
+        llm_cost_usd: Costo estimado de la IA.
+        error_summary: Qué falló, si algo falló.
+    """
+
+    status: SearchStatus
+    progress: dict[str, object]
+    credits_used: int
+    llm_usage: LLMUsage
+    llm_cost_usd: float
+    error_summary: str | None
 
 
 def _json(value: Mapping[str, object]) -> str:
@@ -243,27 +265,40 @@ class PostgresSearchStore:
                 {"id": search_id, "m": message[:MAX_ERROR_CHARS]},
             )
 
-    async def progress_of(self, search_id: UUID) -> tuple[SearchStatus, dict[str, object]] | None:
-        """Estado y avance de una búsqueda (el comando lo consulta mientras corre).
+    async def snapshot(self, search_id: UUID) -> SearchSnapshot | None:
+        """Cómo va una búsqueda (el comando lo consulta mientras corre en el worker).
 
         Args:
             search_id: Id.
 
         Returns:
-            Estado y ``progress``, o ``None`` si no existe.
+            Estado, avance y costos, o ``None`` si no existe.
         """
         async with self._engine.connect() as conn:
             row = (
                 (
                     await conn.execute(
-                        text("SELECT status, progress FROM searches WHERE id = :id"),
+                        text(
+                            "SELECT status, progress, credits_used, llm_tokens_in, "
+                            "llm_tokens_out, llm_cost_usd, error_summary FROM searches "
+                            "WHERE id = :id"
+                        ),
                         {"id": search_id},
                     )
                 )
                 .mappings()
                 .first()
             )
-        return (SearchStatus(row["status"]), dict(row["progress"])) if row else None
+        if row is None:
+            return None
+        return SearchSnapshot(
+            status=SearchStatus(row["status"]),
+            progress=dict(row["progress"]),
+            credits_used=row["credits_used"],
+            llm_usage=LLMUsage(row["llm_tokens_in"], row["llm_tokens_out"]),
+            llm_cost_usd=float(row["llm_cost_usd"]),
+            error_summary=row["error_summary"],
+        )
 
 
 async def _audit(

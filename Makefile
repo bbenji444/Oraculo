@@ -28,7 +28,7 @@ COVERAGE_MIN := 85
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
-        ingesta-historial ngramas-muestra
+        ingesta-historial ngramas-muestra buscar
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -116,6 +116,9 @@ gdelt-diagnostico: ## Reintento diario de D1 en GDELT (máximo una vez al día, 
 
 probar-proveedor: ## UNA consulta real a un proveedor, con confirmación (ARGS="--proveedor gdelt --nombre x")
 	$(UV_RUN) python -m app.cli.probar_proveedor $(ARGS)
+
+buscar: ## Búsqueda real de punta a punta, con costo y confirmación (ARGS="--concepto Extorsión --region 14")
+	$(UV_RUN) python -m app.cli.buscar $(ARGS)
 
 ingesta: ## Corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 	$(UV_RUN) python -m app.cli.ingesta

@@ -4,6 +4,9 @@ Usa el mini-catálogo real (``geo_fixture``) para que las ubicaciones se
 resuelvan con ``regions`` de verdad. Nada sale a internet ni gasta.
 """
 
+import argparse
+import asyncio
+import logging
 from collections.abc import AsyncIterator, Iterator
 from datetime import date
 from decimal import Decimal
@@ -13,6 +16,7 @@ from uuid import UUID
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -25,6 +29,7 @@ from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionL
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
 from app.application.use_cases.run_search import PipelineLimits, RunSearch
+from app.cli import buscar
 from app.core.config import Settings
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
@@ -222,8 +227,12 @@ async def test_busqueda_guardada_de_punta_a_punta(
     assert first.concepts == (CONCEPT_NAME,)
     assert first.precision == "municipality"
     assert {p.in_region for p in preview} == {True, False}
-    status = await searches.progress_of(search_id)
-    assert status is not None and status[0] is SearchStatus.COMPLETED
+    snapshot = await searches.snapshot(search_id)
+    assert snapshot is not None
+    assert (snapshot.status, snapshot.credits_used) == (SearchStatus.COMPLETED, 1)
+    assert snapshot.llm_usage == LLMUsage(2000, 200)
+    assert snapshot.progress["in_region"] == 1
+    assert await searches.snapshot(UUID(int=0)) is None
 
 
 async def test_la_segunda_busqueda_reutiliza_lo_enriquecido(
@@ -290,3 +299,109 @@ async def test_errores_fallo_inesperado_y_retencion_de_textos(
     assert await articles.purge_texts(30) == 2
     assert await articles.purge_texts(30) == 0
     assert await searches.load(UUID(int=0)) is None
+
+
+def cli_settings(settings: Settings, **changes: object) -> Settings:
+    """La configuración real, apuntando a la base de pruebas y sin SearchApi."""
+    base: dict[str, object] = {
+        "postgres_db": settings.postgres_test_db,
+        "searchapi_api_key": None,
+        "openai_api_key": SecretStr("llave-de-prueba"),
+        "llm_provider": "openai",
+    }
+    return settings.model_copy(update={**base, **changes})
+
+
+def cli_args(*extra: str) -> argparse.Namespace:
+    return buscar.parse_args(["--concepto", CONCEPT_NAME, "--region", "09", *extra])
+
+
+async def count_searches(engine: AsyncEngine) -> int:
+    async with engine.connect() as conn:
+        return int((await conn.execute(text("SELECT count(*) FROM searches"))).scalar_one())
+
+
+async def test_el_comando_corre_aqui_y_muestra_el_resultado(
+    test_engine: AsyncEngine,
+    settings: Settings,
+    concept_id: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ran: list[UUID] = []
+
+    async def run_here(cfg: Settings, search_id: UUID) -> None:
+        # En lugar de las piezas reales (red e IA), el pipeline con las simuladas.
+        ran.append(search_id)
+        searches = PostgresSearchStore(test_engine)
+        await run_search(
+            test_engine, searches, PostgresArticleStore(test_engine), LLM(REPLIES)
+        ).run(search_id)
+
+    with caplog.at_level(logging.INFO):
+        code = await buscar.run(
+            cli_args("--aqui"), cli_settings(settings), lambda _q: "si", run_here=run_here
+        )
+
+    assert code == 0
+    assert len(ran) == 1
+    text_ = caplog.text
+    assert "Búsqueda (todavía no se ha gastado nada)" in text_
+    assert "indice_local:" in text_
+    assert "openai · gpt-6-luna" in text_
+    assert "Búsqueda completed" in text_
+    assert "Alcaldía Iztapalapa (municipio" in text_
+
+
+async def test_el_comando_no_gasta_sin_un_si_ni_sin_llave(
+    test_engine: AsyncEngine, settings: Settings, concept_id: int
+) -> None:
+    sent: list[UUID] = []
+
+    cancelled = await buscar.run(
+        cli_args(), cli_settings(settings), lambda _q: "no", enqueue=sent.append
+    )
+    no_key = await buscar.run(
+        cli_args(), cli_settings(settings, openai_api_key=None), lambda _q: "si"
+    )
+    assert (cancelled, no_key) == (1, 1)
+    assert sent == []
+    assert await count_searches(test_engine) == 0
+
+
+async def test_el_comando_manda_al_worker_y_espera(
+    test_engine: AsyncEngine,
+    settings: Settings,
+    concept_id: int,
+) -> None:
+    searches = PostgresSearchStore(test_engine)
+    queued: list[UUID] = []
+
+    async def worker_finishes(_seconds: float) -> None:
+        # Hace de worker: corre la búsqueda encolada en la primera pausa.
+        if queued:
+            await run_search(
+                test_engine, searches, PostgresArticleStore(test_engine), LLM(REPLIES)
+            ).run(queued.pop())
+
+    code = await buscar.run(
+        cli_args(),
+        cli_settings(settings),
+        lambda _q: "si",
+        enqueue=queued.append,
+        sleep=worker_finishes,
+    )
+
+    assert code == 0
+    assert queued == []
+
+
+async def test_el_comando_avisa_si_el_worker_no_responde(
+    settings: Settings, concept_id: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(buscar, "wait_for", lambda *_a, **_k: asyncio.sleep(0, result=None))
+
+    code = await buscar.run(
+        cli_args(), cli_settings(settings), lambda _q: "si", enqueue=lambda _id: None
+    )
+
+    assert code == 1
