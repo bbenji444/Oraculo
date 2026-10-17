@@ -6,6 +6,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.6.0] - 2026-10-17
+
 ### Agregado
 
 - **Fase 6 — Frontend: globo y búsqueda** (§14, ADR-0017):
