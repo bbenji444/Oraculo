@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.0 · Octubre 2026 · Responsable: Benji
+Versión 2.1 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -482,7 +482,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 
 ## 10. Enriquecimiento con LLM
 
-- **Modelo:** configurable (`LLM_MODEL`, por defecto `gemini-2.5-flash`).
+- **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
 - **Prompts:** se guardan versionados en `adapters/llm/prompts/enrich_v1.md`. Cambiar el prompt implica subir la versión.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
@@ -846,6 +846,7 @@ ADR de la Fase 3:
 13. **ADR-0013** — Ingesta periódica e índice local de notas (archivos GKG de GDELT y RSS de medios mexicanos).
 14. **ADR-0014** — Ngramas de GDELT como fuente del índice local (la API DOC está saturada).
 15. **ADR-0015** — Extracción de texto, su retención y el control de costo de la IA.
+16. **ADR-0016** — OpenAI como IA del enriquecimiento, elegible junto a Gemini.
 
 ---
 
@@ -887,3 +888,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 1.8 | 16 de octubre de 2026 | F3 se amplía a "Proveedores e ingesta": índice local alimentado cada 15 minutos por los archivos GKG de GDELT y RSS de medios mexicanos, consultado por el proveedor `indice_local` (ADR-0013). |
 | 1.9 | 16 de octubre de 2026 | Ngramas de GDELT (texto completo) como fuente del índice local, con frases del cuerpo conservadas 30 días; pestaña temporal "Notas" hasta F6 (ADR-0014). |
 | 2.0 | 16 de octubre de 2026 | F4: extracción de texto con retención de 30 días y control de costo de Gemini (ADR-0015); comando `make buscar`. |
+| 2.1 | 17 de octubre de 2026 | OpenAI (`gpt-6-luna`) como IA por defecto, Gemini elegible con `LLM_PROVIDER` (ADR-0016). |

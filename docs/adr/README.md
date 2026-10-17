@@ -29,3 +29,4 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0013](0013-ingesta-periodica-e-indice-local.md) | Ingesta periódica e índice local de notas (GDELT por archivos y RSS de medios) | Aceptado (modificado por 0014) |
 | [0014](0014-ngramas-de-gdelt.md) | Ngramas de GDELT como fuente del índice local | Aceptado |
 | [0015](0015-extraccion-y-costo-de-ia.md) | Extracción de texto, su retención y el control de costo de la IA | Aceptado |
+| [0016](0016-openai-como-ia.md) | OpenAI como IA del enriquecimiento, elegible junto a Gemini | Aceptado |
