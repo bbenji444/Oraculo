@@ -10,7 +10,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.adapters.llm.common import PROMPT_VERSION
-from app.adapters.llm.factory import MissingLLMKeyError, build_llm
+from app.adapters.llm.factory import MissingLLMKeyError, build_llm, llm_info
 from app.adapters.llm.gemini import GeminiEnricher
 from app.adapters.llm.openai import (
     ENRICHMENT_SCHEMA,
@@ -20,7 +20,7 @@ from app.adapters.llm.openai import (
     request_body,
 )
 from app.adapters.providers.http import ProviderHttpClient
-from app.application.ports.llm import EnrichmentError, EnrichmentRequest
+from app.application.ports.llm import EnrichmentError, EnrichmentRequest, LLMInfo
 from app.core.config import Settings
 from app.domain.enrichment import ConceptBrief, LLMUsage
 from app.domain.errors import ProviderAuthError
@@ -191,3 +191,11 @@ def test_la_fabrica_elige_el_proveedor_y_sus_precios() -> None:
 def test_sin_llave_lo_dice_claro(provider: str) -> None:
     with pytest.raises(MissingLLMKeyError, match="API_KEY"):
         build_llm(settings(llm_provider=provider))
+
+
+def test_la_tarifa_se_conoce_sin_llave() -> None:
+    openai = llm_info(settings())
+    gemini = llm_info(settings(llm_provider="gemini", gemini_api_key=SecretStr("y")))
+
+    assert openai == LLMInfo("openai", "gpt-6-luna", 0.10, 0.50, configured=False)
+    assert gemini == LLMInfo("gemini", "gemini-2.5-flash", 0.30, 2.50, configured=True)
