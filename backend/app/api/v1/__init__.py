@@ -16,3 +16,22 @@ api_router.include_router(concepts_router)
 api_router.include_router(searches_router)
 api_router.include_router(articles_router)
 api_router.include_router(local_index_router)
+
+# Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
+OPENAPI_TAGS = [
+    {"name": "diagnóstico", "description": "Estado de la API, la base, Redis y el worker."},
+    {"name": "regiones", "description": "Catálogo geográfico INEGI y países (§12)."},
+    {"name": "conceptos", "description": "Temas que se buscan, con sus palabras clave (§7)."},
+    {
+        "name": "búsquedas",
+        "description": (
+            "Estimar, lanzar y seguir una búsqueda; sus notas y el mapa de calor (§9 y §13). "
+            "Lanzar gasta créditos de SearchApi y tokens de la IA: estima primero."
+        ),
+    },
+    {"name": "notas", "description": "Detalle de una nota. Nunca el texto completo (§8)."},
+    {
+        "name": "índice local (temporal)",
+        "description": "Vista de prueba del índice local hasta que exista el globo (F6).",
+    },
+]

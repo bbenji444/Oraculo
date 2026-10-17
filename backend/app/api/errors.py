@@ -5,12 +5,13 @@ Todas las respuestas de error tienen la forma::
     {"error": {"code": "...", "message": "...", "details": {}}}
 
 con ``message`` en español para la persona y ``code`` estable para otros
-sistemas. Aquí se traducen los errores del dominio y los de validación de
-FastAPI a esa forma.
+sistemas. Aquí se traducen a esa forma los errores del dominio, los de
+validación de FastAPI y cualquier falla inesperada (500).
 
 No hace: no decide reglas de negocio; solo traduce errores a HTTP.
 """
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
@@ -27,6 +28,8 @@ from app.domain.errors import (
     ServiceUnavailableError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class ErrorBody(BaseModel):
     """Contenido de un error."""
@@ -42,16 +45,34 @@ class ErrorOut(BaseModel):
     error: ErrorBody
 
 
-# Para documentar en OpenAPI las respuestas de error de cada router.
-ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    status.HTTP_404_NOT_FOUND: {"model": ErrorOut, "description": "No encontrado"},
-    status.HTTP_409_CONFLICT: {"model": ErrorOut, "description": "Choca con algo que ya existe"},
-    status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorOut, "description": "Petición inválida"},
-    status.HTTP_503_SERVICE_UNAVAILABLE: {
-        "model": ErrorOut,
-        "description": "Falta configurar algo del sistema (por ejemplo, la llave de la IA)",
-    },
+_ERROR_DESCRIPTIONS = {
+    status.HTTP_404_NOT_FOUND: "No encontrado",
+    status.HTTP_409_CONFLICT: "Choca con algo que ya existe o con un tope",
+    status.HTTP_422_UNPROCESSABLE_CONTENT: "Petición inválida",
+    status.HTTP_500_INTERNAL_SERVER_ERROR: "Error inesperado (queda en el registro)",
+    status.HTTP_503_SERVICE_UNAVAILABLE: "Falta configurar el sistema (como la llave de la IA)",
 }
+
+
+def error_responses(*codes: int) -> dict[int | str, dict[str, Any]]:
+    """Errores que documenta una ruta en OpenAPI, además de 422 y 500 (que puede dar cualquiera).
+
+    Args:
+        codes: Códigos HTTP propios de la ruta (404, 409, 503).
+
+    Returns:
+        El diccionario para ``responses=`` de FastAPI.
+    """
+    wanted = {*codes, status.HTTP_422_UNPROCESSABLE_CONTENT, status.HTTP_500_INTERNAL_SERVER_ERROR}
+    return {
+        code: {"model": ErrorOut, "description": _ERROR_DESCRIPTIONS[code]}
+        for code in sorted(wanted)
+    }
+
+
+# Lo que documenta cada router por defecto; cada ruta agrega los suyos.
+ERROR_RESPONSES = error_responses()
+INTERNAL_ERROR_MESSAGE = "Ocurrió un error inesperado; quedó registrado. Intenta de nuevo."
 
 _HTTP_MESSAGES = {
     status.HTTP_404_NOT_FOUND: ("not_found", "La ruta no existe."),
@@ -117,6 +138,15 @@ async def _http_error(request: Request, exc: Exception) -> JSONResponse:
     return error_response(exc.status_code, code, message)
 
 
+async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    # Cualquier otra falla (bug, base caída): se registra completa en el log y
+    # la persona recibe un mensaje en español, sin detalles internos.
+    logger.exception("Error inesperado en %s %s", request.method, request.url.path)
+    return error_response(
+        status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error", INTERNAL_ERROR_MESSAGE
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Registra los manejadores de error en la aplicación.
 
@@ -126,3 +156,4 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, _domain_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(StarletteHTTPException, _http_error)
+    app.add_exception_handler(Exception, _unexpected_error)

@@ -30,7 +30,7 @@ from app.adapters.persistence.search_repository import PostgresArticleStore, Pos
 from app.adapters.providers.local_index import LocalIndexProvider
 from app.adapters.queue.celery_queue import CelerySearchQueue
 from app.api.errors import register_error_handlers
-from app.api.v1 import api_router
+from app.api.v1 import OPENAPI_TAGS, api_router
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.plan_search import PlanSearch
@@ -117,7 +117,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Monitor de Noticias",
-        description="API del monitor de noticias geolocalizadas sobre México.",
+        description=(
+            "API del monitor de noticias geolocalizadas sobre México. Errores con la forma "
+            '{"error": {"code", "message", "details"}} y mensajes en español; '
+            "listas con paginación por cursor. Ejemplos con curl en docs/api.md."
+        ),
+        openapi_tags=OPENAPI_TAGS,
         version=APP_VERSION,
         lifespan=lifespan,
         docs_url=f"{API_PREFIX}/docs",

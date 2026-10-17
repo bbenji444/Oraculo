@@ -18,7 +18,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Path, Query, Request, status
 
-from app.api.errors import ERROR_RESPONSES
+from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.articles import Articles
 from app.api.v1.concepts import get_actor
 from app.api.v1.schemas.articles import AggregatesOut, ArticlePageOut
@@ -125,6 +125,7 @@ def _request(body: SearchIn, actor: Actor) -> SearchRequest:
     "/estimate",
     response_model=EstimateOut,
     summary="Estimar una búsqueda sin gastar",
+    responses=error_responses(404),
 )
 async def estimate_search(body: SearchIn, planner: Planner, actor: CurrentActor) -> EstimateOut:
     """Consultas que se harían, créditos de SearchApi y costo máximo de la IA."""
@@ -136,6 +137,7 @@ async def estimate_search(body: SearchIn, planner: Planner, actor: CurrentActor)
     status_code=status.HTTP_202_ACCEPTED,
     response_model=SearchStartedOut,
     summary="Lanzar una búsqueda",
+    responses=error_responses(404, 409, 503),
 )
 async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) -> SearchStartedOut:
     """Crea la búsqueda y la manda al worker. Gasta créditos y tokens de la IA.
@@ -181,7 +183,12 @@ async def list_searches(
     return SearchPageOut.from_page(page)
 
 
-@router.get("/{search_id}", response_model=SearchOut, summary="Estado y avance de una búsqueda")
+@router.get(
+    "/{search_id}",
+    response_model=SearchOut,
+    summary="Estado y avance de una búsqueda",
+    responses=error_responses(404),
+)
 async def get_search(reader: Reader, search_id: SearchId) -> SearchOut:
     """Estado, etapa actual, conteos, créditos y costo. Consúltala cada 2 s mientras corre."""
     return SearchOut.from_detail(await GetSearch(reader).execute(search_id))
@@ -191,6 +198,7 @@ async def get_search(reader: Reader, search_id: SearchId) -> SearchOut:
     "/{search_id}/articles",
     response_model=ArticlePageOut,
     summary="Notas de una búsqueda",
+    responses=error_responses(404),
 )
 async def list_search_articles(  # noqa: PLR0913 — un parámetro de URL por filtro, todo por nombre (*)
     reader: Reader,
@@ -230,6 +238,7 @@ async def list_search_articles(  # noqa: PLR0913 — un parámetro de URL por fi
     "/{search_id}/aggregates",
     response_model=AggregatesOut,
     summary="Mapa de calor: notas por región",
+    responses=error_responses(404),
 )
 async def search_aggregates(
     reader: Reader,

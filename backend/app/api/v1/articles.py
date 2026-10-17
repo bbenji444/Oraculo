@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Request
 
-from app.api.errors import ERROR_RESPONSES
+from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.schemas.articles import ArticleDetailOut
 from app.application.ports.search_reads import ArticleReaderPort
 from app.application.use_cases.search_reads import GetArticle
@@ -35,7 +35,12 @@ def get_article_reader(request: Request) -> ArticleReaderPort:
 Articles = Annotated[ArticleReaderPort, Depends(get_article_reader)]
 
 
-@router.get("/{article_id}", response_model=ArticleDetailOut, summary="Detalle de una nota")
+@router.get(
+    "/{article_id}",
+    response_model=ArticleDetailOut,
+    summary="Detalle de una nota",
+    responses=error_responses(404),
+)
 async def get_article(
     articles: Articles, article_id: Annotated[int, Path(description="Id de la nota.")]
 ) -> ArticleDetailOut:
