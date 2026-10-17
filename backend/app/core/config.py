@@ -77,6 +77,20 @@ _DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 15.0
 _DEFAULT_EXTRACTION_CONCURRENCY = 4
 # - El texto extraído se borra a los 30 días (solo sirve para procesar).
 _DEFAULT_ARTICLE_TEXT_RETENTION_DAYS = 30
+# - IA: Gemini 2.5 Flash (§10). Precios por millón de tokens al 16/10/2026
+#   (https://ai.google.dev/gemini-api/docs/pricing): 0.30 entrada, 2.50 salida.
+_DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+_DEFAULT_LLM_PRICE_INPUT = 0.30
+_DEFAULT_LLM_PRICE_OUTPUT = 2.50
+# - 60 s por nota: una respuesta de ~300 tokens tarda unos segundos; el margen
+#   cubre horas pico.
+_DEFAULT_LLM_TIMEOUT_SECONDS = 60.0
+# - 4 notas a la vez: rápido sin tocar los límites por minuto del nivel gratis.
+_DEFAULT_LLM_CONCURRENCY = 4
+# - Tope por búsqueda (ADR-0015): ~0.20 USD como máximo.
+_DEFAULT_LLM_MAX_ARTICLES = 150
+# - Confianza mínima de la ubicación principal (§11).
+_DEFAULT_GEO_MIN_CONFIDENCE = 0.6
 
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
@@ -158,6 +172,15 @@ class Settings(BaseSettings):
     extraction_timeout_seconds: float = Field(default=_DEFAULT_EXTRACTION_TIMEOUT_SECONDS, gt=0)
     extraction_concurrency: int = Field(default=_DEFAULT_EXTRACTION_CONCURRENCY, ge=1)
     article_text_retention_days: int = Field(default=_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS, ge=1)
+    # IA (§10, ADR-0015). Sin llave, las notas no se enriquecen y se avisa.
+    gemini_api_key: SecretStr | None = None
+    llm_model: str = _DEFAULT_LLM_MODEL
+    llm_timeout_seconds: float = Field(default=_DEFAULT_LLM_TIMEOUT_SECONDS, gt=0)
+    llm_concurrency: int = Field(default=_DEFAULT_LLM_CONCURRENCY, ge=1)
+    llm_max_articles_per_search: int = Field(default=_DEFAULT_LLM_MAX_ARTICLES, ge=1)
+    llm_price_input_per_million: float = Field(default=_DEFAULT_LLM_PRICE_INPUT, ge=0)
+    llm_price_output_per_million: float = Field(default=_DEFAULT_LLM_PRICE_OUTPUT, ge=0)
+    geo_min_confidence: float = Field(default=_DEFAULT_GEO_MIN_CONFIDENCE, ge=0, le=1)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.
