@@ -6,18 +6,21 @@ aplicación al arrancar (``app.state``) y llaman a un caso de uso.
 - ``POST /searches/estimate``: qué se haría y cuánto costaría. No gasta.
 - ``POST /searches``: lanza la búsqueda (``202``); el worker la corre.
 - ``GET /searches/{id}`` y ``GET /searches``: estado y avance, e historial.
+- ``GET /searches/{id}/articles``: sus notas, con filtros y cursor.
 
 No hace: no valida reglas de negocio; sus errores los traduce
 ``app.api.errors`` al formato uniforme.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Path, Query, Request, status
 
 from app.api.errors import ERROR_RESPONSES
+from app.api.v1.articles import Articles
 from app.api.v1.concepts import get_actor
+from app.api.v1.schemas.articles import ArticlePageOut
 from app.api.v1.schemas.searches import (
     EstimateOut,
     SearchIn,
@@ -28,10 +31,16 @@ from app.api.v1.schemas.searches import (
 from app.application.audit import Actor
 from app.application.clock import mexico_city_today
 from app.application.ports.search_queue import SearchQueuePort
-from app.application.ports.search_reads import SearchReaderPort
+from app.application.ports.search_reads import ArticleFilters, InRegion, SearchReaderPort
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
-from app.application.use_cases.search_reads import DEFAULT_PAGE_SIZE, GetSearch, ListSearches
+from app.application.use_cases.search_reads import (
+    DEFAULT_ARTICLE_PAGE_SIZE,
+    DEFAULT_PAGE_SIZE,
+    GetSearch,
+    ListSearchArticles,
+    ListSearches,
+)
 from app.application.use_cases.start_search import StartSearch
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
@@ -173,3 +182,42 @@ async def list_searches(
 async def get_search(reader: Reader, search_id: SearchId) -> SearchOut:
     """Estado, etapa actual, conteos, créditos y costo. Consúltala cada 2 s mientras corre."""
     return SearchOut.from_detail(await GetSearch(reader).execute(search_id))
+
+
+@router.get(
+    "/{search_id}/articles",
+    response_model=ArticlePageOut,
+    summary="Notas de una búsqueda",
+)
+async def list_search_articles(  # noqa: PLR0913 — un parámetro de URL por filtro, todo por nombre (*)
+    reader: Reader,
+    articles: Articles,
+    search_id: SearchId,
+    *,
+    relevant: Annotated[
+        Literal["true", "all"],
+        Query(description="true: solo las relevantes para algún concepto; all: todas."),
+    ] = "true",
+    in_region: Annotated[
+        InRegion | None,
+        Query(description="true: dentro; false: fuera; none: sin ubicación."),
+    ] = None,
+    precision: Annotated[
+        list[str] | None,
+        Query(description="country, state, municipality, locality o unknown (se repite)."),
+    ] = None,
+    concept_id: Annotated[int | None, Query(description="Solo las de este concepto.")] = None,
+    cursor: Annotated[str | None, Query(description="Cursor de la página anterior.")] = None,
+    limit: Annotated[
+        int, Query(description="Tamaño de página (1 a 200).")
+    ] = DEFAULT_ARTICLE_PAGE_SIZE,
+) -> ArticlePageOut:
+    """Notas con resumen, conceptos, ubicación, precisión y confianza; la más reciente primero."""
+    filters = ArticleFilters(
+        relevant_only=relevant == "true",
+        in_region=in_region,
+        precisions=frozenset(precision or ()),
+        concept_id=concept_id,
+    )
+    page = await ListSearchArticles(reader, articles).execute(search_id, filters, cursor, limit)
+    return ArticlePageOut.from_page(page)

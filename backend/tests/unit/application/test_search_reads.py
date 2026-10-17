@@ -13,9 +13,22 @@ from app.application.pagination import (
     encode_cursor,
     encode_time_cursor,
 )
-from app.application.ports.search_reads import ConceptRef, SearchDetail
+from app.application.ports.search_reads import (
+    ArticleDetail,
+    ArticleFilters,
+    ArticleItem,
+    ConceptRef,
+    InRegion,
+    SearchDetail,
+)
 from app.application.use_cases.run_search import SearchNotFoundError
-from app.application.use_cases.search_reads import GetSearch, ListSearches
+from app.application.use_cases.search_reads import (
+    ArticleNotFoundError,
+    GetArticle,
+    GetSearch,
+    ListSearchArticles,
+    ListSearches,
+)
 from app.domain.enrichment import LLMUsage
 from app.domain.errors import InvalidRequestError
 from app.domain.search import SearchStatus
@@ -109,3 +122,64 @@ async def test_detalle_o_404() -> None:
     assert await use.execute(row.search_id) == row
     with pytest.raises(SearchNotFoundError):
         await use.execute(uuid4())
+
+
+def item(article_id: int, published: datetime | None) -> ArticleItem:
+    return ArticleItem(
+        article_id,
+        f"Nota {article_id}",
+        None,
+        None,
+        "https://x.mx",
+        published,
+        None,
+        None,
+        None,
+        "ok",
+        "ok",
+        (),
+        None,
+        None,
+        ("searchapi",),
+    )
+
+
+class Articles:
+    def __init__(self, rows: list[ArticleItem]) -> None:
+        self.rows = rows
+        self.asked: list[tuple[ArticleFilters, TimeCursor | None]] = []
+
+    async def search_articles(
+        self, search_id: UUID, filters: ArticleFilters, after: TimeCursor | None, limit: int
+    ) -> list[ArticleItem]:
+        self.asked.append((filters, after))
+        start = (
+            0
+            if after is None
+            else next(i + 1 for i, r in enumerate(self.rows) if str(r.article_id) == after.id)
+        )
+        return self.rows[start : start + limit]
+
+    async def article_detail(self, article_id: int) -> ArticleDetail | None:
+        return None
+
+
+async def test_notas_por_paginas_y_validacion() -> None:
+    search = detail(1)
+    articles = Articles([item(3, T0), item(2, None)])
+    use = ListSearchArticles(Reader([search]), articles)
+    filters = ArticleFilters(in_region=InRegion.INSIDE)
+
+    first = await use.execute(search.search_id, filters, limit=1)
+    second = await use.execute(search.search_id, filters, first.next_cursor, limit=1)
+
+    assert [i.article_id for i in first.items] == [3]
+    assert [i.article_id for i in second.items] == [2]
+    assert second.next_cursor is None
+    assert articles.asked[1] == (filters, TimeCursor(T0, "3"))
+    with pytest.raises(InvalidRequestError, match="galaxia"):
+        await use.execute(search.search_id, ArticleFilters(precisions=frozenset({"galaxia"})))
+    with pytest.raises(SearchNotFoundError):
+        await use.execute(uuid4(), filters)
+    with pytest.raises(ArticleNotFoundError):
+        await GetArticle(articles).execute(1)

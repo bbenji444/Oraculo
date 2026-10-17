@@ -5,6 +5,7 @@ La cola del worker es falsa: ninguna prueba corre una búsqueda de verdad ni
 gasta créditos.
 """
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -16,11 +17,17 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.api.v1.searches import get_search_queue
 from app.core.config import Settings
+from app.domain.enrichment import Enrichment
+from app.domain.geocoding import Mention, MentionRole
 from app.main import create_app
 from tests.integration.geo_fixture import load_fixture_catalog
+from tests.integration.test_search_repository import REPLIES, new_search, run_search
+from tests.unit.application.test_run_search import IZTA_SEARCHAPI, LLM, MADRID, enrichment
 
 pytestmark = pytest.mark.integration
 
@@ -262,3 +269,161 @@ def test_lecturas_invalidas(
     response = client.get(URL + path, params=params)
 
     assert (response.status_code, response.json()["error"]["code"]) == expected
+
+
+def fill_search(settings: Settings, concept_id: int) -> tuple[str, dict[str, int]]:
+    """Una búsqueda terminada con 2 notas, armada con el pipeline y piezas simuladas."""
+
+    async def run() -> tuple[str, dict[str, int]]:
+        engine = create_async_engine(settings.database_url(test=True))
+        try:
+            searches = PostgresSearchStore(engine)
+            articles = PostgresArticleStore(engine)
+            search_id = await new_search(searches, engine, concept_id)
+            replies: dict[str, Enrichment | Exception] = {
+                **REPLIES,
+                # La de París no es relevante: solo sale con relevant=all.
+                MADRID.title: enrichment(
+                    Mention("París", MentionRole.EVENT, country="Francia"), relevant=False
+                ),
+            }
+            await run_search(engine, searches, articles, LLM(replies)).run(search_id)
+            async with engine.begin() as conn:
+                # Sin fecha: debe ir al final y el cursor debe saber pasar por ella.
+                await conn.execute(
+                    text("UPDATE articles SET published_at = NULL WHERE title = :t"),
+                    {"t": MADRID.title},
+                )
+                found = (await conn.execute(text("SELECT title, id FROM articles"))).all()
+            return str(search_id), dict(found)
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(run())
+
+
+@pytest.fixture
+def filled(settings: Settings, ids: dict[str, int]) -> tuple[str, dict[str, int]]:
+    return fill_search(settings, ids["concept"])
+
+
+def test_las_notas_relevantes_con_su_ubicacion(
+    client: TestClient, filled: tuple[str, dict[str, int]]
+) -> None:
+    search_id, articles = filled
+
+    response = client.get(f"{URL}/{search_id}/articles")
+
+    assert response.status_code == 200
+    [item] = response.json()["items"]
+    assert item["article_id"] == articles[IZTA_SEARCHAPI.title]
+    assert item["in_region"] is True
+    assert item["providers"] == ["searchapi", "indice_local"]
+    assert item["summary"] == "Resumen propio."
+    assert [(c["name"], c["is_relevant"]) for c in item["concepts"]] == [("Prueba pipeline", True)]
+    primary = item["primary_location"]
+    assert (primary["region_code"], primary["precision"], primary["mention"]) == (
+        "09007",
+        "municipality",
+        "Iztapalapa",
+    )
+    assert primary["place"].endswith("Iztapalapa")
+    assert primary["lon"] is not None
+    # Nunca el texto completo de la nota (CLAUDE.md §8).
+    assert "body" not in item and "text" not in item
+
+
+def test_todas_por_paginas_con_cursor_y_sin_fecha_al_final(
+    client: TestClient, filled: tuple[str, dict[str, int]]
+) -> None:
+    search_id, articles = filled
+    url = f"{URL}/{search_id}/articles"
+
+    first = client.get(url, params={"relevant": "all", "limit": 1}).json()
+    second = client.get(
+        url, params={"relevant": "all", "limit": 1, "cursor": first["next_cursor"]}
+    ).json()
+
+    assert [i["article_id"] for i in first["items"]] == [articles[IZTA_SEARCHAPI.title]]
+    assert [i["article_id"] for i in second["items"]] == [articles[MADRID.title]]
+    assert second["items"][0]["published_at"] is None
+    assert second["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"in_region": "false"}, [MADRID.title]),
+        ({"in_region": "true"}, [IZTA_SEARCHAPI.title]),
+        ({"in_region": "none"}, []),
+        ({"precision": "country"}, [MADRID.title]),
+        ({"precision": ["municipality", "country"]}, [IZTA_SEARCHAPI.title, MADRID.title]),
+        ({"precision": "unknown"}, []),
+    ],
+)
+def test_filtros(
+    client: TestClient,
+    filled: tuple[str, dict[str, int]],
+    params: dict[str, Any],
+    expected: list[str],
+) -> None:
+    search_id, _articles = filled
+
+    response = client.get(f"{URL}/{search_id}/articles", params={"relevant": "all", **params})
+
+    assert [i["title"] for i in response.json()["items"]] == expected
+
+
+def test_filtro_por_concepto(
+    client: TestClient, filled: tuple[str, dict[str, int]], ids: dict[str, int]
+) -> None:
+    search_id, _articles = filled
+    url = f"{URL}/{search_id}/articles"
+
+    judged = client.get(url, params={"relevant": "all", "concept_id": ids["concept"]}).json()
+    other = client.get(url, params={"concept_id": ids["off"]}).json()
+
+    assert len(judged["items"]) == 2
+    assert other["items"] == []
+
+
+@pytest.mark.parametrize(
+    ("path", "params", "expected"),
+    [
+        ("/00000000-0000-0000-0000-000000000000/articles", {}, (404, "search_not_found")),
+        ("/{search}/articles", {"precision": "galaxia"}, (422, "invalid_request")),
+        ("/{search}/articles", {"in_region": "quizas"}, (422, "invalid_request")),
+        ("/{search}/articles", {"limit": 500}, (422, "invalid_request")),
+        ("/{search}/articles", {"cursor": "dañado"}, (422, "invalid_request")),
+    ],
+)
+def test_notas_peticiones_invalidas(
+    client: TestClient,
+    filled: tuple[str, dict[str, int]],
+    path: str,
+    params: dict[str, Any],
+    expected: tuple[int, str],
+) -> None:
+    response = client.get(URL + path.format(search=filled[0]), params=params)
+
+    assert (response.status_code, response.json()["error"]["code"]) == expected
+
+
+def test_detalle_de_una_nota(client: TestClient, filled: tuple[str, dict[str, int]]) -> None:
+    _search_id, articles = filled
+
+    response = client.get(f"/api/v1/articles/{articles[MADRID.title]}")
+    missing = client.get("/api/v1/articles/999999999")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["in_region"] is False
+    assert [(loc["mention"], loc["precision"], loc["is_primary"]) for loc in data["locations"]] == [
+        ("París", "country", True)
+    ]
+    assert [(c["name"], c["is_relevant"]) for c in data["concepts"]] == [
+        ("Prueba API búsquedas", False)
+    ]
+    assert (data["llm_model"], data["prompt_version"]) == ("modelo-de-prueba", "enrich_v1")
+    assert data["providers"] == ["searchapi"]
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "article_not_found")

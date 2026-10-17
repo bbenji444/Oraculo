@@ -1,4 +1,4 @@
-"""Leer búsquedas para la API: detalle e historial (especificación §13).
+"""Leer búsquedas para la API: detalle, historial, notas y detalle de nota (§13).
 
 No hace: no corre ni modifica búsquedas.
 """
@@ -6,10 +6,20 @@ No hace: no corre ni modifica búsquedas.
 from uuid import UUID
 
 from app.application.pagination import Page, TimeCursor, decode_time_cursor, encode_time_cursor
-from app.application.ports.search_reads import SearchDetail, SearchReaderPort
+from app.application.ports.search_reads import (
+    ArticleDetail,
+    ArticleFilters,
+    ArticleItem,
+    ArticleReaderPort,
+    SearchDetail,
+    SearchReaderPort,
+)
 from app.application.use_cases.run_search import SearchNotFoundError
-from app.domain.errors import InvalidRequestError
+from app.domain.errors import InvalidRequestError, NotFoundError
+from app.domain.geocoding import Precision
 
+# Precisiones válidas para filtrar (``unknown`` = sin ubicación).
+PRECISIONS = frozenset(p.value for p in Precision)
 # Búsquedas por página del historial: una pantalla cómoda.
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
@@ -95,3 +105,98 @@ class ListSearches:
             else None
         )
         return Page(tuple(items), next_cursor)
+
+
+# Notas por página: una lista cómoda; el mapa usa los conteos (aggregates).
+DEFAULT_ARTICLE_PAGE_SIZE = 50
+MAX_ARTICLE_PAGE_SIZE = 200
+
+
+class ArticleNotFoundError(NotFoundError):
+    """La nota pedida no existe."""
+
+    code = "article_not_found"
+
+
+class ListSearchArticles:
+    """Notas de una búsqueda con filtros, por páginas."""
+
+    def __init__(self, searches: SearchReaderPort, articles: ArticleReaderPort) -> None:
+        """Recibe los lectores.
+
+        Args:
+            searches: Lecturas de búsquedas (para el 404).
+            articles: Lecturas de notas.
+        """
+        self._searches = searches
+        self._articles = articles
+
+    async def execute(
+        self,
+        search_id: UUID,
+        filters: ArticleFilters,
+        cursor: str | None = None,
+        limit: int = DEFAULT_ARTICLE_PAGE_SIZE,
+    ) -> Page[ArticleItem]:
+        """Devuelve una página, de la nota más reciente a la más vieja.
+
+        Args:
+            search_id: Búsqueda.
+            filters: Filtros.
+            cursor: Cursor de la página anterior.
+            limit: Tamaño de página (1 a 200).
+
+        Returns:
+            La página con su cursor siguiente.
+
+        Raises:
+            SearchNotFoundError: Si la búsqueda no existe.
+            InvalidRequestError: Si el límite, la precisión o el cursor no
+                son válidos.
+        """
+        check_limit(limit, MAX_ARTICLE_PAGE_SIZE)
+        unknown = filters.precisions - PRECISIONS
+        if unknown:
+            raise InvalidRequestError(
+                f"Precisión desconocida: {', '.join(sorted(unknown))}.",
+                {"validas": sorted(PRECISIONS)},
+            )
+        await GetSearch(self._searches).execute(search_id)
+        after = decode_time_cursor(cursor) if cursor else None
+        rows = await self._articles.search_articles(search_id, filters, after, limit + 1)
+        items = rows[:limit]
+        next_cursor = (
+            encode_time_cursor(TimeCursor(items[-1].published_at, str(items[-1].article_id)))
+            if len(rows) > limit and items
+            else None
+        )
+        return Page(tuple(items), next_cursor)
+
+
+class GetArticle:
+    """Una nota con todas sus menciones de lugar y juicios de la IA."""
+
+    def __init__(self, articles: ArticleReaderPort) -> None:
+        """Recibe el lector.
+
+        Args:
+            articles: Lecturas de notas.
+        """
+        self._articles = articles
+
+    async def execute(self, article_id: int) -> ArticleDetail:
+        """Devuelve la nota.
+
+        Args:
+            article_id: Id.
+
+        Returns:
+            La nota.
+
+        Raises:
+            ArticleNotFoundError: Si no existe.
+        """
+        detail = await self._articles.article_detail(article_id)
+        if detail is None:
+            raise ArticleNotFoundError("No existe esa nota.", {"id": article_id})
+        return detail
