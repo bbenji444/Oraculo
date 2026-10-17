@@ -119,6 +119,15 @@ instalar_herramientas_geodatos() {
   ok "pmtiles $("${PMTILES_BIN}" version 2>&1 | head -1) (SHA-256 verificado)"
 }
 
+instalar_librerias_reportes() {
+  paso "Instalando las librerías del sistema para los reportes PDF (WeasyPrint)"
+  export DEBIAN_FRONTEND=noninteractive
+  # WeasyPrint 70 dibuja el texto con Pango (>= 1.44) y HarfBuzz; su
+  # documentación pide estos paquetes en Ubuntu (ADR-0018).
+  como_root apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b >/dev/null
+  ok "pango $(dpkg-query -W -f='${Version}' libpango-1.0-0)"
+}
+
 instalar_uv_y_python() {
   paso "Instalando uv ${UV_VERSION} y Python ${PYTHON_VERSION}"
   if [[ -x "${UV_BIN}" ]] && "${UV_BIN}" --version | grep -q " ${UV_VERSION}"; then
@@ -211,6 +220,7 @@ main() {
   configurar_repositorio_postgres
   instalar_servicios
   instalar_herramientas_geodatos
+  instalar_librerias_reportes
   instalar_uv_y_python
   instalar_dependencias_python
   arrancar_postgres
