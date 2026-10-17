@@ -103,7 +103,7 @@ geo-validate: ## Criterios de aceptación del catálogo geográfico (§12)
 geo-tiles: ## Genera los PMTiles de países, estados, municipios y localidades
 	$(UV_RUN) python -m app.geodata.generar_pmtiles
 
-geo-terms: ## Aplica términos de búsqueda y códigos de país sin recargar el catálogo (ADR-0009)
+geo-terms: ## Aplica términos de búsqueda, alias y códigos de país sin recargar el catálogo (ADR-0009)
 	$(UV_RUN) python -m app.geodata.aplicar_terminos $(ARGS)
 
 geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
