@@ -15,7 +15,7 @@ No hace: no decide nada (eso es ``RunSearch``).
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID
 
@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.application.audit import SEARCH_FINISHED, Actor
 from app.application.ports.llm import EnrichmentResult
 from app.application.ports.search_store import (
+    ArticleMentions,
     NewSearch,
     ProcessingErrorRecord,
     SearchClosing,
@@ -36,7 +37,8 @@ from app.application.ports.search_store import (
 from app.domain.dedupe import DedupedArticle, url_hash
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
-from app.domain.geocoding import Resolution
+from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Resolution
+from app.domain.region import RegionLevel
 from app.domain.search import SearchStatus
 
 AUDIT_ENTITY = "search"
@@ -264,6 +266,20 @@ class PostgresSearchStore:
                 ),
                 {"id": search_id, "m": message[:MAX_ERROR_CHARS]},
             )
+
+    async def last_search_id(self) -> UUID | None:
+        """La búsqueda más reciente (para ``make reubicar`` sin id).
+
+        Returns:
+            Su id, o ``None`` si no hay búsquedas.
+        """
+        async with self._engine.connect() as conn:
+            found: UUID | None = (
+                await conn.execute(
+                    text("SELECT id FROM searches ORDER BY created_at DESC, id DESC LIMIT 1")
+                )
+            ).scalar()
+        return found
 
     async def snapshot(self, search_id: UUID) -> SearchSnapshot | None:
         """Cómo va una búsqueda (el comando lo consulta mientras corre en el worker).
@@ -501,32 +517,7 @@ class PostgresArticleStore:
                         "reason": judgement.relevance_reason,
                     },
                 )
-            await conn.execute(
-                text("DELETE FROM article_locations WHERE article_id = :a"), {"a": article_id}
-            )
-            for r in resolutions:
-                await conn.execute(
-                    text(
-                        """
-                        INSERT INTO article_locations (article_id, mention_text, role, region_id,
-                            precision, confidence, is_primary, point)
-                        VALUES (:a, :mention, :role, :region, :precision, :confidence,
-                            :primary, CASE WHEN CAST(:lon AS double precision) IS NULL THEN NULL
-                                ELSE ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) END)
-                        """
-                    ),
-                    {
-                        "a": article_id,
-                        "mention": r.mention.text,
-                        "role": r.mention.role.value,
-                        "region": r.place.region_id if r.place else None,
-                        "precision": r.precision.value,
-                        "confidence": r.confidence,
-                        "primary": r.is_primary,
-                        "lon": r.place.lon if r.place else None,
-                        "lat": r.place.lat if r.place else None,
-                    },
-                )
+            await _write_locations(conn, article_id, resolutions)
 
     async def mark_enrichment_failed(self, article_id: int) -> None:
         """Ver ``ArticleStorePort.mark_enrichment_failed``."""
@@ -557,6 +548,81 @@ class PostgresArticleStore:
                         "inside": row.in_region,
                     },
                 )
+
+    async def search_mentions(self, search_id: UUID) -> list[ArticleMentions]:
+        """Ver ``RelocationStorePort.search_mentions``."""
+        async with self._engine.connect() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        text(
+                            """
+                            SELECT a.id, a.title, al.mention_text, al.role, al.kind_hint,
+                                al.state_hint,
+                                -- Filas anteriores a 0014: si se resolvió a otro país,
+                                -- ese país es la pista.
+                                COALESCE(al.country_hint, CASE WHEN r.level = 'country'
+                                    AND r.code <> :mx THEN r.name END) AS country,
+                                (SELECT pr.code FROM article_locations p
+                                    JOIN regions pr ON pr.id = p.region_id
+                                    WHERE p.article_id = a.id AND p.is_primary) AS primary_code
+                            FROM (SELECT DISTINCT article_id FROM search_results
+                                  WHERE search_id = :s) sr
+                            JOIN articles a ON a.id = sr.article_id
+                            LEFT JOIN article_locations al ON al.article_id = a.id
+                            LEFT JOIN regions r ON r.id = al.region_id
+                            ORDER BY a.id, al.id
+                            """
+                        ),
+                        {"s": search_id, "mx": MEXICO_ISO3},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        grouped: dict[int, ArticleMentions] = {}
+        for row in rows:
+            current = grouped.get(row["id"]) or ArticleMentions(
+                row["id"], row["title"], (), row["primary_code"]
+            )
+            if row["mention_text"] is not None:
+                mention = Mention(
+                    row["mention_text"],
+                    MentionRole(row["role"]),
+                    RegionLevel(row["kind_hint"]) if row["kind_hint"] else None,
+                    row["state_hint"],
+                    row["country"],
+                )
+                current = replace(current, mentions=(*current.mentions, mention))
+            grouped[row["id"]] = current
+        return list(grouped.values())
+
+    async def save_locations(self, article_id: int, resolutions: Sequence[Resolution]) -> None:
+        """Ver ``RelocationStorePort.save_locations``."""
+        async with self._engine.begin() as conn:
+            await _write_locations(conn, article_id, resolutions)
+
+    async def set_in_region(self, search_id: UUID, article_id: int, in_region: bool | None) -> None:
+        """Ver ``RelocationStorePort.set_in_region``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE search_results SET in_region = :inside "
+                    "WHERE search_id = :s AND article_id = :a"
+                ),
+                {"s": search_id, "a": article_id, "inside": in_region},
+            )
+
+    async def merge_progress(self, search_id: UUID, values: Mapping[str, object]) -> None:
+        """Ver ``RelocationStorePort.merge_progress``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE searches SET progress = progress || CAST(:p AS jsonb), "
+                    "updated_at = now() WHERE id = :s"
+                ),
+                {"s": search_id, "p": _json(values)},
+            )
 
     async def purge_texts(self, older_than_days: int) -> int:
         """Borra los textos extraídos más viejos que la retención (ADR-0015).
@@ -640,3 +706,41 @@ class PostgresArticleStore:
             )
             for row in rows
         ]
+
+
+async def _write_locations(
+    conn: AsyncConnection, article_id: int, resolutions: Sequence[Resolution]
+) -> None:
+    """Reemplaza las ubicaciones de una nota, con las pistas de la IA para reubicar después."""
+    await conn.execute(
+        text("DELETE FROM article_locations WHERE article_id = :a"), {"a": article_id}
+    )
+    for r in resolutions:
+        mention = r.mention
+        await conn.execute(
+            text(
+                """
+                INSERT INTO article_locations (article_id, mention_text, role, kind_hint,
+                    state_hint, country_hint, region_id, precision, confidence, is_primary,
+                    point)
+                VALUES (:a, :mention, :role, :kind, :state, :country, :region, :precision,
+                    :confidence, :primary,
+                    CASE WHEN CAST(:lon AS double precision) IS NULL THEN NULL
+                        ELSE ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) END)
+                """
+            ),
+            {
+                "a": article_id,
+                "mention": mention.text,
+                "role": mention.role.value,
+                "kind": mention.kind_hint.value if mention.kind_hint else None,
+                "state": mention.state_hint,
+                "country": mention.country,
+                "region": r.place.region_id if r.place else None,
+                "precision": r.precision.value,
+                "confidence": r.confidence,
+                "primary": r.is_primary,
+                "lon": r.place.lon if r.place else None,
+                "lat": r.place.lat if r.place else None,
+            },
+        )

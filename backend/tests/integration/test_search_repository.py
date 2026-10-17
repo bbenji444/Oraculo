@@ -29,7 +29,7 @@ from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionL
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
 from app.application.use_cases.run_search import PipelineLimits, RunSearch
-from app.cli import buscar
+from app.cli import buscar, reubicar
 from app.core.config import Settings
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
@@ -41,6 +41,7 @@ from tests.unit.application.test_run_search import (
     DEFAULT_REPLIES,
     IZTA_BODY,
     IZTA_LOCAL,
+    IZTA_MENTION,
     IZTA_SEARCHAPI,
     LLM,
     MADRID,
@@ -405,3 +406,61 @@ async def test_el_comando_avisa_si_el_worker_no_responde(
     )
 
     assert code == 1
+
+
+async def test_las_pistas_se_guardan_y_se_reubica_sin_la_ia(
+    test_engine: AsyncEngine,
+    settings: Settings,
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    concept_id: int,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    searches, articles = stores
+    search_id = await new_search(searches, test_engine, concept_id)
+    await run_search(test_engine, searches, articles, LLM(REPLIES)).run(search_id)
+
+    saved = {a.title: a for a in await articles.search_mentions(search_id)}
+    izta = saved[IZTA_SEARCHAPI.title]
+    assert izta.mentions == (IZTA_MENTION,)
+    assert izta.primary_code == "09007"
+    assert saved[MADRID.title].mentions[0].country == "Francia"
+    # Una ubicación vieja equivocada (antes de corregir el catálogo).
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "UPDATE article_locations SET region_id = (SELECT id FROM regions "
+                "WHERE code = '09'), precision = 'state' WHERE article_id = :a"
+            ),
+            {"a": izta.article_id},
+        )
+        await conn.execute(
+            text("UPDATE search_results SET in_region = NULL WHERE article_id = :a"),
+            {"a": izta.article_id},
+        )
+
+    with caplog.at_level(logging.INFO):
+        code = await reubicar.run(
+            reubicar.parse_args(["--busqueda", str(search_id)]), cli_settings(settings)
+        )
+
+    assert code == 0
+    assert "1 de 2 notas cambiaron de ubicación" in caplog.text
+    after = {a.title: a for a in await articles.search_mentions(search_id)}
+    assert after[IZTA_SEARCHAPI.title].primary_code == "09007"
+    async with test_engine.connect() as conn:
+        inside = (
+            await conn.execute(
+                text("SELECT in_region FROM search_results WHERE article_id = :a"),
+                {"a": izta.article_id},
+            )
+        ).scalars()
+        # Una fila por proveedor que la encontró (SearchApi y el índice local).
+        assert list(inside) == [True, True]
+    snapshot = await searches.snapshot(search_id)
+    assert snapshot is not None
+    assert (snapshot.progress["in_region"], snapshot.progress["stage"]) == (1, "close")
+    assert await searches.last_search_id() == search_id
+
+
+async def test_reubicar_sin_busquedas(settings: Settings, concept_id: int) -> None:
+    assert await reubicar.run(reubicar.parse_args([]), cli_settings(settings)) == 1

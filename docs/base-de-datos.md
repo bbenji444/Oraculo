@@ -47,10 +47,10 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `articles` | Cada nota una sola vez en todo el sistema (por URL canónica): metadatos, resumen propio de la IA, tipo de evento y estado de extracción y enriquecimiento. No guarda el artículo. |
 | `article_texts` | Texto extraído de cada nota, **solo para procesar**: no se expone y se borra a los 30 días (ADR-0015). |
 | `article_concepts` | Si una nota es relevante para cada concepto, con su puntaje y la razón. |
-| `article_locations` | Cada lugar que menciona una nota, resuelto contra el catálogo INEGI: región, precisión, confianza y si es la ubicación principal. El punto sale del catálogo, nunca de la IA. |
+| `article_locations` | Cada lugar que menciona una nota, resuelto contra el catálogo INEGI: región, precisión, confianza y si es la ubicación principal. El punto sale del catálogo, nunca de la IA. Guarda también las pistas de la IA (tipo de lugar, estado y país, migración 0014) para volver a ubicar sin pagar (`make reubicar`). |
 | `search_results` | Qué notas encontró cada búsqueda, con qué proveedor y en qué posición, y si caen dentro de la región buscada. |
 | `processing_errors` | Lo que falló al procesar una nota o una búsqueda (etapa, tipo, mensaje). Un error en una nota no detiene a las demás. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0013`. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0014`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:

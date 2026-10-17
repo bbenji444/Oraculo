@@ -25,7 +25,7 @@ from app.application.ports.llm import EnrichmentResult
 from app.domain.dedupe import DedupedArticle
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
-from app.domain.geocoding import Resolution
+from app.domain.geocoding import Mention, Resolution
 from app.domain.search import SearchStatus, Stage
 
 
@@ -304,5 +304,67 @@ class ArticleStorePort(Protocol):
         Args:
             search_id: Búsqueda.
             rows: Una por nota y proveedor.
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ArticleMentions:
+    """Las menciones de lugar guardadas de una nota de una búsqueda.
+
+    Attributes:
+        article_id: Nota.
+        title: Título (para mostrar el antes y después).
+        mentions: Menciones con las pistas que dio la IA (en notas anteriores
+            a la migración 0014 solo traen texto, papel y, si era otro
+            país, el país).
+        primary_code: Clave de la ubicación principal actual, si tiene.
+    """
+
+    article_id: int
+    title: str
+    mentions: tuple[Mention, ...]
+    primary_code: str | None
+
+
+class RelocationStorePort(Protocol):
+    """Lo necesario para volver a ubicar notas sin pagarle otra vez a la IA."""
+
+    async def search_mentions(self, search_id: UUID) -> list[ArticleMentions]:
+        """Notas de una búsqueda con sus menciones guardadas.
+
+        Args:
+            search_id: Búsqueda.
+
+        Returns:
+            Una por nota encontrada, enriquecida o no.
+        """
+        ...
+
+    async def save_locations(self, article_id: int, resolutions: Sequence[Resolution]) -> None:
+        """Reemplaza las ubicaciones de una nota.
+
+        Args:
+            article_id: Nota.
+            resolutions: Menciones resueltas de nuevo.
+        """
+        ...
+
+    async def set_in_region(self, search_id: UUID, article_id: int, in_region: bool | None) -> None:
+        """Actualiza si la nota cae en la región buscada.
+
+        Args:
+            search_id: Búsqueda.
+            article_id: Nota.
+            in_region: Nuevo valor (``None``: sin ubicación).
+        """
+        ...
+
+    async def merge_progress(self, search_id: UUID, values: Mapping[str, object]) -> None:
+        """Actualiza solo algunos conteos del avance de la búsqueda.
+
+        Args:
+            search_id: Búsqueda.
+            values: Conteos nuevos (los demás se conservan).
         """
         ...
