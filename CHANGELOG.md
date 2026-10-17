@@ -6,6 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Fase 5 — API de búsqueda y resultados** (`docs/api.md`, con ejemplos de `curl` reales):
+  - `POST /searches/estimate`: consultas, créditos del mes y costo máximo de la IA, sin gastar.
+  - `POST /searches`: crea la búsqueda y la manda al worker (`202`). Antes revisa la llave de la IA (`503`), el tope mensual (`409`) y el máximo de consultas.
+  - `GET /searches/{id}` (estado, avance y costo) y `GET /searches` (historial con cursor).
+  - `GET /searches/{id}/articles`: notas con resumen, conceptos, ubicación y punto. Filtros `relevant`, `in_region`, `precision` y `concept_id`, con cursor por fecha.
+  - `GET /searches/{id}/aggregates`: mapa de calor por estado, municipio o país, sin repartir lo menos preciso.
+  - `GET /articles/{id}`: todas sus menciones de lugar (nunca el texto completo).
+  - Errores 500 y 503 con el formato uniforme y OpenAPI revisado: cada ruta documenta solo sus errores y cada grupo tiene descripción.
+  - `PlanSearch`: la API y `make buscar` estiman igual.
+
 ### Corregido
 
 - Borrar un concepto que ya se usó en una búsqueda ahora lo desactiva (borrado lógico, §13). Antes `is_used_in_searches` siempre respondía "no" y el borrado físico chocaba con `search_concepts` (error 500).

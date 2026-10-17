@@ -7,6 +7,7 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Decisiones de arquitectura:** [docs/adr/](docs/adr/README.md)
 - **Historial de cambios:** [CHANGELOG.md](CHANGELOG.md)
 - **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
+- **Usar la API (con ejemplos de `curl`):** [docs/api.md](docs/api.md)
 
 > Estado actual: **Fase 2 (conceptos)**. Además de los cimientos (servicios, `/health`) y el catálogo geográfico de México (INEGI) con su globo 3D, ya existen los conceptos de búsqueda: se crean, editan y prueban desde la pestaña **Conceptos**, que muestra las consultas exactas que se enviarían a cada proveedor sin gastar créditos. La búsqueda real de noticias, la geolocalización y los reportes llegan en las fases siguientes.
 
