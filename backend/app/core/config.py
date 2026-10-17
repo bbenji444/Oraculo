@@ -70,6 +70,14 @@ _DEFAULT_NEWS_BODY_RETENTION_DAYS = 30
 _DEFAULT_NGRAMS_LOOKBACK_MINUTES = 35
 _DEFAULT_NGRAMS_DELAY_MINUTES = 3
 
+# Pipeline de búsqueda (F4, ADR-0015):
+# - 15 s por página: en la muestra real del 16/10/2026 la más lenta tardó 1.6 s.
+_DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 15.0
+# - 4 páginas a la vez: rápido sin saturar a un mismo medio.
+_DEFAULT_EXTRACTION_CONCURRENCY = 4
+# - El texto extraído se borra a los 30 días (solo sirve para procesar).
+_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS = 30
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
 APP_VERSION = "0.3.0"
@@ -145,6 +153,11 @@ class Settings(BaseSettings):
     news_body_retention_days: int = Field(default=_DEFAULT_NEWS_BODY_RETENTION_DAYS, ge=1)
     ngrams_lookback_minutes: int = Field(default=_DEFAULT_NGRAMS_LOOKBACK_MINUTES, ge=1)
     ngrams_delay_minutes: int = Field(default=_DEFAULT_NGRAMS_DELAY_MINUTES, ge=0)
+
+    # --- Pipeline de búsqueda (F4, ADR-0015) ---
+    extraction_timeout_seconds: float = Field(default=_DEFAULT_EXTRACTION_TIMEOUT_SECONDS, gt=0)
+    extraction_concurrency: int = Field(default=_DEFAULT_EXTRACTION_CONCURRENCY, ge=1)
+    article_text_retention_days: int = Field(default=_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS, ge=1)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

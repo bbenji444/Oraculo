@@ -109,7 +109,7 @@ class ProviderHttpClient:
 
     def __init__(  # noqa: PLR0913 — configuración del cliente, todo por nombre (*)
         self,
-        provider: Provider,
+        provider: Provider | str,
         *,
         timeout_seconds: float,
         max_attempts: int,
@@ -123,7 +123,9 @@ class ProviderHttpClient:
         """Configura el cliente.
 
         Args:
-            provider: Proveedor (para los mensajes de error).
+            provider: Proveedor, o un nombre libre para lo que no es un proveedor
+                (por ejemplo ``"paginas"`` al bajar notas para extraer su texto);
+                sale en los mensajes de error y en el registro.
             timeout_seconds: Tiempo máximo por petición.
             max_attempts: Intentos en total (1 = sin reintentos).
             max_concurrency: Peticiones simultáneas permitidas.
@@ -137,7 +139,7 @@ class ProviderHttpClient:
                 ``MockTransport`` con respuestas grabadas.
             sleep: Función de espera; las pruebas la reemplazan para no esperar.
         """
-        self._provider = provider
+        self._name = provider.value if isinstance(provider, Provider) else provider
         self._max_attempts = max_attempts
         self._min_interval = min_interval_seconds
         self._wait = build_wait(rate_limit_wait_seconds)
@@ -161,7 +163,7 @@ class ProviderHttpClient:
         error = state.outcome.exception() if state.outcome else None
         wait = state.next_action.sleep if state.next_action else 0.0
         logger.warning(
-            f"{self._provider.value}: intento {state.attempt_number} falló "
+            f"{self._name}: intento {state.attempt_number} falló "
             f"({error}); siguiente intento en {wait:.0f} s"
         )
 
@@ -184,7 +186,7 @@ class ProviderHttpClient:
         if status < _CLIENT_ERROR:
             return None
         body = response.text[:ERROR_BODY_CHARS]
-        name = self._provider.value
+        name = self._name
         if status in _AUTH_STATUSES:
             return ProviderAuthError(
                 f"{name} rechazó la llave (HTTP {status}). Revisa la configuración.",
@@ -214,7 +216,7 @@ class ProviderHttpClient:
     async def _attempt(
         self, url: str, params: Mapping[str, str], method: str = "GET"
     ) -> httpx2.Response:
-        name = self._provider.value
+        name = self._name
         async with self._semaphore:
             await self._pace()
             try:
@@ -303,5 +305,5 @@ class ProviderHttpClient:
                     rate_limited += 1
                     raise
         if response is None:  # pragma: no cover — tenacity siempre corre al menos un intento
-            raise ProviderUnavailableError("Sin respuesta.", provider=self._provider.value)
+            raise ProviderUnavailableError("Sin respuesta.", provider=self._name)
         return HttpOutcome(response, rate_limited)
