@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Corregido
+
+- Borrar un concepto que ya se usó en una búsqueda ahora lo desactiva (borrado lógico, §13). Antes `is_used_in_searches` siempre respondía "no" y el borrado físico chocaba con `search_concepts` (error 500).
+
 ## [0.4.0] - 2026-10-17
 
 ### Agregado
