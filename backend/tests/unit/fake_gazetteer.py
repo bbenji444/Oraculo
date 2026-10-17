@@ -39,6 +39,18 @@ NEZA = place(26, "15058", RegionLevel.MUNICIPALITY, "Nezahualcóyotl")
 PENON = place(27, "090170999", RegionLevel.LOCALITY, "Peñón de los Baños")
 # Señuelo: el mismo nombre sin Ñ. Si la Ñ se convirtiera en N, coincidiría.
 PENON_SIN_ENIE = place(28, "110030999", RegionLevel.LOCALITY, "Penon de los Banos")
+# Búsqueda real del 17/10/2026: "Juchitán" a secas es el de Guerrero; el de Oaxaca
+# se llama oficialmente "Heroica Ciudad de Juchitán de Zaragoza".
+GUERRERO = place(30, "12", RegionLevel.STATE, "Guerrero")
+OAXACA = place(31, "20", RegionLevel.STATE, "Oaxaca")
+CHIAPAS = place(32, "07", RegionLevel.STATE, "Chiapas")
+GUANAJUATO = place(33, "11", RegionLevel.STATE, "Guanajuato")
+JUCHITAN_GRO = place(34, "12080", RegionLevel.MUNICIPALITY, "Juchitán")
+JUCHITAN_OAX = place(
+    35, "20043", RegionLevel.MUNICIPALITY, "Heroica Ciudad de Juchitán de Zaragoza"
+)
+# Una "colonia La Gloria" de Juchitán coincidía con este pueblo de Guanajuato.
+LA_GLORIA_GTO = place(36, "110350261", RegionLevel.LOCALITY, "Colonia la Gloria")
 
 ALIASES: dict[int, tuple[str, ...]] = {
     CDMX.region_id: ("CDMX", "la capital del país", "DF"),
@@ -46,6 +58,7 @@ ALIASES: dict[int, tuple[str, ...]] = {
     COAHUILA.region_id: ("Coahuila",),
     SAN_PEDRO_GG.region_id: ("San Pedro",),
     NEZA.region_id: ("Neza",),
+    JUCHITAN_OAX.region_id: ("Juchitán de Zaragoza", "Juchitán"),
 }
 ALL = (
     MEXICO,
@@ -64,6 +77,13 @@ ALL = (
     NEZA,
     PENON,
     PENON_SIN_ENIE,
+    GUERRERO,
+    OAXACA,
+    CHIAPAS,
+    GUANAJUATO,
+    JUCHITAN_GRO,
+    JUCHITAN_OAX,
+    LA_GLORIA_GTO,
 )
 
 

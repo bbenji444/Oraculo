@@ -233,17 +233,29 @@ def disambiguate(
 
     Args:
         candidates: Candidatas ya filtradas (``most_general``, nivel, estado).
-        context_states: Claves de estado que nombra la misma nota.
+        context_states: Claves de estado que nombra la misma nota. Si hay,
+            las localidades fuera de esos estados se descartan.
         searched: Región de la búsqueda, si la hay.
 
     Returns:
         La elegida con su confianza; o solo el estado común; o nada.
     """
+    states = set(context_states)
+    if states:
+        # Hay cerca de 300 mil localidades y muchas se llaman como colonias o
+        # barrios ("colonia La Gloria" de Juchitán coincidía con un pueblo de
+        # Guanajuato; búsqueda real del 17/10/2026). Si la nota nombra sus
+        # estados, una localidad fuera de todos ellos es casi siempre un
+        # homónimo: mejor sin ubicar que en el lugar equivocado (§11). Los
+        # municipios sí se conservan: una nota puede mencionar uno de otro
+        # estado sin nombrar ese estado.
+        candidates = [
+            c for c in candidates if c.level is not RegionLevel.LOCALITY or c.state_code in states
+        ]
     if not candidates:
         return Choice(None, None, UNKNOWN_CONFIDENCE)
     if len(candidates) == 1:
         return Choice(candidates[0], None, EXACT_CONFIDENCE)
-    states = set(context_states)
     by_context = [c for c in candidates if c.state_code in states]
     if len(by_context) == 1:
         return Choice(by_context[0], None, TIEBREAK_CONFIDENCE)

@@ -170,3 +170,52 @@ async def test_dos_localidades_del_mismo_estado_suben_al_estado() -> None:
 
     assert (result.place, result.precision) == (cat.COAHUILA, Precision.STATE)
     assert result.confidence == STATE_FALLBACK_CONFIDENCE
+
+
+# --- Fallas de la primera búsqueda real (17/10/2026) ---
+
+
+async def test_juchitan_de_zaragoza_es_el_de_oaxaca_por_su_alias() -> None:
+    result = await one(Mention("Juchitán de Zaragoza", EVENT))
+
+    assert result.place == cat.JUCHITAN_OAX
+    assert result.precision is Precision.MUNICIPALITY
+
+
+async def test_juchitan_a_secas_se_desempata_por_el_estado_de_la_nota() -> None:
+    juchitan, _oaxaca = await resolve(Mention("Juchitán", MENTIONED), Mention("Oaxaca", MENTIONED))
+
+    assert juchitan.place == cat.JUCHITAN_OAX
+    assert juchitan.confidence == TIEBREAK_CONFIDENCE
+
+
+async def test_localidad_de_otro_estado_no_se_usa_si_la_nota_nombra_sus_estados() -> None:
+    gloria, juchitan, *_states = await resolve(
+        Mention("colonia La Gloria", EVENT),
+        Mention("Juchitán de Zaragoza", EVENT),
+        Mention("Oaxaca", MENTIONED),
+        Mention("Chiapas", MENTIONED),
+    )
+
+    # Antes: la colonia de Juchitán se ubicaba en un pueblo de Guanajuato.
+    assert gloria.place is None
+    assert gloria.precision is Precision.UNKNOWN
+    assert juchitan.place == cat.JUCHITAN_OAX
+    assert juchitan.is_primary
+
+
+async def test_localidad_unica_sin_estados_en_la_nota_si_se_usa() -> None:
+    # Sin estados de contexto no hay con qué contrastar: se conserva (§11, Peñón).
+    result = await one(Mention("Colonia la Gloria", EVENT))
+
+    assert result.place == cat.LA_GLORIA_GTO
+
+
+async def test_municipio_de_otro_estado_si_se_conserva() -> None:
+    # Una nota de Jalisco puede mencionar un municipio de otro estado sin
+    # nombrar ese estado: los municipios no se descartan.
+    juchitan, _jalisco = await resolve(
+        Mention("Juchitán de Zaragoza", MENTIONED), Mention("Chiapas", MENTIONED)
+    )
+
+    assert juchitan.place == cat.JUCHITAN_OAX
