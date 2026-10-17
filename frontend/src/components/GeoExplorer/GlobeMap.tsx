@@ -11,9 +11,24 @@ import { type FeatureIdentifier, Map as MapLibreMap, NavigationControl } from 'm
 import { useEffect, useRef, useState } from 'react';
 
 import { setupMapLibre } from '../../map/setup';
-import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
+import {
+  easeOutQuint,
+  INTRO_DURATION_MS,
+  INTRO_FROM_ZOOM,
+  INTRO_LNG_OFFSET_DEGREES,
+} from '../../map/motion';
+import {
+  GLOBE_BEARING,
+  prefersReducedMotion,
+  REGION_BEARING,
+  SPIN_STEP_MS,
+  spinDegrees,
+} from '../../map/spin';
+import { useCameraStore } from '../../store/camera';
 import {
   buildMapStyle,
+  EARTH_LAYER,
+  type EarthMode,
   featureLabel,
   FLY_MAX_ZOOM,
   INTERACTIVE_LAYERS,
@@ -35,6 +50,8 @@ interface GlobeMapProps {
   spinning: boolean;
   /** Avisa que la persona tocó el mapa: el giro se detiene. */
   onUserInteract: () => void;
+  /** Cara de la Tierra visible (ADR-0017). */
+  earth: EarthMode;
 }
 
 // Eventos de la persona sobre el mapa que detienen el giro.
@@ -54,7 +71,7 @@ const INITIAL_ZOOM = 1.8;
 const FLY_PADDING = { top: 80, bottom: 80, left: 420, right: 80 };
 const FLY_DURATION_MS = 1800;
 
-export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeMapProps) {
+export function GlobeMap({ selection, onPick, spinning, onUserInteract, earth }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onPickRef = useRef(onPick);
@@ -65,6 +82,8 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
   const spinStepRef = useRef<() => void>(() => undefined);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [ready, setReady] = useState(false);
+  // La cara de la Tierra al crear el mapa; los cambios se aplican sin recrearlo.
+  const earthRef = useRef(earth);
 
   useEffect(() => {
     onPickRef.current = onPick;
@@ -85,8 +104,9 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
         bearing: GLOBE_BEARING,
         duration: FLY_DURATION_MS,
       });
-    } else {
-      // Primer paso; los siguientes los encadena moveend.
+    } else if (!map.isMoving()) {
+      // Primer paso; los siguientes los encadena moveend. Si la cámara ya se
+      // mueve (por ejemplo, la entrada), el giro empieza cuando termine.
       spinStepRef.current();
     }
   }, [spinning, ready]);
@@ -95,11 +115,16 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
     const container = containerRef.current;
     if (!container) return;
     setupMapLibre();
+    // Entrada (ADR-0017): la cámara arranca lejos y desplazada al este, y llega
+    // a México frenando. Con "menos movimiento" empieza ya en México.
+    const intro = !prefersReducedMotion();
     const map = new MapLibreMap({
       container,
-      style: buildMapStyle(window.location.origin),
-      center: INITIAL_CENTER,
-      zoom: INITIAL_ZOOM,
+      style: buildMapStyle(window.location.origin, earthRef.current),
+      center: intro
+        ? [INITIAL_CENTER[0] + INTRO_LNG_OFFSET_DEGREES, INITIAL_CENTER[1]]
+        : INITIAL_CENTER,
+      zoom: intro ? INTRO_FROM_ZOOM : INITIAL_ZOOM,
       // Eje inclinado como el de la Tierra (ver map/spin.ts).
       bearing: GLOBE_BEARING,
       attributionControl: { compact: true },
@@ -116,8 +141,11 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
     // lanza la siguiente mientras `spinning` siga activo. Es el patrón de los
     // ejemplos de globo giratorio de MapLibre; la latitud no cambia, así que
     // México sigue a la vista en cada vuelta.
+    // El giro no empieza hasta que termine la entrada de la cámara: si no, el
+    // primer moveend del mapa lo arrancaba antes y daba un tirón (17/10/2026).
+    let introDone = !intro;
     const spinStep = () => {
-      if (!spinningRef.current) return;
+      if (!spinningRef.current || !introDone) return;
       const degrees = spinDegrees(map.getZoom());
       if (degrees === 0) return;
       const center = map.getCenter();
@@ -137,7 +165,32 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
 
     map.on('load', () => {
       setReady(true);
+      if (intro) {
+        map.once('moveend', () => {
+          introDone = true;
+          spinStep();
+        });
+        map.easeTo({
+          center: INITIAL_CENTER,
+          zoom: INITIAL_ZOOM,
+          duration: INTRO_DURATION_MS,
+          easing: easeOutQuint,
+        });
+      }
     });
+    // El fondo de universo sigue a la cámara (sin redibujar React).
+    const shareCamera = () => {
+      const center = map.getCenter();
+      useCameraStore.getState().setView({
+        lng: center.lng,
+        lat: center.lat,
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      });
+    };
+    map.on('move', shareCamera);
+    shareCamera();
     map.on('mousemove', (event) => {
       const feature = map.queryRenderedFeatures(event.point, { layers: INTERACTIVE_LAYERS })[0];
       if (feature?.id === undefined) {
@@ -176,13 +229,36 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
       if (feature?.id !== undefined) onPickRef.current(Number(feature.id));
     });
 
+    // Si el mapa se crea cuando su contenedor aún no tiene tamaño (pestaña o
+    // panel ocultos), MapLibre se queda en 400×300 y deforma el globo; este
+    // observador lo reajusta en cuanto el contenedor cambia (17/10/2026).
+    const observer = new ResizeObserver(() => {
+      map.resize();
+    });
+    observer.observe(container);
+
     mapRef.current = map;
+    // Diagnóstico: con ?depurar en la URL, el mapa queda en window.__mapa para
+    // medir cámara y fluidez desde la consola (verificación de F6).
+    if (new URLSearchParams(window.location.search).has('depurar')) {
+      (window as unknown as { __mapa?: MapLibreMap }).__mapa = map;
+    }
     return () => {
+      observer.disconnect();
       map.remove();
       mapRef.current = null;
       setReady(false);
     };
   }, []);
+
+  useEffect(() => {
+    earthRef.current = earth;
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    for (const mode of ['night', 'day'] as const) {
+      map.setLayoutProperty(EARTH_LAYER[mode], 'visibility', mode === earth ? 'visible' : 'none');
+    }
+  }, [earth, ready]);
 
   useEffect(() => {
     const map = mapRef.current;

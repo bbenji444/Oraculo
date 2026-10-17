@@ -11,6 +11,9 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { useRegionDetail } from '../../hooks/useRegions';
 import { prefersReducedMotion } from '../../map/spin';
+import type { EarthMode } from '../../map/style';
+import { SpaceBackground } from '../Space/SpaceBackground';
+import { EarthToggle } from './EarthToggle';
 import { GlobeMap, type MapSelection } from './GlobeMap';
 import { MapLegend } from './MapLegend';
 import { RegionCard } from './RegionCard';
@@ -21,6 +24,8 @@ export function GeoExplorer() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Gira al entrar, salvo que el sistema pida menos movimiento.
   const [spinning, setSpinning] = useState(() => !prefersReducedMotion());
+  // De noche por defecto, con las ciudades iluminadas (decisión de Benji, ADR-0017).
+  const [earth, setEarth] = useState<EarthMode>('night');
   const stopSpinning = useCallback(() => {
     setSpinning(false);
   }, []);
@@ -41,12 +46,14 @@ export function GeoExplorer() {
   );
 
   return (
-    <div className="relative h-full overflow-hidden bg-slate-950">
+    <div className="relative h-full overflow-hidden bg-[#02030a]">
+      <SpaceBackground />
       <GlobeMap
         selection={selection}
         onPick={select}
         spinning={spinning}
         onUserInteract={stopSpinning}
+        earth={earth}
       />
       <aside className="absolute left-4 right-4 top-4 space-y-3 sm:right-auto sm:w-[22rem]">
         <SearchBox
@@ -73,6 +80,7 @@ export function GeoExplorer() {
             setSpinning((current) => !current);
           }}
         />
+        <EarthToggle earth={earth} onChange={setEarth} />
         <MapLegend />
       </div>
     </div>

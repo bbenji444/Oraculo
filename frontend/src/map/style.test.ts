@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { BASEMAP_SWITCH_ZOOM, buildMapStyle, featureLabel, INTERACTIVE_LAYERS } from './style';
+import {
+  BASEMAP_SWITCH_ZOOM,
+  buildMapStyle,
+  EARTH_FADE_END_ZOOM,
+  EARTH_LAYER,
+  featureLabel,
+  INTERACTIVE_LAYERS,
+  LABELS_MIN_ZOOM,
+} from './style';
 
 const ORIGIN = 'http://localhost:8080';
 
@@ -47,8 +55,11 @@ describe('buildMapStyle', () => {
     const firstRegion = ids.indexOf('countries-fill');
     const zoomOf = (id: string) => style.layers.find((l) => l.id === id)?.minzoom ?? 0;
 
+    // Las etiquetas del mapa base van al final, encima de todo.
     const lastBasemap = Math.max(
-      ...ids.map((id, index) => (id.startsWith('basemap_') ? index : -1)),
+      ...style.layers.map((l, index) =>
+        l.id.startsWith('basemap_') && l.type !== 'symbol' ? index : -1,
+      ),
     );
 
     expect(firstRegion).toBeGreaterThan(lastBasemap);
@@ -56,6 +67,45 @@ describe('buildMapStyle', () => {
     expect(zoomOf('municipalities-line')).toBe(5);
     expect(zoomOf('localities-point')).toBe(10);
     expect(INTERACTIVE_LAYERS.every((id) => ids.includes(id))).toBe(true);
+  });
+
+  it('la textura de la NASA tapa el mapa base y se desvanece al acercarse', () => {
+    const ids = style.layers.map((l) => l.id);
+    const night = style.layers.find((l) => l.id === EARTH_LAYER.night);
+    const lastWorldPolygon = Math.max(
+      ...style.layers.map((l, index) =>
+        l.id.startsWith('basemap_world-') && l.type !== 'symbol' ? index : -1,
+      ),
+    );
+
+    expect(style.sources.earth_night).toMatchObject({
+      type: 'raster',
+      url: `pmtiles://${ORIGIN}/tiles/earth_night.pmtiles`,
+    });
+    expect(ids.indexOf(EARTH_LAYER.night)).toBeGreaterThan(lastWorldPolygon);
+    expect(ids.indexOf(EARTH_LAYER.night)).toBeLessThan(ids.indexOf('countries-fill'));
+    expect(night?.maxzoom).toBe(EARTH_FADE_END_ZOOM);
+    expect(night?.layout).toEqual({ visibility: 'visible' });
+    expect(style.layers.find((l) => l.id === EARTH_LAYER.day)?.layout).toEqual({
+      visibility: 'none',
+    });
+  });
+
+  it('de día se ve la otra textura', () => {
+    const day = buildMapStyle(ORIGIN, 'day');
+
+    expect(day.layers.find((l) => l.id === EARTH_LAYER.day)?.layout).toEqual({
+      visibility: 'visible',
+    });
+  });
+
+  it('las etiquetas del mundo no ensucian la vista de globo', () => {
+    const labels = style.layers.filter(
+      (l) => l.id.startsWith('basemap_world-') && l.type === 'symbol',
+    );
+
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((l) => (l.minzoom ?? 0) >= LABELS_MIN_ZOOM)).toBe(true);
   });
 
   it('las capas del mapa base tienen ids únicos', () => {
