@@ -109,7 +109,7 @@ class ProviderHttpClient:
 
     def __init__(  # noqa: PLR0913 — configuración del cliente, todo por nombre (*)
         self,
-        provider: Provider,
+        provider: Provider | str,
         *,
         timeout_seconds: float,
         max_attempts: int,
@@ -123,7 +123,9 @@ class ProviderHttpClient:
         """Configura el cliente.
 
         Args:
-            provider: Proveedor (para los mensajes de error).
+            provider: Proveedor, o un nombre libre para lo que no es un proveedor
+                (por ejemplo ``"paginas"`` al bajar notas para extraer su texto);
+                sale en los mensajes de error y en el registro.
             timeout_seconds: Tiempo máximo por petición.
             max_attempts: Intentos en total (1 = sin reintentos).
             max_concurrency: Peticiones simultáneas permitidas.
@@ -137,7 +139,7 @@ class ProviderHttpClient:
                 ``MockTransport`` con respuestas grabadas.
             sleep: Función de espera; las pruebas la reemplazan para no esperar.
         """
-        self._provider = provider
+        self._name = provider.value if isinstance(provider, Provider) else provider
         self._max_attempts = max_attempts
         self._min_interval = min_interval_seconds
         self._wait = build_wait(rate_limit_wait_seconds)
@@ -161,7 +163,7 @@ class ProviderHttpClient:
         error = state.outcome.exception() if state.outcome else None
         wait = state.next_action.sleep if state.next_action else 0.0
         logger.warning(
-            f"{self._provider.value}: intento {state.attempt_number} falló "
+            f"{self._name}: intento {state.attempt_number} falló "
             f"({error}); siguiente intento en {wait:.0f} s"
         )
 
@@ -184,7 +186,7 @@ class ProviderHttpClient:
         if status < _CLIENT_ERROR:
             return None
         body = response.text[:ERROR_BODY_CHARS]
-        name = self._provider.value
+        name = self._name
         if status in _AUTH_STATUSES:
             return ProviderAuthError(
                 f"{name} rechazó la llave (HTTP {status}). Revisa la configuración.",
@@ -212,13 +214,19 @@ class ProviderHttpClient:
         )
 
     async def _attempt(
-        self, url: str, params: Mapping[str, str], method: str = "GET"
+        self,
+        url: str,
+        params: Mapping[str, str],
+        method: str = "GET",
+        json_body: Mapping[str, object] | None = None,
     ) -> httpx2.Response:
-        name = self._provider.value
+        name = self._name
         async with self._semaphore:
             await self._pace()
             try:
-                response = await self._client.request(method, url, params=dict(params))
+                response = await self._client.request(
+                    method, url, params=dict(params), json=dict(json_body) if json_body else None
+                )
             except httpx2.TimeoutException as exc:
                 raise ProviderUnavailableError(
                     f"{name} no respondió a tiempo.", provider=name
@@ -248,6 +256,23 @@ class ProviderHttpClient:
         """
         return (await self.get_with_history(url, params)).response
 
+    async def post_json(self, url: str, body: Mapping[str, object]) -> httpx2.Response:
+        """Hace un POST con cuerpo JSON, con los mismos reintentos que ``get``.
+
+        Lo usa la IA de OpenAI (ADR-0016).
+
+        Args:
+            url: Dirección del servicio.
+            body: Cuerpo JSON (sin la llave: va en los encabezados).
+
+        Returns:
+            La respuesta 2xx o 3xx.
+
+        Raises:
+            ProviderError: Igual que ``get``.
+        """
+        return (await self.get_with_history(url, {}, method="POST", json_body=body)).response
+
     async def head(self, url: str) -> httpx2.Response:
         """Pide solo los encabezados (tamaño, huella), sin descargar el contenido.
 
@@ -266,7 +291,11 @@ class ProviderHttpClient:
         return (await self.get_with_history(url, {}, method="HEAD")).response
 
     async def get_with_history(
-        self, url: str, params: Mapping[str, str], method: str = "GET"
+        self,
+        url: str,
+        params: Mapping[str, str],
+        method: str = "GET",
+        json_body: Mapping[str, object] | None = None,
     ) -> HttpOutcome:
         """Como ``get``, pero también dice cuántos 429 hubo antes de la respuesta.
 
@@ -277,7 +306,8 @@ class ProviderHttpClient:
         Args:
             url: Dirección del proveedor.
             params: Parámetros de la URL (sin la llave).
-            method: Método HTTP (``GET`` o ``HEAD``).
+            method: Método HTTP (``GET``, ``HEAD`` o ``POST``).
+            json_body: Cuerpo JSON (solo ``POST``).
 
         Returns:
             La respuesta y el número de rechazos 429 previos.
@@ -298,10 +328,10 @@ class ProviderHttpClient:
         async for attempt in retrying:
             with attempt:
                 try:
-                    response = await self._attempt(url, params, method)
+                    response = await self._attempt(url, params, method, json_body)
                 except ProviderRateLimitError:
                     rate_limited += 1
                     raise
         if response is None:  # pragma: no cover — tenacity siempre corre al menos un intento
-            raise ProviderUnavailableError("Sin respuesta.", provider=self._provider.value)
+            raise ProviderUnavailableError("Sin respuesta.", provider=self._name)
         return HttpOutcome(response, rate_limited)

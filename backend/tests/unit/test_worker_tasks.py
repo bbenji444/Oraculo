@@ -1,12 +1,15 @@
 """Tareas periódicas y programación del reloj de Celery (sin red ni base)."""
 
 import logging
+from uuid import UUID, uuid4
 
 import pytest
 from celery.schedules import crontab
 
 from app.application.use_cases.ingest import IngestReport, PurgeReport
+from app.application.use_cases.run_search import SearchReport
 from app.core.config import Settings
+from app.domain.search import SearchStatus
 from app.worker import tasks
 from app.worker.celery_app import build_beat_schedule, celery_app
 from app.worker.ingest_jobs import IngestSummary
@@ -26,7 +29,7 @@ def test_el_reloj_programa_la_ingesta_y_la_limpieza() -> None:
 
 
 def test_las_tareas_estan_registradas_con_su_nombre() -> None:
-    assert {tasks.INGEST_TASK, tasks.PURGE_TASK} <= set(celery_app.tasks)
+    assert {tasks.INGEST_TASK, tasks.PURGE_TASK, tasks.SEARCH_TASK} <= set(celery_app.tasks)
     assert "ingesta-indice-local" in celery_app.conf.beat_schedule
 
 
@@ -53,6 +56,29 @@ def test_la_limpieza_devuelve_cuantas_borro(monkeypatch: pytest.MonkeyPatch) -> 
     async def fake_purge(settings: Settings) -> PurgeReport:
         return PurgeReport(notes_deleted=42, bodies_cleared=5)
 
-    monkeypatch.setattr(tasks, "run_purge", fake_purge)
+    async def fake_texts(settings: Settings) -> int:
+        return 7
 
-    assert tasks.purge_news_index() == {"deleted": 42, "bodies_cleared": 5}
+    monkeypatch.setattr(tasks, "run_purge", fake_purge)
+    monkeypatch.setattr(tasks, "purge_article_texts", fake_texts)
+
+    assert tasks.purge_news_index() == {"deleted": 42, "bodies_cleared": 5, "texts_deleted": 7}
+
+
+def test_la_busqueda_corre_y_devuelve_su_resumen(monkeypatch: pytest.MonkeyPatch) -> None:
+    search_id = uuid4()
+
+    async def fake_job(settings: Settings, wanted: UUID) -> SearchReport:
+        assert wanted == search_id
+        return SearchReport(
+            search_id, SearchStatus.PARTIAL, articles=12, credits_used=1, llm_cost_usd=0.00412
+        )
+
+    monkeypatch.setattr(tasks, "run_search_job", fake_job)
+
+    assert tasks.run_search(str(search_id)) == {
+        "status": "partial",
+        "articles": 12,
+        "credits_used": 1,
+        "llm_cost_usd": 0.0041,
+    }

@@ -70,9 +70,38 @@ _DEFAULT_NEWS_BODY_RETENTION_DAYS = 30
 _DEFAULT_NGRAMS_LOOKBACK_MINUTES = 35
 _DEFAULT_NGRAMS_DELAY_MINUTES = 3
 
+# Pipeline de búsqueda (F4, ADR-0015):
+# - 15 s por página: en la muestra real del 16/10/2026 la más lenta tardó 1.6 s.
+_DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 15.0
+# - 4 páginas a la vez: rápido sin saturar a un mismo medio.
+_DEFAULT_EXTRACTION_CONCURRENCY = 4
+# - El texto extraído se borra a los 30 días (solo sirve para procesar).
+_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS = 30
+# - IA (ADR-0016): OpenAI gpt-6-luna por defecto; Gemini 2.5 Flash elegible.
+#   Precios por millón de tokens: OpenAI al 17/10/2026
+#   (https://developers.openai.com/api/docs/pricing): 0.10 entrada, 0.50
+#   salida; Gemini al 16/10/2026 (https://ai.google.dev/gemini-api/docs/pricing):
+#   0.30 entrada, 2.50 salida.
+_DEFAULT_LLM_PROVIDER: Literal["openai", "gemini"] = "openai"
+_DEFAULT_OPENAI_MODEL = "gpt-6-luna"
+_DEFAULT_OPENAI_PRICE_INPUT = 0.10
+_DEFAULT_OPENAI_PRICE_OUTPUT = 0.50
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+_DEFAULT_GEMINI_PRICE_INPUT = 0.30
+_DEFAULT_GEMINI_PRICE_OUTPUT = 2.50
+# - 60 s por nota: una respuesta de ~300 tokens tarda unos segundos; el margen
+#   cubre horas pico.
+_DEFAULT_LLM_TIMEOUT_SECONDS = 60.0
+# - 4 notas a la vez: rápido sin tocar los límites por minuto del nivel gratis.
+_DEFAULT_LLM_CONCURRENCY = 4
+# - Tope por búsqueda (ADR-0015): ~0.20 USD como máximo.
+_DEFAULT_LLM_MAX_ARTICLES = 150
+# - Confianza mínima de la ubicación principal (§11).
+_DEFAULT_GEO_MIN_CONFIDENCE = 0.6
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 
 class Settings(BaseSettings):
@@ -145,6 +174,26 @@ class Settings(BaseSettings):
     news_body_retention_days: int = Field(default=_DEFAULT_NEWS_BODY_RETENTION_DAYS, ge=1)
     ngrams_lookback_minutes: int = Field(default=_DEFAULT_NGRAMS_LOOKBACK_MINUTES, ge=1)
     ngrams_delay_minutes: int = Field(default=_DEFAULT_NGRAMS_DELAY_MINUTES, ge=0)
+
+    # --- Pipeline de búsqueda (F4, ADR-0015) ---
+    extraction_timeout_seconds: float = Field(default=_DEFAULT_EXTRACTION_TIMEOUT_SECONDS, gt=0)
+    extraction_concurrency: int = Field(default=_DEFAULT_EXTRACTION_CONCURRENCY, ge=1)
+    article_text_retention_days: int = Field(default=_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS, ge=1)
+    # IA (§10, ADR-0015 y ADR-0016). Sin la llave del proveedor elegido, las
+    # notas no se enriquecen y la búsqueda lo avisa.
+    llm_provider: Literal["openai", "gemini"] = _DEFAULT_LLM_PROVIDER
+    openai_api_key: SecretStr | None = None
+    openai_model: str = _DEFAULT_OPENAI_MODEL
+    openai_price_input_per_million: float = Field(default=_DEFAULT_OPENAI_PRICE_INPUT, ge=0)
+    openai_price_output_per_million: float = Field(default=_DEFAULT_OPENAI_PRICE_OUTPUT, ge=0)
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = _DEFAULT_GEMINI_MODEL
+    gemini_price_input_per_million: float = Field(default=_DEFAULT_GEMINI_PRICE_INPUT, ge=0)
+    gemini_price_output_per_million: float = Field(default=_DEFAULT_GEMINI_PRICE_OUTPUT, ge=0)
+    llm_timeout_seconds: float = Field(default=_DEFAULT_LLM_TIMEOUT_SECONDS, gt=0)
+    llm_concurrency: int = Field(default=_DEFAULT_LLM_CONCURRENCY, ge=1)
+    llm_max_articles_per_search: int = Field(default=_DEFAULT_LLM_MAX_ARTICLES, ge=1)
+    geo_min_confidence: float = Field(default=_DEFAULT_GEO_MIN_CONFIDENCE, ge=0, le=1)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.
