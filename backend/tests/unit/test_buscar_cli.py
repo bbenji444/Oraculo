@@ -7,7 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.adapters.persistence.search_repository import ResultPreview, SearchSnapshot
+from app.application.ports.llm import LLMInfo
 from app.application.ports.search_store import NewSearch, SearchConcept
+from app.application.use_cases.plan_search import SearchEstimate
 from app.cli import buscar
 from app.domain.enrichment import LLMUsage
 from app.domain.search import SearchStatus
@@ -45,8 +47,8 @@ def test_los_argumentos_aceptan_varios_conceptos_y_fechas() -> None:
     assert (fixed.desde, fixed.hasta, fixed.aqui) == (date(2026, 10, 1), date(2026, 10, 7), False)
 
 
-def prepared(credits_month: int) -> buscar.Prepared:
-    return buscar.Prepared(
+def prepared(credits_month: int) -> SearchEstimate:
+    return SearchEstimate(
         search=NewSearch(
             "benji",
             2,
@@ -61,7 +63,7 @@ def prepared(credits_month: int) -> buscar.Prepared:
         credits=1,
         credits_month=credits_month,
         credits_limit=100,
-        llm_label="openai · gpt-6-luna",
+        llm=LLMInfo("openai", "gpt-6-luna", 0.10, 0.50, configured=True),
         llm_max_articles=150,
         llm_max_cost_usd=0.0525,
     )

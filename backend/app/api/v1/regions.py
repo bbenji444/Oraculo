@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
 
-from app.api.errors import ERROR_RESPONSES
+from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.schemas.regions import (
     LevelLiteral,
     RegionDetailOut,
@@ -78,7 +78,9 @@ async def search_regions(
     return RegionListOut(items=[RegionOut.from_domain(r) for r in regions])
 
 
-@router.get("/at", response_model=RegionOut, summary="Región en un punto")
+@router.get(
+    "/at", response_model=RegionOut, summary="Región en un punto", responses=error_responses(404)
+)
 async def region_at_point(
     repository: Repository,
     lon: Annotated[float, Query(description="Longitud en grados.")],
@@ -94,7 +96,12 @@ async def region_at_point(
     return RegionOut.from_domain(region)
 
 
-@router.get("/{region_id}", response_model=RegionDetailOut, summary="Detalle de una región")
+@router.get(
+    "/{region_id}",
+    response_model=RegionDetailOut,
+    summary="Detalle de una región",
+    responses=error_responses(404),
+)
 async def get_region(
     repository: Repository, region_id: Annotated[int, Path(description="Id de la región.")]
 ) -> RegionDetailOut:
@@ -103,7 +110,12 @@ async def get_region(
     return RegionDetailOut.from_detail(detail)
 
 
-@router.get("/{region_id}/children", response_model=RegionPageOut, summary="Hijas de una región")
+@router.get(
+    "/{region_id}/children",
+    response_model=RegionPageOut,
+    summary="Hijas de una región",
+    responses=error_responses(404),
+)
 async def list_children(
     repository: Repository,
     region_id: Annotated[int, Path(description="Id de la región padre.")],

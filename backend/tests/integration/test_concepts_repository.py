@@ -14,6 +14,7 @@ from app.adapters.persistence.concepts_repository import PostgresConceptReposito
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.application.audit import CONCEPT_CREATED, Actor, AuditEntry
 from app.application.pagination import NameCursor
+from app.application.use_cases.concepts import DeleteConcept
 from app.core.config import Settings
 from app.domain.concept import ConceptDraft
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
@@ -68,6 +69,8 @@ def sync_engine(settings: Settings, tmp_path_factory: pytest.TempPathFactory) ->
 
 def _empty_tables(engine: Engine) -> None:
     with engine.begin() as conn:
+        # Las búsquedas apuntan a los conceptos: se quitan primero.
+        conn.execute(text("DELETE FROM searches"))
         conn.execute(text("DELETE FROM concepts"))
         conn.execute(text("DELETE FROM audit_log"))
 
@@ -215,10 +218,37 @@ async def test_borrar_dos_veces_es_404(repo: PostgresConceptRepository) -> None:
         await repo.delete(created.id, logical=True, audit=AUDIT)
 
 
-async def test_hasta_f4_ningun_concepto_tiene_busquedas(repo: PostgresConceptRepository) -> None:
-    created = await repo.create(draft(), "prueba", AUDIT)
+async def test_un_concepto_usado_en_una_busqueda_se_borra_solo_logicamente(
+    repo: PostgresConceptRepository, clean: Engine
+) -> None:
+    used = await repo.create(draft(), "prueba", AUDIT)
+    unused = await repo.create(draft("Robo"), "prueba", AUDIT)
+    with clean.begin() as conn:
+        search = conn.execute(
+            text(
+                "INSERT INTO searches (user_id, region_id, date_from, date_to) "
+                "SELECT 'prueba', id, '2026-10-10', '2026-10-16' FROM regions "
+                "WHERE code = '09' RETURNING id"
+            )
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO search_concepts (search_id, concept_id, concept_name, keywords) "
+                "VALUES (:s, :c, 'Secuestro', '{secuestro}')"
+            ),
+            {"s": search, "c": used.id},
+        )
 
-    assert await repo.is_used_in_searches(created.id) is False
+    assert await repo.is_used_in_searches(used.id) is True
+    assert await repo.is_used_in_searches(unused.id) is False
+    # Antes se intentaba un borrado físico y la llave foránea lo rechazaba (500).
+    result = await DeleteConcept(repo).execute(used.id, Actor("prueba"))
+    assert result.logical is True
+    with clean.connect() as conn:
+        kept = conn.execute(
+            text("SELECT deleted_at IS NOT NULL FROM concepts WHERE id = :id"), {"id": used.id}
+        ).scalar_one()
+    assert kept is True
 
 
 # --- Datos del lugar para armar consultas ---------------------------------------------

@@ -13,7 +13,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
-from app.api.errors import ERROR_RESPONSES
+from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.regions import get_region_repository
 from app.api.v1.schemas.concepts import (
     ConceptIn,
@@ -117,6 +117,7 @@ async def list_concepts(
     response_model=ConceptOut,
     status_code=status.HTTP_201_CREATED,
     summary="Crear un concepto",
+    responses=error_responses(409),
 )
 async def create_concept(body: ConceptIn, concepts: Concepts, actor: CurrentActor) -> ConceptOut:
     """Valida, guarda y registra en la bitácora."""
@@ -124,7 +125,12 @@ async def create_concept(body: ConceptIn, concepts: Concepts, actor: CurrentActo
     return ConceptOut.from_domain(concept)
 
 
-@router.post("/preview", response_model=QueryPreviewOut, summary="Probar un concepto sin guardar")
+@router.post(
+    "/preview",
+    response_model=QueryPreviewOut,
+    summary="Probar un concepto sin guardar",
+    responses=error_responses(404),
+)
 async def preview_draft(
     body: ConceptIn,
     concepts: Concepts,
@@ -139,13 +145,23 @@ async def preview_draft(
     return QueryPreviewOut.from_preview(preview)
 
 
-@router.get("/{concept_id}", response_model=ConceptOut, summary="Detalle de un concepto")
+@router.get(
+    "/{concept_id}",
+    response_model=ConceptOut,
+    summary="Detalle de un concepto",
+    responses=error_responses(404),
+)
 async def get_concept(concepts: Concepts, concept_id: ConceptId) -> ConceptOut:
     """Concepto vigente por id."""
     return ConceptOut.from_domain(await GetConcept(concepts).execute(concept_id))
 
 
-@router.patch("/{concept_id}", response_model=ConceptOut, summary="Editar un concepto")
+@router.patch(
+    "/{concept_id}",
+    response_model=ConceptOut,
+    summary="Editar un concepto",
+    responses=error_responses(404, 409),
+)
 async def update_concept(
     body: ConceptPatch, concepts: Concepts, actor: CurrentActor, concept_id: ConceptId
 ) -> ConceptOut:
@@ -155,7 +171,10 @@ async def update_concept(
 
 
 @router.delete(
-    "/{concept_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Borrar un concepto"
+    "/{concept_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar un concepto",
+    responses=error_responses(404),
 )
 async def delete_concept(
     concepts: Concepts, actor: CurrentActor, concept_id: ConceptId
@@ -169,6 +188,7 @@ async def delete_concept(
     "/{concept_id}/preview",
     response_model=QueryPreviewOut,
     summary="Probar un concepto guardado",
+    responses=error_responses(404),
 )
 async def preview_saved(
     concepts: Concepts,

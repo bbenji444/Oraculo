@@ -141,3 +141,21 @@ class QueryTooLongError(InvalidRequestError):
     """
 
     code = "query_too_long"
+
+
+class ServiceUnavailableError(DomainError):
+    """Falta algo del sistema para atender la petición (no es culpa de quien la hace)."""
+
+    code = "service_unavailable"
+
+
+class LLMNotConfiguredError(ServiceUnavailableError):
+    """La IA elegida no tiene su llave en ``.env``: no se puede buscar."""
+
+    code = "llm_not_configured"
+
+
+class CreditLimitReachedError(ConflictError):
+    """La búsqueda haría pasar el tope mensual de créditos de SearchApi."""
+
+    code = "credit_limit_reached"

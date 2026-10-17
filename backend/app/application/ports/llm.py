@@ -98,3 +98,22 @@ class LLMPort(Protocol):
             ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
         """
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class LLMInfo:
+    """Qué IA se usaría y cuánto cobra, sin crear el cliente (para estimar).
+
+    Attributes:
+        provider: ``openai`` o ``gemini`` (``LLM_PROVIDER``).
+        model: Modelo configurado.
+        price_input_per_million: Dólares por millón de tokens de entrada.
+        price_output_per_million: Dólares por millón de tokens de salida.
+        configured: Si su llave está en ``.env`` (sin ella no se puede buscar).
+    """
+
+    provider: str
+    model: str
+    price_input_per_million: float
+    price_output_per_million: float
+    configured: bool
