@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EARTH_AXIAL_TILT_DEGREES,
   GLOBE_BEARING,
+  GLOBE_TILT_DEGREES,
   MAX_SPIN_ZOOM,
   prefersReducedMotion,
   REGION_BEARING,
@@ -48,10 +49,11 @@ describe('prefersReducedMotion', () => {
 });
 
 describe('inclinación del globo', () => {
-  it('usa el ángulo real del eje de la Tierra y se endereza al ver una región', () => {
-    expect(EARTH_AXIAL_TILT_DEGREES).toBeCloseTo(23.44);
+  it('se inclina menos que el eje real y se endereza al ver una región', () => {
+    expect(GLOBE_TILT_DEGREES).toBeGreaterThan(0);
+    expect(GLOBE_TILT_DEGREES).toBeLessThan(EARTH_AXIAL_TILT_DEGREES);
     // Negativo: el polo norte se inclina hacia la derecha.
-    expect(GLOBE_BEARING).toBe(-EARTH_AXIAL_TILT_DEGREES);
+    expect(GLOBE_BEARING).toBe(-GLOBE_TILT_DEGREES);
     expect(REGION_BEARING).toBe(0);
   });
 });

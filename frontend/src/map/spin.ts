@@ -52,9 +52,12 @@ export function prefersReducedMotion(): boolean {
 // eclíptica, ~23.44°). Dibujar el globo con su polo norte inclinado lo hace
 // verse como un globo terráqueo de escritorio.
 export const EARTH_AXIAL_TILT_DEGREES = 23.44;
+// Inclinación que se dibuja: más ligera que la real. Benji la vio a 23.44°
+// (16/10/2026) y pidió un poco menos; 15° conserva el efecto sin marear.
+export const GLOBE_TILT_DEGREES = 15;
 // Rumbo de la cámara en la vista de globo: negativo para que el polo norte
 // se incline hacia la derecha, como en los globos de escritorio. El giro
 // cambia la longitud, así que la Tierra rota alrededor de ese eje inclinado.
-export const GLOBE_BEARING = -EARTH_AXIAL_TILT_DEGREES;
+export const GLOBE_BEARING = -GLOBE_TILT_DEGREES;
 // Al acercarse a una región el mapa se endereza: así se lee con el norte arriba.
 export const REGION_BEARING = 0;
