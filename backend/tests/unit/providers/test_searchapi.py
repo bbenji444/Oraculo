@@ -8,6 +8,7 @@ real aprobada y reemplazarlo por el fixture grabado.
 
 import json
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import httpx2
 import pytest
@@ -152,3 +153,22 @@ async def test_la_llave_viaja_en_el_encabezado_no_en_la_url() -> None:
         provider.estimate_cost(query(DateWindow.last_days(7, TODAY))),
     ) == (1, 1)
     await http.aclose()
+
+
+def test_respuesta_real_de_searchapi() -> None:
+    # Primera consulta real (16/10/2026, 1 crédito aprobado por Benji):
+    # Ciberseguridad · Ciudad de México · últimos 7 días.
+    body = (
+        Path(__file__).resolve().parents[2] / "fixtures" / "providers" / "searchapi_cdmx_7d.json"
+    ).read_text(encoding="utf-8")
+
+    articles, discarded = parse_results(body)
+
+    assert (len(articles), discarded) == (10, 0)
+    first = articles[0]
+    assert first.provider_rank == 1
+    assert first.source_name == "MILENIO"
+    # link=resolved: el link es del medio, no una redirección de Google.
+    assert first.source_domain == "milenio.com"
+    assert first.published_at == datetime(2026, 10, 12, 20, 3, tzinfo=UTC)
+    assert all(a.published_at is not None for a in articles)

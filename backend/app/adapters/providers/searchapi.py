@@ -14,8 +14,18 @@ Documentación: https://www.searchapi.io/docs/google-news
   ``source``, ``date`` y ``snippet``. Según https://www.searchapi.io/pricing
   solo se cobran las respuestas 200.
 
-VERIFICAR con la primera respuesta real: formato de ``date`` (relativo, como
-"hace 19 horas") y si existe ``iso_date``; cuántos resultados trae una página.
+Confirmado con la primera respuesta real (16/10/2026, fixture
+``searchapi_cdmx_7d.json``, 1 crédito aprobado por Benji):
+
+- ``date`` es relativo y en español ("hace 4 días"); ``iso_date`` trae la
+  fecha exacta en UTC ("2026-10-12T20:03:00Z") y es la que se usa.
+- ``link=resolved`` entrega el link del medio (milenio.com, infobae.com...).
+- ``time_period=last_week`` respeta el rango: las 10 notas eran de los
+  últimos 7 días.
+- Una página trae 10 resultados y la respuesta no incluye ``pagination``.
+
+VERIFICAR: si pedir una segunda página cuesta otro crédito (no se probó para
+no gastar).
 
 No hace: no pide más de una página por consulta (cada página es 1 crédito).
 """
