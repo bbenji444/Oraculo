@@ -130,17 +130,17 @@ class Settings(BaseSettings):
     gdelt_enabled: bool = False
 
     # --- Ingesta periódica al índice local (ADR-0013) ---
-    # Archivos GKG de GDELT: activos por defecto (servidor de archivos, sin el
-    # límite de la API). ~760 MB de descarga al día; se apaga con false.
-    gdelt_gkg_enabled: bool = True
+    # Archivos GKG de GDELT (solo títulos): apagados por defecto desde que los
+    # ngramas funcionan (ADR-0014), para no sumar ~760 MB de descarga al día.
+    gdelt_gkg_enabled: bool = False
     # RSS de medios: apagados hasta que Benji revise los términos de cada uno.
     # Además, cada medio se activa por separado en fuentes/medios_rss.csv.
     media_rss_enabled: bool = False
     news_index_retention_days: int = Field(default=_DEFAULT_NEWS_INDEX_RETENTION_DAYS, ge=1)
     ingest_interval_minutes: int = Field(default=_DEFAULT_INGEST_INTERVAL_MINUTES, ge=1)
     # Ngramas de GDELT (ADR-0014): texto completo, ~1 GB de descarga al día.
-    # Apagados hasta que Benji vea 5 ejemplos reales y el consumo medido.
-    gdelt_ngrams_enabled: bool = False
+    # Encendidos por Benji el 16/10/2026 tras ver 5 ejemplos y el consumo medido.
+    gdelt_ngrams_enabled: bool = True
     news_body_retention_days: int = Field(default=_DEFAULT_NEWS_BODY_RETENTION_DAYS, ge=1)
     ngrams_lookback_minutes: int = Field(default=_DEFAULT_NGRAMS_LOOKBACK_MINUTES, ge=1)
     ngrams_delay_minutes: int = Field(default=_DEFAULT_NGRAMS_DELAY_MINUTES, ge=0)
