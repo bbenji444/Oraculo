@@ -80,6 +80,10 @@ class LLMPort(Protocol):
         """Versión del prompt (llave de la caché, §10)."""
         ...
 
+    async def aclose(self) -> None:
+        """Libera las conexiones al terminar la búsqueda."""
+        ...
+
     async def enrich(self, request: EnrichmentRequest) -> EnrichmentResult:
         """Enriquece una nota.
 

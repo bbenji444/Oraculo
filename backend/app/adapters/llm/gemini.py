@@ -116,6 +116,13 @@ class GeminiEnricher:
         """Ver ``LLMPort.prompt_version``."""
         return PROMPT_VERSION
 
+    async def aclose(self) -> None:
+        """Ver ``LLMPort.aclose``.
+
+        VERIFICAR: la documentación de google-genai 1.20 no muestra un cierre
+        explícito del cliente asíncrono; el SDK administra sus conexiones.
+        """
+
     def _config(self) -> types.GenerateContentConfig:
         return types.GenerateContentConfig(
             temperature=TEMPERATURE,

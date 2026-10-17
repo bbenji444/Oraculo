@@ -83,7 +83,9 @@ class FakeModels:
 async def test_respuesta_valida_al_dominio() -> None:
     models = FakeModels(reply(VALID))
 
-    result = await GeminiEnricher(models, "gemini-2.5-flash").enrich(REQUEST)
+    llm = GeminiEnricher(models, "gemini-2.5-flash")
+    result = await llm.enrich(REQUEST)
+    await llm.aclose()
 
     enrichment = result.enrichment
     # El concepto que no se preguntó (99) se ignora.

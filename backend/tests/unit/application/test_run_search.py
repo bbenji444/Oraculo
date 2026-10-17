@@ -215,6 +215,9 @@ class LLM:
     def prompt_version(self) -> str:
         return "enrich_v1"
 
+    async def aclose(self) -> None:
+        return None
+
     async def enrich(self, request: EnrichmentRequest) -> EnrichmentResult:
         self.requests.append(request)
         reply = self.replies[request.title]
