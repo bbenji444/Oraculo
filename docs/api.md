@@ -239,7 +239,7 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
 
 ## Mapa de calor
 
-`GET /searches/{id}/aggregates?level=state|municipality|country`. Cada nota cuenta una vez, en su ubicación principal. Acepta `relevant` igual que la lista de notas.
+`GET /searches/{id}/aggregates?level=state|municipality|locality|country`. Cada nota cuenta una vez, en su ubicación principal. Acepta `relevant` igual que la lista de notas. `locality` solo cuenta las notas ubicadas en una localidad (lo usan los reportes de un municipio).
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d83/aggregates?level=state'

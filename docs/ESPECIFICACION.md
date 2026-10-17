@@ -623,7 +623,7 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | GET | `/searches/{id}` | Estado y progreso |
 | GET | `/searches` | Historial (paginación por cursor) |
 | GET | `/searches/{id}/articles?cursor=&limit=&relevant=&in_region=&precision=&concept_id=` | Resultados (paginación por cursor). Por defecto solo las relevantes (`relevant=all` trae todas); `in_region` = `true`, `false` o `none` (sin ubicación) |
-| GET | `/searches/{id}/aggregates?level=state\|municipality\|country` | Conteo por región para el mapa de calor. Las notas menos precisas que el nivel no se reparten (`coarser`) |
+| GET | `/searches/{id}/aggregates?level=state\|municipality\|locality\|country` | Conteo por región para el mapa de calor. Las notas menos precisas que el nivel no se reparten (`coarser`). `locality` lo usan los reportes de un municipio |
 | GET | `/articles/{id}` | Detalle |
 | POST | `/searches/{id}/report?format=pdf\|html` | Genera reporte (`409` si la búsqueda no ha terminado) |
 | GET | `/searches/{id}/export?format=csv\|geojson` | Notas de la búsqueda como datos: metadatos, resumen y link, nunca el texto completo |
