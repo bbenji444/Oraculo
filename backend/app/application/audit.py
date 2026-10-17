@@ -17,6 +17,8 @@ CONCEPT_CREATED = "concept.created"
 CONCEPT_UPDATED = "concept.updated"
 CONCEPT_DELETED = "concept.deleted"
 SEARCH_FINISHED = "search.finished"
+# Notas de una búsqueda que se volvieron a pasar por la IA (gasto extra).
+SEARCH_REPROCESSED = "search.reprocessed"
 
 
 @dataclass(frozen=True, slots=True)

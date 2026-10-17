@@ -268,7 +268,7 @@ make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
 make seed            # carga los conceptos semilla que falten (no pisa ediciones)
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make buscar ARGS="--concepto Extorsión --region 14 --dias 7"  # búsqueda real de punta a punta: muestra costo, pide "si" y enseña 5 notas (--aqui sin worker)
-make reubicar          # vuelve a ubicar las notas de la última búsqueda sin pagar a la IA (ARGS="--busqueda <id>")
+make reubicar          # vuelve a ubicar las notas de la última búsqueda sin pagar a la IA (ARGS="--busqueda <id>"; --con-ia las vuelve a pasar por la IA desde su texto guardado, pide "si")
 make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
 make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 make ingesta-historial DIAS=7  # mide días anteriores de GDELT y muestra 5 ejemplos; DESCARGAR=si baja todo

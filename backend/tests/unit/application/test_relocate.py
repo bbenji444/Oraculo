@@ -7,15 +7,18 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.application.ports.search_store import ArticleMentions
+from app.application.audit import Actor
+from app.application.ports.llm import EnrichmentError, EnrichmentResult
+from app.application.ports.search_store import ArticleMentions, StoredText
 from app.application.use_cases.geocoding import GeocodeMentions
-from app.application.use_cases.relocate import RelocateSearch
-from app.application.use_cases.run_search import SearchNotFoundError
+from app.application.use_cases.relocate import RelocateSearch, ReprocessSearch
+from app.application.use_cases.run_search import PipelineLimits, SearchNotFoundError
 from app.cli import reubicar
-from app.domain.errors import NotFoundError
+from app.domain.enrichment import LLMUsage
+from app.domain.errors import NotFoundError, ProviderUnavailableError
 from app.domain.geocoding import Mention, MentionRole, Resolution
 from tests.unit import fake_gazetteer as cat
-from tests.unit.application.test_run_search import Searches, stored_search
+from tests.unit.application.test_run_search import LLM, Searches, enrichment, stored_search
 
 pytestmark = pytest.mark.anyio
 
@@ -103,3 +106,112 @@ async def test_el_comando_muestra_antes_y_despues(caplog: pytest.LogCaptureFixtu
     assert "dentro: 1 · fuera: 1 · sin ubicación: 1" in text
     assert reubicar.describe(None) == "Sin ubicación"
     assert reubicar.parse_args([]).busqueda is None
+
+
+class TextStore(Store):
+    def __init__(self, items: Sequence[ArticleMentions], texts: Sequence[StoredText]) -> None:
+        super().__init__(items)
+        self.texts = list(texts)
+        self.enriched: dict[int, list[Resolution]] = {}
+        self.spent: list[tuple[LLMUsage, float, Actor]] = []
+
+    async def search_texts(self, search_id: UUID) -> list[StoredText]:
+        return self.texts
+
+    async def save_enrichment(
+        self, article_id: int, result: EnrichmentResult, resolutions: Sequence[Resolution]
+    ) -> None:
+        self.enriched[article_id] = list(resolutions)
+        # Como la base: lo nuevo queda como menciones guardadas.
+        self.items = [
+            replace(i, mentions=tuple(r.mention for r in resolutions))
+            if i.article_id == article_id
+            else i
+            for i in self.items
+        ]
+
+    async def add_llm_usage(
+        self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor
+    ) -> None:
+        self.spent.append((usage, cost_usd, actor))
+
+
+CUAUTLA_TEXT = StoredText(4, "Una regidora en Cuautla", "Texto de la nota.", None)
+CUAUTLA_OLD = ArticleMentions(4, "Una regidora en Cuautla", (Mention("Iztapalapa", EVENT),), None)
+
+
+async def test_reprocesar_vuelve_a_preguntar_a_la_ia_y_guarda_lo_nuevo() -> None:
+    store = TextStore([CUAUTLA_OLD, NOTHING], [CUAUTLA_TEXT])
+    searches = Searches(stored_search())
+    llm = LLM({CUAUTLA_TEXT.title: enrichment(Mention("Iztapalapa", EVENT, state_hint="CDMX"))})
+    gazetteer = cat.FakeGazetteer()
+
+    report = await ReprocessSearch(
+        searches=searches,
+        store=store,
+        gazetteer=gazetteer,
+        geocoder=GeocodeMentions(gazetteer),
+        llm=llm,
+        limits=PipelineLimits(150, 2, 0.10, 0.50),
+    ).run(uuid4())
+
+    [relocation] = report.relocations
+    assert (relocation.before, relocation.after, relocation.in_region) == (
+        None,
+        cat.IZTAPALAPA,
+        True,
+    )
+    assert [r.title for r in llm.requests] == [CUAUTLA_TEXT.title]
+    assert store.enriched[4][0].mention.state_hint == "CDMX"
+    assert (report.usage, report.failed) == (LLMUsage(1000, 100), 0)
+    assert store.spent == [(LLMUsage(1000, 100), pytest.approx(0.00015), Actor("benji"))]
+    # Al final reubica todo para dejar los conteos al día.
+    assert store.progress == {"in_region": 1, "out_of_region": 0, "unlocated": 1}
+
+
+async def test_reprocesar_registra_las_fallas_y_sigue() -> None:
+    other = StoredText(5, "Otra", "Texto.", None)
+    store = TextStore([], [CUAUTLA_TEXT, other])
+    searches = Searches(stored_search())
+    llm = LLM(
+        {
+            CUAUTLA_TEXT.title: EnrichmentError("JSON inválido", LLMUsage(7, 1)),
+            other.title: ProviderUnavailableError("caída", provider="openai"),
+        }
+    )
+    gazetteer = cat.FakeGazetteer()
+    use = ReprocessSearch(
+        searches=searches,
+        store=store,
+        gazetteer=gazetteer,
+        geocoder=GeocodeMentions(gazetteer),
+        llm=llm,
+        limits=PipelineLimits(150, 2, 0.10, 0.50),
+    )
+
+    report = await use.run(uuid4())
+
+    assert (report.relocations, report.failed, report.usage) == ((), 2, LLMUsage(7, 1))
+    assert {e.error_type for e in searches.errors} == {
+        "EnrichmentError",
+        "ProviderUnavailableError",
+    }
+    with pytest.raises(SearchNotFoundError):
+        await ReprocessSearch(
+            searches=Searches(None),
+            store=store,
+            gazetteer=gazetteer,
+            geocoder=GeocodeMentions(gazetteer),
+            llm=llm,
+            limits=PipelineLimits(150, 2, 0.10, 0.50),
+        ).run(uuid4())
+    no_region = Searches(replace(stored_search(), region_code="99"))
+    with pytest.raises(NotFoundError):
+        await ReprocessSearch(
+            searches=no_region,
+            store=store,
+            gazetteer=gazetteer,
+            geocoder=GeocodeMentions(gazetteer),
+            llm=llm,
+            limits=PipelineLimits(150, 2, 0.10, 0.50),
+        ).run(uuid4())

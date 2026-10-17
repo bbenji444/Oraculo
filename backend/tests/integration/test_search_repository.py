@@ -20,6 +20,7 @@ from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.llm.factory import LLMSetup, MissingLLMKeyError
 from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
@@ -464,3 +465,46 @@ async def test_las_pistas_se_guardan_y_se_reubica_sin_la_ia(
 
 async def test_reubicar_sin_busquedas(settings: Settings, concept_id: int) -> None:
     assert await reubicar.run(reubicar.parse_args([]), cli_settings(settings)) == 1
+
+
+async def test_reprocesar_con_ia_desde_el_texto_guardado(
+    test_engine: AsyncEngine,
+    settings: Settings,
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    concept_id: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    searches, articles = stores
+    search_id = await new_search(searches, test_engine, concept_id)
+    await run_search(test_engine, searches, articles, LLM(REPLIES)).run(search_id)
+    llm = LLM(REPLIES)
+    monkeypatch.setattr(reubicar, "build_llm", lambda _s: LLMSetup("openai", llm, 0.10, 0.50))
+    args = reubicar.parse_args(["--busqueda", str(search_id), "--con-ia"])
+
+    cancelled = await reubicar.run(args, cli_settings(settings), lambda _q: "no")
+    code = await reubicar.run(args, cli_settings(settings), lambda _q: "si")
+
+    assert (cancelled, code) == (1, 0)
+    assert len(llm.requests) == 2
+    async with test_engine.connect() as conn:
+        tokens = (
+            await conn.execute(
+                text("SELECT llm_tokens_in FROM searches WHERE id = :id"), {"id": search_id}
+            )
+        ).scalar_one()
+        audit = (
+            await conn.execute(
+                text(
+                    "SELECT payload->>'tokens_entrada' FROM audit_log "
+                    "WHERE action = 'search.reprocessed' AND entity_id = :id"
+                ),
+                {"id": str(search_id)},
+            )
+        ).scalar_one()
+    assert (tokens, audit) == (4000, "2000")
+
+    def no_key(_s: Settings) -> LLMSetup:
+        raise MissingLLMKeyError("Falta OPENAI_API_KEY en .env.")
+
+    monkeypatch.setattr(reubicar, "build_llm", no_key)
+    assert await reubicar.run(args, cli_settings(settings), lambda _q: "si") == 1

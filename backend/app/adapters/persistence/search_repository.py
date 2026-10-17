@@ -22,7 +22,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from app.application.audit import SEARCH_FINISHED, Actor
+from app.application.audit import SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
 from app.application.ports.llm import EnrichmentResult
 from app.application.ports.search_store import (
     ArticleMentions,
@@ -33,6 +33,7 @@ from app.application.ports.search_store import (
     SearchResultRow,
     StoredArticle,
     StoredSearch,
+    StoredText,
 )
 from app.domain.dedupe import DedupedArticle, url_hash
 from app.domain.enrichment import LLMUsage
@@ -622,6 +623,58 @@ class PostgresArticleStore:
                     "updated_at = now() WHERE id = :s"
                 ),
                 {"s": search_id, "p": _json(values)},
+            )
+
+    async def search_texts(self, search_id: UUID) -> list[StoredText]:
+        """Ver ``ReprocessStorePort.search_texts``."""
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT a.id, a.title, t.body, a.published_at FROM articles a "
+                        "JOIN article_texts t ON t.article_id = a.id "
+                        "WHERE a.id IN (SELECT article_id FROM search_results "
+                        "WHERE search_id = :s) ORDER BY a.id"
+                    ),
+                    {"s": search_id},
+                )
+            ).all()
+        return [StoredText(r[0], r[1], r[2], r[3]) for r in rows]
+
+    async def add_llm_usage(
+        self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor
+    ) -> None:
+        """Ver ``ReprocessStorePort.add_llm_usage``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE searches SET llm_tokens_in = llm_tokens_in + :tin, "
+                    "llm_tokens_out = llm_tokens_out + :tout, "
+                    "llm_cost_usd = llm_cost_usd + :cost, updated_at = now() WHERE id = :s"
+                ),
+                {
+                    "s": search_id,
+                    "tin": usage.tokens_in,
+                    "tout": usage.tokens_out,
+                    "cost": round(cost_usd, 4),
+                },
+            )
+            await conn.execute(
+                text(_INSERT_AUDIT),
+                {
+                    "user_id": actor.user_id,
+                    "action": SEARCH_REPROCESSED,
+                    "entity_type": AUDIT_ENTITY,
+                    "entity_id": str(search_id),
+                    "payload": _json(
+                        {
+                            "tokens_entrada": usage.tokens_in,
+                            "tokens_salida": usage.tokens_out,
+                            "costo_ia_usd": round(cost_usd, 4),
+                        }
+                    ),
+                    "ip": actor.ip,
+                },
             )
 
     async def purge_texts(self, older_than_days: int) -> int:

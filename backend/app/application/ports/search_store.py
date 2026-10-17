@@ -16,7 +16,7 @@ caso de uso ``RunSearch``).
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -366,5 +366,56 @@ class RelocationStorePort(Protocol):
         Args:
             search_id: Búsqueda.
             values: Conteos nuevos (los demás se conservan).
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class StoredText:
+    """El texto guardado de una nota, para volver a pasarlo por la IA.
+
+    Attributes:
+        article_id: Nota.
+        title: Título.
+        text: Texto que se procesó (cuerpo o título + fragmento).
+        published_at: Fecha de publicación, si se conoce.
+    """
+
+    article_id: int
+    title: str
+    text: str
+    published_at: datetime | None
+
+
+class ReprocessStorePort(RelocationStorePort, Protocol):
+    """Lo necesario para volver a pasar por la IA las notas de una búsqueda."""
+
+    async def search_texts(self, search_id: UUID) -> list[StoredText]:
+        """Notas de una búsqueda que todavía tienen su texto guardado.
+
+        Args:
+            search_id: Búsqueda.
+
+        Returns:
+            Las que no han pasado la retención de ``article_texts``.
+        """
+        ...
+
+    async def save_enrichment(
+        self, article_id: int, result: EnrichmentResult, resolutions: Sequence[Resolution]
+    ) -> None:
+        """Ver ``ArticleStorePort.save_enrichment``."""
+        ...
+
+    async def add_llm_usage(
+        self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor
+    ) -> None:
+        """Suma lo gastado en reprocesar al total de la búsqueda y lo anota en la bitácora.
+
+        Args:
+            search_id: Búsqueda.
+            usage: Tokens gastados.
+            cost_usd: Costo estimado.
+            actor: Quién lo pidió.
         """
         ...
