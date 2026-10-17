@@ -9,7 +9,8 @@ import pytest
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from app.adapters.llm.gemini import PROMPT_VERSION, GeminiEnricher, build_gemini, build_prompt
+from app.adapters.llm.common import PROMPT_VERSION, build_prompt
+from app.adapters.llm.gemini import GeminiEnricher, build_gemini
 from app.application.ports.llm import EnrichmentError, EnrichmentRequest
 from app.domain.enrichment import MAX_TEXT_CHARS, ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import (

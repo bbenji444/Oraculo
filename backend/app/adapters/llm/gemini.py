@@ -21,23 +21,25 @@ cobra como salida y para extraer datos de una nota no hace falta.
 No hace: no decide qué notas se enriquecen ni guarda nada.
 """
 
-from collections.abc import Sequence
-from datetime import date
-from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 
-from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
-from app.domain.enrichment import (
-    ConceptBrief,
-    ConceptJudgement,
-    Enrichment,
-    LLMUsage,
+from app.adapters.llm.common import (
+    MAX_OUTPUT_TOKENS,
+    PROMPT_VERSION,
+    RETRY_ERROR_CHARS,
+    RETRY_NOTE,
+    TEMPERATURE,
+    EnrichmentOut,
+    build_prompt,
+    to_enrichment,
 )
+from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
+from app.domain.enrichment import LLMUsage
 from app.domain.errors import (
     ProviderAuthError,
     ProviderError,
@@ -45,121 +47,18 @@ from app.domain.errors import (
     ProviderResponseError,
     ProviderUnavailableError,
 )
-from app.domain.geocoding import Mention, MentionRole
-from app.domain.region import RegionLevel
 
-PROMPT_VERSION = "enrich_v1"
-PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 GEMINI = "gemini"
-# Respuestas consistentes: se extraen datos, no se escribe creativo.
-TEMPERATURE = 0.2
-# Tope de la respuesta: un JSON con resumen, conceptos y lugares cabe de
-# sobra; evita respuestas desbocadas que cuestan.
-MAX_OUTPUT_TOKENS = 2048
 _MS_PER_SECOND = 1000
 _AUTH_CODES = frozenset({401, 403})
 _TOO_MANY = 429
 _SERVER_ERROR = 500
-_RETRY_NOTE = (
-    "\n\nTu respuesta anterior no cumplió el esquema. Error: {error}\n"
-    "Responde de nuevo SOLO con el JSON válido."
-)
-
-LocationKind = Literal["country", "state", "municipality", "locality"]
-
-
-class LocationOut(BaseModel):
-    """Una mención de lugar en la respuesta."""
-
-    mention: str = Field(min_length=1)
-    kind_hint: LocationKind | None = None
-    state_hint: str | None = None
-    country: str | None = None
-    role: Literal["event", "mentioned"]
-
-
-class ConceptOut(BaseModel):
-    """Relevancia para un concepto en la respuesta."""
-
-    concept_id: int
-    is_relevant: bool
-    relevance_score: float = Field(ge=0, le=1)
-    relevance_reason: str | None = None
-
-
-class EnrichmentOut(BaseModel):
-    """Esquema de la respuesta de la IA (salida esperada de §10)."""
-
-    concepts: list[ConceptOut]
-    summary: str | None = None
-    event_type: str | None = None
-    event_date: date | None = None
-    locations: list[LocationOut] = Field(default_factory=list)
 
 
 class _Models(Protocol):
     async def generate_content(
         self, *, model: str, contents: str, config: types.GenerateContentConfig
     ) -> Any: ...
-
-
-def _concepts_text(concepts: Sequence[ConceptBrief]) -> str:
-    return "\n".join(
-        f"- concept_id {c.concept_id}: {c.name}. {c.description} "
-        f"(palabras clave: {', '.join(c.keywords)})"
-        for c in concepts
-    )
-
-
-def build_prompt(request: EnrichmentRequest) -> str:
-    """Llena la plantilla ``enrich_v1.md`` con la nota.
-
-    Args:
-        request: Nota y conceptos.
-
-    Returns:
-        El texto que se manda a la IA.
-    """
-    template = PROMPT_PATH.read_text(encoding="utf-8")
-    published = request.published_at.date().isoformat() if request.published_at else "desconocida"
-    return template.format(
-        concepts=_concepts_text(request.concepts),
-        published_at=published,
-        title=request.title,
-        text=request.text,
-    )
-
-
-def to_enrichment(out: EnrichmentOut, concept_ids: set[int]) -> Enrichment:
-    """Convierte la respuesta validada al dominio.
-
-    Args:
-        out: Respuesta validada.
-        concept_ids: Conceptos que se preguntaron (los demás se ignoran).
-
-    Returns:
-        El enriquecimiento.
-    """
-    return Enrichment(
-        concepts=tuple(
-            ConceptJudgement(c.concept_id, c.is_relevant, c.relevance_score, c.relevance_reason)
-            for c in out.concepts
-            if c.concept_id in concept_ids
-        ),
-        summary=out.summary,
-        event_type=out.event_type,
-        event_date=out.event_date,
-        locations=tuple(
-            Mention(
-                text=loc.mention,
-                role=MentionRole(loc.role),
-                kind_hint=RegionLevel(loc.kind_hint) if loc.kind_hint else None,
-                state_hint=loc.state_hint,
-                country=loc.country,
-            )
-            for loc in out.locations
-        ),
-    )
 
 
 def _usage(response: Any) -> LLMUsage:
@@ -249,8 +148,8 @@ class GeminiEnricher:
             try:
                 out = EnrichmentOut.model_validate_json(getattr(response, "text", None) or "")
             except ValidationError as error:
-                last_error = str(error)[:500]
-                contents = prompt + _RETRY_NOTE.format(error=last_error)
+                last_error = str(error)[:RETRY_ERROR_CHARS]
+                contents = prompt + RETRY_NOTE.format(error=last_error)
                 continue
             return EnrichmentResult(
                 to_enrichment(out, concept_ids),
