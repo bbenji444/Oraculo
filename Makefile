@@ -28,7 +28,7 @@ COVERAGE_MIN := 85
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
-        ingesta-historial ngramas-muestra buscar reubicar
+        ingesta-historial ngramas-muestra buscar reubicar geo-earth
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -108,6 +108,9 @@ geo-terms: ## Aplica términos de búsqueda, alias y códigos de país sin recar
 
 geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
 	$(UV_RUN) python -m app.geodata.mapa_base
+
+geo-earth: ## Texturas NASA de la Tierra (día y noche) y estrellas (ARGS=--muestra para solo 5 recortes)
+	$(UV_RUN) python -m app.geodata.tierra $(ARGS)
 
 # --- Base de datos (docs/base-de-datos.md) ---------------------------------------
 
