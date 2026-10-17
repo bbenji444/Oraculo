@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.2 · Octubre 2026 · Responsable: Benji
+Versión 2.3 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -241,6 +241,7 @@ monitor-noticias/
 | Reportes | Jinja2 + WeasyPrint | Una misma plantilla HTML sirve para vista web y para PDF. |
 | Frontend | React 18 + TypeScript + Vite | Ecosistema amplio, tipado. |
 | Globo y mapa | MapLibre GL JS v6 (proyección `globe`; ver ADR-0007) | Globo 3D rotable que hace zoom continuo hasta nivel calle con la misma librería. Open source, sin llave ni costo. |
+| Tierra y espacio | Texturas de la NASA en PMTiles raster y fondo de estrellas con three.js (ADR-0017) | Tierra realista de día y de noche, y un universo detrás del globo, sin depender de servidores de terceros. |
 | Teselas | PMTiles autoalojados (mapa base Protomaps + capas INEGI) | No se depende de servidores de mapas externos, algo importante en un sistema institucional. Un solo archivo por capa, servido por nginx con HTTP Range. |
 | Estado UI | Zustand + TanStack Query | Simple y predecible; caché de datos del servidor. |
 | Estilos | Tailwind CSS | Rápido, consistente; modo oscuro sencillo. |
@@ -632,9 +633,19 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 
 ### 14.2 Comportamiento del globo
 
+**Apariencia (ADR-0017)**
+- El globo ocupa la pantalla, sobre un fondo de universo (Vía Láctea y estrellas que titilan) que gira con la cámara.
+- Tierra con textura satelital de la NASA. Por defecto de noche, con las ciudades iluminadas; un botón cambia a la de día. Al acercarse se funde con el mapa de calles y los límites de INEGI.
+- Paneles translúcidos a los lados (búsqueda, lista, gráficas y descargas) que no tapan el centro.
+
 **Vista inicial**
-- Proyección `globe`, rotación lenta automática centrada en México.
-- La rotación se detiene al interactuar y hay un botón para reanudarla.
+- La cámara entra desde lejos y llega a México con frenado suave (~3.5 s).
+- Proyección `globe`, rotación lenta automática centrada en México (una vuelta en 90 s, más lenta al acercarse).
+- La rotación se detiene al interactuar y hay un botón para reanudarla. Se reanuda sola tras 25 s sin uso, acelerando poco a poco.
+
+**Movimiento**
+- Los vuelos duran según la distancia y el cambio de zoom (1.2 a 4.5 s). Subir por las migas de pan es más rápido.
+- Control de velocidad: lenta, normal, rápida o sin animación. Se recuerda en el navegador. Si el sistema pide menos movimiento, no hay animaciones.
 
 **Interacción**
 - **Hover:** resalta la región bajo el cursor y muestra un tooltip con nombre y tipo ("Alcaldía Iztapalapa").
@@ -890,3 +901,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.0 | 16 de octubre de 2026 | F4: extracción de texto con retención de 30 días y control de costo de Gemini (ADR-0015); comando `make buscar`. |
 | 2.1 | 17 de octubre de 2026 | OpenAI (`gpt-6-luna`) como IA por defecto, Gemini elegible con `LLM_PROVIDER` (ADR-0016). |
 | 2.2 | 17 de octubre de 2026 | F5: parámetros finales de `/searches/{id}/articles` (`relevant`, `concept_id`, `in_region=none`) y de `/aggregates` (`level`, `coarser`); errores 500 y 503 uniformes; `docs/api.md`. |
+| 2.3 | 17 de octubre de 2026 | F6: Tierra realista con texturas de la NASA, fondo de universo con three.js y reglas de movimiento del globo (ADR-0017). |
