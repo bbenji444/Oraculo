@@ -6,6 +6,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Fase 6 — Frontend: globo y búsqueda** (§14, ADR-0017):
+  - Pantalla **Explorar** (inicial): el globo domina la pantalla, con la Tierra de la NASA (de noche con las luces de las ciudades o de día) sobre un fondo de Vía Láctea y estrellas que titilan (three.js), y paneles translúcidos a los lados.
+  - `make geo-earth`: descarga Blue Marble, Black Marble 2016 y Deep Star Maps con manifiesto y SHA-256, mezcla la noche con GDAL y genera teselas locales `earth_day.pmtiles` y `earth_night.pmtiles` (zoom 0–6). Al acercarse se funden con el mapa vectorial y las capas de INEGI.
+  - Movimiento en un solo módulo (`map/motion.ts`): entrada hacia México, giro que se frena al acercarse y se reanuda tras 25 s sin uso, y vuelos cuya duración depende de la distancia y del zoom (1.2 a 4.5 s), con inclinación según el nivel. Hay control de velocidad (lenta, normal, rápida o sin animación) y se respeta "menos movimiento" del sistema.
+  - Panel de búsqueda (§14.3): buscador de regiones, migas de pan, filtros Estado → Municipio → Localidad sincronizados con el globo, conceptos, fechas, estimación de consultas, créditos y costo de IA antes de buscar, y avance por etapas.
+  - Resultados sobre el globo: mapa de calor, grupos de puntos, puntos que aparecen en cascada y laten al elegirlos, y anillo punteado para lo ubicado solo por estado o país. Un clic vuela a la nota y abre su ficha (§14.4) con línea guía.
+  - Lista de noticias (Dentro, Fuera, Sin ubicación), gráficas "Top 5 estados" y "Tipos de noticias", y panel de Descargas (sus botones funcionan en la Fase 7).
+  - Pestaña **Historial**: reabre una búsqueda anterior en el globo sin gastar créditos.
+  - Estado global con Zustand y servicios y hooks de búsquedas con TanStack Query (consulta el avance cada 2 s).
+  - Prueba de humo del flujo principal (H1) con Testing Library y respuestas reales grabadas.
+
 ### Eliminado
 
 - Pestaña temporal **Notas**, rutas `/api/v1/local-index/search` y `/stats`, y el globo viejo de **Geodatos**: los reemplaza la pantalla Explorar (Fase 6). El índice local sigue buscando como proveedor dentro de cada búsqueda.

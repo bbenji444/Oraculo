@@ -61,7 +61,13 @@ Verificado el 17/10/2026:
 
 ## Consecuencias
 
-- **Peso:** ~60–110 MB más de teselas (se mide al generarlas). Si pasa de 150 MB, el zoom 6 se limita a México.
+- **Peso:** se estimaban ~60–110 MB de teselas. Medido al generarlas: 12.5 MB de día y 6.1 MB de noche (WebP, zoom 0–6), más 2.3 MB y 7.2 MB de los mapas de estrellas de 4K y 8K. Si algún día pasara de 150 MB, el zoom 6 se limitaría a México.
 - **Nitidez:** a zoom 6, la textura de día viene de una imagen de ~2 km/píxel, aceptable. Para ver más detalle está el mapa vectorial, que aparece al acercarse.
 - **Rendimiento:** hay dos lienzos WebGL en pantalla (mapa y fondo). El fondo solo dibuja cuando cambia la vista, para sostener la meta de 60 fps (§14.2).
+  - **Medición del 17/10/2026** (navegador integrado, GPU Intel UHD integrada, monitor de 144 Hz, lienzo de 1280×884):
+    - giro del globo en reposo: mediana de **~69 fps**, que cumple la meta;
+    - vuelo de México a un estado con inclinación: **~48 fps** (un cuadro cada 20.8 ms, la mediana). MapLibre dibuja cada cuadro en ~6 ms (mediana), así que el límite está en la GPU.
+  - Apagar la atmósfera, el fondo espacial o el desenfoque de los paneles no cambió el vuelo de forma repetible.
+  - A 144 Hz, un cuadro que tarda entre 14 y 21 ms se muestra a 20.8 ms. En un monitor de 60 Hz ese mismo cuadro cabe en 16.7 ms, pero no se midió.
+  - Si los analistas notan tirones, lo siguiente a probar es reducir la resolución del lienzo del mapa (`pixelRatio`) durante los vuelos.
 - **Licencias:** la NASA pide crédito y se muestra en el mapa. El paquete de estrellas acredita además a Gaia/ESA solo en su versión 2020, que no se usa.
