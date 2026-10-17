@@ -47,3 +47,14 @@ export function prefersReducedMotion(): boolean {
   if (typeof scope.matchMedia !== 'function') return false;
   return scope.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+// Inclinación del eje de la Tierra respecto a su órbita (oblicuidad de la
+// eclíptica, ~23.44°). Dibujar el globo con su polo norte inclinado lo hace
+// verse como un globo terráqueo de escritorio.
+export const EARTH_AXIAL_TILT_DEGREES = 23.44;
+// Rumbo de la cámara en la vista de globo: negativo para que el polo norte
+// se incline hacia la derecha, como en los globos de escritorio. El giro
+// cambia la longitud, así que la Tierra rota alrededor de ese eje inclinado.
+export const GLOBE_BEARING = -EARTH_AXIAL_TILT_DEGREES;
+// Al acercarse a una región el mapa se endereza: así se lee con el norte arriba.
+export const REGION_BEARING = 0;

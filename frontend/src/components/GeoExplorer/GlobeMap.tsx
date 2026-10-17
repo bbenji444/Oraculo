@@ -11,7 +11,7 @@ import { type FeatureIdentifier, Map as MapLibreMap, NavigationControl } from 'm
 import { useEffect, useRef, useState } from 'react';
 
 import { setupMapLibre } from '../../map/setup';
-import { SPIN_STEP_MS, spinDegrees } from '../../map/spin';
+import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
   buildMapStyle,
   featureLabel,
@@ -82,6 +82,7 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
         center: [map.getCenter().lng, INITIAL_CENTER[1]],
         zoom: INITIAL_ZOOM,
         pitch: 0,
+        bearing: GLOBE_BEARING,
         duration: FLY_DURATION_MS,
       });
     } else {
@@ -99,6 +100,8 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
       style: buildMapStyle(window.location.origin),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
+      // Eje inclinado como el de la Tierra (ver map/spin.ts).
+      bearing: GLOBE_BEARING,
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
@@ -190,14 +193,24 @@ export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeM
     const [west, south, east, north] = selection.bbox;
     if (west === east && south === north) {
       // Localidad sin polígono: su "rectángulo" es un punto.
-      map.flyTo({ center: [west, south], zoom: FLY_MAX_ZOOM.locality, duration: FLY_DURATION_MS });
+      map.flyTo({
+        center: [west, south],
+        zoom: FLY_MAX_ZOOM.locality,
+        bearing: REGION_BEARING,
+        duration: FLY_DURATION_MS,
+      });
     } else {
       map.fitBounds(
         [
           [west, south],
           [east, north],
         ],
-        { padding: FLY_PADDING, maxZoom: FLY_MAX_ZOOM[selection.level], duration: FLY_DURATION_MS },
+        {
+          padding: FLY_PADDING,
+          maxZoom: FLY_MAX_ZOOM[selection.level],
+          bearing: REGION_BEARING,
+          duration: FLY_DURATION_MS,
+        },
       );
     }
     return () => {

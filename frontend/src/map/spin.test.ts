@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  EARTH_AXIAL_TILT_DEGREES,
+  GLOBE_BEARING,
   MAX_SPIN_ZOOM,
   prefersReducedMotion,
+  REGION_BEARING,
   SLOW_SPIN_ZOOM,
   spinDegrees,
   SPIN_STEP_MS,
@@ -41,5 +44,14 @@ describe('prefersReducedMotion', () => {
       vi.fn(() => ({ matches: false })),
     );
     expect(prefersReducedMotion()).toBe(false);
+  });
+});
+
+describe('inclinación del globo', () => {
+  it('usa el ángulo real del eje de la Tierra y se endereza al ver una región', () => {
+    expect(EARTH_AXIAL_TILT_DEGREES).toBeCloseTo(23.44);
+    // Negativo: el polo norte se inclina hacia la derecha.
+    expect(GLOBE_BEARING).toBe(-EARTH_AXIAL_TILT_DEGREES);
+    expect(REGION_BEARING).toBe(0);
   });
 });
