@@ -214,13 +214,19 @@ class ProviderHttpClient:
         )
 
     async def _attempt(
-        self, url: str, params: Mapping[str, str], method: str = "GET"
+        self,
+        url: str,
+        params: Mapping[str, str],
+        method: str = "GET",
+        json_body: Mapping[str, object] | None = None,
     ) -> httpx2.Response:
         name = self._name
         async with self._semaphore:
             await self._pace()
             try:
-                response = await self._client.request(method, url, params=dict(params))
+                response = await self._client.request(
+                    method, url, params=dict(params), json=dict(json_body) if json_body else None
+                )
             except httpx2.TimeoutException as exc:
                 raise ProviderUnavailableError(
                     f"{name} no respondió a tiempo.", provider=name
@@ -250,6 +256,23 @@ class ProviderHttpClient:
         """
         return (await self.get_with_history(url, params)).response
 
+    async def post_json(self, url: str, body: Mapping[str, object]) -> httpx2.Response:
+        """Hace un POST con cuerpo JSON, con los mismos reintentos que ``get``.
+
+        Lo usa la IA de OpenAI (ADR-0016).
+
+        Args:
+            url: Dirección del servicio.
+            body: Cuerpo JSON (sin la llave: va en los encabezados).
+
+        Returns:
+            La respuesta 2xx o 3xx.
+
+        Raises:
+            ProviderError: Igual que ``get``.
+        """
+        return (await self.get_with_history(url, {}, method="POST", json_body=body)).response
+
     async def head(self, url: str) -> httpx2.Response:
         """Pide solo los encabezados (tamaño, huella), sin descargar el contenido.
 
@@ -268,7 +291,11 @@ class ProviderHttpClient:
         return (await self.get_with_history(url, {}, method="HEAD")).response
 
     async def get_with_history(
-        self, url: str, params: Mapping[str, str], method: str = "GET"
+        self,
+        url: str,
+        params: Mapping[str, str],
+        method: str = "GET",
+        json_body: Mapping[str, object] | None = None,
     ) -> HttpOutcome:
         """Como ``get``, pero también dice cuántos 429 hubo antes de la respuesta.
 
@@ -279,7 +306,8 @@ class ProviderHttpClient:
         Args:
             url: Dirección del proveedor.
             params: Parámetros de la URL (sin la llave).
-            method: Método HTTP (``GET`` o ``HEAD``).
+            method: Método HTTP (``GET``, ``HEAD`` o ``POST``).
+            json_body: Cuerpo JSON (solo ``POST``).
 
         Returns:
             La respuesta y el número de rechazos 429 previos.
@@ -300,7 +328,7 @@ class ProviderHttpClient:
         async for attempt in retrying:
             with attempt:
                 try:
-                    response = await self._attempt(url, params, method)
+                    response = await self._attempt(url, params, method, json_body)
                 except ProviderRateLimitError:
                     rate_limited += 1
                     raise

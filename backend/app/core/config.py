@@ -77,11 +77,18 @@ _DEFAULT_EXTRACTION_TIMEOUT_SECONDS = 15.0
 _DEFAULT_EXTRACTION_CONCURRENCY = 4
 # - El texto extraído se borra a los 30 días (solo sirve para procesar).
 _DEFAULT_ARTICLE_TEXT_RETENTION_DAYS = 30
-# - IA: Gemini 2.5 Flash (§10). Precios por millón de tokens al 16/10/2026
-#   (https://ai.google.dev/gemini-api/docs/pricing): 0.30 entrada, 2.50 salida.
-_DEFAULT_LLM_MODEL = "gemini-2.5-flash"
-_DEFAULT_LLM_PRICE_INPUT = 0.30
-_DEFAULT_LLM_PRICE_OUTPUT = 2.50
+# - IA (ADR-0016): OpenAI gpt-6-luna por defecto; Gemini 2.5 Flash elegible.
+#   Precios por millón de tokens: OpenAI al 17/10/2026
+#   (https://developers.openai.com/api/docs/pricing): 0.10 entrada, 0.50
+#   salida; Gemini al 16/10/2026 (https://ai.google.dev/gemini-api/docs/pricing):
+#   0.30 entrada, 2.50 salida.
+_DEFAULT_LLM_PROVIDER: Literal["openai", "gemini"] = "openai"
+_DEFAULT_OPENAI_MODEL = "gpt-6-luna"
+_DEFAULT_OPENAI_PRICE_INPUT = 0.10
+_DEFAULT_OPENAI_PRICE_OUTPUT = 0.50
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+_DEFAULT_GEMINI_PRICE_INPUT = 0.30
+_DEFAULT_GEMINI_PRICE_OUTPUT = 2.50
 # - 60 s por nota: una respuesta de ~300 tokens tarda unos segundos; el margen
 #   cubre horas pico.
 _DEFAULT_LLM_TIMEOUT_SECONDS = 60.0
@@ -172,14 +179,20 @@ class Settings(BaseSettings):
     extraction_timeout_seconds: float = Field(default=_DEFAULT_EXTRACTION_TIMEOUT_SECONDS, gt=0)
     extraction_concurrency: int = Field(default=_DEFAULT_EXTRACTION_CONCURRENCY, ge=1)
     article_text_retention_days: int = Field(default=_DEFAULT_ARTICLE_TEXT_RETENTION_DAYS, ge=1)
-    # IA (§10, ADR-0015). Sin llave, las notas no se enriquecen y se avisa.
+    # IA (§10, ADR-0015 y ADR-0016). Sin la llave del proveedor elegido, las
+    # notas no se enriquecen y la búsqueda lo avisa.
+    llm_provider: Literal["openai", "gemini"] = _DEFAULT_LLM_PROVIDER
+    openai_api_key: SecretStr | None = None
+    openai_model: str = _DEFAULT_OPENAI_MODEL
+    openai_price_input_per_million: float = Field(default=_DEFAULT_OPENAI_PRICE_INPUT, ge=0)
+    openai_price_output_per_million: float = Field(default=_DEFAULT_OPENAI_PRICE_OUTPUT, ge=0)
     gemini_api_key: SecretStr | None = None
-    llm_model: str = _DEFAULT_LLM_MODEL
+    gemini_model: str = _DEFAULT_GEMINI_MODEL
+    gemini_price_input_per_million: float = Field(default=_DEFAULT_GEMINI_PRICE_INPUT, ge=0)
+    gemini_price_output_per_million: float = Field(default=_DEFAULT_GEMINI_PRICE_OUTPUT, ge=0)
     llm_timeout_seconds: float = Field(default=_DEFAULT_LLM_TIMEOUT_SECONDS, gt=0)
     llm_concurrency: int = Field(default=_DEFAULT_LLM_CONCURRENCY, ge=1)
     llm_max_articles_per_search: int = Field(default=_DEFAULT_LLM_MAX_ARTICLES, ge=1)
-    llm_price_input_per_million: float = Field(default=_DEFAULT_LLM_PRICE_INPUT, ge=0)
-    llm_price_output_per_million: float = Field(default=_DEFAULT_LLM_PRICE_OUTPUT, ge=0)
     geo_min_confidence: float = Field(default=_DEFAULT_GEO_MIN_CONFIDENCE, ge=0, le=1)
 
     def database_url(self, *, test: bool = False) -> URL:
