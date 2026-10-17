@@ -73,6 +73,66 @@ class ConceptValidationError(InvalidRequestError):
     code = "invalid_concept"
 
 
+class ProviderError(DomainError):
+    """Un proveedor de noticias no pudo responder la consulta.
+
+    Los adaptadores traducen a esta familia los errores HTTP y de red
+    (CLAUDE.md §6.1). ``retryable`` dice si vale la pena reintentar.
+    Que falle un proveedor no tumba la búsqueda: queda "parcial" (§8).
+
+    Attributes:
+        provider: Proveedor que falló (``searchapi``, ``gdelt``...).
+        http_status: Código HTTP, si hubo respuesta.
+    """
+
+    code = "provider_error"
+    retryable = False
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: str,
+        http_status: int | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message, {"proveedor": provider, **(details or {})})
+        self.provider = provider
+        self.http_status = http_status
+
+
+class ProviderNotConfiguredError(ProviderError):
+    """Falta la configuración del proveedor (por ejemplo, su llave)."""
+
+    code = "provider_not_configured"
+
+
+class ProviderAuthError(ProviderError):
+    """La llave fue rechazada (401/403): reintentar no sirve."""
+
+    code = "provider_auth_error"
+
+
+class ProviderRateLimitError(ProviderError):
+    """El proveedor pide ir más despacio (429): se reintenta con espera."""
+
+    code = "provider_rate_limited"
+    retryable = True
+
+
+class ProviderUnavailableError(ProviderError):
+    """Error del servidor (5xx), red caída o tiempo agotado: se reintenta."""
+
+    code = "provider_unavailable"
+    retryable = True
+
+
+class ProviderResponseError(ProviderError):
+    """La respuesta no tiene el formato esperado (o es un error en texto plano)."""
+
+    code = "provider_bad_response"
+
+
 class QueryTooLongError(InvalidRequestError):
     """La consulta no cabe en el límite del proveedor ni con una sola palabra clave.
 

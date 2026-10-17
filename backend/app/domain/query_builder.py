@@ -79,7 +79,7 @@ def build_queries(
         concept: Concepto con palabras clave y exclusiones.
         place: Cómo se nombra el lugar (``queries.place_for``).
         window: Rango de fechas.
-        providers: Proveedores a usar, en orden (por defecto los tres).
+        providers: Proveedores a usar, en orden (por defecto todos).
 
     Returns:
         Una o más consultas por proveedor. Ninguna se ejecuta: sirven para
@@ -111,6 +111,8 @@ def build_queries(
                     language=SEARCH_LANGUAGE,
                     window=window,
                     estimated_credits=dialect.credits_per_query,
+                    exclude_terms=concept.exclude_terms,
+                    place=place,
                 )
             )
     return queries

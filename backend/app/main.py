@@ -16,17 +16,23 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.adapters.cache.redis_query_cache import RedisQueryCache
 from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
 from app.adapters.health.postgres_probe import PostgresHealthProbe
 from app.adapters.health.redis_probe import RedisHealthProbe
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
+from app.adapters.persistence.news_index_repository import PostgresIndexStats
+from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.adapters.providers.local_index import LocalIndexProvider
 from app.api.errors import register_error_handlers
 from app.api.v1 import api_router
 from app.application.use_cases.check_health import CheckSystemHealth
+from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
+from app.domain.queries import Provider
 from app.worker.celery_app import create_celery_app
 
 API_PREFIX = "/api/v1"
@@ -75,6 +81,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.region_repository = PostgresRegionRepository(engine)
         app.state.concept_repository = PostgresConceptRepository(engine)
         app.state.dev_user = settings.dev_user
+        # Pestaña temporal "Notas" (ADR-0014): solo el índice local, sin créditos.
+        app.state.local_index_executor = ExecuteQueries(
+            {Provider.LOCAL_INDEX: LocalIndexProvider(engine)},
+            RedisQueryCache(redis_client),
+            PostgresProviderQueryLog(engine),
+            ExecutionLimits(settings.max_queries_per_search, settings.query_cache_ttl_hours, {}),
+        )
+        app.state.index_stats = PostgresIndexStats(engine)
         try:
             yield
         finally:

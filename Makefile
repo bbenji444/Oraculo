@@ -27,7 +27,8 @@ COVERAGE_MIN := 85
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
-        geo-terms geo-basemap db-shell db-dump seed
+        geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
+        ingesta-historial ngramas-muestra
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -40,7 +41,7 @@ bootstrap: ## Instala todo: servicios en Ubuntu y dependencias de backend y fron
 	@echo "==> Instalando dependencias del frontend con el npm de Windows"
 	$(NPM) ci --no-fund --no-audit
 
-up: ## Levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+up: ## Levanta PostgreSQL, Redis, API, worker, reloj de Celery y nginx (http://localhost:8080)
 	bash scripts/dev/servicios.sh up
 
 down: ## Detiene todos los servicios
@@ -49,7 +50,7 @@ down: ## Detiene todos los servicios
 status: ## Muestra qué servicios corren y el resultado de /health
 	bash scripts/dev/servicios.sh status
 
-logs: ## Sigue los logs de la API y del worker (Ctrl+C para salir)
+logs: ## Sigue los logs de la API, del worker y del reloj (Ctrl+C para salir)
 	bash scripts/dev/servicios.sh logs
 
 migrate: ## Aplica las migraciones de Alembic a la base de desarrollo
@@ -109,6 +110,21 @@ geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.3
 	$(UV_RUN) python -m app.geodata.mapa_base
 
 # --- Base de datos (docs/base-de-datos.md) ---------------------------------------
+
+gdelt-diagnostico: ## Reintento diario de D1 en GDELT (máximo una vez al día, ADR-0012)
+	$(UV_RUN) python -m app.cli.diagnostico_gdelt
+
+probar-proveedor: ## UNA consulta real a un proveedor, con confirmación (ARGS="--proveedor gdelt --nombre x")
+	$(UV_RUN) python -m app.cli.probar_proveedor $(ARGS)
+
+ingesta: ## Corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
+	$(UV_RUN) python -m app.cli.ingesta
+
+ingesta-historial: ## Historial de GDELT: vista previa con DIAS=N; baja todo solo con DESCARGAR=si
+	$(UV_RUN) python -m app.cli.ingesta_historial --dias $(or $(DIAS),1) $(if $(filter si,$(DESCARGAR)),--descargar,)
+
+ngramas-muestra: ## Prueba real de los ngramas de GDELT: consumo, espacio y 5 ejemplos (MINUTOS=60)
+	$(UV_RUN) python -m app.cli.muestra_ngramas --minutos $(or $(MINUTOS),60)
 
 seed: ## Carga los conceptos semilla que falten (nunca modifica los existentes)
 	$(UV_RUN) python -m app.seed.cargar_conceptos

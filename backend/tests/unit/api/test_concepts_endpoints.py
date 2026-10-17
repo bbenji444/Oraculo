@@ -114,14 +114,19 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
     body = response.json()
     assert body["region"]["breadcrumb"] == "México › Ciudad de México › Iztapalapa"
     assert body["window"]["description"] == "últimos 7 días"
-    assert [q["provider"] for q in body["queries"]] == ["searchapi", "google_news_rss", "gdelt"]
+    assert [q["provider"] for q in body["queries"]] == [
+        "searchapi",
+        "google_news_rss",
+        "gdelt",
+        "indice_local",
+    ]
     assert body["queries"][0]["provider_label"] == "SearchApi (Google News)"
     assert body["queries"][0]["filters"] == {
         "country": "México",
         "language": "español",
         "period": "últimos 7 días",
     }
-    assert (body["total_queries"], body["total_credits"]) == (3, 1)
+    assert (body["total_queries"], body["total_credits"]) == (4, 1)
     assert concepts.concepts == {}
 
 

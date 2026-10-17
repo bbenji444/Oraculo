@@ -1,0 +1,14 @@
+{
+  "proveedor": "gdelt",
+  "texto": "gobierno sourcelang:spanish sourcecountry:mexico",
+  "parametros": {
+    "query": "gobierno sourcelang:spanish sourcecountry:mexico",
+    "mode": "ArtList",
+    "format": "json",
+    "maxrecords": "250",
+    "sort": "DateDesc",
+    "timespan": "1d"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-16T17:53:17+00:00"
+}

@@ -2,21 +2,24 @@
  * Componente raíz: encabezado con pestañas y la pantalla activa.
  *
  * Pestañas: "Geodatos" (globo con el catálogo de regiones, F1), "Conceptos"
- * (administración y "Probar concepto", F2) y "Estado del sistema" (F0). La
- * pestaña vive en la URL (#/geodatos, #/conceptos, #/estado) para que se pueda
- * compartir o recargar sin perderla. No hace llamadas HTTP.
+ * (administración y "Probar concepto", F2), "Notas" (vista temporal del índice
+ * local, ADR-0014) y "Estado del sistema" (F0). La pestaña vive en la URL
+ * (#/geodatos, #/conceptos, #/notas, #/estado) para que se pueda compartir o
+ * recargar sin perderla. No hace llamadas HTTP.
  */
 import { useEffect, useState } from 'react';
 
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { GeoExplorer } from './components/GeoExplorer/GeoExplorer';
+import { NotesPage } from './components/LocalIndex/NotesPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'geodatos' | 'conceptos' | 'estado';
+type Tab = 'geodatos' | 'conceptos' | 'notas' | 'estado';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'geodatos', label: 'Geodatos' },
   { id: 'conceptos', label: 'Conceptos' },
+  { id: 'notas', label: 'Notas' },
   { id: 'estado', label: 'Estado del sistema' },
 ];
 
@@ -24,11 +27,13 @@ function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === '#/estado') return 'estado';
   if (hash === '#/conceptos') return 'conceptos';
+  if (hash === '#/notas') return 'notas';
   return 'geodatos';
 }
 
 function Screen({ tab }: { tab: Tab }) {
   if (tab === 'conceptos') return <ConceptsPage />;
+  if (tab === 'notas') return <NotesPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
   return <GeoExplorer />;
 }

@@ -224,7 +224,7 @@ Antes de cargar shapefiles, CSV o DBF, detecta el encoding (probar `utf-8`, `cp1
 ## 7. Pruebas
 
 - Toda la lógica de `domain/` y `application/` lleva pruebas unitarias. Cobertura mínima del 85% en esas capas.
-- Los adaptadores externos se prueban con respuestas grabadas en `tests/fixtures/`, usando `respx`. **Las pruebas nunca llaman a internet ni gastan créditos.**
+- Los adaptadores externos se prueban con respuestas grabadas en `tests/fixtures/`, usando `httpx2.MockTransport` (ADR-0010). **Las pruebas nunca llaman a internet ni gastan créditos.**
 - Las pruebas de integración corren contra el PostGIS local de WSL, en una base de pruebas separada (`monitor_noticias_test`), nunca contra la base de desarrollo (ver ADR-0006).
 - Todo bug corregido lleva primero una prueba que lo reproduce.
 - El frontend usa `vitest` para la lógica, más una prueba de humo del flujo principal.
@@ -249,10 +249,10 @@ Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl 
 
 ```
 make bootstrap       # instala servicios y dependencias (se puede repetir)
-make up              # levanta PostgreSQL, Redis, API, worker y nginx (http://localhost:8080)
+make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta) y nginx (http://localhost:8080)
 make down            # los detiene
 make status          # qué corre y resultado de /health
-make logs            # sigue los logs de la API y del worker
+make logs            # sigue los logs de la API, del worker y del reloj
 make test            # pruebas backend (con cobertura) + frontend
 make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
 make format          # aplica el formato de ruff y Prettier
@@ -266,6 +266,11 @@ make geo-tiles       # solo los PMTiles de las capas de INEGI
 make geo-terms       # términos de búsqueda y códigos de país (ARGS=--muestra para ver sin escribir)
 make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
 make seed            # carga los conceptos semilla que falten (no pisa ediciones)
+make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
+make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
+make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
+make ingesta-historial DIAS=7  # mide días anteriores de GDELT y muestra 5 ejemplos; DESCARGAR=si baja todo
+make ngramas-muestra   # prueba real de una hora de ngramas de GDELT: consumo, espacio y 5 ejemplos
 make db-shell        # consola SQL (psql) en la base de desarrollo
 make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```

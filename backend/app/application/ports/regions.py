@@ -58,6 +58,17 @@ class RegionRepositoryPort(Protocol):
         """
         ...
 
+    async def get_by_code(self, code: str) -> Region | None:
+        """Busca una región por su clave INEGI (``09007``) o ISO-A3 (``COL``).
+
+        Args:
+            code: Clave de la región.
+
+        Returns:
+            La región, o ``None`` si no existe.
+        """
+        ...
+
     async def ancestors(self, region_id: int) -> list[RegionRef]:
         """Ancestros de una región, del más general al más cercano.
 

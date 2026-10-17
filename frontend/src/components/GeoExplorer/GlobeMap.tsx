@@ -1,7 +1,7 @@
 /**
  * Globo 3D con MapLibre: mapa base, capas de INEGI, resaltado bajo el cursor,
- * tooltip ("Alcaldía Iztapalapa"), clic para seleccionar y vuelo a la región
- * seleccionada.
+ * tooltip ("Alcaldía Iztapalapa"), clic para seleccionar, vuelo a la región
+ * seleccionada y giro lento automático que se detiene al tocar el mapa.
  *
  * No pide datos a la API: recibe la selección y avisa los clics con `onPick`.
  */
@@ -11,6 +11,7 @@ import { type FeatureIdentifier, Map as MapLibreMap, NavigationControl } from 'm
 import { useEffect, useRef, useState } from 'react';
 
 import { setupMapLibre } from '../../map/setup';
+import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
   buildMapStyle,
   featureLabel,
@@ -30,7 +31,14 @@ export interface MapSelection {
 interface GlobeMapProps {
   selection: MapSelection | null;
   onPick: (regionId: number) => void;
+  /** Si el globo gira solo (especificación §14.2). */
+  spinning: boolean;
+  /** Avisa que la persona tocó el mapa: el giro se detiene. */
+  onUserInteract: () => void;
 }
+
+// Eventos de la persona sobre el mapa que detienen el giro.
+const USER_EVENTS = ['mousedown', 'touchstart', 'wheel', 'dragstart'] as const;
 
 interface TooltipState {
   x: number;
@@ -46,16 +54,42 @@ const INITIAL_ZOOM = 1.8;
 const FLY_PADDING = { top: 80, bottom: 80, left: 420, right: 80 };
 const FLY_DURATION_MS = 1800;
 
-export function GlobeMap({ selection, onPick }: GlobeMapProps) {
+export function GlobeMap({ selection, onPick, spinning, onUserInteract }: GlobeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const onPickRef = useRef(onPick);
+  const onUserInteractRef = useRef(onUserInteract);
+  // El ciclo de giro vive dentro de MapLibre (eventos), fuera de React: lee
+  // estos refs para saber si debe seguir y cómo dar el siguiente paso.
+  const spinningRef = useRef(spinning);
+  const spinStepRef = useRef<() => void>(() => undefined);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     onPickRef.current = onPick;
-  }, [onPick]);
+    onUserInteractRef.current = onUserInteract;
+  }, [onPick, onUserInteract]);
+
+  useEffect(() => {
+    spinningRef.current = spinning;
+    const map = mapRef.current;
+    if (!spinning || !ready || !map) return;
+    if (spinDegrees(map.getZoom()) === 0) {
+      // Muy de cerca no se gira: primero se aleja a la vista de globo sobre
+      // México; al terminar (moveend) empieza el giro.
+      map.easeTo({
+        center: [map.getCenter().lng, INITIAL_CENTER[1]],
+        zoom: INITIAL_ZOOM,
+        pitch: 0,
+        bearing: GLOBE_BEARING,
+        duration: FLY_DURATION_MS,
+      });
+    } else {
+      // Primer paso; los siguientes los encadena moveend.
+      spinStepRef.current();
+    }
+  }, [spinning, ready]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -66,6 +100,8 @@ export function GlobeMap({ selection, onPick }: GlobeMapProps) {
       style: buildMapStyle(window.location.origin),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
+      // Eje inclinado como el de la Tierra (ver map/spin.ts).
+      bearing: GLOBE_BEARING,
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
@@ -75,6 +111,29 @@ export function GlobeMap({ selection, onPick }: GlobeMapProps) {
       if (hovered) map.setFeatureState(hovered, { hover: false });
       hovered = null;
     };
+
+    // Giro: una animación lineal de SPIN_STEP_MS que, al terminar (moveend),
+    // lanza la siguiente mientras `spinning` siga activo. Es el patrón de los
+    // ejemplos de globo giratorio de MapLibre; la latitud no cambia, así que
+    // México sigue a la vista en cada vuelta.
+    const spinStep = () => {
+      if (!spinningRef.current) return;
+      const degrees = spinDegrees(map.getZoom());
+      if (degrees === 0) return;
+      const center = map.getCenter();
+      map.easeTo({
+        center: [center.lng - degrees, center.lat],
+        duration: SPIN_STEP_MS,
+        easing: (t) => t,
+      });
+    };
+    spinStepRef.current = spinStep;
+    map.on('moveend', spinStep);
+    for (const type of USER_EVENTS) {
+      map.on(type, () => {
+        onUserInteractRef.current();
+      });
+    }
 
     map.on('load', () => {
       setReady(true);
@@ -134,14 +193,24 @@ export function GlobeMap({ selection, onPick }: GlobeMapProps) {
     const [west, south, east, north] = selection.bbox;
     if (west === east && south === north) {
       // Localidad sin polígono: su "rectángulo" es un punto.
-      map.flyTo({ center: [west, south], zoom: FLY_MAX_ZOOM.locality, duration: FLY_DURATION_MS });
+      map.flyTo({
+        center: [west, south],
+        zoom: FLY_MAX_ZOOM.locality,
+        bearing: REGION_BEARING,
+        duration: FLY_DURATION_MS,
+      });
     } else {
       map.fitBounds(
         [
           [west, south],
           [east, north],
         ],
-        { padding: FLY_PADDING, maxZoom: FLY_MAX_ZOOM[selection.level], duration: FLY_DURATION_MS },
+        {
+          padding: FLY_PADDING,
+          maxZoom: FLY_MAX_ZOOM[selection.level],
+          bearing: REGION_BEARING,
+          duration: FLY_DURATION_MS,
+        },
       );
     }
     return () => {

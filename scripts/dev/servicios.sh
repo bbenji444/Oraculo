@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Arranca, detiene y muestra el estado de los servicios de desarrollo en WSL:
-# PostgreSQL, Redis, la API (uvicorn), el worker (Celery) y nginx.
+# PostgreSQL, Redis, la API (uvicorn), el worker y el reloj de Celery, y nginx.
 #
 # Quién lo usa: `make up`, `make down`, `make status` y `make logs`.
 # Uso directo: bash scripts/dev/servicios.sh {up|down|status|logs}
 #
 # Sin systemd (ADR-0006), PostgreSQL, Redis y nginx se manejan con `service`,
-# y la API y el worker con archivos de PID (junto con sus logs) en RUN_DIR.
+# y la API, el worker y el reloj con archivos de PID (y sus logs) en RUN_DIR.
 #
 # Qué NO hace: no instala nada (eso es `make bootstrap`) ni aplica
 # migraciones (eso es `make migrate`).
@@ -39,7 +39,7 @@ readonly APP_READY_TIMEOUT_SECONDS=90
 # Segundos que se espera a que un proceso termine con SIGTERM antes de forzarlo.
 readonly STOP_GRACE_SECONDS=10
 
-# --- Procesos propios (API y worker) -------------------------------------------
+# --- Procesos propios (API, worker y reloj) ------------------------------------
 
 pid_vivo() {
   local pid_file="$1"
@@ -125,7 +125,7 @@ cmd_up() {
   esperar_listo "Redis" redis-cli ping
   ok "Redis listo"
 
-  paso "API y worker"
+  paso "API, worker y reloj de Celery"
   # --reload reinicia la API al guardar código. En /mnt/d no llegan avisos de
   # cambios de archivos desde Windows, así que watchfiles revisa por sondeo.
   arrancar_proceso api env WATCHFILES_FORCE_POLLING=true \
@@ -140,6 +140,11 @@ cmd_up() {
   LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "El worker" bash -c \
     "curl -s http://127.0.0.1:${API_PORT}/api/v1/health | grep -q '\"workers\"'"
   ok "Worker respondiendo"
+  # El reloj (celery beat) encola la ingesta al índice local cada
+  # INGEST_INTERVAL_MINUTES y la limpieza diaria (ADR-0013). Guarda cuándo
+  # corrió cada tarea en RUN_DIR, no en el repositorio.
+  arrancar_proceso beat "${UV_BIN}" run --frozen celery -A app.worker.celery_app beat \
+    --loglevel=INFO --schedule="${RUN_DIR}/celerybeat-schedule"
 
   paso "nginx"
   if [[ ! -f "${ROOT_DIR}/frontend/dist/index.html" ]]; then
@@ -161,6 +166,7 @@ cmd_up() {
 
 cmd_down() {
   paso "Deteniendo servicios"
+  detener_proceso beat
   detener_proceso worker
   detener_proceso api
   como_root service nginx stop >/dev/null 2>&1 || true
@@ -184,6 +190,7 @@ cmd_status() {
   linea_estado "Redis" "$(redis-cli ping >/dev/null 2>&1 && echo si || echo no)" "(puerto 6379)"
   linea_estado "API" "$(pid_vivo "${RUN_DIR}/api.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/api.pid" 2>/dev/null || echo -), puerto ${API_PORT})"
   linea_estado "Worker" "$(pid_vivo "${RUN_DIR}/worker.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/worker.pid" 2>/dev/null || echo -))"
+  linea_estado "Reloj (beat)" "$(pid_vivo "${RUN_DIR}/beat.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/beat.pid" 2>/dev/null || echo -), ingesta cada ${INGEST_INTERVAL_MINUTES:-15} min)"
   linea_estado "nginx" "$(como_root service nginx status >/dev/null 2>&1 && echo si || echo no)" "(puerto ${NGINX_PORT})"
 
   paso "Puertos escuchando"
@@ -205,7 +212,7 @@ cmd_status() {
 
 cmd_logs() {
   mkdir -p "${RUN_DIR}"
-  tail -n 30 -F "${RUN_DIR}"/api.log "${RUN_DIR}"/worker.log
+  tail -n 30 -F "${RUN_DIR}"/api.log "${RUN_DIR}"/worker.log "${RUN_DIR}"/beat.log
 }
 
 case "${1:-}" in

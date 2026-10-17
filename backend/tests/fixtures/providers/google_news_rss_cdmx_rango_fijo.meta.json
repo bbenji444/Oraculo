@@ -1,0 +1,12 @@
+{
+  "proveedor": "google_news_rss",
+  "texto": "(ciberataque OR hackeo OR ransomware OR \"filtración de datos\" OR phishing OR \"robo de datos\" OR \"fraude cibernético\") (\"Ciudad de México\" OR CDMX) -curso -webinar -diplomado -vacante after:2026-10-08 before:2026-10-15",
+  "parametros": {
+    "q": "(ciberataque OR hackeo OR ransomware OR \"filtración de datos\" OR phishing OR \"robo de datos\" OR \"fraude cibernético\") (\"Ciudad de México\" OR CDMX) -curso -webinar -diplomado -vacante after:2026-10-08 before:2026-10-15",
+    "hl": "es-419",
+    "gl": "MX",
+    "ceid": "MX:es-419"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-16T17:10:27+00:00"
+}

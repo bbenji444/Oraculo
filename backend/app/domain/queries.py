@@ -19,7 +19,7 @@ a ningún proveedor.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 from enum import StrEnum
 
 from app.domain.errors import InvalidRequestError
@@ -40,6 +40,9 @@ class Provider(StrEnum):
     SEARCHAPI = "searchapi"
     GOOGLE_NEWS_RSS = "google_news_rss"
     GDELT = "gdelt"
+    # Índice propio que llena la ingesta periódica (ADR-0013): GDELT por
+    # archivos y RSS de medios. Gratis y sin límite de consultas.
+    LOCAL_INDEX = "indice_local"
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +109,22 @@ class DateWindow:
             )
         return cls(date_from, date_to, None)
 
+    def contains(self, moment: datetime, tz: tzinfo) -> bool:
+        """Dice si un momento cae dentro del rango (días contados en ``tz``).
+
+        Sirve para descartar notas que un proveedor devuelve fuera del rango
+        pedido: Google News RSS ignora ``after:``/``before:`` (medido el
+        16/10/2026: 4 de 38 notas fuera de un rango fijo).
+
+        Args:
+            moment: Fecha y hora con zona.
+            tz: Zona en que se cuentan los días (la de la Ciudad de México).
+
+        Returns:
+            ``True`` si su día local está entre ``date_from`` y ``date_to``.
+        """
+        return self.date_from <= moment.astimezone(tz).date() <= self.date_to
+
     def describe(self) -> str:
         """Descripción para la persona: "últimos 7 días" o "del 01/10/2026 al 15/10/2026"."""
         if self.relative_days == 1:
@@ -148,6 +167,10 @@ class PlaceFacts:
             estados).
         state_search_terms: Términos curados de ese estado.
         country: País de la región.
+        state_code: Clave INEGI del estado: la propia si la región es un
+            estado, la de su estado si es municipio o localidad, ``None`` en
+            un país. Hoy no se usa para buscar (la pista de estado de GDELT
+            resultó poco fiable, ADR-0014); queda como dato para F4.
     """
 
     level: RegionLevel
@@ -157,6 +180,7 @@ class PlaceFacts:
     state_name: str | None
     state_search_terms: tuple[str, ...]
     country: CountryFilter
+    state_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,6 +237,11 @@ class PlannedQuery:
         language: Idioma (``es``).
         window: Rango de fechas.
         estimated_credits: Créditos que se espera gastar.
+        exclude_terms: Exclusiones del concepto, por separado del texto: el
+            índice local las evalúa una por una (ADR-0013).
+        place: Lugar ya resuelto, por la misma razón. ``None`` solo en
+            consultas armadas a mano (diagnóstico): equivale a no filtrar
+            por lugar.
     """
 
     provider: Provider
@@ -222,3 +251,5 @@ class PlannedQuery:
     language: str
     window: DateWindow
     estimated_credits: int
+    exclude_terms: tuple[str, ...] = ()
+    place: QueryPlace | None = None

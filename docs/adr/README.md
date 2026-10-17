@@ -23,3 +23,8 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0007](0007-maplibre-v6.md) | MapLibre GL JS v6 en lugar de v5 | Aceptado |
 | [0008](0008-fuentes-y-procesamiento-de-geodatos.md) | Fuentes y procesamiento de geodatos | Aceptado |
 | [0009](0009-construccion-de-consultas.md) | Construcción de consultas a los proveedores de noticias | Aceptado |
+| [0010](0010-httpx2-para-llamadas-externas.md) | httpx2 para las llamadas HTTP externas y sus pruebas | Aceptado |
+| [0011](0011-google-news-rss-fuera-de-produccion.md) | Google News RSS fuera de producción por sus términos de uso | Aceptado (revisión legal pendiente) |
+| [0012](0012-gdelt-desactivado-por-limite.md) | GDELT desactivado mientras responda 429 de forma persistente | Aceptado |
+| [0013](0013-ingesta-periodica-e-indice-local.md) | Ingesta periódica e índice local de notas (GDELT por archivos y RSS de medios) | Aceptado (modificado por 0014) |
+| [0014](0014-ngramas-de-gdelt.md) | Ngramas de GDELT como fuente del índice local | Aceptado |

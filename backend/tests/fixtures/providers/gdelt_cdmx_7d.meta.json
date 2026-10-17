@@ -1,0 +1,14 @@
+{
+  "proveedor": "gdelt",
+  "texto": "(ciberataque OR hackeo OR ransomware OR \"filtración de datos\" OR phishing OR \"robo de datos\" OR \"fraude cibernético\") (\"Ciudad de México\" OR CDMX) -curso -webinar -diplomado -vacante sourcelang:spanish sourcecountry:MX",
+  "parametros": {
+    "query": "(ciberataque OR hackeo OR ransomware OR \"filtración de datos\" OR phishing OR \"robo de datos\" OR \"fraude cibernético\") (\"Ciudad de México\" OR CDMX) -curso -webinar -diplomado -vacante sourcelang:spanish sourcecountry:MX",
+    "mode": "ArtList",
+    "format": "json",
+    "maxrecords": "250",
+    "sort": "DateDesc",
+    "timespan": "7d"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-16T16:51:53+00:00"
+}
