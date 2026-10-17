@@ -45,6 +45,14 @@ export interface ExplorerState {
   toggleConcept: (conceptId: number) => void;
   setRange: (range: DateRange) => void;
   openSearch: (searchId: string | null) => void;
+  /** Reabre una búsqueda guardada con su región, conceptos y fechas (Historial). */
+  restoreSearch: (search: {
+    searchId: string;
+    regionId: number;
+    conceptIds: number[];
+    dateFrom: string;
+    dateTo: string;
+  }) => void;
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
   setEarth: (earth: EarthMode) => void;
@@ -130,6 +138,17 @@ export const useExplorerStore = create<ExplorerState>()(
       openSearch: (searchId) => {
         // Otra búsqueda: se olvida la nota elegida y el filtro de la lista.
         set({ searchId, articleId: null, listFilter: 'all' });
+      },
+      restoreSearch: ({ searchId, regionId, conceptIds, dateFrom, dateTo }) => {
+        set({
+          searchId,
+          regionId,
+          conceptIds,
+          range: { kind: 'custom', from: dateFrom, to: dateTo },
+          articleId: null,
+          listFilter: 'all',
+          spinning: false,
+        });
       },
       selectArticle: (articleId) => {
         set(articleId === null ? { articleId } : { articleId, spinning: false });

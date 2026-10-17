@@ -86,3 +86,27 @@ describe('store de Explorar', () => {
     expect(useExplorerStore.getState()).toMatchObject({ motion: 'off', spinning: false });
   });
 });
+
+describe('reabrir una búsqueda', () => {
+  it('restaura región, conceptos y fechas, y detiene el giro', () => {
+    const store = useExplorerStore.getState();
+    store.setSpinning(true);
+    store.selectArticle(11);
+    store.restoreSearch({
+      searchId: 'abc',
+      regionId: 272,
+      conceptIds: [3],
+      dateFrom: '2026-10-10',
+      dateTo: '2026-10-17',
+    });
+
+    expect(useExplorerStore.getState()).toMatchObject({
+      searchId: 'abc',
+      regionId: 272,
+      conceptIds: [3],
+      range: { kind: 'custom', from: '2026-10-10', to: '2026-10-17' },
+      articleId: null,
+      spinning: false,
+    });
+  });
+});
