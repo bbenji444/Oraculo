@@ -25,14 +25,13 @@ import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.adapters.llm.factory import MissingLLMKeyError, build_llm
+from app.adapters.llm.factory import MissingLLMKeyError, build_llm, llm_info
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
@@ -42,19 +41,15 @@ from app.adapters.persistence.search_repository import (
     ResultPreview,
     SearchSnapshot,
 )
+from app.adapters.queue.celery_queue import CelerySearchQueue
 from app.application.clock import MEXICO_CITY
-from app.application.ports.search_store import NewSearch, SearchConcept
-from app.application.use_cases.run_search import plan_queries
+from app.application.use_cases.plan_search import PlanSearch, SearchEstimate, SearchRequest
 from app.cli.probar_proveedor import find_concept, window_from
 from app.core.config import Settings, get_settings
-from app.domain.budget import month_start
-from app.domain.enrichment import estimated_usage
-from app.domain.queries import PlannedQuery, Provider, place_for
 from app.domain.search import SearchStatus, Stage
 from app.geodata.consola import configure_cli_logging, heading
 from app.worker.celery_app import celery_app
 from app.worker.search_jobs import build_providers, run_search_job
-from app.worker.tasks import SEARCH_TASK
 
 logger = logging.getLogger(__name__)
 
@@ -88,40 +83,10 @@ PRECISION_LABELS = {
 }
 
 
-@dataclass(frozen=True, slots=True)
-class Prepared:
-    """Búsqueda lista para mostrar y, si se confirma, crear.
-
-    Attributes:
-        search: Datos para crear la fila de ``searches``.
-        breadcrumb: Región elegida ("México › Jalisco").
-        queries: Consultas que se enviarían.
-        credits: Créditos de SearchApi estimados.
-        credits_month: Créditos ya gastados este mes.
-        credits_limit: Tope mensual (``SEARCHAPI_MONTHLY_CREDIT_LIMIT``).
-        llm_label: IA y modelo ("openai · gpt-6-luna").
-        llm_max_articles: Tope de notas para la IA.
-        llm_max_cost_usd: Costo estimado si se enriquece el tope completo.
-    """
-
-    search: NewSearch
-    breadcrumb: str
-    queries: tuple[PlannedQuery, ...]
-    credits: int
-    credits_month: int
-    credits_limit: int
-    llm_label: str
-    llm_max_articles: int
-    llm_max_cost_usd: float
-
-    @property
-    def over_limit(self) -> bool:
-        """``True`` si las consultas pasarían el tope mensual de créditos."""
-        return self.credits_month + self.credits > self.credits_limit
-
-
-async def prepare(args: argparse.Namespace, settings: Settings, engine: AsyncEngine) -> Prepared:
-    """Arma la búsqueda y su costo sin gastar nada.
+async def prepare(
+    args: argparse.Namespace, settings: Settings, engine: AsyncEngine
+) -> SearchEstimate:
+    """Arma la búsqueda y su costo sin gastar nada (``PlanSearch``, igual que la API).
 
     Args:
         args: Opciones del comando.
@@ -132,57 +97,31 @@ async def prepare(args: argparse.Namespace, settings: Settings, engine: AsyncEng
         Lo que se mostraría.
 
     Raises:
-        SystemExit: Si un concepto o la región no existen.
+        SystemExit: Si un concepto no existe.
         MissingLLMKeyError: Si falta la llave de la IA elegida.
+        RegionNotFoundError: Si la región no existe.
     """
-    llm = build_llm(settings)
-    llm_label = f"{llm.provider} · {llm.llm.model}"
-    await llm.llm.aclose()
+    info = llm_info(settings)
+    if not info.configured:
+        build_llm(settings)  # lanza MissingLLMKeyError con el nombre de la variable
     concepts_repo = PostgresConceptRepository(engine)
-    concepts = [await find_concept(concepts_repo, name) for name in args.concepto]
+    concept_ids = tuple([(await find_concept(concepts_repo, n)).id for n in args.concepto])
     regions = PostgresRegionRepository(engine)
     region = await regions.get_by_code(args.region)
-    facts = await regions.place_facts(region.id) if region else None
-    if region is None or facts is None:
+    if region is None:
         raise SystemExit(f"No existe una región con clave {args.region}.")
-    ancestors = await regions.ancestors(region.id)
-    window = window_from(args)
-    snapshots = tuple(
-        SearchConcept(c.id, c.data.name, c.data.description, c.data.keywords, c.data.exclude_terms)
-        for c in concepts
-    )
-    providers = build_providers(settings, engine)
-    available = [p for p, adapter in providers.items() if adapter.is_configured()]
-    queries = tuple(plan_queries(snapshots, place_for(facts), window, available))
-    estimated = sum(providers[q.provider].estimate_cost(q) for q in queries)
-    used = await PostgresProviderQueryLog(engine).credits_used_since(
-        Provider.SEARCHAPI.value, month_start(datetime.now(UTC), MEXICO_CITY)
-    )
-    max_articles = settings.llm_max_articles_per_search
-    return Prepared(
-        search=NewSearch(
-            user_id=settings.dev_user,
-            region_id=region.id,
-            date_from=window.date_from,
-            date_to=window.date_to,
-            concepts=snapshots,
-            queries_planned=len(queries),
-            credits_estimated=estimated,
-        ),
-        breadcrumb=" › ".join([*(a.name for a in ancestors), region.name]),
-        queries=queries,
-        credits=estimated,
-        credits_month=used,
+    return await PlanSearch(
+        concepts=concepts_repo,
+        regions=regions,
+        providers=build_providers(settings, engine),
+        log=PostgresProviderQueryLog(engine),
+        llm=info,
+        llm_max_articles=settings.llm_max_articles_per_search,
         credits_limit=settings.searchapi_monthly_credit_limit,
-        llm_label=llm_label,
-        llm_max_articles=max_articles,
-        llm_max_cost_usd=estimated_usage(max_articles).cost_usd(
-            llm.price_input_per_million, llm.price_output_per_million
-        ),
-    )
+    ).estimate(SearchRequest(settings.dev_user, concept_ids, region.id, window_from(args)))
 
 
-def show_prepared(prepared: Prepared) -> None:
+def show_prepared(prepared: SearchEstimate) -> None:
     """Muestra lo que se haría y cuánto costaría.
 
     Args:
@@ -202,8 +141,9 @@ def show_prepared(prepared: Prepared) -> None:
         f"(este mes van {prepared.credits_month} de {prepared.credits_limit})"
     )
     logger.info(
-        f"IA: {prepared.llm_label}, hasta {prepared.llm_max_articles} notas, "
-        f"~{prepared.llm_max_cost_usd:.4f} USD como máximo (las ya procesadas no se pagan)"
+        f"IA: {prepared.llm.provider} · {prepared.llm.model}, hasta "
+        f"{prepared.llm_max_articles} notas, ~{prepared.llm_max_cost_usd:.4f} USD como máximo "
+        "(las ya procesadas no se pagan)"
     )
 
 
@@ -341,7 +281,7 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def _enqueue(search_id: UUID) -> None:
-    celery_app.send_task(SEARCH_TASK, args=[str(search_id)])
+    CelerySearchQueue(celery_app).enqueue(search_id)
 
 
 async def run(  # noqa: PLR0913 — dependencias que las pruebas reemplazan, todo por nombre (*)

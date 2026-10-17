@@ -13,6 +13,7 @@ import asyncio
 import logging
 from uuid import UUID
 
+from app.adapters.queue.celery_queue import SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
 from app.worker.celery_app import celery_app
@@ -23,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 INGEST_TASK = "ingest.news"
 PURGE_TASK = "ingest.purge"
-SEARCH_TASK = "search.run"
 
 
 def _log_report(report: IngestReport) -> None:

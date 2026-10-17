@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.1 · Octubre 2026 · Responsable: Benji
+Versión 2.2 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -613,12 +613,12 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | POST | `/searches` | Crea búsqueda → `202 {search_id}` |
 | GET | `/searches/{id}` | Estado y progreso |
 | GET | `/searches` | Historial (paginación por cursor) |
-| GET | `/searches/{id}/articles?cursor=&limit=&in_region=&precision=` | Resultados (paginación por cursor) |
-| GET | `/searches/{id}/aggregates?level=` | Conteo por región para el mapa de calor |
+| GET | `/searches/{id}/articles?cursor=&limit=&relevant=&in_region=&precision=&concept_id=` | Resultados (paginación por cursor). Por defecto solo las relevantes (`relevant=all` trae todas); `in_region` = `true`, `false` o `none` (sin ubicación) |
+| GET | `/searches/{id}/aggregates?level=state\|municipality\|country` | Conteo por región para el mapa de calor. Las notas menos precisas que el nivel no se reparten (`coarser`) |
 | GET | `/articles/{id}` | Detalle |
 | POST | `/searches/{id}/report?format=pdf\|html` | Genera reporte |
 
-Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "details": {} } }`, con mensajes en español.
+Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "details": {} } }`, con mensajes en español. También ante fallas inesperadas (`500 internal_error`) y configuración faltante (`503`, por ejemplo `llm_not_configured`). Ejemplos con `curl` en `docs/api.md`.
 
 ---
 
@@ -889,3 +889,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 1.9 | 16 de octubre de 2026 | Ngramas de GDELT (texto completo) como fuente del índice local, con frases del cuerpo conservadas 30 días; pestaña temporal "Notas" hasta F6 (ADR-0014). |
 | 2.0 | 16 de octubre de 2026 | F4: extracción de texto con retención de 30 días y control de costo de Gemini (ADR-0015); comando `make buscar`. |
 | 2.1 | 17 de octubre de 2026 | OpenAI (`gpt-6-luna`) como IA por defecto, Gemini elegible con `LLM_PROVIDER` (ADR-0016). |
+| 2.2 | 17 de octubre de 2026 | F5: parámetros finales de `/searches/{id}/articles` (`relevant`, `concept_id`, `in_region=none`) y de `/aggregates` (`level`, `coarser`); errores 500 y 503 uniformes; `docs/api.md`. |

@@ -1,9 +1,11 @@
 """Paginación por cursor (CLAUDE.md §6.3: nunca ``OFFSET``).
 
 Un cursor es una marca opaca que dice "dame lo que sigue después de este
-registro". Para las regiones el orden es alfabético por ``name_norm`` y, en
-empate, por ``id``; el cursor guarda ese par en base64 para que el cliente
-no dependa de su forma.
+registro". Para las regiones y los conceptos el orden es alfabético por
+``name_norm`` y, en empate, por ``id`` (``NameCursor``); para el historial de
+búsquedas y las notas, de la fecha más reciente a la más vieja y luego por
+``id`` (``TimeCursor``). El cursor guarda ese par en base64 para que el
+cliente no dependa de su forma.
 
 No hace: no consulta la base; solo codifica y decodifica cursores.
 """
@@ -12,6 +14,7 @@ import base64
 import binascii
 import json
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.domain.errors import InvalidRequestError
 
@@ -77,3 +80,58 @@ class Page[T]:
 
     items: tuple[T, ...]
     next_cursor: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TimeCursor:
+    """Posición en una lista ordenada por (fecha, id), de la más reciente a la más vieja.
+
+    La usan el historial de búsquedas (``created_at``) y las notas de una
+    búsqueda (``published_at``, que puede faltar: esas van al final).
+
+    Attributes:
+        moment: Fecha del último registro entregado, o ``None`` si no tenía.
+        id: Id del último registro entregado, como texto (uuid o número).
+    """
+
+    moment: datetime | None
+    id: str
+
+
+def encode_time_cursor(cursor: TimeCursor) -> str:
+    """Convierte la posición en un texto opaco para la URL.
+
+    Args:
+        cursor: Posición del último registro entregado.
+
+    Returns:
+        Texto base64 seguro para URL, sin relleno.
+    """
+    moment = cursor.moment.isoformat() if cursor.moment else None
+    raw = json.dumps(["t", moment, cursor.id]).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def decode_time_cursor(token: str) -> TimeCursor:
+    """Recupera la posición desde el texto del cursor.
+
+    Args:
+        token: Cursor recibido del cliente.
+
+    Returns:
+        La posición.
+
+    Raises:
+        InvalidRequestError: Si el cursor está dañado o no es de esta lista.
+    """
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        kind, moment, record_id = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8"))
+        if kind != "t" or not isinstance(record_id, str):
+            raise ValueError("forma inesperada")
+        when = datetime.fromisoformat(moment) if moment is not None else None
+    except (binascii.Error, UnicodeDecodeError, ValueError, TypeError) as exc:
+        raise InvalidRequestError(
+            "El cursor de paginación no es válido; vuelve a pedir la primera página."
+        ) from exc
+    return TimeCursor(when, record_id)

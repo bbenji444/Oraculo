@@ -221,9 +221,17 @@ class PostgresConceptRepository:
     async def is_used_in_searches(self, concept_id: int) -> bool:
         """Ver ``ConceptRepositoryPort.is_used_in_searches``.
 
-        Las búsquedas (tabla ``search_concepts``) llegan en F4; hasta entonces
-        ningún concepto puede haberse usado y el borrado siempre es físico.
-        PENDIENTE F4: consultar ``search_concepts`` y probarlo con una
-        búsqueda real (anotado en CHANGELOG).
+        Un concepto con búsquedas no se puede borrar físicamente: su copia en
+        ``search_concepts`` y sus juicios en ``article_concepts`` lo apuntan.
         """
-        return False
+        async with self._engine.connect() as conn:
+            used = (
+                await conn.execute(
+                    text(
+                        "SELECT EXISTS (SELECT 1 FROM search_concepts WHERE concept_id = :id) "
+                        "OR EXISTS (SELECT 1 FROM article_concepts WHERE concept_id = :id)"
+                    ),
+                    {"id": concept_id},
+                )
+            ).scalar_one()
+        return bool(used)

@@ -73,7 +73,9 @@ NO_USAGE = LLMUsage(0, 0)
 
 
 class SearchNotFoundError(NotFoundError):
-    """La búsqueda que se pidió correr no existe."""
+    """La búsqueda pedida no existe."""
+
+    code = "search_not_found"
 
 
 @dataclass(frozen=True, slots=True)

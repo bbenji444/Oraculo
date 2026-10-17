@@ -19,11 +19,23 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.application.audit import SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
+from app.application.pagination import TimeCursor
 from app.application.ports.llm import EnrichmentResult
+from app.application.ports.search_reads import (
+    ArticleDetail,
+    ArticleFilters,
+    ArticleItem,
+    ConceptRef,
+    InRegion,
+    JudgementView,
+    LocationView,
+    RegionPoint,
+    SearchDetail,
+)
 from app.application.ports.search_store import (
     ArticleMentions,
     NewSearch,
@@ -35,10 +47,11 @@ from app.application.ports.search_store import (
     StoredSearch,
     StoredText,
 )
+from app.domain.aggregates import NoteLocation
 from app.domain.dedupe import DedupedArticle, url_hash
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
-from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Resolution
+from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
 from app.domain.region import RegionLevel
 from app.domain.search import SearchStatus
 
@@ -267,6 +280,74 @@ class PostgresSearchStore:
                 ),
                 {"id": search_id, "m": message[:MAX_ERROR_CHARS]},
             )
+
+    async def search_detail(self, search_id: UUID) -> SearchDetail | None:
+        """Ver ``SearchReaderPort.search_detail``."""
+        rows = await self._details("s.id = :id", {"id": search_id}, 1)
+        return rows[0] if rows else None
+
+    async def history(
+        self, user_id: str, after: TimeCursor | None, limit: int
+    ) -> list[SearchDetail]:
+        """Ver ``SearchReaderPort.history``."""
+        where = "s.user_id = :user"
+        params: dict[str, object] = {"user": user_id}
+        if after is not None:
+            where += " AND (s.created_at, s.id) < (:moment, CAST(:after_id AS uuid))"
+            params.update({"moment": after.moment, "after_id": after.id})
+        return await self._details(where, params, limit)
+
+    async def _details(
+        self, where: str, params: Mapping[str, object], limit: int
+    ) -> list[SearchDetail]:
+        async with self._engine.connect() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        text(
+                            f"""
+                            SELECT s.*, r.code AS region_code, r.name AS region_name,
+                                COALESCE((SELECT json_agg(json_build_array(sc.concept_id,
+                                    sc.concept_name) ORDER BY sc.concept_id)
+                                    FROM search_concepts sc WHERE sc.search_id = s.id),
+                                    '[]') AS concepts
+                            FROM searches s JOIN regions r ON r.id = s.region_id
+                            WHERE {where}
+                            ORDER BY s.created_at DESC, s.id DESC
+                            LIMIT :limit
+                            """  # noqa: S608 — where se arma con texto fijo de este módulo
+                        ),
+                        {**params, "limit": limit},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            SearchDetail(
+                search_id=row["id"],
+                user_id=row["user_id"],
+                status=SearchStatus(row["status"]),
+                region_id=row["region_id"],
+                region_code=row["region_code"],
+                region_name=row["region_name"],
+                date_from=row["date_from"],
+                date_to=row["date_to"],
+                concepts=tuple(ConceptRef(c[0], c[1]) for c in row["concepts"]),
+                progress=dict(row["progress"]),
+                queries_planned=row["queries_planned"],
+                credits_estimated=row["credits_estimated"],
+                credits_used=row["credits_used"],
+                llm_usage=LLMUsage(row["llm_tokens_in"], row["llm_tokens_out"]),
+                llm_cost_usd=float(row["llm_cost_usd"]),
+                results_count=row["results_count"],
+                error_summary=row["error_summary"],
+                created_at=row["created_at"],
+                started_at=row["started_at"],
+                finished_at=row["finished_at"],
+            )
+            for row in rows
+        ]
 
     async def last_search_id(self) -> UUID | None:
         """La búsqueda más reciente (para ``make reubicar`` sin id).
@@ -677,6 +758,122 @@ class PostgresArticleStore:
                 },
             )
 
+    async def search_articles(
+        self, search_id: UUID, filters: ArticleFilters, after: TimeCursor | None, limit: int
+    ) -> list[ArticleItem]:
+        """Ver ``ArticleReaderPort.search_articles``."""
+        where, params = _article_filters(filters)
+        params.update({"s": search_id, "limit": limit})
+        if after is not None:
+            # Orden: fecha de publicación de la más reciente a la más vieja, las
+            # que no tienen fecha al final, y en empate por id descendente.
+            if after.moment is None:
+                where.append("a.published_at IS NULL AND a.id < :after_id")
+            else:
+                where.append(
+                    "(a.published_at < :after_moment OR a.published_at IS NULL "
+                    "OR (a.published_at = :after_moment AND a.id < :after_id))"
+                )
+                params["after_moment"] = after.moment
+            params["after_id"] = int(after.id)
+        sql = f"""
+            SELECT {_ARTICLE_COLUMNS}, sr.in_region, sr.providers, {_PRIMARY_COLUMNS},
+                {_JUDGEMENTS_IN_SEARCH} AS judgements
+            FROM (SELECT article_id, bool_or(in_region) AS in_region,
+                    array_agg(provider ORDER BY provider_rank, provider) AS providers
+                  FROM search_results WHERE search_id = :s GROUP BY article_id) sr
+            JOIN articles a ON a.id = sr.article_id
+            LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
+            LEFT JOIN regions r ON r.id = p.region_id
+            WHERE {" AND ".join(where) or "true"}
+            ORDER BY a.published_at DESC NULLS LAST, a.id DESC
+            LIMIT :limit
+        """  # noqa: S608 — columnas y condiciones son texto fijo de este módulo
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(text(sql), params)).mappings().all()
+        return [_article_item(row) for row in rows]
+
+    async def article_detail(self, article_id: int) -> ArticleDetail | None:
+        """Ver ``ArticleReaderPort.article_detail``."""
+        sql = f"""
+            SELECT {_ARTICLE_COLUMNS}, a.first_seen_at, a.llm_model, a.prompt_version,
+                (SELECT bool_or(in_region) FROM search_results WHERE article_id = a.id)
+                    AS in_region,
+                ARRAY(SELECT DISTINCT provider FROM search_results WHERE article_id = a.id
+                    ORDER BY provider) AS providers,
+                {_PRIMARY_COLUMNS},
+                COALESCE((SELECT json_agg(json_build_array(ac.concept_id, c.name,
+                    ac.is_relevant, ac.relevance_score, ac.relevance_reason)
+                    ORDER BY ac.concept_id)
+                    FROM article_concepts ac JOIN concepts c ON c.id = ac.concept_id
+                    WHERE ac.article_id = a.id), '[]') AS judgements
+            FROM articles a
+            LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
+            LEFT JOIN regions r ON r.id = p.region_id
+            WHERE a.id = :id
+        """  # noqa: S608 — columnas fijas de este módulo
+        async with self._engine.connect() as conn:
+            row = (await conn.execute(text(sql), {"id": article_id})).mappings().first()
+            if row is None:
+                return None
+            locations = (
+                (
+                    await conn.execute(
+                        text(
+                            f"SELECT {_LOCATION_COLUMNS} FROM article_locations p "  # noqa: S608 — columnas fijas
+                            "LEFT JOIN regions r ON r.id = p.region_id "
+                            "WHERE p.article_id = :id ORDER BY p.id"
+                        ),
+                        {"id": article_id},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return ArticleDetail(
+            item=_article_item(row),
+            locations=tuple(_location(loc) for loc in locations),
+            first_seen_at=row["first_seen_at"],
+            llm_model=row["llm_model"],
+            prompt_version=row["prompt_version"],
+        )
+
+    async def note_locations(self, search_id: UUID, filters: ArticleFilters) -> list[NoteLocation]:
+        """Ver ``ArticleReaderPort.note_locations``."""
+        where, params = _article_filters(filters)
+        params["s"] = search_id
+        sql = f"""
+            SELECT r.code, r.country_code, p.precision
+            FROM (SELECT article_id, bool_or(in_region) AS in_region
+                  FROM search_results WHERE search_id = :s GROUP BY article_id) sr
+            JOIN articles a ON a.id = sr.article_id
+            LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
+            LEFT JOIN regions r ON r.id = p.region_id
+            WHERE {" AND ".join(where) or "true"}
+        """  # noqa: S608 — condiciones de texto fijo de este módulo
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(text(sql), params)).all()
+        return [
+            NoteLocation(code, country, Precision(precision) if precision else Precision.UNKNOWN)
+            for code, country, precision in rows
+        ]
+
+    async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
+        """Ver ``ArticleReaderPort.regions_by_code``."""
+        if not codes:
+            return []
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT id, code, name, ST_X(centroid), ST_Y(centroid) FROM regions "
+                        "WHERE code = ANY(:codes)"
+                    ),
+                    {"codes": list(codes)},
+                )
+            ).all()
+        return [RegionPoint(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
     async def purge_texts(self, older_than_days: int) -> int:
         """Borra los textos extraídos más viejos que la retención (ADR-0015).
 
@@ -797,3 +994,112 @@ async def _write_locations(
                 "lat": r.place.lat if r.place else None,
             },
         )
+
+
+_ARTICLE_COLUMNS = """
+    a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
+    a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status
+"""
+_LOCATION_COLUMNS = """
+    p.mention_text, p.role, p.precision, p.confidence, p.is_primary, r.id AS region_id,
+    r.code AS region_code, r.level::text AS region_level, r.name AS region_name,
+    r.display_prefix, ST_X(p.point) AS lon, ST_Y(p.point) AS lat
+"""
+# La ubicación principal, con el prefijo "p_" para no chocar con las de la nota.
+_PRIMARY_COLUMNS = """
+    p.id AS p_id, p.mention_text AS p_mention_text, p.role AS p_role,
+    p.precision AS p_precision, p.confidence AS p_confidence, p.is_primary AS p_is_primary,
+    r.id AS p_region_id, r.code AS p_region_code, r.level::text AS p_region_level,
+    r.name AS p_region_name, r.display_prefix AS p_display_prefix,
+    ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat
+"""
+# Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces.
+_JUDGEMENTS_IN_SEARCH = """
+    COALESCE((SELECT json_agg(json_build_array(ac.concept_id, sc.concept_name,
+        ac.is_relevant, ac.relevance_score, ac.relevance_reason) ORDER BY ac.concept_id)
+        FROM article_concepts ac JOIN search_concepts sc
+            ON sc.concept_id = ac.concept_id AND sc.search_id = :s
+        WHERE ac.article_id = a.id), '[]')
+"""
+_UNKNOWN = "unknown"
+
+
+def _article_filters(filters: ArticleFilters) -> tuple[list[str], dict[str, object]]:
+    """Condiciones SQL (texto fijo) y sus parámetros para los filtros de notas."""
+    where: list[str] = []
+    params: dict[str, object] = {}
+    judged = (
+        "EXISTS (SELECT 1 FROM article_concepts ac JOIN search_concepts sc "
+        "ON sc.concept_id = ac.concept_id AND sc.search_id = :s WHERE ac.article_id = a.id"
+    )
+    if filters.relevant_only:
+        judged += " AND ac.is_relevant"
+    if filters.concept_id is not None:
+        judged += " AND ac.concept_id = :concept_id"
+        params["concept_id"] = filters.concept_id
+    if filters.relevant_only or filters.concept_id is not None:
+        where.append(judged + ")")
+    if filters.in_region is InRegion.INSIDE:
+        where.append("sr.in_region IS TRUE")
+    elif filters.in_region is InRegion.OUTSIDE:
+        where.append("sr.in_region IS FALSE")
+    elif filters.in_region is InRegion.UNLOCATED:
+        where.append("sr.in_region IS NULL")
+    if filters.precisions:
+        located = sorted(filters.precisions - {_UNKNOWN})
+        parts = ["p.precision = ANY(:precisions)"] if located else []
+        if _UNKNOWN in filters.precisions:
+            parts.append("p.id IS NULL")
+        where.append(f"({' OR '.join(parts)})")
+        params["precisions"] = located
+    return where, params
+
+
+def _place_name(level: str | None, prefix: str | None, name: str | None) -> str | None:
+    # Igual que Region.display_name: municipios y localidades con su prefijo.
+    if name is None:
+        return None
+    if level in ("municipality", "locality") and prefix:
+        return f"{prefix} {name}"
+    return name
+
+
+def _location(row: RowMapping, prefix: str = "") -> LocationView:
+    return LocationView(
+        mention=row[f"{prefix}mention_text"],
+        role=row[f"{prefix}role"],
+        precision=row[f"{prefix}precision"],
+        confidence=float(row[f"{prefix}confidence"]),
+        is_primary=row[f"{prefix}is_primary"],
+        region_id=row[f"{prefix}region_id"],
+        region_code=row[f"{prefix}region_code"],
+        place=_place_name(
+            row[f"{prefix}region_level"],
+            row[f"{prefix}display_prefix"],
+            row[f"{prefix}region_name"],
+        ),
+        lon=row[f"{prefix}lon"],
+        lat=row[f"{prefix}lat"],
+    )
+
+
+def _article_item(row: RowMapping) -> ArticleItem:
+    return ArticleItem(
+        article_id=row["id"],
+        title=row["title"],
+        source_name=row["source_name"],
+        source_domain=row["source_domain"],
+        url=row["url_canonical"],
+        published_at=row["published_at"],
+        summary=row["summary"],
+        event_type=row["event_type"],
+        event_date=row["event_date"],
+        extraction_status=row["extraction_status"],
+        enrichment_status=row["enrichment_status"],
+        judgements=tuple(
+            JudgementView(j[0], j[1], j[2], float(j[3]), j[4]) for j in row["judgements"]
+        ),
+        primary=_location(row, "p_") if row["p_id"] is not None else None,
+        in_region=row["in_region"],
+        providers=tuple(row["providers"]),
+    )
