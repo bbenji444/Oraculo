@@ -24,6 +24,7 @@ def test_la_noche_suma_las_luces_a_la_tierra_oscurecida_banda_por_banda(tmp_path
         "numpy.clip(C*0.22+F*1.1,0,255)",
     ]
     assert "--A_band=1" in command and "--F_band=3" in command
+    assert "--overwrite" in command
     assert command[-1] == str(tmp_path / "n.tif")
 
 

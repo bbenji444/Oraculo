@@ -248,6 +248,8 @@ def night_command(day: Path, lights: Path, output: Path) -> list[str]:
         command += ["--calc", expression]
     return [
         *command,
+        # Repetir el comando reemplaza la noche anterior (por ejemplo, la de --muestra).
+        "--overwrite",
         "--type=Byte",
         "--co",
         "TILED=YES",
