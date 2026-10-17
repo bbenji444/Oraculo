@@ -223,3 +223,42 @@ def test_sin_llave_de_la_ia_es_503_y_con_tope_es_409(
     assert queue.sent == []
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM searches")).scalar_one() == 0
+
+
+def test_detalle_e_historial_con_cursor(client: TestClient, ids: dict[str, int]) -> None:
+    created = [client.post(URL, json=body(ids)).json()["search_id"] for _ in range(3)]
+
+    detail = client.get(f"{URL}/{created[0]}")
+    first = client.get(URL, params={"limit": 2})
+    second = client.get(URL, params={"limit": 2, "cursor": first.json()["next_cursor"]})
+
+    assert detail.status_code == 200
+    data = detail.json()
+    assert (data["status"], data["region_name"], data["region_code"]) == (
+        "pending",
+        "Ciudad de México",
+        "09",
+    )
+    assert data["concepts"] == [{"id": ids["concept"], "name": CONCEPT_NAME}]
+    assert (data["credits_estimated"], data["credits_used"], data["progress"]) == (1, 0, {})
+    # La más reciente primero; la segunda página trae la que falta.
+    assert [s["search_id"] for s in first.json()["items"]] == created[:0:-1]
+    assert [s["search_id"] for s in second.json()["items"]] == created[:1]
+    assert second.json()["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    ("path", "params", "expected"),
+    [
+        ("/00000000-0000-0000-0000-000000000000", {}, (404, "search_not_found")),
+        ("/no-es-un-uuid", {}, (422, "invalid_request")),
+        ("", {"cursor": "dañado"}, (422, "invalid_request")),
+        ("", {"limit": 0}, (422, "invalid_request")),
+    ],
+)
+def test_lecturas_invalidas(
+    client: TestClient, path: str, params: dict[str, Any], expected: tuple[int, str]
+) -> None:
+    response = client.get(URL + path, params=params)
+
+    assert (response.status_code, response.json()["error"]["code"]) == expected

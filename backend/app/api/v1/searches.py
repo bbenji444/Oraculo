@@ -5,23 +5,33 @@ aplicación al arrancar (``app.state``) y llaman a un caso de uso.
 
 - ``POST /searches/estimate``: qué se haría y cuánto costaría. No gasta.
 - ``POST /searches``: lanza la búsqueda (``202``); el worker la corre.
+- ``GET /searches/{id}`` y ``GET /searches``: estado y avance, e historial.
 
 No hace: no valida reglas de negocio; sus errores los traduce
 ``app.api.errors`` al formato uniforme.
 """
 
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Path, Query, Request, status
 
 from app.api.errors import ERROR_RESPONSES
 from app.api.v1.concepts import get_actor
-from app.api.v1.schemas.searches import EstimateOut, SearchIn, SearchStartedOut
+from app.api.v1.schemas.searches import (
+    EstimateOut,
+    SearchIn,
+    SearchOut,
+    SearchPageOut,
+    SearchStartedOut,
+)
 from app.application.audit import Actor
 from app.application.clock import mexico_city_today
 from app.application.ports.search_queue import SearchQueuePort
+from app.application.ports.search_reads import SearchReaderPort
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
+from app.application.use_cases.search_reads import DEFAULT_PAGE_SIZE, GetSearch, ListSearches
 from app.application.use_cases.start_search import StartSearch
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
@@ -128,3 +138,38 @@ async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) ->
         status="pending",
         estimate=EstimateOut.from_estimate(started.estimate),
     )
+
+
+def get_search_reader(request: Request) -> SearchReaderPort:
+    """Lecturas de búsquedas creadas al arrancar.
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        El lector compartido.
+    """
+    reader: SearchReaderPort = request.app.state.search_store
+    return reader
+
+
+Reader = Annotated[SearchReaderPort, Depends(get_search_reader)]
+SearchId = Annotated[UUID, Path(description="Id de la búsqueda.")]
+
+
+@router.get("", response_model=SearchPageOut, summary="Historial de búsquedas")
+async def list_searches(
+    reader: Reader,
+    actor: CurrentActor,
+    cursor: Annotated[str | None, Query(description="Cursor de la página anterior.")] = None,
+    limit: Annotated[int, Query(description="Tamaño de página (1 a 100).")] = DEFAULT_PAGE_SIZE,
+) -> SearchPageOut:
+    """Búsquedas de la persona, de la más reciente a la más vieja."""
+    page = await ListSearches(reader).execute(actor.user_id, cursor, limit)
+    return SearchPageOut.from_page(page)
+
+
+@router.get("/{search_id}", response_model=SearchOut, summary="Estado y avance de una búsqueda")
+async def get_search(reader: Reader, search_id: SearchId) -> SearchOut:
+    """Estado, etapa actual, conteos, créditos y costo. Consúltala cada 2 s mientras corre."""
+    return SearchOut.from_detail(await GetSearch(reader).execute(search_id))

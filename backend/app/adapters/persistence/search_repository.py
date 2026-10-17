@@ -23,7 +23,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.application.audit import SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
+from app.application.pagination import TimeCursor
 from app.application.ports.llm import EnrichmentResult
+from app.application.ports.search_reads import ConceptRef, SearchDetail
 from app.application.ports.search_store import (
     ArticleMentions,
     NewSearch,
@@ -267,6 +269,74 @@ class PostgresSearchStore:
                 ),
                 {"id": search_id, "m": message[:MAX_ERROR_CHARS]},
             )
+
+    async def search_detail(self, search_id: UUID) -> SearchDetail | None:
+        """Ver ``SearchReaderPort.search_detail``."""
+        rows = await self._details("s.id = :id", {"id": search_id}, 1)
+        return rows[0] if rows else None
+
+    async def history(
+        self, user_id: str, after: TimeCursor | None, limit: int
+    ) -> list[SearchDetail]:
+        """Ver ``SearchReaderPort.history``."""
+        where = "s.user_id = :user"
+        params: dict[str, object] = {"user": user_id}
+        if after is not None:
+            where += " AND (s.created_at, s.id) < (:moment, CAST(:after_id AS uuid))"
+            params.update({"moment": after.moment, "after_id": after.id})
+        return await self._details(where, params, limit)
+
+    async def _details(
+        self, where: str, params: Mapping[str, object], limit: int
+    ) -> list[SearchDetail]:
+        async with self._engine.connect() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        text(
+                            f"""
+                            SELECT s.*, r.code AS region_code, r.name AS region_name,
+                                COALESCE((SELECT json_agg(json_build_array(sc.concept_id,
+                                    sc.concept_name) ORDER BY sc.concept_id)
+                                    FROM search_concepts sc WHERE sc.search_id = s.id),
+                                    '[]') AS concepts
+                            FROM searches s JOIN regions r ON r.id = s.region_id
+                            WHERE {where}
+                            ORDER BY s.created_at DESC, s.id DESC
+                            LIMIT :limit
+                            """  # noqa: S608 — where se arma con texto fijo de este módulo
+                        ),
+                        {**params, "limit": limit},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            SearchDetail(
+                search_id=row["id"],
+                user_id=row["user_id"],
+                status=SearchStatus(row["status"]),
+                region_id=row["region_id"],
+                region_code=row["region_code"],
+                region_name=row["region_name"],
+                date_from=row["date_from"],
+                date_to=row["date_to"],
+                concepts=tuple(ConceptRef(c[0], c[1]) for c in row["concepts"]),
+                progress=dict(row["progress"]),
+                queries_planned=row["queries_planned"],
+                credits_estimated=row["credits_estimated"],
+                credits_used=row["credits_used"],
+                llm_usage=LLMUsage(row["llm_tokens_in"], row["llm_tokens_out"]),
+                llm_cost_usd=float(row["llm_cost_usd"]),
+                results_count=row["results_count"],
+                error_summary=row["error_summary"],
+                created_at=row["created_at"],
+                started_at=row["started_at"],
+                finished_at=row["finished_at"],
+            )
+            for row in rows
+        ]
 
     async def last_search_id(self) -> UUID | None:
         """La búsqueda más reciente (para ``make reubicar`` sin id).
