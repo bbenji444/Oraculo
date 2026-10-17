@@ -134,9 +134,9 @@ class Settings(BaseSettings):
     # Archivos GKG de GDELT (solo títulos): apagados por defecto desde que los
     # ngramas funcionan (ADR-0014), para no sumar ~760 MB de descarga al día.
     gdelt_gkg_enabled: bool = False
-    # RSS de medios: apagados hasta que Benji revise los términos de cada uno.
-    # Además, cada medio se activa por separado en fuentes/medios_rss.csv.
-    media_rss_enabled: bool = False
+    # RSS de medios: encendidos por Benji el 16/10/2026 (La Jornada, El Universal,
+    # Infobae México). Cada medio se activa por separado en fuentes/medios_rss.csv.
+    media_rss_enabled: bool = True
     news_index_retention_days: int = Field(default=_DEFAULT_NEWS_INDEX_RETENTION_DAYS, ge=1)
     ingest_interval_minutes: int = Field(default=_DEFAULT_INGEST_INTERVAL_MINUTES, ge=1)
     # Ngramas de GDELT (ADR-0014): texto completo, ~1 GB de descarga al día.

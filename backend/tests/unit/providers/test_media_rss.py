@@ -28,12 +28,12 @@ def fixture(slug: str) -> bytes:
     return (FIXTURES / f"rss_{slug}.xml").read_bytes()
 
 
-def test_la_lista_curada_tiene_los_tres_medios_inactivos() -> None:
+def test_la_lista_curada_tiene_los_tres_medios_activos() -> None:
     feeds = read_feeds()
 
     assert [f.slug for f in feeds] == ["la-jornada", "el-universal", "infobae-mexico"]
-    # Inactivos hasta que Benji revise sus términos (ADR-0013).
-    assert not any(f.active for f in feeds)
+    # Activados por Benji el 16/10/2026; cada uno se apaga con activo=no.
+    assert all(f.active for f in feeds)
     assert feeds[0].source == "rss:la-jornada"
 
 
