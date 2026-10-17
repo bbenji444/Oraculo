@@ -28,7 +28,7 @@ COVERAGE_MIN := 85
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
-        ingesta-historial ngramas-muestra
+        ingesta-historial ngramas-muestra buscar reubicar
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -103,7 +103,7 @@ geo-validate: ## Criterios de aceptación del catálogo geográfico (§12)
 geo-tiles: ## Genera los PMTiles de países, estados, municipios y localidades
 	$(UV_RUN) python -m app.geodata.generar_pmtiles
 
-geo-terms: ## Aplica términos de búsqueda y códigos de país sin recargar el catálogo (ADR-0009)
+geo-terms: ## Aplica términos de búsqueda, alias y códigos de país sin recargar el catálogo (ADR-0009)
 	$(UV_RUN) python -m app.geodata.aplicar_terminos $(ARGS)
 
 geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.35 GB)
@@ -116,6 +116,12 @@ gdelt-diagnostico: ## Reintento diario de D1 en GDELT (máximo una vez al día, 
 
 probar-proveedor: ## UNA consulta real a un proveedor, con confirmación (ARGS="--proveedor gdelt --nombre x")
 	$(UV_RUN) python -m app.cli.probar_proveedor $(ARGS)
+
+buscar: ## Búsqueda real de punta a punta, con costo y confirmación (ARGS="--concepto Extorsión --region 14")
+	$(UV_RUN) python -m app.cli.buscar $(ARGS)
+
+reubicar: ## Vuelve a ubicar las notas de una búsqueda sin pagar a la IA (ARGS="--busqueda <id>")
+	$(UV_RUN) python -m app.cli.reubicar $(ARGS)
 
 ingesta: ## Corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 	$(UV_RUN) python -m app.cli.ingesta

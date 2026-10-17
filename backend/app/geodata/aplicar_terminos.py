@@ -1,6 +1,7 @@
-"""Comando ``make geo-terms``: términos de búsqueda y códigos de país (ADR-0009).
+"""Comando ``make geo-terms``: términos de búsqueda, alias y códigos de país (ADR-0009).
 
-Aplica ``geodata/search_terms.csv`` y los códigos de país de Natural Earth
+Aplica ``geodata/search_terms.csv``, los alias de ``geodata/aliases.csv`` (los
+usa el geolocalizador, §11) y los códigos de país de Natural Earth
 sobre el catálogo ya cargado, sin volver a cargar geometrías (tarda
 segundos, no minutos). ``make geo-load`` hace lo mismo al final de la carga
 completa, con las mismas funciones (``app.geodata.terminos``).
@@ -24,9 +25,11 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine, text
 
 from app.core.config import get_settings
+from app.geodata.carga import apply_aliases, read_aliases
 from app.geodata.cargar import MissingInspectionError, read_inspection
 from app.geodata.consola import configure_cli_logging, heading
 from app.geodata.fuentes import (
+    ALIASES_PATH,
     INSPECTION_PATH,
     NATURAL_EARTH_LAYER,
     NATURAL_EARTH_WORK_SUBDIR,
@@ -114,18 +117,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     settings = get_settings()
     encoding = read_inspection(INSPECTION_PATH)["natural_earth"]["encoding"]
     terms = read_search_terms(SEARCH_TERMS_PATH)
+    aliases = read_aliases(ALIASES_PATH)
     countries = read_country_codes(natural_earth_path(settings.geodata_work_dir), encoding)
     engine = create_engine(settings.database_url())
     try:
         mode = "Vista previa (no se escribe nada)" if args.muestra else "Aplicando"
         heading(logger, f"{mode}: términos de búsqueda de {SEARCH_TERMS_PATH.name}")
         show_terms(engine, terms)
+        heading(logger, f"{mode}: alias de {ALIASES_PATH.name}")
+        show_terms(engine, aliases)
         heading(logger, f"{mode}: códigos de país de Natural Earth")
         show_countries(countries)
         if args.muestra:
             return
         heading(logger, "Guardando en regions")
         logger.info(f"Regiones con términos: {apply_search_terms(engine, terms)}")
+        logger.info(f"Alias aplicados: {apply_aliases(engine, aliases)}")
         logger.info(f"Países con códigos: {apply_country_codes(engine, countries)}")
     finally:
         engine.dispose()

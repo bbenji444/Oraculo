@@ -11,8 +11,8 @@ API (FastAPI) y worker (Celery) del monitor de noticias. Corre en Ubuntu dentro 
 | `app/application/use_cases/` | Acciones completas (por ejemplo, revisar la salud del sistema). | `domain`, `ports` |
 | `app/adapters/` | Implementaciones de los puertos con tecnología concreta (PostgreSQL, Redis, Celery...). | `application`, `domain` |
 | `app/api/v1/` | Routers FastAPI delgados y esquemas de entrada y salida. | `application` |
-| `app/worker/` | App de Celery, su reloj (`beat`) y las tareas de ingesta al índice local. | `application`, `adapters` |
-| `app/cli/` | Comandos de terminal: probar un proveedor, diagnóstico de GDELT, ingesta e historial. | `application`, `adapters` |
+| `app/worker/` | App de Celery, su reloj (`beat`), las tareas de ingesta al índice local y la tarea que corre una búsqueda (`search.run`, §9). | `application`, `adapters` |
+| `app/cli/` | Comandos de terminal: probar un proveedor, buscar de punta a punta, diagnóstico de GDELT, ingesta e historial. | `application`, `adapters` |
 | `app/core/` | Configuración (variables de entorno) y logs JSON. | — |
 | `alembic/` | Migraciones de esquema. | `core` |
 | `tests/unit/` | Pruebas sin red ni base de datos. | — |

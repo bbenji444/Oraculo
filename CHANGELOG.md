@@ -6,6 +6,39 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-10-17
+
+### Agregado
+
+- **Fase 4 — Pipeline, IA y geolocalización.**
+  - Tablas de búsquedas y notas (migraciones 0011 a 0013):
+    - `searches` y `search_concepts` (los conceptos se copian al buscar);
+    - `articles` (una por URL canónica) y `article_texts` (solo para procesar, se borra a los 30 días);
+    - `article_concepts`, `article_locations` (el punto sale del catálogo, nunca de la IA) y `search_results`;
+    - `processing_errors`.
+  - Duplicados: URL canónica sin rastreo, `www.` ni AMP, y títulos casi iguales (≥ 0.9 con rapidfuzz, ±1 día).
+  - Extracción del texto con trafilatura. Si falla, se usa título + fragmento (`fallback`).
+  - IA detrás de `LLMPort`, con prompt versionado (`enrich_v1`) y respuesta validada con un reintento:
+    - OpenAI (`gpt-6-luna`, por defecto; ADR-0016) o Gemini (`gemini-2.5-flash`), elegible con `LLM_PROVIDER`;
+    - costo estimado antes de gastar, tope de 150 notas por búsqueda y tokens y costo registrados (ADR-0015).
+  - Geolocalizador de §11:
+    - alias (`geodata/aliases.csv`) y desempate por los estados de la nota y la región buscada;
+    - si sigue ambiguo, sube al estado o queda sin ubicar;
+    - parecidos por trigramas con confianza reducida.
+  - `RunSearch`: las 8 etapas de §9 con avance real en `searches.progress`.
+    - Un error en una nota no detiene la búsqueda. Si falla más de la mitad, queda `partial`.
+    - Las notas ya enriquecidas se reutilizan sin pagar.
+  - Tarea de Celery `search.run`. La limpieza diaria también borra los textos vencidos.
+  - `make buscar`: muestra créditos y costo máximo, pide "si", corre la búsqueda (en el worker o con `--aqui`) y enseña 5 notas con lugar, precisión y confianza.
+  - `make reubicar`: vuelve a ubicar las notas de una búsqueda con las reglas y el catálogo vigentes sin pagar a la IA; con `--con-ia` las vuelve a pasar por la IA desde su texto guardado (0 créditos). Las pistas de lugar de la IA se guardan (migración 0014).
+  - Globo con rotación automática e inclinación de 15°.
+
+### Corregido
+
+- Geolocalización, con lo aprendido en la primera búsqueda real (Extorsión en Jalisco: 18 notas, 1 crédito y 0.0068 USD):
+  - alias de los municipios cuyo nombre oficial es más largo que el de uso diario ("Heroica Ciudad de Juchitán de Zaragoza", "Santo Domingo Tehuantepec"…);
+  - una localidad de otro estado ya no se usa si la nota nombra sus estados (la "colonia La Gloria" de Juchitán caía en Guanajuato).
+
 ## [0.3.0] - 2026-10-16
 
 ### Agregado
