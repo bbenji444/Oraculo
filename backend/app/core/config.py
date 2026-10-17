@@ -72,7 +72,7 @@ _DEFAULT_NGRAMS_DELAY_MINUTES = 3
 
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 
 class Settings(BaseSettings):

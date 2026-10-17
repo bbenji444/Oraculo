@@ -6,9 +6,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-10-16
+
 ### Agregado
 
-- **Fase 3 — Proveedores e ingesta** (en curso).
+- **Fase 3 — Proveedores e ingesta.**
   - Cliente HTTP compartido (httpx2, ADR-0010) con:
     - tiempo máximo por petición;
     - reintentos con espera creciente solo ante 429, 5xx o red caída;
@@ -46,6 +48,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - `PlannedQuery` lleva exclusiones y lugar por separado, y `PlaceFacts`/`QueryPlace` la clave INEGI del estado.
 - "Probar concepto" muestra también la consulta del índice local, escrita en palabras.
 - El worker y el reloj de Celery escriben logs JSON, igual que la API.
+- Especificación v1.9: los ngramas de GDELT son la fuente principal del índice local y el GKG (solo títulos) queda apagado por defecto (ADR-0014).
+- RSS de medios: La Jornada, El Universal e Infobae México **encendidos** por decisión de Benji (`MEDIA_RSS_ENABLED=true`); cada medio se apaga en `fuentes/medios_rss.csv`.
 
 ### Corregido
 
@@ -57,7 +61,6 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 - Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`).
 - API DOC de GDELT apagada mientras responda 429 (ADR-0012, `GDELT_ENABLED=false`); sus archivos sí se usan en el índice local.
-- RSS de medios apagados hasta revisar sus términos (`MEDIA_RSS_ENABLED=false`).
 
 ## [0.2.0] - 2026-10-16
 
