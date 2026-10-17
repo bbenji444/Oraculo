@@ -6,6 +6,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-10-17
+
 ### Agregado
 
 - **Fase 5 — API de búsqueda y resultados** (`docs/api.md`, con ejemplos de `curl` reales):
