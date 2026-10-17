@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Eliminado
+
+- Pestaña temporal **Notas**, rutas `/api/v1/local-index/search` y `/stats`, y el globo viejo de **Geodatos**: los reemplaza la pantalla Explorar (Fase 6). El índice local sigue buscando como proveedor dentro de cada búsqueda.
+
 ## [0.5.0] - 2026-10-17
 
 ### Agregado

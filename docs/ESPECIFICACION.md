@@ -803,6 +803,7 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 
 **Tareas**
 - Todo lo de la sección 14.
+- Retirar la pestaña temporal "Notas" y sus rutas `/local-index/*` (ADR-0014). El índice local sigue siendo uno de los proveedores de las búsquedas.
 
 **Criterios de aceptación**
 - La historia H1 se puede ejecutar completa en el navegador.
