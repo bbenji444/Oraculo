@@ -1,0 +1,55 @@
+{
+  "search_id": "b01afb0d-e78b-4257-8a14-5d2e98082d83",
+  "status": "completed",
+  "region_id": 272,
+  "region_code": "14",
+  "region_name": "Jalisco",
+  "date_from": "2026-10-10",
+  "date_to": "2026-10-17",
+  "concepts": [
+    {
+      "id": 3,
+      "name": "Extorsión"
+    }
+  ],
+  "progress": {
+    "stage": "close",
+    "reused": 0,
+    "stages": {
+      "query": {
+        "total": 2,
+        "failed": 0
+      },
+      "enrich": {
+        "total": 18,
+        "failed": 0
+      },
+      "extract": {
+        "total": 18,
+        "failed": 0
+      },
+      "geocode": {
+        "total": 18,
+        "failed": 0
+      }
+    },
+    "articles": 18,
+    "enriched": 18,
+    "fallback": 5,
+    "in_region": 9,
+    "unlocated": 2,
+    "out_of_region": 7,
+    "skipped_by_cap": 0
+  },
+  "queries_planned": 2,
+  "credits_estimated": 1,
+  "credits_used": 1,
+  "llm_tokens_in": 52094,
+  "llm_tokens_out": 15516,
+  "llm_cost_usd": 0.0129,
+  "results_count": 18,
+  "error_summary": null,
+  "created_at": "2026-10-17T09:00:48.189169-06:00",
+  "started_at": "2026-10-17T09:00:48.369499-06:00",
+  "finished_at": "2026-10-17T09:01:49.588868-06:00"
+}

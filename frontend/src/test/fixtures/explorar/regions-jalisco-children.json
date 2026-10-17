@@ -1,0 +1,90 @@
+{
+  "items": [
+    {
+      "id": 561,
+      "level": "municipality",
+      "code": "14001",
+      "name": "Acatic",
+      "display_name": "Municipio Acatic",
+      "display_prefix": "Municipio",
+      "country_code": "MEX",
+      "parent_id": 272,
+      "point": {
+        "lon": -102.92039704750994,
+        "lat": 20.768783479597385
+      },
+      "bbox": [-103.04211468886236, 20.66319952040302, -102.80448635033807, 20.87441297019699],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 1072,
+      "level": "municipality",
+      "code": "14002",
+      "name": "Acatlán de Juárez",
+      "display_name": "Municipio Acatlán de Juárez",
+      "display_prefix": "Municipio",
+      "country_code": "MEX",
+      "parent_id": 272,
+      "point": {
+        "lon": -103.59855081974084,
+        "lat": 20.419075239820533
+      },
+      "bbox": [-103.68842441956079, 20.33233887548179, -103.53625804874692, 20.505687369981402],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 1073,
+      "level": "municipality",
+      "code": "14003",
+      "name": "Ahualulco de Mercado",
+      "display_name": "Municipio Ahualulco de Mercado",
+      "display_prefix": "Municipio",
+      "country_code": "MEX",
+      "parent_id": 272,
+      "point": {
+        "lon": -103.97539443428414,
+        "lat": 20.710353799769003
+      },
+      "bbox": [-104.05736305001744, 20.610950139622528, -103.78614564975109, 20.809980140286786],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 1775,
+      "level": "municipality",
+      "code": "14004",
+      "name": "Amacueca",
+      "display_name": "Municipio Amacueca",
+      "display_prefix": "Municipio",
+      "country_code": "MEX",
+      "parent_id": 272,
+      "point": {
+        "lon": -103.63022291574802,
+        "lat": 19.988361810312348
+      },
+      "bbox": [-103.68433953967096, 19.908595449832927, -103.5439237095853, 20.068456379865676],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 1074,
+      "level": "municipality",
+      "code": "14005",
+      "name": "Amatitán",
+      "display_name": "Municipio Amatitán",
+      "display_prefix": "Municipio",
+      "country_code": "MEX",
+      "parent_id": 272,
+      "point": {
+        "lon": -103.71051998145218,
+        "lat": 20.844348749832196
+      },
+      "bbox": [-103.79039437041523, 20.763297860377453, -103.6316584800448, 20.925934879972576],
+      "has_polygon": true,
+      "aliases": []
+    }
+  ],
+  "next_cursor": null
+}
