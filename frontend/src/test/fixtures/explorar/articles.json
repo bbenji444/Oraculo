@@ -1,0 +1,138 @@
+{
+  "items": [
+    {
+      "article_id": 17,
+      "title": "Procesan a 4 detenidos durante protesta por el agua en Jalisco",
+      "source_name": null,
+      "source_domain": "sinembargo.mx",
+      "url": "https://sinembargo.mx/4888910/juez-procesa-a-repartidor-y-otros-3-detenidos-durante-protesta-por-el-agua-en-jalisco",
+      "published_at": "2026-10-16T20:47:00-06:00",
+      "summary": "Cuatro personas fueron procesadas tras ser detenidas durante una protesta por el agua en Jalisco. La nota no aporta más detalles sobre el caso.",
+      "event_type": "procesamiento",
+      "event_date": null,
+      "extraction_status": "fallback",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": false,
+          "relevance_score": 0,
+          "relevance_reason": "La nota informa sobre detenidos durante una protesta por el agua, sin mencionar extorsión ni cobros o amenazas para obtener dinero."
+        }
+      ],
+      "primary_location": {
+        "mention": "Jalisco",
+        "role": "event",
+        "precision": "state",
+        "confidence": 0.95,
+        "is_primary": true,
+        "region_id": 272,
+        "region_code": "14",
+        "place": "Jalisco",
+        "lon": -103.21734934861192,
+        "lat": 20.838057309584556
+      },
+      "in_region": true,
+      "providers": ["indice_local"]
+    },
+    {
+      "article_id": 11,
+      "title": "Morelos en llamas y Sheinbaum pide \"un mes para consulta\", escribe Salvador García Soto",
+      "source_name": null,
+      "source_domain": "eluniversal.com.mx",
+      "url": "https://eluniversal.com.mx/opinion/salvador-garcia-soto/morelos-en-llamas-y-sheinbaum-pide-un-mes-para-consulta",
+      "published_at": "2026-10-17T06:32:00-06:00",
+      "summary": "La columna describe una crisis de inseguridad en Morelos y cuestiona la respuesta de los gobiernos estatal y federal. Señala aumentos en las denuncias por extorsión, además de homicidios, secuestros y robos, y menciona municipios con altos índices de violencia.",
+      "event_type": "extorsión",
+      "event_date": null,
+      "extraction_status": "ok",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": true,
+          "relevance_score": 1,
+          "relevance_reason": "La nota aborda el aumento de las denuncias por extorsión en Morelos y menciona expresamente el cobro de piso como práctica criminal."
+        }
+      ],
+      "primary_location": {
+        "mention": "Morelos",
+        "role": "event",
+        "precision": "state",
+        "confidence": 0.95,
+        "is_primary": true,
+        "region_id": 275,
+        "region_code": "17",
+        "place": "Morelos",
+        "lon": -99.10181651110256,
+        "lat": 18.732125509858896
+      },
+      "in_region": false,
+      "providers": ["indice_local"]
+    },
+    {
+      "article_id": 12,
+      "title": "Fiscalía de Michoacán liga al CJNG con el asesinato de Carlos Manz – Periódico Zócalo | Noticias de Saltillo, Torreón, Piedras Negras, Monclova, Acuña",
+      "source_name": null,
+      "source_domain": "zocalo.com.mx",
+      "url": "https://zocalo.com.mx/fiscalia-de-michoacan-liga-al-cjng-con-el-asesinato-de-carlos-manz",
+      "published_at": "2026-10-17T01:01:00-06:00",
+      "summary": "La Fiscalía de Michoacán sostiene que el asesinato de Carlos Manzo fue una represalia del CJNG por operativos y detenciones contra sus integrantes. La investigación registra 33 detenidos y continúa con diligencias sobre presuntos colaboradores; entre los delitos atribuidos a la organización se menciona una red de extorsión a productores de aguacate.",
+      "event_type": "asesinato",
+      "event_date": null,
+      "extraction_status": "ok",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": true,
+          "relevance_score": 0.85,
+          "relevance_reason": "La nota menciona una red de extorsión operada por el CJNG contra productores de aguacate como parte de la investigación criminal relacionada con el asesinato."
+        }
+      ],
+      "primary_location": null,
+      "in_region": null,
+      "providers": ["indice_local"]
+    },
+    {
+      "article_id": 16,
+      "title": "Una regidora en Cuautla pide la disolución de la policía municipal por colusión con el crimen organizado",
+      "source_name": null,
+      "source_domain": "elpais.com",
+      "url": "https://elpais.com/mexico/2026-10-17/una-regidora-en-cuautla-pide-la-disolucion-de-la-policia-municipal-por-colusion-con-el-crimen-organizado.html",
+      "published_at": "2026-10-16T21:01:00-06:00",
+      "summary": "Una regidora de Cuautla pidió disolver la policía municipal por su presunta colusión con el crimen organizado. La nota no ofrece más detalles sobre el caso.",
+      "event_type": "colusión",
+      "event_date": null,
+      "extraction_status": "fallback",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": false,
+          "relevance_score": 0,
+          "relevance_reason": "La nota menciona una presunta colusión con el crimen organizado, pero no trata sobre extorsión ni cobros o amenazas para obtener dinero."
+        }
+      ],
+      "primary_location": {
+        "mention": "Cuautla",
+        "role": "event",
+        "precision": "municipality",
+        "confidence": 0.95,
+        "is_primary": true,
+        "region_id": 764,
+        "region_code": "17006",
+        "place": "Municipio Cuautla",
+        "lon": -98.9737362555594,
+        "lat": 18.81498702590786
+      },
+      "in_region": false,
+      "providers": ["indice_local"]
+    }
+  ],
+  "next_cursor": null
+}

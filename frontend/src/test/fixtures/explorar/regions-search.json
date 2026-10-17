@@ -1,0 +1,55 @@
+{
+  "items": [
+    {
+      "id": 272,
+      "level": "state",
+      "code": "14",
+      "name": "Jalisco",
+      "display_name": "Jalisco",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -103.21734934861192,
+        "lat": 20.838057309584556
+      },
+      "bbox": [-105.69540345961917, 18.925871880076365, -101.51054174984321, 22.750245940344733],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 19614,
+      "level": "locality",
+      "code": "040032405",
+      "name": "Jalisco",
+      "display_name": "Localidad Jalisco",
+      "display_prefix": "Localidad",
+      "country_code": "MEX",
+      "parent_id": 316,
+      "point": {
+        "lon": -91.32777027777779,
+        "lat": 18.066867222222218
+      },
+      "bbox": [-91.32777027777779, 18.066867222222218, -91.32777027777779, 18.066867222222218],
+      "has_polygon": false,
+      "aliases": []
+    },
+    {
+      "id": 28614,
+      "level": "locality",
+      "code": "050230554",
+      "name": "Jalisco",
+      "display_name": "Localidad Jalisco",
+      "display_prefix": "Localidad",
+      "country_code": "MEX",
+      "parent_id": 1689,
+      "point": {
+        "lon": -103.18457777777778,
+        "lat": 28.069519444444456
+      },
+      "bbox": [-103.18457777777778, 28.069519444444456, -103.18457777777778, 28.069519444444456],
+      "has_polygon": false,
+      "aliases": []
+    }
+  ]
+}

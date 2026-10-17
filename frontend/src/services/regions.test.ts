@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, getRegion, type Region, searchRegions } from './regions';
+import {
+  ApiError,
+  getRegion,
+  listChildRegions,
+  listRegionsByLevel,
+  MAX_FILTER_OPTIONS,
+  type Region,
+  searchRegions,
+} from './regions';
 
 const iztapalapa: Region = {
   id: 3,
@@ -109,5 +117,40 @@ describe('getRegion', () => {
     );
 
     await expect(getRegion(1)).rejects.toThrow('(502)');
+  });
+});
+
+describe('listas para los filtros encadenados', () => {
+  it('sigue el cursor hasta traer todos los estados', async () => {
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [iztapalapa], next_cursor: 'c2' }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [iztapalapa], next_cursor: null }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', spy);
+
+    const states = await listRegionsByLevel('state');
+
+    expect(states).toHaveLength(2);
+    expect(spy.mock.calls[0]?.[0]).toBe('/api/v1/regions?level=state&limit=200');
+    expect(spy.mock.calls[1]?.[0]).toBe('/api/v1/regions?level=state&limit=200&cursor=c2');
+  });
+
+  it('hijas de una región, con tope', async () => {
+    const page = Array.from({ length: 200 }, (_, i) => ({ ...iztapalapa, id: i }));
+    const spy = vi.fn<(url: string) => Promise<Response>>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: page, next_cursor: 'otra' }), { status: 200 }),
+      ),
+    );
+    vi.stubGlobal('fetch', spy);
+
+    const children = await listChildRegions(9);
+
+    expect(children).toHaveLength(MAX_FILTER_OPTIONS);
+    expect(spy.mock.calls[0]?.[0]).toBe('/api/v1/regions/9/children?limit=200');
   });
 });

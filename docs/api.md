@@ -320,6 +320,7 @@ curl -s http://localhost:8080/api/v1/searches/00000000-0000-0000-0000-0000000000
 - **`/health`:** estado de la API, la base, Redis y el worker.
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
-- **`/local-index`:** vista temporal hasta F6.
+
+Las rutas temporales `/local-index/*` se retiraron en la Fase 6: el índice local se consulta como un proveedor más dentro de cada búsqueda.
 
 Todas están en la documentación interactiva. Los reportes (`/searches/{id}/report`) llegan en la Fase 7.

@@ -87,3 +87,52 @@ export async function getRegion(id: number, signal?: AbortSignal): Promise<Regio
   }
   return body as RegionDetail;
 }
+
+// Tope de la API por página (backend: MAX_PAGE_SIZE de regiones).
+const REGIONS_PAGE_SIZE = 200;
+// Para los filtros encadenados: los 32 estados y hasta 570 municipios de un
+// estado caben de sobra. Un municipio puede tener miles de localidades: se
+// muestran las primeras y para las demás está el buscador.
+export const MAX_FILTER_OPTIONS = 600;
+
+async function collect(
+  path: string,
+  query: Record<string, string>,
+  max: number,
+  signal?: AbortSignal,
+): Promise<Region[]> {
+  const all: Region[] = [];
+  let cursor: string | null = null;
+  do {
+    const params = new URLSearchParams({ ...query, limit: String(REGIONS_PAGE_SIZE) });
+    if (cursor) params.set('cursor', cursor);
+    const body = (await requestJson(`${apiUrl(path)}?${params.toString()}`, {
+      signal,
+    })) as { items?: unknown; next_cursor?: unknown } | null;
+    if (!Array.isArray(body?.items) || !body.items.every(isRegion)) throw badFormat();
+    all.push(...body.items);
+    cursor = typeof body.next_cursor === 'string' ? body.next_cursor : null;
+  } while (cursor && all.length < max);
+  return all.slice(0, max);
+}
+
+/**
+ * Todas las regiones de un nivel (por ejemplo, los 32 estados), en orden alfabético.
+ *
+ * @param level Nivel.
+ * @param signal Señal para cancelar.
+ */
+export function listRegionsByLevel(level: RegionLevel, signal?: AbortSignal): Promise<Region[]> {
+  return collect('regions', { level }, MAX_FILTER_OPTIONS, signal);
+}
+
+/**
+ * Hijas de una región (municipios de un estado, localidades de un municipio),
+ * hasta `MAX_FILTER_OPTIONS`, en orden alfabético.
+ *
+ * @param regionId Región madre.
+ * @param signal Señal para cancelar.
+ */
+export function listChildRegions(regionId: number, signal?: AbortSignal): Promise<Region[]> {
+  return collect(`regions/${String(regionId)}/children`, {}, MAX_FILTER_OPTIONS, signal);
+}

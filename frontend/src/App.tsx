@@ -1,25 +1,25 @@
 /**
  * Componente raíz: encabezado con pestañas y la pantalla activa.
  *
- * Pestañas: "Geodatos" (globo con el catálogo de regiones, F1), "Conceptos"
- * (administración y "Probar concepto", F2), "Notas" (vista temporal del índice
- * local, ADR-0014) y "Estado del sistema" (F0). La pestaña vive en la URL
- * (#/geodatos, #/conceptos, #/notas, #/estado) para que se pueda compartir o
- * recargar sin perderla. No hace llamadas HTTP.
+ * Pestañas: "Explorar" (globo, búsqueda y resultados, F6), "Conceptos"
+ * (administración y "Probar concepto", F2), "Historial" (búsquedas anteriores,
+ * F6) y "Estado del sistema" (F0). La pestaña vive en la URL (#/explorar,
+ * #/conceptos, #/historial, #/estado) para que se pueda compartir o recargar
+ * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
  */
 import { useEffect, useState } from 'react';
 
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
-import { GeoExplorer } from './components/GeoExplorer/GeoExplorer';
-import { NotesPage } from './components/LocalIndex/NotesPage';
+import { ExplorePage } from './components/Explore/ExplorePage';
+import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'geodatos' | 'conceptos' | 'notas' | 'estado';
+type Tab = 'explorar' | 'conceptos' | 'historial' | 'estado';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'geodatos', label: 'Geodatos' },
+  { id: 'explorar', label: 'Explorar' },
   { id: 'conceptos', label: 'Conceptos' },
-  { id: 'notas', label: 'Notas' },
+  { id: 'historial', label: 'Historial' },
   { id: 'estado', label: 'Estado del sistema' },
 ];
 
@@ -27,15 +27,15 @@ function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === '#/estado') return 'estado';
   if (hash === '#/conceptos') return 'conceptos';
-  if (hash === '#/notas') return 'notas';
-  return 'geodatos';
+  if (hash === '#/historial') return 'historial';
+  return 'explorar';
 }
 
 function Screen({ tab }: { tab: Tab }) {
   if (tab === 'conceptos') return <ConceptsPage />;
-  if (tab === 'notas') return <NotesPage />;
+  if (tab === 'historial') return <HistoryPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
-  return <GeoExplorer />;
+  return <ExplorePage />;
 }
 
 export function App() {

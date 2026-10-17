@@ -9,7 +9,7 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
 - **Usar la API (con ejemplos de `curl`):** [docs/api.md](docs/api.md)
 
-> Estado actual: **Fase 2 (conceptos)**. Además de los cimientos (servicios, `/health`) y el catálogo geográfico de México (INEGI) con su globo 3D, ya existen los conceptos de búsqueda: se crean, editan y prueban desde la pestaña **Conceptos**, que muestra las consultas exactas que se enviarían a cada proveedor sin gastar créditos. La búsqueda real de noticias, la geolocalización y los reportes llegan en las fases siguientes.
+> Estado actual: **Fase 6 (globo y búsqueda)**. La pantalla **Explorar** muestra la Tierra de la NASA sobre la Vía Láctea. Desde ahí se elige región, conceptos y fechas, se ve el costo antes de gastar, se lanza la búsqueda y se sigue su avance; las notas aparecen sobre el globo con su ficha, su lista y sus gráficas. **Historial** reabre búsquedas anteriores sin gastar nada. Los reportes (PDF, CSV, GeoJSON) llegan en la Fase 7.
 
 ---
 
@@ -67,6 +67,7 @@ wsl make geo-download  # INEGI (249 MB) y Natural Earth
 wsl make geo-inspect   # revisa proyección y encoding; muestra 5 nombres con Ñ
 wsl make geo-load      # carga a PostGIS (7 min), valida y genera los mapas
 wsl make geo-basemap   # mapa base de Protomaps (1.3 GB, 10 min)
+wsl make geo-earth     # texturas de la NASA: Tierra de día, de noche y estrellas (ADR-0017)
 ```
 
 `geo-inspect` muestra 5 nombres reales: revisa que la Ñ y los acentos se vean bien antes de `geo-load`. `geo-load` termina con **"Todas las revisiones pasaron"** (criterios de la especificación §12). Detalles en [geodata/README.md](geodata/README.md).
@@ -77,7 +78,7 @@ Carga también los conceptos de ejemplo (Ciberseguridad, Secuestro, Extorsión, 
 wsl make seed      # solo crea los que falten; se puede repetir sin riesgo
 ```
 
-Abre <http://localhost:8080>: verás el **globo** con México. Busca "Iztapalapa" o haz clic en un estado. En la pestaña **Conceptos** elige uno, busca "Jalisco" en "Probar concepto" y presiona **Ver consultas**. La pestaña **Estado del sistema** muestra los cuatro componentes en verde.
+Abre <http://localhost:8080>: la cámara llega a México sobre la Tierra de noche. En **Explorar** busca "Jalisco" y elige un concepto: el panel muestra cuántas consultas y créditos gastaría la búsqueda **antes** de presionar **Buscar** (buscar sí gasta créditos de SearchApi y tokens de la IA). En **Historial** puedes reabrir una búsqueda anterior sin gastar nada. En **Conceptos**, "Probar concepto" muestra las consultas exactas sin gastar. **Estado del sistema** muestra los cuatro componentes en verde.
 
 ### 6. Comprobar que todo funciona
 
@@ -119,7 +120,7 @@ Direcciones útiles con el sistema arriba:
 
 | Dirección | Qué es |
 |---|---|
-| <http://localhost:8080> | La aplicación: globo de geodatos (nginx). |
+| <http://localhost:8080> | La aplicación: Explorar, Conceptos, Historial y Estado del sistema (nginx). |
 | <http://localhost:8080/api/v1/regions/search?q=izta> | Búsqueda de regiones en JSON. |
 | <http://localhost:8080/api/v1/health> | Diagnóstico en JSON. |
 | <http://localhost:8080/api/v1/docs> | Documentación interactiva de la API (OpenAPI). |
@@ -159,7 +160,7 @@ wsl make ngramas-muestra
 
 Se encienden con `GDELT_NGRAMS_ENABLED=true` (~1 GB de descarga al día).
 
-**Ver las notas en la interfaz.** La pestaña **Notas** (<http://localhost:8080/#/notas>) busca un concepto en el índice local: eliges concepto, región y rango, y ves las notas con medio, fecha y link. Es una vista de prueba hasta que llegue la búsqueda sobre el globo (Fase 6).
+**Ver las notas en la interfaz.** Las notas del índice local aparecen en las búsquedas de la pantalla **Explorar** (<http://localhost:8080/>), junto con las de los demás proveedores. La pestaña temporal "Notas" se retiró en la Fase 6.
 
 > ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.
 

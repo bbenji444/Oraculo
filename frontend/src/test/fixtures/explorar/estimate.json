@@ -1,0 +1,63 @@
+{
+  "concepts": [
+    {
+      "id": 3,
+      "name": "Extorsión"
+    }
+  ],
+  "region_id": 272,
+  "region": "México › Jalisco",
+  "date_from": "2026-10-10",
+  "date_to": "2026-10-17",
+  "queries": [
+    {
+      "provider": "searchapi",
+      "provider_label": "SearchApi (Google News)",
+      "text": "(extorsión OR extorsionador OR \"cobro de piso\" OR \"derecho de piso\" OR \"extorsión telefónica\" OR montadeudas) Jalisco -simulacro",
+      "keywords": [
+        "extorsión",
+        "extorsionador",
+        "cobro de piso",
+        "derecho de piso",
+        "extorsión telefónica",
+        "montadeudas"
+      ],
+      "filters": {
+        "country": "México",
+        "language": "español",
+        "period": "del 10/10/2026 al 17/10/2026"
+      },
+      "estimated_credits": 1
+    },
+    {
+      "provider": "indice_local",
+      "provider_label": "Índice local (GDELT + medios)",
+      "text": "contiene: extorsión, extorsionador, \"cobro de piso\", \"derecho de piso\", \"extorsión telefónica\" o montadeudas · lugar: Jalisco · sin: simulacro",
+      "keywords": [
+        "extorsión",
+        "extorsionador",
+        "cobro de piso",
+        "derecho de piso",
+        "extorsión telefónica",
+        "montadeudas"
+      ],
+      "filters": {
+        "country": "México",
+        "language": "español",
+        "period": "del 10/10/2026 al 17/10/2026"
+      },
+      "estimated_credits": 0
+    }
+  ],
+  "credits": 1,
+  "credits_month": 2,
+  "credits_limit": 100,
+  "over_limit": false,
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-6-luna",
+    "configured": true,
+    "max_articles": 150,
+    "max_cost_usd": 0.0525
+  }
+}
