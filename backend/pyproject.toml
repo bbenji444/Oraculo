@@ -2,8 +2,9 @@
 # formato (ruff), tipos (mypy) y pruebas (pytest).
 #
 # Las versiones exactas quedan en uv.lock; aquí solo van los mínimos.
-# Las dependencias de fases futuras (trafilatura, google-genai, weasyprint,
-# rapidfuzz...) se agregan en la fase que las usa.
+# Las dependencias de fases futuras (trafilatura, google-genai, weasyprint...)
+# se agregan en la fase que las usa. F4: rapidfuzz compara títulos para quitar
+# duplicados (§9).
 #
 # HTTP externo (F3): httpx2 + tenacity (ADR-0010); defusedxml lee el RSS de
 # Google News sin exponerse a "bombas XML". httpx2 también es el cliente de
@@ -25,6 +26,7 @@ dependencies = [
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
+    "rapidfuzz>=3",
     "redis>=6.4.0",
     "sqlalchemy[asyncio]>=2.1.4",
     "tenacity>=9.2.1",
