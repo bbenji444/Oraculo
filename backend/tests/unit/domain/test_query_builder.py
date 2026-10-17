@@ -1,6 +1,6 @@
 """Constructor de consultas: casos de la especificación §7.2 y del ADR-0009."""
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
@@ -15,7 +15,7 @@ from app.domain.queries import (
     place_for,
 )
 from app.domain.query_builder import build_queries
-from app.domain.query_dialects import GOOGLE_MAX_WORDS, gdelt_country
+from app.domain.query_dialects import DIALECTS, GOOGLE_MAX_WORDS, gdelt_country
 from app.domain.region import RegionLevel
 
 TODAY = date(2026, 10, 16)
@@ -85,7 +85,7 @@ def test_una_consulta_por_proveedor_con_pais_idioma_fechas_y_creditos() -> None:
     assert {q.language for q in queries} == {"es"}
     assert {q.country for q in queries} == {MEXICO}
     assert {q.window for q in queries} == {WEEK}
-    assert [q.estimated_credits for q in queries] == [1, 0, 0]
+    assert [q.estimated_credits for q in queries] == [1, 0, 0, 0]
     assert queries[0].keywords == CIBERSEGURIDAD.keywords
 
 
@@ -273,3 +273,44 @@ def test_rango_fijo_al_reves_o_demasiado_largo() -> None:
         DateWindow.between(date(2026, 10, 15), date(2026, 10, 1))
     with pytest.raises(InvalidRequestError, match="90 días"):
         DateWindow.between(date(2026, 1, 1), date(2026, 10, 1))
+
+
+def test_un_momento_cae_o_no_dentro_del_rango_en_hora_local() -> None:
+    mexico = timezone(timedelta(hours=-6))
+    window = DateWindow.between(date(2026, 10, 8), date(2026, 10, 14))
+
+    # 15 de octubre a las 03:00 UTC sigue siendo 14 de octubre en la CDMX.
+    assert window.contains(datetime(2026, 10, 15, 3, 0, tzinfo=UTC), mexico)
+    assert not window.contains(datetime(2026, 10, 15, 7, 0, tzinfo=UTC), mexico)
+    assert not window.contains(datetime(2026, 10, 7, 23, 0, tzinfo=mexico), mexico)
+
+
+# --- Índice local (ADR-0013) ---
+
+
+def test_indice_local_se_describe_en_palabras() -> None:
+    assert texts(IZTAPALAPA)[Provider.LOCAL_INDEX] == [
+        'contiene: ciberataque, hackeo, ransomware, "filtración de datos" o phishing'
+        " · lugar: Iztapalapa · sin: curso, webinar o diplomado"
+    ]
+
+
+def test_indice_local_con_estado_requerido_estado_y_pais() -> None:
+    juarez = place_for(
+        facts(RegionLevel.MUNICIPALITY, "Benito Juárez", repeated=True, state="Quintana Roo")
+    )
+    jalisco = place_for(PlaceFacts(RegionLevel.STATE, "Jalisco", (), False, None, (), MEXICO, "14"))
+    mexico = place_for(facts(RegionLevel.COUNTRY, "México"))
+
+    assert 'lugar: "Benito Juárez" (y "Quintana Roo") ·' in texts(juarez)[Provider.LOCAL_INDEX][0]
+    assert "lugar: Jalisco ·" in texts(jalisco)[Provider.LOCAL_INDEX][0]
+    assert "lugar: México" in texts(mexico)[Provider.LOCAL_INDEX][0]
+
+
+def test_las_consultas_llevan_exclusiones_y_lugar_aparte() -> None:
+    [query] = build_queries(CIBERSEGURIDAD, IZTAPALAPA, WEEK, [Provider.LOCAL_INDEX])
+
+    assert query.exclude_terms == CIBERSEGURIDAD.exclude_terms
+    assert query.place == IZTAPALAPA
+    assert DIALECTS[Provider.LOCAL_INDEX].cacheable is False
+    assert DIALECTS[Provider.SEARCHAPI].cacheable is True

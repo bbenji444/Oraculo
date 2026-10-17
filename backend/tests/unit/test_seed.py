@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from app.domain.queries import CountryFilter, DateWindow, QueryPlace
+from app.domain.queries import CountryFilter, DateWindow, Provider, QueryPlace
 from app.domain.query_builder import build_queries
 from app.seed.cargar_conceptos import read_seed
 
@@ -28,7 +28,7 @@ def test_cada_semilla_cabe_en_una_consulta_por_proveedor_en_un_lugar_comun() -> 
     place = QueryPlace(("Iztapalapa",), (), MEXICO)
 
     for draft in (c.validated() for c in read_seed()):
-        assert len(build_queries(draft, place, WEEK)) == 3, draft.name
+        assert len(build_queries(draft, place, WEEK)) == len(Provider), draft.name
 
 
 def test_con_un_nombre_oficial_largo_se_parte_sin_perder_palabras() -> None:

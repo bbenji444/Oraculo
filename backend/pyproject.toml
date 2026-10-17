@@ -3,7 +3,11 @@
 #
 # Las versiones exactas quedan en uv.lock; aquí solo van los mínimos.
 # Las dependencias de fases futuras (trafilatura, google-genai, weasyprint,
-# rapidfuzz, respx...) se agregan en la fase que las usa.
+# rapidfuzz...) se agregan en la fase que las usa.
+#
+# HTTP externo (F3): httpx2 + tenacity (ADR-0010); defusedxml lee el RSS de
+# Google News sin exponerse a "bombas XML". httpx2 también es el cliente de
+# pruebas de FastAPI (Starlette).
 
 [project]
 name = "monitor-noticias-backend"
@@ -15,18 +19,20 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.20.0",
     "celery[redis]>=5.6.3",
+    "defusedxml>=0.7.1",
     "fastapi>=0.143.2",
+    "httpx2>=2.13.1",
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
     "redis>=6.4.0",
     "sqlalchemy[asyncio]>=2.1.4",
+    "tenacity>=9.2.1",
     "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.13.1",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -104,6 +110,13 @@ warn_redundant_casts = true
 [[tool.mypy.overrides]]
 # Celery y kombu no publican tipos; sin esto mypy marca cada import como error.
 module = ["celery", "celery.*", "kombu", "kombu.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# defusedxml tampoco publica tipos (existen en un paquete aparte que no se
+# instala). Su resultado se trata como xml.etree.ElementTree.Element, que sí
+# tiene tipos, en el adaptador de Google News RSS.
+module = ["defusedxml", "defusedxml.*"]
 ignore_missing_imports = true
 
 # --- pytest --------------------------------------------------------------------

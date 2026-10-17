@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.4 · Octubre 2026 · Responsable: Benji
+Versión 1.9 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -235,7 +235,7 @@ monitor-noticias/
 | ORM y migraciones | SQLAlchemy 2 + Alembic + psycopg 3 | Estándar maduro; las migraciones versionadas dejan rastro de cada cambio de esquema. |
 | Base de datos | PostgreSQL 16 + PostGIS + `pg_trgm` + `unaccent` | Consultas espaciales ("¿esta noticia cae en este municipio?") y búsqueda difusa de nombres. Es el motor que ya usa el proyecto. |
 | Cola | Celery + Redis | Una búsqueda tarda decenas de segundos y no puede bloquear la API. Celery es el estándar más conocido; Redis sirve también de caché. |
-| HTTP externo | httpx (async) + tenacity | Timeouts, reintentos con backoff y concurrencia controlada. |
+| HTTP externo | httpx2 (async) + tenacity (ADR-0010) | Timeouts, reintentos con backoff y concurrencia controlada. httpx2 es la continuación mantenida de httpx; las pruebas usan su `MockTransport`. |
 | Extracción de texto | trafilatura | Extrae el cuerpo del artículo sin menús ni anuncios. |
 | LLM | Gemini 2.5 Flash vía SDK oficial vigente (`google-genai`; verificar), detrás de `LLMPort` | Ya se usa en el proyecto, es barato y rápido. El puerto permite cambiarlo. |
 | Reportes | Jinja2 + WeasyPrint | Una misma plantilla HTML sirve para vista web y para PDF. |
@@ -301,7 +301,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - Copia del nombre y las palabras clave **al momento de buscar**, para que editar un concepto no altere el historial.
 
 **`provider_queries`**
-- `id`, `search_id`
+- `id`, `search_id` (opcional: las consultas del comando de prueba no pertenecen a una búsqueda; la llave foránea llega con `searches` en F4)
 - `provider`
 - `query_text`, `params` jsonb
 - `status`, `http_status`
@@ -309,6 +309,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `from_cache`
 - `cost_credits`
 - `duration_ms`
+- `error_message`
 
 **`articles`** — global y deduplicado
 - `id` bigserial
@@ -421,8 +422,9 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
-| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Respetar su ritmo de peticiones. |
-| **Google News RSS** | Respaldo gratuito | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. |
+| **Índice local** (`indice_local`, ADR-0013 y ADR-0014) | Notas que la ingesta periódica junta cada 15 minutos: **ngramas de GDELT** (texto completo, español + México; ADR-0014), archivos GKG de GDELT (solo título; apagados por defecto cuando los ngramas funcionan) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~1 GB de descarga al día) | Busca en título, fragmento y frases del cuerpo (`body_terms`, solo para buscar; nunca se muestran). Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
+| **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
+| **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
 
 **Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.
 
@@ -435,12 +437,15 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
   "url": "https://www.medio.com.mx/seguridad/ataque-ransomware-alcaldia-2026",
   "title": "Alcaldía sufre ataque de ransomware; servicios en línea suspendidos",
   "source_name": "Medio Ejemplo",
+  "source_domain": "medio.com.mx",
   "published_at": "2026-10-12T14:05:00Z",
   "snippet": "La alcaldía informó que sus sistemas...",
   "language": "es",
   "raw": { "...": "respuesta original del proveedor, para depurar" }
 }
 ```
+
+`source_domain` es el dominio del medio: en Google News RSS el `url` es de Google y el medio llega aparte (`<source url="…">`). Fechas siempre en UTC; si el proveedor no da fecha, `published_at` queda vacío (nunca se inventa).
 
 Cada adaptador debe:
 1. usar timeout explícito;
@@ -459,7 +464,7 @@ Cada adaptador debe:
 Lo ejecuta el worker. Cada etapa actualiza `searches.progress` para que la UI muestre avance real.
 
 1. **Planear.** `build_queries` por cada concepto × proveedor. Se guardan en `provider_queries`.
-2. **Consultar.** En paralelo, con límite de concurrencia por proveedor. Primero se revisa la caché.
+2. **Consultar.** En paralelo, con límite de concurrencia por proveedor. Primero se revisa la caché. Incluye el índice local (ADR-0013), que responde al instante con lo que la ingesta periódica ya juntó y no pasa por la caché (cambia cada 15 minutos).
 3. **Normalizar y deduplicar.**
    - URL canónica: resolver redirecciones, quitar parámetros de rastreo (`utm_*`, `fbclid`...), normalizar dominio.
    - Duplicado exacto: misma URL canónica.
@@ -740,18 +745,21 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 - Pruebas unitarias de `build_queries` con los casos de la sección 7.2.
 - CRUD probado de punta a punta.
 
-### F3 — Proveedores
+### F3 — Proveedores e ingesta
 
 **Tareas**
 - Puerto `NewsProviderPort` y los 3 adaptadores.
 - Normalización a `RawArticle`, caché, contador de créditos y presupuesto.
 - Pruebas con fixtures.
-- Script CLI `scripts/probar_proveedor.py` que ejecuta **una** consulta real con confirmación previa y guarda la respuesta como fixture.
+- Comando `make probar-proveedor` (`backend/app/cli/probar_proveedor.py`, con tipos y pruebas como el resto del backend) que ejecuta **una** consulta real con confirmación previa y guarda la respuesta como fixture, sin la llave.
+- Ingesta periódica (cada 15 min, `celery beat`) de archivos GKG de GDELT y RSS de medios mexicanos a un índice local, y proveedor `indice_local` que busca en él (ADR-0013).
+- Ngramas de GDELT (texto completo de las notas) como fuente del índice local, `make ingesta-historial` y una pestaña temporal "Notas" para ver el índice en la interfaz hasta F6 (ADR-0014).
 
 **Criterios de aceptación**
 - Pruebas sin red pasan.
-- Una consulta real por proveedor, aprobada por Benji, devuelve resultados normalizados.
-- Se muestran 5 ejemplos reales.
+- Una consulta real a SearchApi, aprobada por Benji, devuelve resultados normalizados.
+- La ingesta de GDELT y de RSS de medios funciona con datos reales y se muestran 5 ejemplos de cada una.
+- `indice_local` responde a los casos de §7.2 sobre el índice real.
 
 ### F4 — Pipeline, LLM y geolocalización
 
@@ -828,6 +836,14 @@ ADR de la Fase 2:
 
 9. **ADR-0009** — Construcción de consultas a los proveedores (dialectos, términos de búsqueda de cada lugar, nombres repetidos, códigos de país).
 
+ADR de la Fase 3:
+
+10. **ADR-0010** — httpx2 (continuación mantenida de httpx) para las llamadas externas y `MockTransport` para sus pruebas, en lugar de httpx + respx.
+11. **ADR-0011** — Google News RSS fuera de producción por sus términos de uso (desactivado por defecto).
+12. **ADR-0012** — GDELT desactivado mientras responda 429 de forma persistente; criterio de reactivación con el reintento diario de D1.
+13. **ADR-0013** — Ingesta periódica e índice local de notas (archivos GKG de GDELT y RSS de medios mexicanos).
+14. **ADR-0014** — Ngramas de GDELT como fuente del índice local (la API DOC está saturada).
+
 ---
 
 ## 19. Riesgos y preguntas abiertas
@@ -845,7 +861,15 @@ ADR de la Fase 2:
 
 ---
 
-## 20. Historial del documento
+## 20. Pendientes y mejoras futuras
+
+Ideas registradas para evaluarlas después. **No están en el alcance de ninguna fase** hasta que Benji las apruebe.
+
+| Idea | Por qué podría servir | Qué habría que evaluar antes |
+|---|---|---|
+| **Ingerir los archivos GKG de GDELT** en lugar de su API DOC 2.0 (Benji, 16/10/2026). ✅ **Aprobado e incorporado a F3** (ADR-0013); quedan por evaluar el uso de sus temas y el historial largo. | GDELT publica sus datos como archivos descargables que se actualizan cada 15 minutos. El GKG (Global Knowledge Graph) trae cada nota con **temas ya clasificados** y **ubicaciones ya geocodificadas**. Podría evitar el límite de la API (ADR-0012) y adelantar parte del trabajo de clasificación y geolocalización de F4. | `# VERIFICAR:` en la documentación vigente de GDELT: formato y campos exactos del GKG, tamaño de los archivos y espacio en disco, cobertura de medios mexicanos en español, calidad de sus ubicaciones frente al catálogo INEGI (§11), términos de uso y si conviene un proceso programado (F8). |
+
+## 21. Historial del documento
 
 | Versión | Fecha | Cambios |
 |---|---|---|
@@ -854,3 +878,8 @@ ADR de la Fase 2:
 | 1.2 | 15 de octubre de 2026 | Entorno de desarrollo sin Docker (ADR-0006): cambian la estructura del repositorio, las tareas de F0 y el riesgo de entorno. |
 | 1.3 | 15 de octubre de 2026 | MapLibre GL JS v6 (ADR-0007), decisiones de geodatos (ADR-0008) y lógica del pipeline en `backend/app/geodata/`. |
 | 1.4 | 16 de octubre de 2026 | Construcción de consultas (ADR-0009): `search_terms` y códigos de país en `regions`, nombres repetidos con su estado, exclusiones también en GDELT; `name_norm` y `deleted_at` en `concepts`; columnas de entidad en `audit_log`; endpoint `POST /concepts/preview`. |
+| 1.5 | 16 de octubre de 2026 | httpx2 en lugar de httpx + respx (ADR-0010); `source_domain` en `RawArticle`; `search_id` opcional y `error_message` en `provider_queries`; comando `make probar-proveedor` en `backend/app/cli/`. |
+| 1.6 | 16 de octubre de 2026 | Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`); GDELT como proveedor no garantizado. |
+| 1.7 | 16 de octubre de 2026 | GDELT desactivado por defecto con criterio de reactivación (ADR-0012); un `{}` tras un 429 es falla; nueva sección 20, "Pendientes y mejoras futuras" (GKG de GDELT); el historial pasa a la sección 21. |
+| 1.8 | 16 de octubre de 2026 | F3 se amplía a "Proveedores e ingesta": índice local alimentado cada 15 minutos por los archivos GKG de GDELT y RSS de medios mexicanos, consultado por el proveedor `indice_local` (ADR-0013). |
+| 1.9 | 16 de octubre de 2026 | Ngramas de GDELT (texto completo) como fuente del índice local, con frases del cuerpo conservadas 30 días; pestaña temporal "Notas" hasta F6 (ADR-0014). |

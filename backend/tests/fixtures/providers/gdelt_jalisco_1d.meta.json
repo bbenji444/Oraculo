@@ -1,0 +1,8 @@
+{
+  "proveedor": "gdelt",
+  "texto": "Jalisco sourcelang:spanish",
+  "parametros": {"mode": "artlist", "format": "json", "maxrecords": "50", "timespan": "1d"},
+  "http_status": 200,
+  "grabado": "2026-10-16T23:03:51+00:00",
+  "nota": "Una de 2 respuestas con notas entre 10 peticiones de diagnóstico (ADR-0014): pidió 50 y llegaron 14."
+}

@@ -34,9 +34,45 @@ _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geoda
 # Nombre del usuario de desarrollo en la bitácora de auditoría.
 _DEFAULT_DEV_USER = "desarrollo"
 
+# Proveedores de noticias (plan aprobado de F3):
+# - 20 s por petición; SearchApi 30 s porque link=resolved sigue redirecciones.
+_DEFAULT_PROVIDER_TIMEOUT_SECONDS = 20.0
+_DEFAULT_SEARCHAPI_TIMEOUT_SECONDS = 30.0
+# - 3 intentos en total (esperas de 1 s y 2 s entre ellos).
+_DEFAULT_PROVIDER_MAX_ATTEMPTS = 3
+# - 2 peticiones simultáneas por proveedor: suficiente para pocas consultas
+#   por búsqueda sin parecer un ataque.
+_DEFAULT_PROVIDER_MAX_CONCURRENCY = 2
+# - GDELT: una petición cada 5 s. No está en la página de DOC 2.0, pero lo
+#   dice el propio GDELT en su respuesta 429: "Please limit requests to one
+#   every 5 seconds" (medido el 16/10/2026).
+_DEFAULT_GDELT_MIN_INTERVAL_SECONDS = 5.0
+# - GDELT: tras un 429, esperar al menos 15 s antes de reintentar. Medido el
+#   16/10/2026: reintentos a 1-5 s recibían 429 de nuevo (plan aprobado).
+_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS = 15.0
+# - Especificación §7.2: máximo 10 consultas por búsqueda; caché de 6 h.
+_DEFAULT_MAX_QUERIES_PER_SEARCH = 10
+_DEFAULT_QUERY_CACHE_TTL_HOURS = 6.0
+# - Tope mensual de créditos de SearchApi: las 100 búsquedas de la prueba
+#   gratuita. Red de seguridad contra gastos por error.
+_DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
+
+# Ingesta al índice local (ADR-0013):
+# - 90 días de notas, igual que la ventana que cubre la API de GDELT.
+_DEFAULT_NEWS_INDEX_RETENTION_DAYS = 90
+# - GDELT publica un GKG cada 15 minutos; correr más seguido no trae nada nuevo.
+_DEFAULT_INGEST_INTERVAL_MINUTES = 15
+# - Frases del cuerpo (ngramas, ADR-0014): 30 días; son lo que más ocupa.
+_DEFAULT_NEWS_BODY_RETENTION_DAYS = 30
+# - Ngramas: cada corrida revisa los últimos 35 minutos (el intervalo de 15
+#   más margen por retrasos de GDELT) y deja los 3 más recientes para la
+#   siguiente: GDELT recomienda pedir el archivo de hace unos minutos.
+_DEFAULT_NGRAMS_LOOKBACK_MINUTES = 35
+_DEFAULT_NGRAMS_DELAY_MINUTES = 3
+
 # Versión de la API que se reporta en /health y en OpenAPI. Sube con cada fase
 # (CLAUDE.md §4.3: tag v0.<N>.0 al cerrar la fase N).
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 
 class Settings(BaseSettings):
@@ -72,6 +108,43 @@ class Settings(BaseSettings):
     # Usuario fijo que firma los cambios en la bitácora hasta que F8 agregue
     # autenticación (especificación §16).
     dev_user: str = Field(default=_DEFAULT_DEV_USER, min_length=1)
+
+    # --- Proveedores de noticias (F3, especificación §7.2 y §8) ---
+    # Sin llave, SearchApi se salta con un aviso; GDELT y RSS no la necesitan.
+    searchapi_api_key: SecretStr | None = None
+    provider_timeout_seconds: float = Field(default=_DEFAULT_PROVIDER_TIMEOUT_SECONDS, gt=0)
+    searchapi_timeout_seconds: float = Field(default=_DEFAULT_SEARCHAPI_TIMEOUT_SECONDS, gt=0)
+    provider_max_attempts: int = Field(default=_DEFAULT_PROVIDER_MAX_ATTEMPTS, ge=1)
+    provider_max_concurrency: int = Field(default=_DEFAULT_PROVIDER_MAX_CONCURRENCY, ge=1)
+    gdelt_min_interval_seconds: float = Field(default=_DEFAULT_GDELT_MIN_INTERVAL_SECONDS, ge=0)
+    gdelt_rate_limit_wait_seconds: float = Field(
+        default=_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS, ge=0
+    )
+    max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
+    query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
+    searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
+    # Google News RSS: desactivado por defecto por sus términos de uso
+    # (ADR-0011). Solo se activa a propósito en desarrollo; nunca en producción.
+    news_rss_enabled: bool = False
+    # GDELT: desactivado por defecto mientras responda 429 de forma persistente
+    # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
+    gdelt_enabled: bool = False
+
+    # --- Ingesta periódica al índice local (ADR-0013) ---
+    # Archivos GKG de GDELT (solo títulos): apagados por defecto desde que los
+    # ngramas funcionan (ADR-0014), para no sumar ~760 MB de descarga al día.
+    gdelt_gkg_enabled: bool = False
+    # RSS de medios: encendidos por Benji el 16/10/2026 (La Jornada, El Universal,
+    # Infobae México). Cada medio se activa por separado en fuentes/medios_rss.csv.
+    media_rss_enabled: bool = True
+    news_index_retention_days: int = Field(default=_DEFAULT_NEWS_INDEX_RETENTION_DAYS, ge=1)
+    ingest_interval_minutes: int = Field(default=_DEFAULT_INGEST_INTERVAL_MINUTES, ge=1)
+    # Ngramas de GDELT (ADR-0014): texto completo, ~1 GB de descarga al día.
+    # Encendidos por Benji el 16/10/2026 tras ver 5 ejemplos y el consumo medido.
+    gdelt_ngrams_enabled: bool = True
+    news_body_retention_days: int = Field(default=_DEFAULT_NEWS_BODY_RETENTION_DAYS, ge=1)
+    ngrams_lookback_minutes: int = Field(default=_DEFAULT_NGRAMS_LOOKBACK_MINUTES, ge=1)
+    ngrams_delay_minutes: int = Field(default=_DEFAULT_NGRAMS_DELAY_MINUTES, ge=0)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

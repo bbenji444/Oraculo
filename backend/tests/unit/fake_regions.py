@@ -82,6 +82,9 @@ class FakeRegionRepository:
     async def get(self, region_id: int) -> Region | None:
         return self.regions.get(region_id)
 
+    async def get_by_code(self, code: str) -> Region | None:
+        return next((r for r in self.regions.values() if r.code == code), None)
+
     async def ancestors(self, region_id: int) -> list[RegionRef]:
         chain: list[RegionRef] = []
         current = self.regions[region_id].parent_id
@@ -118,6 +121,9 @@ class FakeRegionRepository:
             name_is_repeated=repeated,
             state_name=state.name if state else None,
             state_search_terms=self.search_terms.get(state.code, ()) if state else (),
+            state_code=region.code
+            if region.level is RegionLevel.STATE
+            else (state.code if state else None),
             country=MEXICO_FILTER,
         )
 

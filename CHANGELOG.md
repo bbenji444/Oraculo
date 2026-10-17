@@ -6,6 +6,62 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-10-16
+
+### Agregado
+
+- **Fase 3 — Proveedores e ingesta.**
+  - Cliente HTTP compartido (httpx2, ADR-0010) con:
+    - tiempo máximo por petición;
+    - reintentos con espera creciente solo ante 429, 5xx o red caída;
+    - espera mínima tras un 429 y User-Agent propio;
+    - registro de cada intento fallido.
+  - Adaptadores con el mismo contrato (`NewsProviderPort`) y notas en un formato común (`RawArticle`):
+    - SearchApi (Google News, la llave viaja en el encabezado);
+    - GDELT DOC;
+    - Google News RSS.
+  - `ExecuteQueries` aplica, en este orden:
+    - el presupuesto de 10 consultas por búsqueda;
+    - la caché de consultas idénticas (Redis, 6 h);
+    - el tope mensual de créditos de SearchApi (100, por mes de la Ciudad de México);
+    - el registro de cada petición en `provider_queries` (migración 0007).
+  - `make probar-proveedor` (una consulta real con confirmación y fixture sin la llave) y `make gdelt-diagnostico` (reintento diario de D1, ADR-0012).
+  - **Índice local de notas** (ADR-0013):
+    - tablas `news_index` e `ingest_runs` (migraciones 0008 y 0009);
+    - lectura de los archivos GKG de GDELT (solo notas en español con México, verificadas con MD5) y de RSS de medios desde `fuentes/medios_rss.csv`;
+    - equivalencias de estados FIPS→INEGI (`geodata/fips_inegi.csv`).
+  - Ingesta automática cada 15 minutos con el reloj de Celery (`celery beat`), que arranca `make up`, más limpieza diaria por retención (90 días). `make ingesta` corre una vez y muestra 5 ejemplos.
+  - Proveedor `indice_local`:
+    - palabra clave completa (sin acentos, con Ñ), exclusiones y lugar en el texto, o la pista de GDELT si la región es un estado;
+    - días en hora de la Ciudad de México;
+    - gratis y sin caché.
+  - `make ingesta-historial DIAS=N`: vista previa del tamaño sin descargar y 5 ejemplos reales; solo baja todo con `DESCARGAR=si`.
+  - **Ngramas de GDELT** (ADR-0014): notas en español que mencionan México, con frases del texto completo (`body_terms`, migración 0010) solo para buscar y conservadas 30 días. `indice_local` busca también en el cuerpo. `make ngramas-muestra` prueba una hora real.
+  - Pestaña **Notas** (vista temporal hasta F6) y endpoints temporales `/api/v1/local-index/search` y `/stats`.
+  - Primera consulta real a SearchApi (1 crédito): 10 notas normalizadas; confirma `iso_date`, `link=resolved` y `time_period`. También quedó grabada la primera respuesta de GDELT DOC con notas.
+  - Globo: gira solo (una vuelta cada 90 s, se detiene al tocarlo) con el eje inclinado 15°, como un globo de escritorio. Se endereza al acercarse a una región.
+  - ADR-0010 a ADR-0014.
+
+### Cambiado
+
+- Especificación v1.8: F3 pasa a ser "Proveedores e ingesta".
+- `PlannedQuery` lleva exclusiones y lugar por separado, y `PlaceFacts`/`QueryPlace` la clave INEGI del estado.
+- "Probar concepto" muestra también la consulta del índice local, escrita en palabras.
+- El worker y el reloj de Celery escriben logs JSON, igual que la API.
+- Especificación v1.9: los ngramas de GDELT son la fuente principal del índice local y el GKG (solo títulos) queda apagado por defecto (ADR-0014).
+- RSS de medios: La Jornada, El Universal e Infobae México **encendidos** por decisión de Benji (`MEDIA_RSS_ENABLED=true`); cada medio se apaga en `fuentes/medios_rss.csv`.
+
+### Corregido
+
+- GDELT repetía la misma ubicación por cada mención; ahora se guarda una vez.
+- El índice local ya no acepta notas solo porque GDELT las ubicó en el estado buscado: en datos reales metía notas de otros estados (ADR-0014).
+- El tamaño y el MD5 de los archivos de GDELT se leen de `x-goog-hash` y `x-goog-stored-content-length`: Google quita el ETag cuando recomprime al vuelo.
+
+### Desactivado
+
+- Google News RSS fuera de producción por sus términos de uso (ADR-0011, `NEWS_RSS_ENABLED=false`).
+- API DOC de GDELT apagada mientras responda 429 (ADR-0012, `GDELT_ENABLED=false`); sus archivos sí se usan en el índice local.
+
 ## [0.2.0] - 2026-10-16
 
 ### Agregado

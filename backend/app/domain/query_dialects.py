@@ -10,6 +10,10 @@ filtros que van **dentro** del texto y los límites de largo:
   (``when:7d``, o ``after:``/``before:`` con fechas fijas).
 - **GDELT DOC 2.0**: el texto base más ``sourcelang:spanish`` y
   ``sourcecountry:<FIPS>``; las fechas van como parámetros (``timespan``).
+- **Índice local** (ADR-0013): no es un buscador externo, así que su
+  "consulta" se escribe en palabras para que el analista entienda qué se
+  filtra. No tiene límite de largo y no pasa por la caché: el índice cambia
+  cada 15 minutos y consultarlo no cuesta nada.
 
 No hace: no conoce los parámetros HTTP de cada API ni llama a nadie; eso es
 de los adaptadores de F3.
@@ -93,9 +97,11 @@ def _no_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
 
 
 def _google_news_rss_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
-    # VERIFICAR: when:, after: y before: no son operadores documentados de
-    # Google News RSS; se comprueban en F3. before: excluye su fecha, por eso
-    # se usa el día siguiente al último del rango.
+    # when:, after: y before: no son operadores documentados de Google News
+    # RSS. Medido el 16/10/2026: when:7d sí limita a 7 días; after:/before:
+    # NO se respetan (llegaron notas posteriores a before:), así que el
+    # adaptador descarta lo que cae fuera del rango. Se envían igual porque
+    # orientan la búsqueda. before: excluye su fecha: se usa el día siguiente.
     if window.relative_days is not None:
         return [f"when:{window.relative_days}d"]
     end = window.date_to + timedelta(days=1)
@@ -122,6 +128,43 @@ def _gdelt_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
     return ["sourcelang:spanish", f"sourcecountry:{gdelt_country(place)}"]
 
 
+def _in_words(terms: Sequence[str]) -> str:
+    """'a', 'a o b', 'a, b o "c d"'."""
+    parts = [quote(term) for term in terms]
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} o {parts[-1]}"
+
+
+def local_index_text(
+    keywords: Sequence[str],
+    place: QueryPlace,
+    exclusions: Sequence[str],
+    window: DateWindow,
+) -> str:
+    """Describe en palabras lo que filtrará el índice local.
+
+    Args:
+        keywords: Palabras clave.
+        place: Lugar.
+        exclusions: Exclusiones.
+        window: Rango (va aparte, en los filtros de la vista previa).
+
+    Returns:
+        Por ejemplo ``contiene: hackeo o ciberataque · lugar: Iztapalapa ·
+        sin: curso``.
+    """
+    parts = [f"contiene: {_in_words(keywords)}"]
+    if place.terms:
+        where = _in_words(place.terms)
+        if place.required_terms:
+            where += f" (y {_in_words(place.required_terms)})"
+        parts.append(f"lugar: {where}")
+    else:
+        parts.append(f"lugar: {place.country.name}")
+    if exclusions:
+        parts.append(f"sin: {_in_words(exclusions)}")
+    return " · ".join(parts)
+
+
 @dataclass(frozen=True, slots=True)
 class QueryDialect:
     """Reglas de escritura de un proveedor.
@@ -133,6 +176,9 @@ class QueryDialect:
         max_words: Máximo de palabras del texto, o ``None``.
         max_chars: Máximo de caracteres del texto, o ``None``.
         suffix: Filtros que van al final del texto.
+        cacheable: Si sus respuestas se guardan en la caché de consultas.
+        writer: Escritura propia del texto completo, en lugar del texto
+            base más ``suffix`` (la usa el índice local).
     """
 
     provider: Provider
@@ -141,6 +187,8 @@ class QueryDialect:
     max_words: int | None
     max_chars: int | None
     suffix: Callable[[QueryPlace, DateWindow], list[str]]
+    cacheable: bool = True
+    writer: Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow], str] | None = None
 
     def render(
         self,
@@ -160,6 +208,8 @@ class QueryDialect:
         Returns:
             El texto exacto que se enviará.
         """
+        if self.writer is not None:
+            return self.writer(keywords, place, exclusions, window)
         return " ".join([*base_query(keywords, place, exclusions), *self.suffix(place, window)])
 
     def fits(self, text: str) -> bool:
@@ -198,5 +248,15 @@ DIALECTS: dict[Provider, QueryDialect] = {
     ),
     Provider.GDELT: QueryDialect(
         Provider.GDELT, "GDELT", FREE, None, GDELT_MAX_CHARS, _gdelt_suffix
+    ),
+    Provider.LOCAL_INDEX: QueryDialect(
+        Provider.LOCAL_INDEX,
+        "Índice local (GDELT + medios)",
+        FREE,
+        None,
+        None,
+        _no_suffix,
+        cacheable=False,
+        writer=local_index_text,
     ),
 }

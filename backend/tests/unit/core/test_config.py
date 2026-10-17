@@ -70,3 +70,28 @@ def test_timeout_de_health_debe_ser_positivo(env: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError, match="health_check_timeout_seconds"):
         build_settings()
+
+
+def test_la_llave_de_searchapi_es_opcional(env: pytest.MonkeyPatch) -> None:
+    settings = build_settings()
+
+    assert settings.searchapi_api_key is None
+    assert settings.searchapi_monthly_credit_limit == 100
+    assert settings.max_queries_per_search == 10
+
+
+def test_la_llave_de_searchapi_no_aparece_al_imprimir(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SEARCHAPI_API_KEY", "llave-super-secreta")
+
+    settings = build_settings()
+
+    assert "llave-super-secreta" not in repr(settings)
+    assert settings.searchapi_api_key is not None
+    assert settings.searchapi_api_key.get_secret_value() == "llave-super-secreta"
+
+
+def test_google_news_rss_desactivado_por_defecto(env: pytest.MonkeyPatch) -> None:
+    assert build_settings().news_rss_enabled is False
+
+    env.setenv("NEWS_RSS_ENABLED", "true")
+    assert build_settings().news_rss_enabled is True

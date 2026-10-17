@@ -114,6 +114,14 @@ class PostgresRegionRepository:
         )
         return rows[0] if rows else None
 
+    async def get_by_code(self, code: str) -> Region | None:
+        """Ver ``RegionRepositoryPort.get_by_code``."""
+        rows = await self._fetch(
+            f"SELECT {_COLUMNS} FROM regions r WHERE r.code = :code",  # noqa: S608 — fragmentos SQL constantes del módulo
+            {"code": code},
+        )
+        return rows[0] if rows else None
+
     async def ancestors(self, region_id: int) -> list[RegionRef]:
         """Ver ``RegionRepositoryPort.ancestors``."""
         sql = """
@@ -182,6 +190,7 @@ class PostgresRegionRepository:
                          AND o.country_code = r.country_code AND o.id <> r.id
                    ) AS repeated,
                    s.name AS state_name, s.search_terms AS state_terms,
+                   CASE WHEN r.level = 'state' THEN r.code ELSE s.code END AS state_code,
                    c.name AS country_name, c.iso_a2, c.fips_code,
                    COALESCE(c.name_en, c.name) AS country_name_en
             FROM regions r
@@ -203,6 +212,7 @@ class PostgresRegionRepository:
             name_is_repeated=row["repeated"],
             state_name=row["state_name"],
             state_search_terms=tuple(row["state_terms"] or ()),
+            state_code=row["state_code"],
             country=CountryFilter(
                 name=row["country_name"],
                 iso_a2=row["iso_a2"],
@@ -210,6 +220,26 @@ class PostgresRegionRepository:
                 name_en=row["country_name_en"],
             ),
         )
+
+    async def state_terms(self) -> list[str]:
+        """Nombres y términos curados de los estados, para reconocer notas de México.
+
+        Lo usa la ingesta de ngramas (ADR-0014): una nota entra si nombra al
+        país o a alguno de sus estados. Solo México tiene estados en el
+        catálogo, así que no hace falta filtrar por país.
+
+        Returns:
+            Los textos sin repetir ("Ciudad de México", "CDMX", "Jalisco"...).
+        """
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text("SELECT name, search_terms FROM regions WHERE level = 'state' ORDER BY code")
+            )
+            terms: dict[str, None] = {}
+            for name, extra in rows:
+                terms[name] = None
+                terms.update(dict.fromkeys(extra))
+        return list(terms)
 
     async def find_at_point(self, point: GeoPoint, level: RegionLevel | None) -> Region | None:
         """Ver ``RegionRepositoryPort.find_at_point``."""

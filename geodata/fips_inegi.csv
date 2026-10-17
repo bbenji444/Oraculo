@@ -1,0 +1,33 @@
+fips,inegi,estado,verificado
+MX01,01,Aguascalientes,norma FIPS 10-4
+MX02,02,Baja California,muestra GDELT 2026-10-16
+MX03,03,Baja California Sur,norma FIPS 10-4
+MX04,04,Campeche,muestra GDELT 2026-10-16
+MX05,07,Chiapas,muestra GDELT 2026-10-16
+MX06,08,Chihuahua,muestra GDELT 2026-10-16
+MX07,05,Coahuila de Zaragoza,muestra GDELT 2026-10-16
+MX08,06,Colima,norma FIPS 10-4
+MX09,09,Ciudad de México,muestra GDELT 2026-10-16
+MX10,10,Durango,muestra GDELT 2026-10-16
+MX11,11,Guanajuato,norma FIPS 10-4
+MX12,12,Guerrero,muestra GDELT 2026-10-16
+MX13,13,Hidalgo,norma FIPS 10-4
+MX14,14,Jalisco,muestra GDELT 2026-10-16
+MX15,15,México,muestra GDELT 2026-10-16
+MX16,16,Michoacán de Ocampo,muestra GDELT 2026-10-16
+MX17,17,Morelos,norma FIPS 10-4
+MX18,18,Nayarit,norma FIPS 10-4
+MX19,19,Nuevo León,muestra GDELT 2026-10-16
+MX20,20,Oaxaca,muestra GDELT 2026-10-16
+MX21,21,Puebla,muestra GDELT 2026-10-16
+MX22,22,Querétaro,muestra GDELT 2026-10-16
+MX23,23,Quintana Roo,norma FIPS 10-4
+MX24,24,San Luis Potosí,muestra GDELT 2026-10-16
+MX25,25,Sinaloa,muestra GDELT 2026-10-16
+MX26,26,Sonora,muestra GDELT 2026-10-16
+MX27,27,Tabasco,muestra GDELT 2026-10-16
+MX28,28,Tamaulipas,muestra GDELT 2026-10-16
+MX29,29,Tlaxcala,norma FIPS 10-4
+MX30,30,Veracruz de Ignacio de la Llave,muestra GDELT 2026-10-16
+MX31,31,Yucatán,muestra GDELT 2026-10-16
+MX32,32,Zacatecas,norma FIPS 10-4
