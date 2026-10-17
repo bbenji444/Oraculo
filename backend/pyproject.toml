@@ -30,6 +30,7 @@ dependencies = [
     "redis>=6.4.0",
     "sqlalchemy[asyncio]>=2.1.4",
     "tenacity>=9.2.1",
+    "trafilatura>=2",
     "uvicorn[standard]>=0.54.0",
 ]
 
