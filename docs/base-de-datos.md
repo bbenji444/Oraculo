@@ -42,7 +42,15 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `provider_queries` | Cada petición a un proveedor de noticias (SearchApi, GDELT, Google News RSS): texto, resultado, si vino de caché y créditos gastados. |
 | `news_index` | Índice local de notas que junta la ingesta cada 15 minutos (GDELT por archivos y RSS de medios): título, fragmento, medio, fecha, link y pistas de ubicación de GDELT. Con los ngramas de GDELT (ADR-0014) también `body_terms`: frases del cuerpo normalizadas, **solo para buscar** (nunca se muestran) y borradas a los 30 días. No guarda artículos. |
 | `ingest_runs` | Cada corrida de la ingesta: qué archivo o feed se leyó, bytes descargados, notas vistas y guardadas, errores. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0010`. |
+| `searches` | Cada búsqueda (F4): quién, dónde, qué fechas, en qué etapa va (`progress`) y cuánto costó (créditos de SearchApi y tokens de Gemini). |
+| `search_concepts` | Los conceptos de cada búsqueda, copiados al momento de buscar para que editarlos no cambie el historial. |
+| `articles` | Cada nota una sola vez en todo el sistema (por URL canónica): metadatos, resumen propio de la IA, tipo de evento y estado de extracción y enriquecimiento. No guarda el artículo. |
+| `article_texts` | Texto extraído de cada nota, **solo para procesar**: no se expone y se borra a los 30 días (ADR-0015). |
+| `article_concepts` | Si una nota es relevante para cada concepto, con su puntaje y la razón. |
+| `article_locations` | Cada lugar que menciona una nota, resuelto contra el catálogo INEGI: región, precisión, confianza y si es la ubicación principal. El punto sale del catálogo, nunca de la IA. |
+| `search_results` | Qué notas encontró cada búsqueda, con qué proveedor y en qué posición, y si caen dentro de la región buscada. |
+| `processing_errors` | Lo que falló al procesar una nota o una búsqueda (etapa, tipo, mensaje). Un error en una nota no detiene a las demás. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0013`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
