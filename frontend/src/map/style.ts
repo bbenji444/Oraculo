@@ -21,6 +21,12 @@ import type {
 
 /** Zoom a partir del cual se usa el mapa base detallado de México. */
 export const BASEMAP_SWITCH_ZOOM = 7;
+// Los polígonos del mapa mundial siguen 2 niveles más debajo del de México.
+// MapLibre filtra las capas por el zoom de cada tesela: con la cámara
+// inclinada, las teselas lejanas son de un zoom menor y, justo en el cambio,
+// quedaba un hueco sin ninguno de los dos mapas (visto el 17/10/2026). Las
+// etiquetas no se traslapan para no duplicarse.
+export const WORLD_POLYGON_OVERLAP_ZOOMS = 2;
 
 /** Atribución obligatoria (ADR-0008). */
 export const ATTRIBUTION_INEGI = '© INEGI · Natural Earth';
@@ -255,6 +261,9 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
     (layer) => layer.type === 'background',
   ) as LayerSpecification | undefined;
   const world = basemapFor('basemap_world', { maxzoom: BASEMAP_SWITCH_ZOOM });
+  const worldPolygons = basemapFor('basemap_world', {
+    maxzoom: BASEMAP_SWITCH_ZOOM + WORLD_POLYGON_OVERLAP_ZOOMS,
+  });
   const mexico = basemapFor('basemap_mexico', { minzoom: BASEMAP_SWITCH_ZOOM });
   return {
     version: 8,
@@ -275,7 +284,7 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
     },
     layers: [
       ...(background ? [{ ...background, id: 'background' }] : []),
-      ...world.filter((layer) => layer.type !== 'symbol'),
+      ...worldPolygons.filter((layer) => layer.type !== 'symbol'),
       earthLayer('day', earth === 'day'),
       earthLayer('night', earth === 'night'),
       ...mexico.filter((layer) => layer.type !== 'symbol'),

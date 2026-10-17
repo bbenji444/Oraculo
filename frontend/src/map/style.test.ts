@@ -8,6 +8,7 @@ import {
   featureLabel,
   INTERACTIVE_LAYERS,
   LABELS_MIN_ZOOM,
+  WORLD_POLYGON_OVERLAP_ZOOMS,
 } from './style';
 
 const ORIGIN = 'http://localhost:8080';
@@ -33,14 +34,28 @@ describe('buildMapStyle', () => {
     });
   });
 
-  it('no duplica el mapa base: el mundo hasta el zoom de cambio y México desde ahí', () => {
+  it('no duplica etiquetas: el mundo hasta el zoom de cambio y México desde ahí', () => {
     const world = style.layers.filter((l) => l.id.startsWith('basemap_world-'));
     const mexico = style.layers.filter((l) => l.id.startsWith('basemap_mexico-'));
+    const worldLabels = world.filter((l) => l.type === 'symbol');
 
     expect(world.length).toBeGreaterThan(10);
     expect(world.length).toBe(mexico.length);
-    expect(world.every((l) => (l.maxzoom ?? 24) <= BASEMAP_SWITCH_ZOOM)).toBe(true);
+    expect(worldLabels.every((l) => (l.maxzoom ?? 24) <= BASEMAP_SWITCH_ZOOM)).toBe(true);
     expect(mexico.every((l) => (l.minzoom ?? 0) >= BASEMAP_SWITCH_ZOOM)).toBe(true);
+  });
+
+  it('los polígonos del mundo siguen debajo de México un poco más (sin huecos al inclinar)', () => {
+    const worldPolygons = style.layers.filter(
+      (l) => l.id.startsWith('basemap_world-') && l.type !== 'symbol',
+    );
+
+    expect(
+      worldPolygons.every(
+        (l) => (l.maxzoom ?? 24) <= BASEMAP_SWITCH_ZOOM + WORLD_POLYGON_OVERLAP_ZOOMS,
+      ),
+    ).toBe(true);
+    expect(worldPolygons.some((l) => (l.maxzoom ?? 24) > BASEMAP_SWITCH_ZOOM)).toBe(true);
   });
 
   it('tiene un solo fondo, al principio', () => {
