@@ -43,8 +43,9 @@ _DEFAULT_PROVIDER_MAX_ATTEMPTS = 3
 # - 2 peticiones simultáneas por proveedor: suficiente para pocas consultas
 #   por búsqueda sin parecer un ataque.
 _DEFAULT_PROVIDER_MAX_CONCURRENCY = 2
-# - GDELT: una petición cada 5 s. VERIFICAR: cifra que circula en la
-#   comunidad, no documentada en la página de DOC 2.0.
+# - GDELT: una petición cada 5 s. No está en la página de DOC 2.0, pero lo
+#   dice el propio GDELT en su respuesta 429: "Please limit requests to one
+#   every 5 seconds" (medido el 16/10/2026).
 _DEFAULT_GDELT_MIN_INTERVAL_SECONDS = 5.0
 # - GDELT: tras un 429, esperar al menos 15 s antes de reintentar. Medido el
 #   16/10/2026: reintentos a 1-5 s recibían 429 de nuevo (plan aprobado).

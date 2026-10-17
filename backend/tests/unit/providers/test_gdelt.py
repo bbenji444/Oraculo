@@ -201,3 +201,18 @@ async def test_desactivado_no_envia_nada() -> None:
     with pytest.raises(ProviderNotConfiguredError, match="ADR-0012"):
         await provider.search(d1())
     assert sent == []
+
+
+def test_respuesta_real_de_gdelt_con_notas() -> None:
+    # Primera respuesta de GDELT con notas reales (16/10/2026, ADR-0014):
+    # "Jalisco sourcelang:spanish", último día. Pidió 50, llegaron 14.
+    body = (FIXTURES / "gdelt_jalisco_1d.json").read_text(encoding="utf-8")
+
+    articles, discarded = parse_articles(body)
+
+    assert (len(articles), discarded) == (14, 0)
+    first = articles[0]
+    assert first.title.startswith("Investigan a 17 policías")
+    # "seendate" llega como 20261016T021500Z: UTC con T y Z.
+    assert first.published_at == datetime(2026, 10, 16, 2, 15, tzinfo=UTC)
+    assert all(a.published_at is not None for a in articles)

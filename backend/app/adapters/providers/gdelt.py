@@ -39,8 +39,9 @@ MAX_RECORDS = 250
 # Más recientes primero: en monitoreo importa no perder lo nuevo.
 SORT = "DateDesc"
 _GDELT_DATETIME = "%Y%m%d%H%M%S"
-# VERIFICAR: formato de "seendate" no documentado en la página de DOC 2.0;
-# se confirma con la primera respuesta real.
+# Formato de "seendate" (no documentado en la página de DOC 2.0), confirmado
+# con respuestas reales del 16/10/2026: "20261016T021500Z", en UTC
+# (fixture gdelt_jalisco_1d.json).
 _SEENDATE = "%Y%m%dT%H%M%SZ"
 _END_OF_DAY = time(23, 59, 59)
 
