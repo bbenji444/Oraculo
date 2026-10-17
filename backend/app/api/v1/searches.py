@@ -7,6 +7,7 @@ aplicación al arrancar (``app.state``) y llaman a un caso de uso.
 - ``POST /searches``: lanza la búsqueda (``202``); el worker la corre.
 - ``GET /searches/{id}`` y ``GET /searches``: estado y avance, e historial.
 - ``GET /searches/{id}/articles``: sus notas, con filtros y cursor.
+- ``GET /searches/{id}/aggregates``: conteos por región para el mapa de calor.
 
 No hace: no valida reglas de negocio; sus errores los traduce
 ``app.api.errors`` al formato uniforme.
@@ -20,7 +21,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request, status
 from app.api.errors import ERROR_RESPONSES
 from app.api.v1.articles import Articles
 from app.api.v1.concepts import get_actor
-from app.api.v1.schemas.articles import ArticlePageOut
+from app.api.v1.schemas.articles import AggregatesOut, ArticlePageOut
 from app.api.v1.schemas.searches import (
     EstimateOut,
     SearchIn,
@@ -37,11 +38,13 @@ from app.application.use_cases.plan_search import PlanSearch, SearchRequest
 from app.application.use_cases.search_reads import (
     DEFAULT_ARTICLE_PAGE_SIZE,
     DEFAULT_PAGE_SIZE,
+    GetAggregates,
     GetSearch,
     ListSearchArticles,
     ListSearches,
 )
 from app.application.use_cases.start_search import StartSearch
+from app.domain.aggregates import AggregateLevel
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
 
@@ -221,3 +224,25 @@ async def list_search_articles(  # noqa: PLR0913 — un parámetro de URL por fi
     )
     page = await ListSearchArticles(reader, articles).execute(search_id, filters, cursor, limit)
     return ArticlePageOut.from_page(page)
+
+
+@router.get(
+    "/{search_id}/aggregates",
+    response_model=AggregatesOut,
+    summary="Mapa de calor: notas por región",
+)
+async def search_aggregates(
+    reader: Reader,
+    articles: Articles,
+    search_id: SearchId,
+    level: Annotated[
+        AggregateLevel, Query(description="country, state o municipality.")
+    ] = AggregateLevel.STATE,
+    relevant: Annotated[
+        Literal["true", "all"], Query(description="true: solo las relevantes; all: todas.")
+    ] = "true",
+) -> AggregatesOut:
+    """Cuántas notas caen en cada región, con su centro, al nivel pedido."""
+    filters = ArticleFilters(relevant_only=relevant == "true")
+    view = await GetAggregates(reader, articles).execute(search_id, level, filters)
+    return AggregatesOut.from_view(view)

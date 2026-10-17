@@ -3,6 +3,7 @@
 No hace: no corre ni modifica búsquedas.
 """
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from app.application.pagination import Page, TimeCursor, decode_time_cursor, encode_time_cursor
@@ -11,10 +12,12 @@ from app.application.ports.search_reads import (
     ArticleFilters,
     ArticleItem,
     ArticleReaderPort,
+    RegionPoint,
     SearchDetail,
     SearchReaderPort,
 )
 from app.application.use_cases.run_search import SearchNotFoundError
+from app.domain.aggregates import AggregateLevel, aggregate
 from app.domain.errors import InvalidRequestError, NotFoundError
 from app.domain.geocoding import Precision
 
@@ -200,3 +203,82 @@ class GetArticle:
         if detail is None:
             raise ArticleNotFoundError("No existe esa nota.", {"id": article_id})
         return detail
+
+
+@dataclass(frozen=True, slots=True)
+class AggregateItem:
+    """Una región con su conteo.
+
+    Attributes:
+        region: Región (nombre y centro).
+        count: Notas que caen ahí.
+    """
+
+    region: RegionPoint
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class AggregatesView:
+    """El mapa de calor de una búsqueda.
+
+    Attributes:
+        level: Nivel pedido.
+        items: Regiones con notas, de la que más tiene a la que menos.
+        coarser: Notas ubicadas con menos precisión que el nivel.
+        abroad: Notas de otro país.
+        unlocated: Notas sin ubicación.
+        total: Todas las notas contadas.
+    """
+
+    level: AggregateLevel
+    items: tuple[AggregateItem, ...]
+    coarser: int
+    abroad: int
+    unlocated: int
+    total: int
+
+
+class GetAggregates:
+    """Conteo de notas por región para el mapa de calor."""
+
+    def __init__(self, searches: SearchReaderPort, articles: ArticleReaderPort) -> None:
+        """Recibe los lectores.
+
+        Args:
+            searches: Lecturas de búsquedas (para el 404).
+            articles: Lecturas de notas.
+        """
+        self._searches = searches
+        self._articles = articles
+
+    async def execute(
+        self, search_id: UUID, level: AggregateLevel, filters: ArticleFilters
+    ) -> AggregatesView:
+        """Agrupa las notas de la búsqueda.
+
+        Args:
+            search_id: Búsqueda.
+            level: País, estado o municipio.
+            filters: Los mismos filtros de la lista de notas.
+
+        Returns:
+            Conteos por región, con nombre y centro.
+
+        Raises:
+            SearchNotFoundError: Si la búsqueda no existe.
+        """
+        await GetSearch(self._searches).execute(search_id)
+        result = aggregate(await self._articles.note_locations(search_id, filters), level)
+        regions = {r.code: r for r in await self._articles.regions_by_code(sorted(result.counts))}
+        items = sorted(
+            (
+                AggregateItem(regions[code], count)
+                for code, count in result.counts.items()
+                if code in regions
+            ),
+            key=lambda i: (-i.count, i.region.name),
+        )
+        return AggregatesView(
+            level, tuple(items), result.coarser, result.abroad, result.unlocated, result.total
+        )

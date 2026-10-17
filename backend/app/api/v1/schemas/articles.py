@@ -18,6 +18,7 @@ from app.application.ports.search_reads import (
     JudgementView,
     LocationView,
 )
+from app.application.use_cases.search_reads import AggregatesView
 
 
 class JudgementOut(BaseModel):
@@ -185,4 +186,57 @@ class ArticleDetailOut(ArticleOut):
             first_seen_at=detail.first_seen_at,
             llm_model=detail.llm_model,
             prompt_version=detail.prompt_version,
+        )
+
+
+class AggregateItemOut(BaseModel):
+    """Una región del mapa de calor."""
+
+    region_id: int
+    code: str = Field(examples=["14"])
+    name: str = Field(examples=["Jalisco"])
+    count: int = Field(description="Notas cuya ubicación principal cae aquí.")
+    lon: float = Field(description="Centro de la región.")
+    lat: float
+
+
+class AggregatesOut(BaseModel):
+    """Conteo de notas por región, para el mapa de calor."""
+
+    level: str = Field(examples=["state"])
+    items: list[AggregateItemOut] = Field(description="De la región con más notas a la de menos.")
+    coarser: int = Field(
+        description="Notas con ubicación menos precisa que el nivel (no se reparten)."
+    )
+    abroad: int = Field(description="Notas de otro país (en los niveles de México).")
+    unlocated: int = Field(description="Notas sin ubicación.")
+    total: int
+
+    @classmethod
+    def from_view(cls, view: AggregatesView) -> "AggregatesOut":
+        """Convierte el resultado del caso de uso.
+
+        Args:
+            view: Conteos.
+
+        Returns:
+            El esquema.
+        """
+        return cls(
+            level=view.level.value,
+            items=[
+                AggregateItemOut(
+                    region_id=i.region.region_id,
+                    code=i.region.code,
+                    name=i.region.name,
+                    count=i.count,
+                    lon=i.region.lon,
+                    lat=i.region.lat,
+                )
+                for i in view.items
+            ],
+            coarser=view.coarser,
+            abroad=view.abroad,
+            unlocated=view.unlocated,
+            total=view.total,
         )

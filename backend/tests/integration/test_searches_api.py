@@ -427,3 +427,37 @@ def test_detalle_de_una_nota(client: TestClient, filled: tuple[str, dict[str, in
     assert (data["llm_model"], data["prompt_version"]) == ("modelo-de-prueba", "enrich_v1")
     assert data["providers"] == ["searchapi"]
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "article_not_found")
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"level": "state", "relevant": "all"}, ([("09", 1)], 0, 1, 0)),
+        ({"level": "municipality", "relevant": "all"}, ([("09007", 1)], 0, 1, 0)),
+        ({"level": "country", "relevant": "all"}, ([("FRA", 1), ("MEX", 1)], 0, 0, 0)),
+        ({}, ([("09", 1)], 0, 0, 0)),
+    ],
+)
+def test_mapa_de_calor(
+    client: TestClient,
+    filled: tuple[str, dict[str, int]],
+    params: dict[str, Any],
+    expected: tuple[list[tuple[str, int]], int, int, int],
+) -> None:
+    search_id, _articles = filled
+
+    response = client.get(f"{URL}/{search_id}/aggregates", params=params)
+
+    assert response.status_code == 200
+    data = response.json()
+    items = sorted((i["code"], i["count"]) for i in data["items"])
+    assert (items, data["coarser"], data["abroad"], data["unlocated"]) == expected
+    assert all(i["lon"] is not None and i["name"] for i in data["items"])
+
+
+def test_mapa_de_calor_errores(client: TestClient, filled: tuple[str, dict[str, int]]) -> None:
+    missing = client.get(f"{URL}/00000000-0000-0000-0000-000000000000/aggregates")
+    bad = client.get(f"{URL}/{filled[0]}/aggregates", params={"level": "colonia"})
+
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "search_not_found")
+    assert (bad.status_code, bad.json()["error"]["code"]) == (422, "invalid_request")

@@ -1,5 +1,6 @@
 """Lecturas de búsquedas: cursor de fecha + id, historial y detalle (sin base)."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
@@ -19,18 +20,22 @@ from app.application.ports.search_reads import (
     ArticleItem,
     ConceptRef,
     InRegion,
+    RegionPoint,
     SearchDetail,
 )
 from app.application.use_cases.run_search import SearchNotFoundError
 from app.application.use_cases.search_reads import (
     ArticleNotFoundError,
+    GetAggregates,
     GetArticle,
     GetSearch,
     ListSearchArticles,
     ListSearches,
 )
+from app.domain.aggregates import AggregateLevel, NoteLocation
 from app.domain.enrichment import LLMUsage
 from app.domain.errors import InvalidRequestError
+from app.domain.geocoding import Precision
 from app.domain.search import SearchStatus
 
 pytestmark = pytest.mark.anyio
@@ -163,6 +168,21 @@ class Articles:
     async def article_detail(self, article_id: int) -> ArticleDetail | None:
         return None
 
+    async def note_locations(self, search_id: UUID, filters: ArticleFilters) -> list[NoteLocation]:
+        return [
+            NoteLocation("14039", "MEX", Precision.MUNICIPALITY),
+            NoteLocation("14", "MEX", Precision.STATE),
+            NoteLocation("17006", "MEX", Precision.MUNICIPALITY),
+            # Clave que ya no está en el catálogo: no se pinta.
+            NoteLocation("99001", "MEX", Precision.MUNICIPALITY),
+        ]
+
+    async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
+        known = {"14": "Jalisco", "17": "Morelos"}
+        return [
+            RegionPoint(i, c, known[c], -100.0, 20.0) for i, c in enumerate(codes) if c in known
+        ]
+
 
 async def test_notas_por_paginas_y_validacion() -> None:
     search = detail(1)
@@ -183,3 +203,18 @@ async def test_notas_por_paginas_y_validacion() -> None:
         await use.execute(uuid4(), filters)
     with pytest.raises(ArticleNotFoundError):
         await GetArticle(articles).execute(1)
+
+
+async def test_mapa_de_calor_ordenado_y_sin_regiones_desconocidas() -> None:
+    search = detail(1)
+
+    view = await GetAggregates(Reader([search]), Articles([])).execute(
+        search.search_id, AggregateLevel.STATE, ArticleFilters()
+    )
+
+    assert [(i.region.name, i.count) for i in view.items] == [("Jalisco", 2), ("Morelos", 1)]
+    assert (view.coarser, view.abroad, view.unlocated, view.total) == (0, 0, 0, 4)
+    with pytest.raises(SearchNotFoundError):
+        await GetAggregates(Reader([]), Articles([])).execute(
+            uuid4(), AggregateLevel.STATE, ArticleFilters()
+        )

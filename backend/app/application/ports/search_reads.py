@@ -7,7 +7,7 @@ que el pipeline escribe (``search_store``). La implementación está en
 No hace: no decide nada ni escribe.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
@@ -15,6 +15,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.application.pagination import TimeCursor
+from app.domain.aggregates import NoteLocation
 from app.domain.enrichment import LLMUsage
 from app.domain.search import SearchStatus
 
@@ -245,6 +246,25 @@ class ArticleDetail:
     prompt_version: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class RegionPoint:
+    """Una región para el mapa: nombre y centro.
+
+    Attributes:
+        region_id: Id.
+        code: Clave (INEGI o ISO-A3).
+        name: Nombre.
+        lon: Longitud del centro.
+        lat: Latitud del centro.
+    """
+
+    region_id: int
+    code: str
+    name: str
+    lon: float
+    lat: float
+
+
 class ArticleReaderPort(Protocol):
     """Lecturas de notas para la API."""
 
@@ -272,5 +292,28 @@ class ArticleReaderPort(Protocol):
 
         Returns:
             La nota, o ``None`` si no existe.
+        """
+        ...
+
+    async def note_locations(self, search_id: UUID, filters: ArticleFilters) -> list[NoteLocation]:
+        """Ubicación principal de cada nota de una búsqueda (para el mapa de calor).
+
+        Args:
+            search_id: Búsqueda.
+            filters: Filtros (los mismos de la lista de notas).
+
+        Returns:
+            Una por nota.
+        """
+        ...
+
+    async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
+        """Nombre y centro de varias regiones.
+
+        Args:
+            codes: Claves (INEGI o ISO-A3).
+
+        Returns:
+            Las que existen, en cualquier orden.
         """
         ...

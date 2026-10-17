@@ -33,6 +33,7 @@ from app.application.ports.search_reads import (
     InRegion,
     JudgementView,
     LocationView,
+    RegionPoint,
     SearchDetail,
 )
 from app.application.ports.search_store import (
@@ -46,10 +47,11 @@ from app.application.ports.search_store import (
     StoredSearch,
     StoredText,
 )
+from app.domain.aggregates import NoteLocation
 from app.domain.dedupe import DedupedArticle, url_hash
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
-from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Resolution
+from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
 from app.domain.region import RegionLevel
 from app.domain.search import SearchStatus
 
@@ -835,6 +837,42 @@ class PostgresArticleStore:
             llm_model=row["llm_model"],
             prompt_version=row["prompt_version"],
         )
+
+    async def note_locations(self, search_id: UUID, filters: ArticleFilters) -> list[NoteLocation]:
+        """Ver ``ArticleReaderPort.note_locations``."""
+        where, params = _article_filters(filters)
+        params["s"] = search_id
+        sql = f"""
+            SELECT r.code, r.country_code, p.precision
+            FROM (SELECT article_id, bool_or(in_region) AS in_region
+                  FROM search_results WHERE search_id = :s GROUP BY article_id) sr
+            JOIN articles a ON a.id = sr.article_id
+            LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
+            LEFT JOIN regions r ON r.id = p.region_id
+            WHERE {" AND ".join(where) or "true"}
+        """  # noqa: S608 — condiciones de texto fijo de este módulo
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(text(sql), params)).all()
+        return [
+            NoteLocation(code, country, Precision(precision) if precision else Precision.UNKNOWN)
+            for code, country, precision in rows
+        ]
+
+    async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
+        """Ver ``ArticleReaderPort.regions_by_code``."""
+        if not codes:
+            return []
+        async with self._engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT id, code, name, ST_X(centroid), ST_Y(centroid) FROM regions "
+                        "WHERE code = ANY(:codes)"
+                    ),
+                    {"codes": list(codes)},
+                )
+            ).all()
+        return [RegionPoint(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
     async def purge_texts(self, older_than_days: int) -> int:
         """Borra los textos extraídos más viejos que la retención (ADR-0015).
