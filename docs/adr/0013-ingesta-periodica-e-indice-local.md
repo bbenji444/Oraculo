@@ -1,6 +1,6 @@
 # ADR-0013 — Ingesta periódica e índice local de notas (GDELT por archivos y RSS de medios)
 
-- **Estado:** aceptado
+- **Estado:** aceptado. Modificado por el [ADR-0014](0014-ngramas-de-gdelt.md): la fuente principal de GDELT pasan a ser los ngramas (texto completo) y el GKG queda apagado por defecto.
 - **Fecha:** 2026-10-16
 - **Fase:** F3 (ampliada a "Proveedores e ingesta")
 - **Decide:** Benji
