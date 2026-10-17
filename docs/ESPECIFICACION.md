@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.3 · Octubre 2026 · Responsable: Benji
+Versión 2.4 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -368,6 +368,14 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `ip`
 - `created_at`
 
+**`reports`** (F7, ADR-0018) — el resumen ejecutivo de cada búsqueda, para no volver a pagarlo
+- `id`
+- `search_id` (único, con índice)
+- `executive_summary`
+- `llm_provider`, `llm_model`, `prompt_version`
+- `llm_tokens_in`, `llm_tokens_out`, `llm_cost_usd`
+- `created_by`, `created_at`
+
 **`users`** — se crea en la Fase 8; antes, un usuario fijo de desarrollo.
 
 ---
@@ -617,7 +625,8 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | GET | `/searches/{id}/articles?cursor=&limit=&relevant=&in_region=&precision=&concept_id=` | Resultados (paginación por cursor). Por defecto solo las relevantes (`relevant=all` trae todas); `in_region` = `true`, `false` o `none` (sin ubicación) |
 | GET | `/searches/{id}/aggregates?level=state\|municipality\|country` | Conteo por región para el mapa de calor. Las notas menos precisas que el nivel no se reparten (`coarser`) |
 | GET | `/articles/{id}` | Detalle |
-| POST | `/searches/{id}/report?format=pdf\|html` | Genera reporte |
+| POST | `/searches/{id}/report?format=pdf\|html` | Genera reporte (`409` si la búsqueda no ha terminado) |
+| GET | `/searches/{id}/export?format=csv\|geojson` | Notas de la búsqueda como datos: metadatos, resumen y link, nunca el texto completo |
 
 Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "details": {} } }`, con mensajes en español. También ante fallas inesperadas (`500 internal_error`) y configuración faltante (`503`, por ejemplo `llm_not_configured`). Ejemplos con `curl` en `docs/api.md`.
 
@@ -701,10 +710,14 @@ Plantilla Jinja2 única → HTML (vista previa) y PDF (WeasyPrint).
 **Contenido:**
 - portada: conceptos, región, rango, fecha y hora de generación, usuario;
 - resumen ejecutivo generado por el LLM a partir de los resúmenes, nunca del texto completo;
-- tabla de conteo por subregión;
-- mapa estático (imagen generada en el servidor o captura del canvas enviada por el frontend; decidir en ADR);
+- tabla de conteo por subregión (país → estados, estado → municipios, municipio → localidades; lo menos preciso se cuenta aparte);
+- mapa estático en SVG dibujado en el servidor con PostGIS: subregiones coloreadas por número de notas y puntos, con anillo punteado para lo poco preciso (ADR-0018);
 - lista de noticias con resumen, fuente, fecha, link y precisión;
 - pie con proveedores consultados y créditos usados.
+
+El resumen ejecutivo se guarda en `reports` y no se vuelve a pagar. La fuente (Noto Sans) va incluida en el repositorio para que la Ñ y los acentos salgan iguales en cualquier servidor.
+
+**Datos:** CSV (UTF-8 con BOM, para Excel) y GeoJSON (un punto por nota ubicada), con metadatos, resumen generado y link. Cada reporte o exportación queda en la bitácora como `report.generated`.
 
 ---
 
@@ -903,3 +916,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.1 | 17 de octubre de 2026 | OpenAI (`gpt-6-luna`) como IA por defecto, Gemini elegible con `LLM_PROVIDER` (ADR-0016). |
 | 2.2 | 17 de octubre de 2026 | F5: parámetros finales de `/searches/{id}/articles` (`relevant`, `concept_id`, `in_region=none`) y de `/aggregates` (`level`, `coarser`); errores 500 y 503 uniformes; `docs/api.md`. |
 | 2.3 | 17 de octubre de 2026 | F6: Tierra realista con texturas de la NASA, fondo de universo con three.js y reglas de movimiento del globo (ADR-0017). |
+| 2.4 | 17 de octubre de 2026 | F7: reportes con mapa SVG dibujado en el servidor, resumen ejecutivo guardado en `reports`, fuente incluida y datos en CSV y GeoJSON (`/export`) (ADR-0018). |
