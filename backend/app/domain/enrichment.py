@@ -24,6 +24,11 @@ from app.domain.geocoding import Mention
 # inicio de la nota trae lo esencial (quién, qué, dónde).
 MAX_TEXT_CHARS = 6000
 _TOKENS_PER_MILLION = 1_000_000
+# Tokens que se suponen por nota para estimar el costo ANTES de gastar
+# (ADR-0015: ~2,000 de entrada con el texto recortado y ~300 de salida). El
+# costo real se registra con los tokens que reporta la IA.
+ESTIMATED_TOKENS_IN_PER_ARTICLE = 2000
+ESTIMATED_TOKENS_OUT_PER_ARTICLE = 300
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +113,28 @@ class LLMUsage:
         return (
             self.tokens_in * price_in_per_million + self.tokens_out * price_out_per_million
         ) / _TOKENS_PER_MILLION
+
+    def __add__(self, other: "LLMUsage") -> "LLMUsage":
+        """Suma los tokens de dos llamadas (total de una búsqueda)."""
+        return LLMUsage(self.tokens_in + other.tokens_in, self.tokens_out + other.tokens_out)
+
+
+def estimated_usage(articles: int) -> LLMUsage:
+    """Tokens que se calculan para enriquecer cierta cantidad de notas, antes de gastar.
+
+    Args:
+        articles: Notas que se mandarían a la IA.
+
+    Returns:
+        Tokens estimados (ADR-0015).
+
+    Example:
+        >>> estimated_usage(150).cost_usd(0.10, 0.50)
+        0.0525
+    """
+    return LLMUsage(
+        articles * ESTIMATED_TOKENS_IN_PER_ARTICLE, articles * ESTIMATED_TOKENS_OUT_PER_ARTICLE
+    )
 
 
 def text_for_llm(text: str) -> str:

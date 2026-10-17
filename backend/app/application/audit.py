@@ -16,6 +16,7 @@ from app.domain.concept import ConceptDraft
 CONCEPT_CREATED = "concept.created"
 CONCEPT_UPDATED = "concept.updated"
 CONCEPT_DELETED = "concept.deleted"
+SEARCH_FINISHED = "search.finished"
 
 
 @dataclass(frozen=True, slots=True)
