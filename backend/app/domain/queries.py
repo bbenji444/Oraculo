@@ -169,7 +169,8 @@ class PlaceFacts:
         country: País de la región.
         state_code: Clave INEGI del estado: la propia si la región es un
             estado, la de su estado si es municipio o localidad, ``None`` en
-            un país.
+            un país. Hoy no se usa para buscar (la pista de estado de GDELT
+            resultó poco fiable, ADR-0014); queda como dato para F4.
     """
 
     level: RegionLevel
@@ -191,16 +192,11 @@ class QueryPlace:
         required_terms: Palabras del estado que también deben aparecer, para
             distinguir nombres repetidos. Vacío si no hace falta.
         country: País por el que filtran los proveedores.
-        state_code: Clave INEGI si el lugar **es** un estado; ``None`` en
-            otros niveles. El índice local la usa para aceptar notas que
-            GDELT ubicó en ese estado aunque el texto no lo nombre
-            (ADR-0013). En un municipio no se usa: traería todo su estado.
     """
 
     terms: tuple[str, ...]
     required_terms: tuple[str, ...]
     country: CountryFilter
-    state_code: str | None = None
 
 
 def place_for(facts: PlaceFacts) -> QueryPlace:
@@ -225,8 +221,7 @@ def place_for(facts: PlaceFacts) -> QueryPlace:
     required: tuple[str, ...] = ()
     if needs_state and facts.state_name is not None:
         required = facts.state_search_terms or (facts.state_name,)
-    state_code = facts.state_code if facts.level is RegionLevel.STATE else None
-    return QueryPlace(terms, required, facts.country, state_code)
+    return QueryPlace(terms, required, facts.country)
 
 
 @dataclass(frozen=True, slots=True)

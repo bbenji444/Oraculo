@@ -51,8 +51,6 @@ _SEARCH = text(
          OR ((text_norm ~ :place OR body_terms ~ :body_place)
              AND (CAST(:required AS text) IS NULL
                   OR text_norm ~ :required OR body_terms ~ :body_required))
-         OR (CAST(:state AS text) IS NOT NULL
-             AND gdelt_states @> ARRAY[CAST(:state AS text)])
       )
     ORDER BY published_at DESC, id DESC
     LIMIT :limit
@@ -86,7 +84,6 @@ def _sql_params(criteria: LocalIndexCriteria) -> dict[str, object]:
         "body_place": word_pattern(for_body(criteria.place_terms)),
         "required": word_pattern(criteria.required_terms),
         "body_required": word_pattern(for_body(criteria.required_terms)),
-        "state": criteria.state_code,
         "limit": criteria.limit,
     }
 
@@ -119,7 +116,6 @@ class LocalIndexProvider:
             "excluir": " | ".join(criteria.exclusions),
             "lugar": " | ".join(criteria.place_terms),
             "estado_requerido": " | ".join(criteria.required_terms),
-            "estado_gdelt": criteria.state_code or "",
             "desde": criteria.start.isoformat(),
             "hasta": criteria.end.isoformat(),
             "max": str(criteria.limit),

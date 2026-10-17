@@ -12,10 +12,12 @@ Convierte una ``PlannedQuery`` en criterios concretos que el adaptador de
 - **Exclusiones:** si aparece alguna **en el título o el fragmento**, la nota
   se descarta. En el cuerpo no se aplican: palabras como "curso" aparecen en
   frases normales ("la investigación en curso") y tirarían notas buenas.
-- **Lugar:** algún término del lugar aparece en el texto o el cuerpo (y, si hace falta
-  para distinguir nombres repetidos, también el estado), **o** la región es
-  un estado y GDELT ubicó la nota ahí. En México a nivel país no se filtra
-  por lugar: todo el índice es de México. En otro país se pide su nombre.
+- **Lugar:** algún término del lugar aparece en el texto o el cuerpo (y, si
+  hace falta para distinguir nombres repetidos, también el estado). En México
+  a nivel país no se filtra por lugar: todo el índice es de México. En otro
+  país se pide su nombre. La "pista" de estado de GDELT ya **no** cuenta: en
+  datos reales ubicó en Jalisco notas de Michoacán y del Estado de México
+  (16/10/2026, ADR-0014). Se sigue guardando como dato para F4.
 - **Fechas:** días completos en la zona de la Ciudad de México.
 - **Tope:** las ``MAX_LOCAL_RESULTS`` más recientes.
 
@@ -64,8 +66,6 @@ class LocalIndexCriteria:
         exclusions: Ninguna debe aparecer.
         place_terms: Al menos uno debe aparecer; vacío = sin filtro de lugar.
         required_terms: Si no está vacío, también debe aparecer uno.
-        state_code: Clave INEGI: una nota que GDELT ubicó en ese estado
-            cumple el lugar aunque el texto no lo nombre.
         start: Primer instante incluido (UTC).
         end: Primer instante ya no incluido (UTC).
         limit: Máximo de notas.
@@ -75,7 +75,6 @@ class LocalIndexCriteria:
     exclusions: tuple[str, ...]
     place_terms: tuple[str, ...]
     required_terms: tuple[str, ...]
-    state_code: str | None
     start: datetime
     end: datetime
     limit: int = MAX_LOCAL_RESULTS
@@ -118,7 +117,6 @@ def criteria_for(query: PlannedQuery, tz: tzinfo) -> LocalIndexCriteria:
         exclusions=_normalized(query.exclude_terms),
         place_terms=place_terms,
         required_terms=_normalized(place.required_terms),
-        state_code=place.state_code,
         start=start.astimezone(UTC),
         end=end.astimezone(UTC),
     )

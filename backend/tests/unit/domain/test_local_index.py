@@ -59,7 +59,7 @@ def test_mexico_a_nivel_pais_no_filtra_lugar_y_otro_pais_pide_su_nombre() -> Non
     assert criteria_for(guatemala, CDMX_TZ).place_terms == ("GUATEMALA",)
 
 
-def test_nombre_repetido_lleva_el_estado_y_sin_pista_de_gdelt() -> None:
+def test_nombre_repetido_lleva_el_estado() -> None:
     facts = PlaceFacts(
         RegionLevel.MUNICIPALITY, "Benito Juárez", (), True, "Quintana Roo", (), MEXICO, "23"
     )
@@ -68,16 +68,16 @@ def test_nombre_repetido_lleva_el_estado_y_sin_pista_de_gdelt() -> None:
 
     assert criteria.place_terms == ("BENITO JUAREZ",)
     assert criteria.required_terms == ("QUINTANA ROO",)
-    # En un municipio la pista de GDELT traería todo el estado.
-    assert criteria.state_code is None
 
 
-def test_un_estado_acepta_la_pista_de_gdelt() -> None:
+def test_un_estado_se_busca_por_su_nombre() -> None:
+    # Sin pista de estado de GDELT: ubicaba mal notas de otros estados (ADR-0014).
     facts = PlaceFacts(RegionLevel.STATE, "Jalisco", (), False, None, (), MEXICO, "14")
 
     criteria = criteria_for(query(place_for(facts)), CDMX_TZ)
 
-    assert (criteria.place_terms, criteria.state_code) == (("JALISCO",), "14")
+    assert criteria.place_terms == ("JALISCO",)
+    assert not hasattr(criteria, "state_code")
 
 
 def test_sin_palabras_clave_utiles_es_error() -> None:

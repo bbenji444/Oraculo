@@ -295,7 +295,7 @@ def test_indice_local_se_describe_en_palabras() -> None:
     ]
 
 
-def test_indice_local_con_estado_requerido_pista_de_gdelt_y_pais() -> None:
+def test_indice_local_con_estado_requerido_estado_y_pais() -> None:
     juarez = place_for(
         facts(RegionLevel.MUNICIPALITY, "Benito Juárez", repeated=True, state="Quintana Roo")
     )
@@ -303,10 +303,7 @@ def test_indice_local_con_estado_requerido_pista_de_gdelt_y_pais() -> None:
     mexico = place_for(facts(RegionLevel.COUNTRY, "México"))
 
     assert 'lugar: "Benito Juárez" (y "Quintana Roo") ·' in texts(juarez)[Provider.LOCAL_INDEX][0]
-    assert (
-        "lugar: Jalisco, o GDELT la ubicó en el estado 14"
-        in texts(jalisco)[Provider.LOCAL_INDEX][0]
-    )
+    assert "lugar: Jalisco ·" in texts(jalisco)[Provider.LOCAL_INDEX][0]
     assert "lugar: México" in texts(mexico)[Provider.LOCAL_INDEX][0]
 
 
@@ -317,13 +314,3 @@ def test_las_consultas_llevan_exclusiones_y_lugar_aparte() -> None:
     assert query.place == IZTAPALAPA
     assert DIALECTS[Provider.LOCAL_INDEX].cacheable is False
     assert DIALECTS[Provider.SEARCHAPI].cacheable is True
-
-
-def test_solo_un_estado_lleva_su_clave_para_la_pista_de_gdelt() -> None:
-    municipio = PlaceFacts(
-        RegionLevel.MUNICIPALITY, "Iztapalapa", (), False, "CDMX", (), MEXICO, "09"
-    )
-    estado = PlaceFacts(RegionLevel.STATE, "Ciudad de México", (), False, None, (), MEXICO, "09")
-
-    assert place_for(municipio).state_code is None
-    assert place_for(estado).state_code == "09"

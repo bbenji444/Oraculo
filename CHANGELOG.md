@@ -48,6 +48,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 ### Corregido
 
 - GDELT repetía la misma ubicación por cada mención; ahora se guarda una vez.
+- El índice local ya no acepta notas solo porque GDELT las ubicó en el estado buscado: en datos reales metía notas de otros estados (ADR-0014).
 - El tamaño y el MD5 de los archivos de GDELT se leen de `x-goog-hash` y `x-goog-stored-content-length`: Google quita el ETag cuando recomprime al vuelo.
 
 ### Desactivado

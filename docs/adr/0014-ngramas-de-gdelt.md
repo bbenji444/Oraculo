@@ -39,6 +39,7 @@ Muestra real del 16/10/2026 (`20261016224700`):
 3. **Las frases del cuerpo se conservan 30 días** (`NEWS_BODY_RETENTION_DAYS`); título y link, 90 (`NEWS_INDEX_RETENTION_DAYS`).
 4. **Los archivos GKG quedan apagados por defecto** (`GDELT_GKG_ENABLED=false`) cuando los ngramas funcionen, para no sumar 760 MB al día. Se reactivan con la variable. Las notas GKG ya guardadas se conservan.
 5. **La API DOC sigue apagada** (ADR-0012). Se revisa cuando GDELT anuncie que terminó la migración.
+6. **La pista de estado de GDELT ya no cuenta para buscar** (corrección del 16/10/2026). En datos reales, "Extorsión · Jalisco" trajo 3 notas y 2 eran de otros estados (Michoacán y Estado de México) que GDELT había ubicado en Jalisco. También ubicó "Sinaloa" y "Michoacán" como pueblos de Tabasco. Un estado se encuentra ahora solo si el texto lo nombra; las pistas (`gdelt_states`) se siguen guardando como dato para F4.
 
 ## Alternativas consideradas
 

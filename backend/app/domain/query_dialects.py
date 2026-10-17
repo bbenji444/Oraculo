@@ -157,8 +157,6 @@ def local_index_text(
         where = _in_words(place.terms)
         if place.required_terms:
             where += f" (y {_in_words(place.required_terms)})"
-        if place.state_code:
-            where += f", o GDELT la ubicó en el estado {place.state_code}"
         parts.append(f"lugar: {where}")
     else:
         parts.append(f"lugar: {place.country.name}")

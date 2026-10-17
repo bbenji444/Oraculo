@@ -23,7 +23,7 @@ MEXICO = CountryFilter("México", "MX", "MX", "Mexico")
 # Del 10 al 16 de octubre en hora de la CDMX: del 10/10 06:00 al 17/10 06:00 UTC.
 WINDOW = DateWindow.between(date(2026, 10, 10), date(2026, 10, 16))
 IZTAPALAPA = QueryPlace(("Iztapalapa",), (), MEXICO)
-JALISCO = QueryPlace(("Jalisco",), (), MEXICO, "14")
+JALISCO = QueryPlace(("Jalisco",), (), MEXICO)
 NOON = datetime(2026, 10, 15, 18, 0, tzinfo=UTC)
 
 
@@ -59,6 +59,9 @@ NOTES = [
     note("plural", "Hackeos en Iztapalapa"),
     note("curso", "Curso contra el hackeo en Iztapalapa"),
     note("gdl", "Hackeo en dependencia de Guadalajara", states=("14",)),
+    # Caso real del 16/10/2026: GDELT ubicó en Jalisco (14) notas de otros estados.
+    note("michoacan", "Hackeo a productores de Uruapan, Michoacán", states=("14",)),
+    note("jalisco", "Hackeo al gobierno de Jalisco"),
     note("penon", "Hackeo en el Peñón de los Baños"),
     note("vieja", "Hackeo en Iztapalapa", at=datetime(2026, 9, 1, tzinfo=UTC)),
     # 23:30 del 16/10 en la CDMX: dentro. 00:00 del 17/10: fuera.
@@ -98,17 +101,26 @@ async def test_palabra_completa_lugar_exclusiones_y_fechas(provider: LocalIndexP
     assert response.params["lugar"] == "IZTAPALAPA"
 
 
-async def test_un_estado_acepta_notas_que_gdelt_ubico_ahi(provider: LocalIndexProvider) -> None:
+async def test_un_estado_se_busca_por_su_nombre_no_por_la_pista_de_gdelt(
+    provider: LocalIndexProvider,
+) -> None:
     response = await provider.search(query(JALISCO))
 
-    assert slugs([a.url for a in response.articles]) == ["gdl"]
-    assert response.articles[0].raw["gdelt_states"] == ["14"]
+    # La pista de GDELT ya no basta: metía notas de Michoacán (ADR-0014).
+    assert slugs([a.url for a in response.articles]) == ["jalisco"]
 
 
 async def test_mexico_completo_no_filtra_lugar(provider: LocalIndexProvider) -> None:
     response = await provider.search(query(QueryPlace((), (), MEXICO)))
 
-    assert set(slugs([a.url for a in response.articles])) == {"a", "gdl", "penon", "borde"}
+    assert set(slugs([a.url for a in response.articles])) == {
+        "a",
+        "gdl",
+        "penon",
+        "borde",
+        "michoacan",
+        "jalisco",
+    }
 
 
 async def test_la_enie_se_conserva_y_es_letra(provider: LocalIndexProvider) -> None:
