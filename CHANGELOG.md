@@ -6,9 +6,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-10-17
+
 ### Agregado
 
-- **Fase 4 — Pipeline, IA y geolocalización** (en curso).
+- **Fase 4 — Pipeline, IA y geolocalización.**
   - Tablas de búsquedas y notas (migraciones 0011 a 0013):
     - `searches` y `search_concepts` (los conceptos se copian al buscar);
     - `articles` (una por URL canónica) y `article_texts` (solo para procesar, se borra a los 30 días);
@@ -28,7 +30,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - Las notas ya enriquecidas se reutilizan sin pagar.
   - Tarea de Celery `search.run`. La limpieza diaria también borra los textos vencidos.
   - `make buscar`: muestra créditos y costo máximo, pide "si", corre la búsqueda (en el worker o con `--aqui`) y enseña 5 notas con lugar, precisión y confianza.
+  - `make reubicar`: vuelve a ubicar las notas de una búsqueda con las reglas y el catálogo vigentes sin pagar a la IA; con `--con-ia` las vuelve a pasar por la IA desde su texto guardado (0 créditos). Las pistas de lugar de la IA se guardan (migración 0014).
   - Globo con rotación automática e inclinación de 15°.
+
+### Corregido
+
+- Geolocalización, con lo aprendido en la primera búsqueda real (Extorsión en Jalisco: 18 notas, 1 crédito y 0.0068 USD):
+  - alias de los municipios cuyo nombre oficial es más largo que el de uso diario ("Heroica Ciudad de Juchitán de Zaragoza", "Santo Domingo Tehuantepec"…);
+  - una localidad de otro estado ya no se usa si la nota nombra sus estados (la "colonia La Gloria" de Juchitán caía en Guanajuato).
 
 ## [0.3.0] - 2026-10-16
 
