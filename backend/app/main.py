@@ -21,19 +21,24 @@ from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
 from app.adapters.health.postgres_probe import PostgresHealthProbe
 from app.adapters.health.redis_probe import RedisHealthProbe
+from app.adapters.llm.factory import llm_info
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.news_index_repository import PostgresIndexStats
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.providers.local_index import LocalIndexProvider
+from app.adapters.queue.celery_queue import CelerySearchQueue
 from app.api.errors import register_error_handlers
 from app.api.v1 import api_router
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
+from app.application.use_cases.plan_search import PlanSearch
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
 from app.domain.queries import Provider
 from app.worker.celery_app import create_celery_app
+from app.worker.search_jobs import build_providers
 
 API_PREFIX = "/api/v1"
 
@@ -89,6 +94,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ExecutionLimits(settings.max_queries_per_search, settings.query_cache_ttl_hours, {}),
         )
         app.state.index_stats = PostgresIndexStats(engine)
+        # Búsquedas (F5): la misma planeación que make buscar y la cola del worker.
+        concepts = app.state.concept_repository
+        app.state.search_planner = PlanSearch(
+            concepts=concepts,
+            regions=app.state.region_repository,
+            providers=build_providers(settings, engine),
+            log=PostgresProviderQueryLog(engine),
+            llm=llm_info(settings),
+            llm_max_articles=settings.llm_max_articles_per_search,
+            credits_limit=settings.searchapi_monthly_credit_limit,
+        )
+        app.state.search_store = PostgresSearchStore(engine)
+        app.state.article_store = PostgresArticleStore(engine)
+        app.state.search_queue = CelerySearchQueue(celery_app)
+        app.state.max_queries_per_search = settings.max_queries_per_search
         try:
             yield
         finally:

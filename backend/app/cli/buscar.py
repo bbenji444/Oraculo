@@ -41,6 +41,7 @@ from app.adapters.persistence.search_repository import (
     ResultPreview,
     SearchSnapshot,
 )
+from app.adapters.queue.celery_queue import CelerySearchQueue
 from app.application.clock import MEXICO_CITY
 from app.application.use_cases.plan_search import PlanSearch, SearchEstimate, SearchRequest
 from app.cli.probar_proveedor import find_concept, window_from
@@ -49,7 +50,6 @@ from app.domain.search import SearchStatus, Stage
 from app.geodata.consola import configure_cli_logging, heading
 from app.worker.celery_app import celery_app
 from app.worker.search_jobs import build_providers, run_search_job
-from app.worker.tasks import SEARCH_TASK
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +281,7 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def _enqueue(search_id: UUID) -> None:
-    celery_app.send_task(SEARCH_TASK, args=[str(search_id)])
+    CelerySearchQueue(celery_app).enqueue(search_id)
 
 
 async def run(  # noqa: PLR0913 — dependencias que las pruebas reemplazan, todo por nombre (*)
