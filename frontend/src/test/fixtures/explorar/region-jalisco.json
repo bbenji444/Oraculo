@@ -1,0 +1,26 @@
+{
+  "id": 272,
+  "level": "state",
+  "code": "14",
+  "name": "Jalisco",
+  "display_name": "Jalisco",
+  "display_prefix": "Estado",
+  "country_code": "MEX",
+  "parent_id": 258,
+  "point": {
+    "lon": -103.21734934861192,
+    "lat": 20.838057309584556
+  },
+  "bbox": [-105.69540345961917, 18.925871880076365, -101.51054174984321, 22.750245940344733],
+  "has_polygon": true,
+  "aliases": [],
+  "ancestors": [
+    {
+      "id": 258,
+      "level": "country",
+      "code": "MEX",
+      "name": "México"
+    }
+  ],
+  "breadcrumb": "México › Jalisco"
+}

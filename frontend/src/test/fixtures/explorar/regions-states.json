@@ -1,0 +1,549 @@
+{
+  "items": [
+    {
+      "id": 259,
+      "level": "state",
+      "code": "01",
+      "name": "Aguascalientes",
+      "display_name": "Aguascalientes",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -102.31315441918474,
+        "lat": 22.04095110535146
+      },
+      "bbox": [-102.87417657965533, 21.62226648001623, -101.83528945032292, 22.459589680315716],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 260,
+      "level": "state",
+      "code": "02",
+      "name": "Baja California",
+      "display_name": "Baja California",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -115.24430868688897,
+        "lat": 30.3592506302301
+      },
+      "bbox": [-118.36526321777073, 27.99999997961995, -112.29677498324659, 32.71865357039013],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 261,
+      "level": "state",
+      "code": "03",
+      "name": "Baja California Sur",
+      "display_name": "Baja California Sur",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -111.5428600266891,
+        "lat": 25.43590882100576
+      },
+      "bbox": [-115.76610370926068, 22.871657269774882, -109.41310960936164, 28.00000171097507],
+      "has_polygon": true,
+      "aliases": ["BCS"]
+    },
+    {
+      "id": 262,
+      "level": "state",
+      "code": "04",
+      "name": "Campeche",
+      "display_name": "Campeche",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -89.94338310327481,
+        "lat": 19.330598180045243
+      },
+      "bbox": [-92.46879002007414, 17.812871169641422, -89.12122919988998, 20.848327289654645],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 265,
+      "level": "state",
+      "code": "07",
+      "name": "Chiapas",
+      "display_name": "Chiapas",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -92.24561739664354,
+        "lat": 16.25832528992868
+      },
+      "bbox": [-94.1391560000093, 14.53209836976643, -90.37021371989351, 17.98528780079105],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 266,
+      "level": "state",
+      "code": "08",
+      "name": "Chihuahua",
+      "display_name": "Chihuahua",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -106.04148599612415,
+        "lat": 28.69253048978704
+      },
+      "bbox": [-109.07488616963226, 25.55884362033175, -103.3067687999315, 31.784486289572868],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 267,
+      "level": "state",
+      "code": "09",
+      "name": "Ciudad de México",
+      "display_name": "Ciudad de México",
+      "display_prefix": "Entidad federativa",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.15178967215995,
+        "lat": 19.320453498962344
+      },
+      "bbox": [-99.36492420018587, 19.04823666290047, -98.94030282041224, 19.59275727980179],
+      "has_polygon": true,
+      "aliases": ["CDMX", "DF", "Distrito Federal", "la capital del país"]
+    },
+    {
+      "id": 263,
+      "level": "state",
+      "code": "05",
+      "name": "Coahuila de Zaragoza",
+      "display_name": "Coahuila de Zaragoza",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -102.30976126354841,
+        "lat": 27.206905969686417
+      },
+      "bbox": [-103.96000192013908, 24.542684060717498, -99.84311979968838, 29.8800242896095],
+      "has_polygon": true,
+      "aliases": ["Coahuila"]
+    },
+    {
+      "id": 264,
+      "level": "state",
+      "code": "06",
+      "name": "Colima",
+      "display_name": "Colima",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -103.92156711806099,
+        "lat": 19.098226722120557
+      },
+      "bbox": [-114.75950078688388, 18.338863909849575, -103.48634644963192, 19.512518770443474],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 268,
+      "level": "state",
+      "code": "10",
+      "name": "Durango",
+      "display_name": "Durango",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -104.58679996310569,
+        "lat": 24.594182244827643
+      },
+      "bbox": [-107.21013223031535, 22.345083710355, -102.47269698031131, 26.844875910058633],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 269,
+      "level": "state",
+      "code": "11",
+      "name": "Guanajuato",
+      "display_name": "Guanajuato",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -101.25735677621483,
+        "lat": 20.87714102497826
+      },
+      "bbox": [-102.09703228003144, 19.912750181274635, -99.67130261977907, 21.83941672041752],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 270,
+      "level": "state",
+      "code": "12",
+      "name": "Guerrero",
+      "display_name": "Guerrero",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.94629890519724,
+        "lat": 17.601956234729062
+      },
+      "bbox": [-102.18435117971927, 16.31595257978138, -98.00727640026658, 18.887846780398437],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 271,
+      "level": "state",
+      "code": "13",
+      "name": "Hidalgo",
+      "display_name": "Hidalgo",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.2134851589104,
+        "lat": 20.498178095289585
+      },
+      "bbox": [-99.85954142989017, 19.597758109691632, -97.98492891011362, 21.39852076974633],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 272,
+      "level": "state",
+      "code": "14",
+      "name": "Jalisco",
+      "display_name": "Jalisco",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -103.21734934861192,
+        "lat": 20.838057309584556
+      },
+      "bbox": [-105.69540345961917, 18.925871880076365, -101.51054174984321, 22.750245940344733],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 273,
+      "level": "state",
+      "code": "15",
+      "name": "México",
+      "display_name": "México",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.82218148981596,
+        "lat": 19.326584642882388
+      },
+      "bbox": [-100.61309099981369, 18.366942880606967, -98.59686665974627, 20.285866660291873],
+      "has_polygon": true,
+      "aliases": ["Estado de México", "Edomex"]
+    },
+    {
+      "id": 274,
+      "level": "state",
+      "code": "16",
+      "name": "Michoacán de Ocampo",
+      "display_name": "Michoacán de Ocampo",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -101.66798680925822,
+        "lat": 19.15422371375285
+      },
+      "bbox": [-103.7381270796591, 17.913368377219935, -100.06303281888502, 20.394556339609935],
+      "has_polygon": true,
+      "aliases": ["Michoacán"]
+    },
+    {
+      "id": 275,
+      "level": "state",
+      "code": "17",
+      "name": "Morelos",
+      "display_name": "Morelos",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.10181651110256,
+        "lat": 18.732125509858896
+      },
+      "bbox": [-99.49441414999364, 18.332373080370107, -98.63294664956337, 19.131701722554176],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 276,
+      "level": "state",
+      "code": "18",
+      "name": "Nayarit",
+      "display_name": "Nayarit",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -104.87213189254392,
+        "lat": 21.84387651017498
+      },
+      "bbox": [-106.68772678044525, 20.603220949713794, -103.7208955500691, 23.084503340224533],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 277,
+      "level": "state",
+      "code": "19",
+      "name": "Nuevo León",
+      "display_name": "Nuevo León",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -99.50250154342453,
+        "lat": 25.478999540759723
+      },
+      "bbox": [-101.20676271005061, 23.162683179970863, -98.42157608016537, 27.799137180041008],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 278,
+      "level": "state",
+      "code": "20",
+      "name": "Oaxaca",
+      "display_name": "Oaxaca",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -96.28342500924623,
+        "lat": 17.16368662531788
+      },
+      "bbox": [-98.55270734008116, 15.65686527294324, -93.86742677074241, 18.669688059993288],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 279,
+      "level": "state",
+      "code": "21",
+      "name": "Puebla",
+      "display_name": "Puebla",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -97.42044876450778,
+        "lat": 19.350425669693067
+      },
+      "bbox": [-99.0704942800433, 17.860911919557985, -96.72468303039402, 20.83995974964591],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 280,
+      "level": "state",
+      "code": "22",
+      "name": "Querétaro",
+      "display_name": "Querétaro",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -100.00190539516062,
+        "lat": 20.842647294920308
+      },
+      "bbox": [-100.59653570962001, 20.015018290067736, -99.0430798502363, 21.670005429863355],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 281,
+      "level": "state",
+      "code": "23",
+      "name": "Quintana Roo",
+      "display_name": "Quintana Roo",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -88.32288025635721,
+        "lat": 19.74185121280245
+      },
+      "bbox": [-89.2965618203677, 17.893985550464354, -86.71040527988357, 21.605504140005568],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 282,
+      "level": "state",
+      "code": "24",
+      "name": "San Luis Potosí",
+      "display_name": "San Luis Potosí",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -101.09626249548134,
+        "lat": 22.827414565375303
+      },
+      "bbox": [-102.2960384198764, 21.16015382958215, -98.32596705024712, 24.491521830307388],
+      "has_polygon": true,
+      "aliases": ["SLP"]
+    },
+    {
+      "id": 283,
+      "level": "state",
+      "code": "25",
+      "name": "Sinaloa",
+      "display_name": "Sinaloa",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -107.41855015028275,
+        "lat": 24.754117094879373
+      },
+      "bbox": [-109.44470736738356, 22.467133770097593, -105.39221999974187, 27.042305979696597],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 284,
+      "level": "state",
+      "code": "26",
+      "name": "Sonora",
+      "display_name": "Sonora",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -110.55478331979864,
+        "lat": 29.395221555259788
+      },
+      "bbox": [-115.05302231950469, 26.296987941816255, -108.42427083004425, 32.49391316955397],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 285,
+      "level": "state",
+      "code": "27",
+      "name": "Tabasco",
+      "display_name": "Tabasco",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -92.48324085666195,
+        "lat": 17.95094260076425
+      },
+      "bbox": [-94.13002516958959, 17.250893340041802, -90.98745919992786, 18.65096495034167],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 286,
+      "level": "state",
+      "code": "28",
+      "name": "Tamaulipas",
+      "display_name": "Tamaulipas",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -98.35915164728522,
+        "lat": 24.942888654087703
+      },
+      "bbox": [-100.14495022007144, 22.206965830154367, -97.14431345015211, 27.67912622027133],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 287,
+      "level": "state",
+      "code": "29",
+      "name": "Tlaxcala",
+      "display_name": "Tlaxcala",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -98.10974763043089,
+        "lat": 19.41695294504137
+      },
+      "bbox": [-98.7083985789526, 19.10507186022849, -97.62543911032256, 19.72891742973123],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 288,
+      "level": "state",
+      "code": "30",
+      "name": "Veracruz de Ignacio de la Llave",
+      "display_name": "Veracruz de Ignacio de la Llave",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -96.87573701573955,
+        "lat": 19.804372739956797
+      },
+      "bbox": [-98.68154660008055, 17.136964912862982, -93.60793981602878, 22.471750910346234],
+      "has_polygon": true,
+      "aliases": ["Veracruz"]
+    },
+    {
+      "id": 289,
+      "level": "state",
+      "code": "31",
+      "name": "Yucatán",
+      "display_name": "Yucatán",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -89.08796745928748,
+        "lat": 20.609875745035424
+      },
+      "bbox": [-92.32630000174989, 19.55117408977481, -87.53314527990848, 22.585951489135077],
+      "has_polygon": true,
+      "aliases": []
+    },
+    {
+      "id": 290,
+      "level": "state",
+      "code": "32",
+      "name": "Zacatecas",
+      "display_name": "Zacatecas",
+      "display_prefix": "Estado",
+      "country_code": "MEX",
+      "parent_id": 258,
+      "point": {
+        "lon": -103.20856987553398,
+        "lat": 23.08235825486417
+      },
+      "bbox": [-104.35353305038664, 21.041869399753637, -100.7423242904584, 25.125235509668304],
+      "has_polygon": true,
+      "aliases": []
+    }
+  ],
+  "next_cursor": null
+}

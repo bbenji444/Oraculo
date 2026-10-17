@@ -1,0 +1,41 @@
+{
+  "level": "state",
+  "items": [
+    {
+      "region_id": 272,
+      "code": "14",
+      "name": "Jalisco",
+      "count": 7,
+      "lon": -103.21734934861192,
+      "lat": 20.838057309584556
+    },
+    {
+      "region_id": 278,
+      "code": "20",
+      "name": "Oaxaca",
+      "count": 3,
+      "lon": -96.28342500924623,
+      "lat": 17.16368662531788
+    },
+    {
+      "region_id": 270,
+      "code": "12",
+      "name": "Guerrero",
+      "count": 1,
+      "lon": -99.94629890519724,
+      "lat": 17.601956234729062
+    },
+    {
+      "region_id": 275,
+      "code": "17",
+      "name": "Morelos",
+      "count": 1,
+      "lon": -99.10181651110256,
+      "lat": 18.732125509858896
+    }
+  ],
+  "coarser": 0,
+  "abroad": 0,
+  "unlocated": 2,
+  "total": 14
+}

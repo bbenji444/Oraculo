@@ -265,6 +265,7 @@ make geo-validate    # solo los criterios de aceptación del catálogo
 make geo-tiles       # solo los PMTiles de las capas de INEGI
 make geo-terms       # términos de búsqueda, alias y códigos de país (ARGS=--muestra para ver sin escribir)
 make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
+make geo-earth       # texturas NASA de la Tierra y estrellas (ARGS=--muestra: 5 recortes)
 make seed            # carga los conceptos semilla que falten (no pisa ediciones)
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make buscar ARGS="--concepto Extorsión --region 14 --dias 7"  # búsqueda real de punta a punta: muestra costo, pide "si" y enseña 5 notas (--aqui sin worker)

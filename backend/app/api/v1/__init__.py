@@ -5,7 +5,6 @@ from fastapi import APIRouter
 from app.api.v1.articles import router as articles_router
 from app.api.v1.concepts import router as concepts_router
 from app.api.v1.health import router as health_router
-from app.api.v1.local_index import router as local_index_router
 from app.api.v1.regions import router as regions_router
 from app.api.v1.searches import router as searches_router
 
@@ -15,7 +14,6 @@ api_router.include_router(regions_router)
 api_router.include_router(concepts_router)
 api_router.include_router(searches_router)
 api_router.include_router(articles_router)
-api_router.include_router(local_index_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
@@ -30,8 +28,4 @@ OPENAPI_TAGS = [
         ),
     },
     {"name": "notas", "description": "Detalle de una nota. Nunca el texto completo (§8)."},
-    {
-        "name": "índice local (temporal)",
-        "description": "Vista de prueba del índice local hasta que exista el globo (F6).",
-    },
 ]

@@ -1,0 +1,81 @@
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Ciberseguridad",
+      "description": "Ataques informáticos, robo de datos y fraudes digitales",
+      "keywords": [
+        "ciberataque",
+        "hackeo",
+        "ransomware",
+        "filtración de datos",
+        "phishing",
+        "robo de datos",
+        "fraude cibernético"
+      ],
+      "exclude_terms": ["curso", "webinar", "diplomado", "vacante"],
+      "color": "#2E86DE",
+      "is_active": true,
+      "created_by": "semilla",
+      "created_at": "2026-10-16T09:17:26.063584-06:00",
+      "updated_at": "2026-10-16T09:17:26.063584-06:00"
+    },
+    {
+      "id": 5,
+      "name": "Desaparición de personas",
+      "description": "Personas desaparecidas, fichas y colectivos de búsqueda, fosas clandestinas",
+      "keywords": [
+        "persona desaparecida",
+        "desaparecido",
+        "desaparecida",
+        "ficha de búsqueda",
+        "colectivo de búsqueda",
+        "fosa clandestina",
+        "Alerta Amber"
+      ],
+      "exclude_terms": [],
+      "color": "#1ABC9C",
+      "is_active": true,
+      "created_by": "semilla",
+      "created_at": "2026-10-16T09:17:26.096288-06:00",
+      "updated_at": "2026-10-16T09:17:26.096288-06:00"
+    },
+    {
+      "id": 3,
+      "name": "Extorsión",
+      "description": "Cobro de piso, extorsión telefónica y amenazas para obtener dinero",
+      "keywords": [
+        "extorsión",
+        "extorsionador",
+        "cobro de piso",
+        "derecho de piso",
+        "extorsión telefónica",
+        "montadeudas"
+      ],
+      "exclude_terms": ["simulacro"],
+      "color": "#F39C12",
+      "is_active": true,
+      "created_by": "semilla",
+      "created_at": "2026-10-16T09:17:26.083147-06:00",
+      "updated_at": "2026-10-16T09:17:26.083147-06:00"
+    },
+    {
+      "id": 7,
+      "name": "Extorsión telefónica",
+      "description": "",
+      "keywords": [
+        "extorsión telefónica",
+        "llamada de extorsión",
+        "montadeudas",
+        "secuestro virtual"
+      ],
+      "exclude_terms": ["simulacro"],
+      "color": "#D35400",
+      "is_active": true,
+      "created_by": "desarrollo",
+      "created_at": "2026-10-16T09:26:02.724696-06:00",
+      "updated_at": "2026-10-16T09:27:41.308025-06:00"
+    }
+  ],
+  "next_cursor": null
+}
