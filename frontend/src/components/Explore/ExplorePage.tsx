@@ -19,7 +19,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { SpaceBackground } from '../Space/SpaceBackground';
 import { GlobeControls, DownloadsPanel, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
-import { conceptSlices } from './format';
+import { conceptSlices, visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
 import { ConceptDonut, TopStatesChart } from './SearchCharts';
 import { SearchPanel } from './SearchPanel';
@@ -39,12 +39,18 @@ export function ExplorePage() {
     [concepts],
   );
   const slices = useMemo(() => conceptSlices(articles, colors), [articles, colors]);
+  const showIrrelevant = useExplorerStore((s) => s.showIrrelevant);
+  // Lo mismo para el globo y la lista: nunca muestran notas distintas.
+  const shown = useMemo(
+    () => visibleArticles(articles, showIrrelevant),
+    [articles, showIrrelevant],
+  );
   const hasResults = finished && articles.length > 0;
 
   return (
     <div className="relative h-full overflow-hidden bg-[#02030a]">
       <SpaceBackground />
-      <ExploreGlobe articles={articles} colors={colors} />
+      <ExploreGlobe articles={shown} colors={colors} />
 
       <aside className="pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 sm:w-[24rem]">
         <div className="pointer-events-auto">
@@ -52,7 +58,7 @@ export function ExplorePage() {
         </div>
         {hasResults && (
           <div className="pointer-events-auto flex max-h-[28rem] min-h-[14rem] flex-col">
-            <ResultsList articles={articles} colors={colors} />
+            <ResultsList articles={shown} colors={colors} />
           </div>
         )}
         <div className="pointer-events-auto">

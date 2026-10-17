@@ -9,6 +9,7 @@ import {
   isCoarse,
   NO_CONCEPT_COLOR,
   stageProgress,
+  visibleArticles,
 } from './format';
 
 function article(judgements: [number, string, boolean][]): Article {
@@ -96,5 +97,18 @@ describe('notas por concepto', () => {
       { conceptId: 5, name: 'Secuestro', color: NO_CONCEPT_COLOR, count: 1 },
       { conceptId: null, name: 'No relevantes', color: NO_CONCEPT_COLOR, count: 1 },
     ]);
+  });
+});
+
+describe('notas visibles (lista y globo)', () => {
+  const kept = article([[3, 'Extorsión', true]]);
+  const discarded = article([[3, 'Extorsión', false]]);
+
+  it('por defecto solo las relevantes para algún concepto', () => {
+    expect(visibleArticles([kept, discarded], false)).toEqual([kept]);
+  });
+
+  it('con "No relevantes" se ven todas', () => {
+    expect(visibleArticles([kept, discarded], true)).toEqual([kept, discarded]);
   });
 });

@@ -151,3 +151,18 @@ export function conceptSlices(
   }
   return slices;
 }
+
+/**
+ * Notas que se ven en la lista y en el globo: por defecto solo las relevantes
+ * para algún concepto. Las dos vistas usan esta misma función para que nunca
+ * muestren cosas distintas (antes el globo pintaba también las descartadas).
+ *
+ * @param articles Todas las notas de la búsqueda.
+ * @param showIrrelevant Si el interruptor "No relevantes" está prendido.
+ * @returns Las notas a mostrar, en el mismo orden.
+ * @example visibleArticles(notas, false) // solo las relevantes
+ */
+export function visibleArticles(articles: readonly Article[], showIrrelevant: boolean): Article[] {
+  if (showIrrelevant) return [...articles];
+  return articles.filter((article) => article.concepts.some((c) => c.is_relevant));
+}

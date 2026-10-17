@@ -2,9 +2,10 @@
  * Lista de noticias de la búsqueda, sincronizada con el globo: elegir una nota
  * aquí o en el mapa es la misma acción (store). Pestañas Dentro de la región,
  * Fuera y Sin ubicación (§9 paso 7: las de fuera no se borran, se muestran
- * aparte). Por defecto solo las relevantes; un interruptor muestra todas.
+ * aparte). Recibe las notas ya filtradas por relevancia (las mismas que el
+ * globo); su interruptor "No relevantes" cambia el store y afecta a los dos.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
@@ -25,6 +26,7 @@ function matches(article: Article, filter: ListFilter): boolean {
 }
 
 interface ResultsListProps {
+  /** Notas visibles (ver `visibleArticles`). */
   articles: readonly Article[];
   colors: ReadonlyMap<number, string>;
 }
@@ -34,10 +36,10 @@ export function ResultsList({ articles, colors }: ResultsListProps) {
   const setFilter = useExplorerStore((s) => s.setListFilter);
   const articleId = useExplorerStore((s) => s.articleId);
   const selectArticle = useExplorerStore((s) => s.selectArticle);
-  const [showAll, setShowAll] = useState(false);
+  const showIrrelevant = useExplorerStore((s) => s.showIrrelevant);
+  const setShowIrrelevant = useExplorerStore((s) => s.setShowIrrelevant);
   const selectedRef = useRef<HTMLButtonElement>(null);
-  const visible = articles.filter((a) => showAll || a.concepts.some((c) => c.is_relevant));
-  const shown = visible.filter((a) => matches(a, filter));
+  const shown = articles.filter((a) => matches(a, filter));
 
   useEffect(() => {
     // La nota elegida en el globo se trae a la vista en la lista.
@@ -47,13 +49,13 @@ export function ResultsList({ articles, colors }: ResultsListProps) {
   return (
     <section aria-label="Noticias" className={`${GLASS} flex min-h-0 flex-col p-4`}>
       <div className="flex items-center justify-between">
-        <h2 className={PANEL_TITLE}>Noticias ({visible.length})</h2>
+        <h2 className={PANEL_TITLE}>Noticias ({articles.length})</h2>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <input
             type="checkbox"
-            checked={showAll}
+            checked={showIrrelevant}
             onChange={(event) => {
-              setShowAll(event.target.checked);
+              setShowIrrelevant(event.target.checked);
             }}
             className="accent-sky-400"
           />
@@ -76,7 +78,7 @@ export function ResultsList({ articles, colors }: ResultsListProps) {
                 : 'bg-white/5 text-slate-400 hover:bg-white/10'
             }`}
           >
-            {tab.label} · {visible.filter((a) => matches(a, tab.id)).length}
+            {tab.label} · {articles.filter((a) => matches(a, tab.id)).length}
           </button>
         ))}
       </div>

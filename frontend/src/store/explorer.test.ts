@@ -65,16 +65,18 @@ describe('store de Explorar', () => {
     expect(useExplorerStore.getState().conceptIds).toEqual([5]);
   });
 
-  it('abrir otra búsqueda olvida la nota y el filtro', () => {
+  it('abrir otra búsqueda olvida la nota y los filtros', () => {
     const store = useExplorerStore.getState();
     store.selectArticle(11);
     store.setListFilter('false');
+    store.setShowIrrelevant(true);
     store.openSearch('abc');
 
     expect(useExplorerStore.getState()).toMatchObject({
       searchId: 'abc',
       articleId: null,
       listFilter: 'all',
+      showIrrelevant: false,
     });
   });
 

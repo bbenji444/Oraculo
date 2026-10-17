@@ -156,14 +156,15 @@ describe('flujo principal (H1)', () => {
     // 4. Al terminar: costo real, notas en el globo, lista y gráficas.
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
     const list = await screen.findByRole('region', { name: 'Noticias' });
-    await waitFor(() => {
-      expect(screen.getByTestId('globo').dataset.notas).toBe(String(articles.items.length));
-    });
     const topStates = screen.getByRole('region', { name: 'Top 5 estados con más noticias' });
     expect(within(topStates).getByLabelText(/^Jalisco: 7/)).toBeTruthy();
 
-    // Por defecto solo las relevantes; la pestaña "Fuera" las separa (§9 paso 7).
+    // Por defecto solo las relevantes, en la lista y en el globo por igual; la
+    // pestaña "Fuera" las separa (§9 paso 7).
     const relevant = articles.items.filter((a) => a.concepts.some((c) => c.is_relevant));
+    await waitFor(() => {
+      expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
+    });
     expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
     const outside = relevant.filter((a) => a.in_region === false).length;
     expect(within(list).getByRole('tab', { name: `Fuera · ${String(outside)}` })).toBeTruthy();
@@ -180,6 +181,14 @@ describe('flujo principal (H1)', () => {
         .getByRole('link', { name: /Ver nota original/ })
         .getAttribute('href'),
     ).toBe(note.url);
+
+    // 6. "No relevantes" muestra las descartadas en la lista y en el globo a la vez.
+    const showIrrelevant = within(list).getByRole('checkbox', { name: 'No relevantes' });
+    fireEvent.click(showIrrelevant);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(articles.items.length);
+    expect(screen.getByTestId('globo').dataset.notas).toBe(String(articles.items.length));
+    fireEvent.click(showIrrelevant);
+    expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
   }, 15000);
 
   it('reabrir una búsqueda del Historial no gasta nada', async () => {

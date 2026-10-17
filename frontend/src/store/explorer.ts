@@ -38,6 +38,8 @@ export interface ExplorerState {
   searchId: string | null;
   articleId: number | null;
   listFilter: ListFilter;
+  /** Interruptor "No relevantes": vale para la lista y el globo a la vez. */
+  showIrrelevant: boolean;
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
@@ -55,6 +57,7 @@ export interface ExplorerState {
   }) => void;
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
+  setShowIrrelevant: (showIrrelevant: boolean) => void;
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
@@ -117,6 +120,7 @@ export const useExplorerStore = create<ExplorerState>()(
       searchId: null,
       articleId: null,
       listFilter: 'all',
+      showIrrelevant: false,
       earth: 'night',
       // "Menos movimiento" del sistema manda sobre la preferencia guardada.
       motion: prefersReducedMotion() ? 'off' : 'normal',
@@ -136,8 +140,8 @@ export const useExplorerStore = create<ExplorerState>()(
         set({ range });
       },
       openSearch: (searchId) => {
-        // Otra búsqueda: se olvida la nota elegida y el filtro de la lista.
-        set({ searchId, articleId: null, listFilter: 'all' });
+        // Otra búsqueda: se olvidan la nota elegida y los filtros de la lista.
+        set({ searchId, articleId: null, listFilter: 'all', showIrrelevant: false });
       },
       restoreSearch: ({ searchId, regionId, conceptIds, dateFrom, dateTo }) => {
         set({
@@ -147,6 +151,7 @@ export const useExplorerStore = create<ExplorerState>()(
           range: { kind: 'custom', from: dateFrom, to: dateTo },
           articleId: null,
           listFilter: 'all',
+          showIrrelevant: false,
           spinning: false,
         });
       },
@@ -155,6 +160,9 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       setListFilter: (listFilter) => {
         set({ listFilter });
+      },
+      setShowIrrelevant: (showIrrelevant) => {
+        set({ showIrrelevant });
       },
       setEarth: (earth) => {
         set({ earth });
