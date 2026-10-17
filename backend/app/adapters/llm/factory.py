@@ -1,6 +1,6 @@
 """Arma la IA según ``LLM_PROVIDER`` (ADR-0016).
 
-Lo usan el pipeline de búsqueda, la API y los comandos. ``llm_info`` dice
+Lo usan el pipeline de búsqueda, los reportes, la API y los comandos. ``llm_info`` dice
 qué modelo se usaría y cuánto cobra sin crear el cliente (la estimación de
 costo no necesita la llave); ``build_llm`` crea el adaptador.
 
@@ -9,9 +9,9 @@ No hace: no llama a ninguna IA.
 
 from dataclasses import dataclass
 
-from app.adapters.llm.gemini import build_gemini
-from app.adapters.llm.openai import build_openai
-from app.application.ports.llm import LLMInfo, LLMPort
+from app.adapters.llm.gemini import GeminiEnricher, build_gemini
+from app.adapters.llm.openai import OpenAIEnricher, build_openai
+from app.application.ports.llm import LLMInfo, LLMPort, SummarizerPort
 from app.core.config import Settings
 
 
@@ -85,20 +85,58 @@ def build_llm(settings: Settings) -> LLMSetup:
     Raises:
         MissingLLMKeyError: Si falta la llave del proveedor elegido.
     """
+    info, llm = _adapter(settings)
+    return LLMSetup(info.provider, llm, info.price_input_per_million, info.price_output_per_million)
+
+
+@dataclass(frozen=True, slots=True)
+class SummarizerSetup:
+    """La IA que escribe el resumen ejecutivo de los reportes y lo que cuesta.
+
+    Attributes:
+        provider: ``openai`` o ``gemini``.
+        summarizer: El adaptador.
+        price_input_per_million: Dólares por millón de tokens de entrada.
+        price_output_per_million: Dólares por millón de tokens de salida.
+    """
+
+    provider: str
+    summarizer: SummarizerPort
+    price_input_per_million: float
+    price_output_per_million: float
+
+
+def build_summarizer(settings: Settings) -> SummarizerSetup:
+    """Crea la IA del resumen ejecutivo (la misma que elige ``LLM_PROVIDER``).
+
+    Args:
+        settings: Configuración (``LLM_PROVIDER`` y la llave y modelo de ese
+            proveedor).
+
+    Returns:
+        El adaptador con sus precios.
+
+    Raises:
+        MissingLLMKeyError: Si falta la llave del proveedor elegido.
+    """
+    info, llm = _adapter(settings)
+    return SummarizerSetup(
+        info.provider, llm, info.price_input_per_million, info.price_output_per_million
+    )
+
+
+def _adapter(settings: Settings) -> tuple[LLMInfo, OpenAIEnricher | GeminiEnricher]:
     info = llm_info(settings)
     key = _key(settings)
     if key is None:
         name = "OPENAI_API_KEY" if info.provider == "openai" else "GEMINI_API_KEY"
         raise MissingLLMKeyError(f"Falta {name} en .env (LLM_PROVIDER={info.provider}).")
-    llm: LLMPort
     if info.provider == "openai":
-        llm = build_openai(
+        return info, build_openai(
             key,
             info.model,
             settings.llm_timeout_seconds,
             settings.provider_max_attempts,
             settings.llm_concurrency,
         )
-    else:
-        llm = build_gemini(key, info.model, settings.llm_timeout_seconds)
-    return LLMSetup(info.provider, llm, info.price_input_per_million, info.price_output_per_million)
+    return info, build_gemini(key, info.model, settings.llm_timeout_seconds)

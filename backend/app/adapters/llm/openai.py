@@ -1,4 +1,4 @@
-"""``LLMPort`` con OpenAI por HTTP (ADR-0016).
+"""``LLMPort`` y ``SummarizerPort`` con OpenAI por HTTP (ADR-0016, ADR-0018).
 
 Confirmado en la documentación de OpenAI (17/10/2026):
 
@@ -32,12 +32,23 @@ from app.adapters.llm.common import (
     PROMPT_VERSION,
     RETRY_ERROR_CHARS,
     RETRY_NOTE,
+    SUMMARY_MAX_OUTPUT_TOKENS,
+    SUMMARY_PROMPT_VERSION,
     EnrichmentOut,
+    SummaryOut,
     build_prompt,
+    build_summary_prompt,
     to_enrichment,
 )
 from app.adapters.providers.http import ProviderHttpClient
-from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
+from app.application.ports.llm import (
+    EnrichmentError,
+    EnrichmentRequest,
+    EnrichmentResult,
+    SummaryError,
+    SummaryRequest,
+    SummaryResult,
+)
 from app.domain.enrichment import LLMUsage
 
 RESPONSES_URL = "https://api.openai.com/v1/responses"
@@ -88,6 +99,14 @@ ENRICHMENT_SCHEMA: dict[str, Any] = {
             },
         },
     },
+}
+
+# Esquema estricto del resumen ejecutivo (mismo contenido que SummaryOut).
+SUMMARY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["executive_summary"],
+    "properties": {"executive_summary": {"type": "string"}},
 }
 
 
@@ -182,6 +201,11 @@ class OpenAIEnricher:
         """Ver ``LLMPort.prompt_version``."""
         return PROMPT_VERSION
 
+    @property
+    def summary_prompt_version(self) -> str:
+        """Ver ``SummarizerPort.summary_prompt_version``."""
+        return SUMMARY_PROMPT_VERSION
+
     async def aclose(self) -> None:
         """Cierra las conexiones HTTP."""
         await self._http.aclose()
@@ -245,6 +269,19 @@ class OpenAIEnricher:
             raise EnrichmentError(f"OpenAI no dio un JSON válido tras reintentar: {error}", usage)
         concept_ids = {c.concept_id for c in request.concepts}
         return EnrichmentResult(to_enrichment(out, concept_ids), usage, self._model, PROMPT_VERSION)
+
+    async def summarize(self, request: SummaryRequest) -> SummaryResult:
+        """Ver ``SummarizerPort.summarize``."""
+        out, usage, error = await self._complete(
+            build_summary_prompt(request),
+            SummaryOut,
+            name="executive_summary",
+            schema=SUMMARY_SCHEMA,
+            max_output_tokens=SUMMARY_MAX_OUTPUT_TOKENS,
+        )
+        if out is None:
+            raise SummaryError(f"OpenAI no dio un resumen válido tras reintentar: {error}", usage)
+        return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
 
 
 def build_openai(
