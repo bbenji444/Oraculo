@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 1.9 · Octubre 2026 · Responsable: Benji
+Versión 2.0 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -470,7 +470,7 @@ Lo ejecuta el worker. Cada etapa actualiza `searches.progress` para que la UI mu
    - Duplicado exacto: misma URL canónica.
    - Casi duplicado: título normalizado con similitud ≥ 0.9 (rapidfuzz) y misma fecha ±1 día. Se conserva uno y se registran todos los proveedores que lo encontraron.
    - Si la noticia ya existe en `articles` (de una búsqueda anterior), se reutiliza su enriquecimiento cuando el `prompt_version` coincide.
-4. **Extraer texto** con trafilatura, con concurrencia limitada y timeout. Si falla, se usa título + snippet y se marca `extraction_status = fallback`.
+4. **Extraer texto** con trafilatura, con concurrencia limitada y timeout. Si falla, se usa título + snippet y se marca `extraction_status = fallback`. El texto solo sirve para procesar: va a `article_texts` y se borra a los `ARTICLE_TEXT_RETENTION_DAYS` días (ADR-0015).
 5. **Enriquecer con LLM** (sección 10).
 6. **Geolocalizar** (sección 11).
 7. **Filtrar por región.** Se calcula `in_region` por prefijo de código. Las noticias fuera de región **no se borran**: se muestran aparte.
@@ -486,6 +486,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 - **Prompts:** se guardan versionados en `adapters/llm/prompts/enrich_v1.md`. Cambiar el prompt implica subir la versión.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
+- **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; se registran tokens y costo estimado por búsqueda.
 
 **Salida esperada:**
 
@@ -768,6 +769,7 @@ Cada fase termina con criterios verificables, `CHANGELOG.md` actualizado y tag. 
 - Adaptador de LLM con prompt versionado.
 - Resolutor geográfico con los casos de la sección 11.
 - Tabla `processing_errors`.
+- Comando `make buscar` que corre una búsqueda real de punta a punta (pide confirmación con el costo estimado) y muestra 5 ejemplos. Los endpoints de búsqueda llegan en F5.
 
 **Criterios de aceptación**
 - Todos los casos de prueba de la sección 11 pasan.
@@ -843,6 +845,7 @@ ADR de la Fase 3:
 12. **ADR-0012** — GDELT desactivado mientras responda 429 de forma persistente; criterio de reactivación con el reintento diario de D1.
 13. **ADR-0013** — Ingesta periódica e índice local de notas (archivos GKG de GDELT y RSS de medios mexicanos).
 14. **ADR-0014** — Ngramas de GDELT como fuente del índice local (la API DOC está saturada).
+15. **ADR-0015** — Extracción de texto, su retención y el control de costo de la IA.
 
 ---
 
@@ -883,3 +886,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 1.7 | 16 de octubre de 2026 | GDELT desactivado por defecto con criterio de reactivación (ADR-0012); un `{}` tras un 429 es falla; nueva sección 20, "Pendientes y mejoras futuras" (GKG de GDELT); el historial pasa a la sección 21. |
 | 1.8 | 16 de octubre de 2026 | F3 se amplía a "Proveedores e ingesta": índice local alimentado cada 15 minutos por los archivos GKG de GDELT y RSS de medios mexicanos, consultado por el proveedor `indice_local` (ADR-0013). |
 | 1.9 | 16 de octubre de 2026 | Ngramas de GDELT (texto completo) como fuente del índice local, con frases del cuerpo conservadas 30 días; pestaña temporal "Notas" hasta F6 (ADR-0014). |
+| 2.0 | 16 de octubre de 2026 | F4: extracción de texto con retención de 30 días y control de costo de Gemini (ADR-0015); comando `make buscar`. |
