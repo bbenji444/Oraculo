@@ -1,0 +1,287 @@
+/*
+ * Estilos del reporte (especificación §15, ADR-0018).
+ *
+ * Sirven igual para el PDF (WeasyPrint, A4) y para la vista HTML que se
+ * imprime desde el navegador. La fuente Noto Sans viene de ../fonts/ (en el
+ * PDF); en el navegador, si no la encuentra, usa la sans-serif del sistema.
+ * Colores sobrios que se leen bien impresos en blanco y negro.
+ */
+
+@font-face {
+  font-family: "Noto Sans Reporte";
+  src: url("NotoSans-Regular.ttf");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Noto Sans Reporte";
+  src: url("NotoSans-Bold.ttf");
+  font-weight: 700;
+}
+
+@page {
+  size: A4;
+  margin: 20mm 16mm 18mm;
+
+  @top-left {
+    content: "Monitor de Noticias · Reporte";
+    font: 8pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+  }
+
+  @bottom-right {
+    content: "Página " counter(page) " de " counter(pages);
+    font: 8pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+  }
+}
+
+html {
+  font: 10pt/1.45 "Noto Sans Reporte", "Noto Sans", sans-serif;
+  color: #0f172a;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0;
+}
+
+h2 {
+  font-size: 13pt;
+  margin: 18pt 0 6pt;
+  padding-bottom: 3pt;
+  border-bottom: 1pt solid #cbd5e1;
+  break-after: avoid;
+}
+
+a {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+/* Portada: lo que se busca, dónde, cuándo y las cifras clave. */
+.cover .kicker {
+  margin: 0 0 4pt;
+  font-size: 8pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.cover h1 {
+  font-size: 22pt;
+}
+
+.cover .region {
+  margin: 4pt 0 10pt;
+  font-size: 13pt;
+  color: #1e3a8a;
+}
+
+.facts {
+  margin: 0;
+}
+
+.facts div {
+  display: flex;
+  gap: 6pt;
+}
+
+.facts dt {
+  min-width: 70pt;
+  color: #475569;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.numbers {
+  display: flex;
+  gap: 8pt;
+  margin: 12pt 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.numbers li {
+  flex: 1;
+  padding: 6pt 8pt;
+  border: 1pt solid #cbd5e1;
+  border-radius: 4pt;
+}
+
+.numbers strong {
+  display: block;
+  font-size: 16pt;
+}
+
+.numbers span {
+  font-size: 8pt;
+  color: #475569;
+}
+
+.auto {
+  font-size: 8pt;
+  color: #64748b;
+}
+
+.notice {
+  padding: 6pt 8pt;
+  background: #f1f5f9;
+  border-left: 3pt solid #94a3b8;
+}
+
+/* Mapa y leyenda. */
+.map {
+  margin: 0;
+  break-inside: avoid;
+}
+
+.map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 150mm;
+}
+
+.map figcaption {
+  margin-top: 4pt;
+  font-size: 8pt;
+  color: #334155;
+}
+
+.legend-title {
+  margin-right: 4pt;
+}
+
+.legend-item {
+  margin-right: 8pt;
+  white-space: nowrap;
+}
+
+.legend-item i {
+  display: inline-block;
+  width: 9pt;
+  height: 9pt;
+  margin-right: 3pt;
+  vertical-align: -1pt;
+  border: 0.5pt solid #94a3b8;
+}
+
+.legend-item i.dot {
+  border-radius: 50%;
+  background: #e11d48;
+  border-color: #ffffff;
+}
+
+.legend-item i.ring {
+  border-radius: 50%;
+  border: 1pt dashed #e11d48;
+}
+
+/* Tablas. */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+
+th,
+td {
+  padding: 3pt 5pt;
+  border-bottom: 0.5pt solid #e2e8f0;
+  text-align: left;
+}
+
+th {
+  color: #475569;
+  font-weight: 700;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+tfoot td {
+  color: #475569;
+}
+
+tfoot .total td {
+  font-weight: 700;
+  color: #0f172a;
+  border-top: 1pt solid #94a3b8;
+}
+
+.empty {
+  color: #64748b;
+}
+
+/* Noticias. */
+.news article {
+  padding: 6pt 0;
+  border-bottom: 0.5pt solid #e2e8f0;
+  break-inside: avoid;
+}
+
+.news h3 {
+  font-size: 10.5pt;
+}
+
+.news .meta {
+  margin: 2pt 0;
+  font-size: 8pt;
+  color: #475569;
+}
+
+.news .text {
+  margin: 2pt 0;
+}
+
+.news .link {
+  margin: 0;
+  font-size: 7pt;
+  color: #64748b;
+  word-break: break-all;
+}
+
+.badge {
+  padding: 0 3pt;
+  border-radius: 2pt;
+  font-size: 7pt;
+  background: #e2e8f0;
+}
+
+.badge-state,
+.badge-country {
+  border: 0.5pt dashed #be123c;
+  background: #fff1f2;
+}
+
+.badge-outside {
+  background: #fef3c7;
+}
+
+.sources p {
+  font-size: 8.5pt;
+}
+
+.disclaimer {
+  color: #64748b;
+}
+
+/* En pantalla (vista previa o "Imprimir"), una hoja centrada. */
+@media screen {
+  body {
+    max-width: 180mm;
+    margin: 24px auto;
+    padding: 0 16px;
+  }
+}

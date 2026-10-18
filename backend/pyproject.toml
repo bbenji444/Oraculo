@@ -133,6 +133,12 @@ ignore_missing_imports = true
 module = ["defusedxml", "defusedxml.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# WeasyPrint 70 no publica tipos (no trae py.typed). Solo lo usa el
+# adaptador de reportes, que anota lo que recibe y devuelve (bytes del PDF).
+module = ["weasyprint", "weasyprint.*"]
+ignore_missing_imports = true
+
 # --- pytest --------------------------------------------------------------------
 
 [tool.pytest.ini_options]

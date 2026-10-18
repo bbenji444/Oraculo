@@ -123,8 +123,11 @@ instalar_librerias_reportes() {
   paso "Instalando las librerías del sistema para los reportes PDF (WeasyPrint)"
   export DEBIAN_FRONTEND=noninteractive
   # WeasyPrint 70 dibuja el texto con Pango (>= 1.44) y HarfBuzz; su
-  # documentación pide estos paquetes en Ubuntu (ADR-0018).
-  como_root apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b >/dev/null
+  # documentación pide estos paquetes en Ubuntu (ADR-0018). HarfBuzz-Subset
+  # recorta las fuentes incrustadas; sin ella, WeasyPrint 70 avisa que será
+  # obligatoria.
+  como_root apt-get install -y -qq \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 >/dev/null
   ok "pango $(dpkg-query -W -f='${Version}' libpango-1.0-0)"
 }
 

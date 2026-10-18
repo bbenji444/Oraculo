@@ -1,0 +1,125 @@
+{#
+  Plantilla única del reporte (especificación §15, ADR-0018): la usan la
+  vista HTML (con el CSS incrustado) y el PDF (WeasyPrint, con el CSS aparte
+  para cargar la fuente). Todo el texto se escapa; solo el SVG del mapa va
+  tal cual. Nunca lleva el texto completo de una nota (§8).
+#}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reporte · {{ data.search.concepts | map(attribute="name") | join(", ") }} · {{ data.breadcrumb }}</title>
+  {% if css %}<style>{{ css }}</style>{% endif %}
+</head>
+<body>
+  <header class="cover">
+    <p class="kicker">Monitor de Noticias · Reporte</p>
+    <h1>{{ data.search.concepts | map(attribute="name") | join(", ") }}</h1>
+    <p class="region">{{ data.breadcrumb }}</p>
+    <dl class="facts">
+      <div><dt>Periodo</dt><dd>{{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}</dd></div>
+      <div><dt>Generado</dt><dd>{{ data.generated_at | mx_datetime }} (hora de la Ciudad de México)</dd></div>
+      <div><dt>Pedido por</dt><dd>{{ data.generated_by }}</dd></div>
+    </dl>
+    <ul class="numbers">
+      <li><strong>{{ total }}</strong><span>notas relevantes</span></li>
+      <li><strong>{{ inside }}</strong><span>dentro de la región</span></li>
+      <li><strong>{{ data.outside }}</strong><span>fuera de la región</span></li>
+      <li><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></li>
+    </ul>
+  </header>
+
+  <section class="summary">
+    <h2>Resumen ejecutivo</h2>
+    {% if data.summary %}
+      <p class="auto">Resumen automático generado por IA ({{ data.summary_model }}) a partir de los resúmenes de las notas. Verifique en las fuentes antes de citarlo.</p>
+      {% for paragraph in data.summary | paragraphs %}
+        <p>{{ paragraph }}</p>
+      {% endfor %}
+    {% else %}
+      <p class="notice">{{ data.summary_notice }}</p>
+    {% endif %}
+  </section>
+
+  <section class="map-section">
+    <h2>Mapa</h2>
+    <figure class="map">
+      {{ map_svg }}
+      <figcaption>
+        {% if legend %}
+          <span class="legend-title">Notas por {{ level_label | lower }}:</span>
+          {% for item in legend %}
+            <span class="legend-item"><i style="background: {{ item.fill }}"></i>{{ item.label }}</span>
+          {% endfor %}
+        {% else %}
+          <span>Ninguna nota relevante se ubicó dentro de la región a nivel {{ level_label | lower }}.</span>
+        {% endif %}
+        <span class="legend-item"><i class="dot"></i>Lugar preciso</span>
+        <span class="legend-item"><i class="ring"></i>Solo estado o país (centro aproximado)</span>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="counts">
+    <h2>Notas por {{ level_label | lower }}</h2>
+    <table>
+      <thead>
+        <tr><th>{{ level_label }}</th><th class="num">Notas</th><th class="num">%</th></tr>
+      </thead>
+      <tbody>
+        {% for row in data.counts %}
+          <tr><td>{{ row.name }}</td><td class="num">{{ row.count }}</td><td class="num">{{ (100 * row.count / total) | round | int if total else 0 }}</td></tr>
+        {% else %}
+          <tr><td colspan="3" class="empty">Sin notas ubicadas a este nivel.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% if data.coarser %}<tr><td>Dentro de la región, sin {{ level_label | lower }} preciso</td><td class="num">{{ data.coarser }}</td><td class="num">{{ (100 * data.coarser / total) | round | int }}</td></tr>{% endif %}
+        {% if data.outside %}<tr><td>Fuera de la región</td><td class="num">{{ data.outside }}</td><td class="num">{{ (100 * data.outside / total) | round | int }}</td></tr>{% endif %}
+        {% if data.unlocated %}<tr><td>Sin ubicación</td><td class="num">{{ data.unlocated }}</td><td class="num">{{ (100 * data.unlocated / total) | round | int }}</td></tr>{% endif %}
+        <tr class="total"><td>Total</td><td class="num">{{ total }}</td><td class="num">{{ 100 if total else 0 }}</td></tr>
+      </tfoot>
+    </table>
+  </section>
+
+  <section class="news">
+    <h2>Noticias ({{ total }})</h2>
+    {% for article in data.articles %}
+      <article>
+        <h3><a href="{{ article.url }}">{{ article.title }}</a></h3>
+        <p class="meta">
+          {{ article.source_name or article.source_domain or "Medio sin nombre" }}
+          · {{ article.published_at | mx_datetime }}
+          · {% if article.primary %}{{ article.primary.place or "Lugar sin nombre" }} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% else %}<span class="badge badge-unknown">Sin ubicación</span>{% endif %}
+          {% if article.in_region is false %}<span class="badge badge-outside">Fuera de la región</span>{% endif %}
+        </p>
+        {% if article.summary %}
+          <p class="text"><span class="auto">Resumen automático:</span> {{ article.summary }}</p>
+        {% endif %}
+        <p class="link">{{ article.url }}</p>
+      </article>
+    {% else %}
+      <p class="notice">La búsqueda no encontró notas relevantes.</p>
+    {% endfor %}
+  </section>
+
+  <footer class="sources">
+    <h2>Fuentes y costo</h2>
+    <table>
+      <thead>
+        <tr><th>Proveedor</th><th class="num">Consultas</th><th class="num">Notas recibidas</th><th class="num">Créditos</th><th class="num">De la caché</th><th class="num">Fallidas</th></tr>
+      </thead>
+      <tbody>
+        {% for p in data.providers %}
+          <tr><td>{{ provider_label.get(p.provider, p.provider) }}</td><td class="num">{{ p.queries }}</td><td class="num">{{ p.results }}</td><td class="num">{{ p.credits }}</td><td class="num">{{ p.from_cache }}</td><td class="num">{{ p.failed }}</td></tr>
+        {% else %}
+          <tr><td colspan="6" class="empty">Sin consultas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p>Créditos de SearchApi usados: <strong>{{ data.search.credits_used }}</strong> · Costo estimado de la IA en la búsqueda: <strong>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</strong>.</p>
+    {% if uses_gdelt %}<p>Incluye datos de The GDELT Project (gdeltproject.org).</p>{% endif %}
+    <p class="disclaimer">Los resúmenes y la ubicación de cada nota se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link.</p>
+  </footer>
+</body>
+</html>
