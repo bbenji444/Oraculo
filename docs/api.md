@@ -17,7 +17,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 | HTTP | Cuándo | Ejemplos de `code` |
 |---|---|---|
 | 404 | Lo pedido no existe | `search_not_found`, `article_not_found`, `concept_not_found`, `region_not_found` |
-| 409 | Choca con algo que ya existe o con un tope | `credit_limit_reached`, `concept_name_taken` |
+| 409 | Choca con algo que ya existe, con un tope o con una búsqueda que aún corre | `credit_limit_reached`, `concept_name_taken`, `search_not_finished` |
 | 422 | Parámetros inválidos | `invalid_request`, `query_budget_exceeded` |
 | 500 | Falla inesperada (el detalle queda en el registro, nunca en la respuesta) | `internal_error` |
 | 503 | Falta configurar el sistema | `llm_not_configured`, `service_unavailable` |
@@ -33,6 +33,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 3. `GET /searches/{id}`: su avance (consúltala cada 2 s hasta que `status` sea `completed`, `partial` o `failed`).
 4. `GET /searches/{id}/articles`: las notas, y `GET /searches/{id}/aggregates`: el mapa de calor.
 5. `GET /articles/{id}`: el detalle de una nota.
+6. `POST /searches/{id}/report` y `GET /searches/{id}/export`: el reporte en PDF o HTML y las notas en CSV o GeoJSON.
 
 ## Estimar una búsqueda (no gasta)
 
@@ -315,6 +316,54 @@ curl -s http://localhost:8080/api/v1/searches/00000000-0000-0000-0000-0000000000
 { "error": { "code": "search_not_found", "message": "No existe esa búsqueda.", "details": { "id": "00000000-0000-0000-0000-000000000000" } } }
 ```
 
+## Reporte y datos de una búsqueda
+
+Solo para búsquedas terminadas (`completed`, `partial` o `failed`). Si la búsqueda todavía corre, las dos rutas responden `409` con `code` `search_not_finished`. Cada reporte o exportación queda en la bitácora como `report.generated` (ADR-0018).
+
+**Reporte.** `POST /searches/{id}/report?format=pdf|html`. Lleva:
+- portada;
+- resumen ejecutivo escrito por la IA a partir de los resúmenes de las notas;
+- mapa con las subregiones coloreadas;
+- conteo por subregión;
+- notas relevantes con su resumen, lugar y link;
+- proveedores y créditos.
+
+La **primera vez** le pide el resumen ejecutivo a la IA (en este ejemplo: 1,880 tokens de entrada, 175 de salida, **0.0003 USD**, 0 créditos de SearchApi). Las siguientes lo reutilizan.
+
+```bash
+curl -s -X POST -D - -o reporte.pdf \
+  'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d83/report?format=pdf'
+```
+
+```text
+HTTP/1.1 200 OK
+Content-Type: application/pdf
+content-disposition: attachment; filename="reporte-extorsion-jalisco-2026-10-17.pdf"
+```
+
+Resultado: 5 páginas A4, 79 KB, en 5.7 s la primera vez (con la IA) y 4.4 s las siguientes. Con `format=html` devuelve la misma página para verla o imprimirla desde el navegador (0.8 s).
+
+**Datos.** `GET /searches/{id}/export?format=csv|geojson`, con las notas relevantes. Nunca el texto completo (§8). No gasta nada.
+
+```bash
+curl -s -D - -o notas.csv \
+  'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d83/export?format=csv'
+```
+
+```text
+HTTP/1.1 200 OK
+content-type: text/csv; charset=utf-8
+content-disposition: attachment; filename="reporte-extorsion-jalisco-2026-10-17.csv"
+```
+
+```text
+titulo,medio,publicada,lugar,precision,dentro_de_la_region,latitud,longitud,conceptos,resumen_automatico,proveedores,link
+"Morelos en llamas y Sheinbaum pide ""un mes para consulta"", escribe Salvador García Soto",eluniversal.com.mx,17/10/2026 06:32,Municipio Cuernavaca,Municipio,no,18.9331479002984,-99.25995256354925,…
+```
+
+- **CSV:** va en UTF-8 con BOM, para que Excel muestre la Ñ al abrirlo con doble clic. Las fechas van en hora de la Ciudad de México. Si un título empieza con `=`, `+`, `-` o `@`, se le antepone un apóstrofo para que Excel no lo tome por fórmula.
+- **GeoJSON** (`application/geo+json`): un punto por nota ubicada, con las coordenadas en orden `[longitud, latitud]`. En el ejemplo son 12 puntos: las 14 notas menos las 2 sin ubicación. El objeto `busqueda` dice la región, los conceptos y el periodo.
+
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
@@ -323,4 +372,4 @@ curl -s http://localhost:8080/api/v1/searches/00000000-0000-0000-0000-0000000000
 
 Las rutas temporales `/local-index/*` se retiraron en la Fase 6: el índice local se consulta como un proveedor más dentro de cada búsqueda.
 
-Todas están en la documentación interactiva. Los reportes (`/searches/{id}/report`) llegan en la Fase 7.
+Todas están en la documentación interactiva.
