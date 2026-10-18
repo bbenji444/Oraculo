@@ -39,12 +39,18 @@ POINT_COLOR = "#e11d48"
 # Margen alrededor de la región: 4 % de su lado mayor, para que el contorno
 # no toque el marco.
 MARGIN_SHARE = 0.04
-# Tolerancia de simplificación: 1/1500 del lado mayor (~2 km para todo
-# México, ~300 m para Jalisco). A tamaño de página no se nota y evita SVG
-# pesados en estados con cientos de municipios (Oaxaca tiene 570).
-SIMPLIFY_SHARE = 1 / 1500
-# Decimales de las coordenadas en grados: 4 ≈ 11 m, de sobra para una página.
-SVG_DIGITS = 4
+# Tolerancia de simplificación: 1/800 del lado mayor (~4 km para todo
+# México, ~600 m para Jalisco: menos de 0.2 mm en la hoja). Medido el
+# 17/10/2026: el SVG de Oaxaca (570 municipios) bajó de 337 a 225 KB y el de
+# Jalisco de 273 a 163 KB respecto a 1/1500, sin diferencia visible.
+SIMPLIFY_SHARE = 1 / 800
+# Decimales de las coordenadas: los justos para 1/2000 del lado mayor de la
+# región (menos de 0.1 mm en la hoja). Jalisco y Oaxaca quedan en 3, la CDMX
+# en 4 y todo México en 2: más decimales solo hacen pesado el SVG (Oaxaca
+# pasaba de 370 KB con 4 fijos).
+PRECISION_SHARE = 1 / 2000
+MIN_DIGITS = 2
+MAX_DIGITS = 5
 # Tamaños relativos al lado mayor de la región (medidos a ojo en el PDF).
 POINT_SHARE = 0.007
 LABEL_SHARE = 0.022
@@ -80,10 +86,21 @@ _OUTLINE = text(
     WHERE r.id = :id AND r.geom IS NOT NULL
     """
 )
+# Las vecinas se recortan al marco del mapa antes de simplificarlas: de un
+# estado o país grande (Estados Unidos junto a México) solo se dibuja lo que
+# se ve. Sin recorte, el mapa de la CDMX pesaba 294 KB por el Estado de México.
 _CONTEXT = text(
     """
-    SELECT ST_AsSVG(ST_Scale(ST_SimplifyPreserveTopology(r.geom, :tol), :kx, 1), 0, :digits)
-               AS path
+    SELECT ST_AsSVG(
+               ST_Scale(
+                   ST_SimplifyPreserveTopology(
+                       ST_ClipByBox2D(r.geom, ST_MakeEnvelope(:west, :south, :east, :north, 4326)),
+                       :tol
+                   ),
+                   :kx, 1
+               ),
+               0, :digits
+           ) AS path
     FROM regions r
     WHERE r.level = CAST(:level AS region_level) AND r.id <> :region_id AND r.geom IS NOT NULL
       AND r.geom && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
@@ -179,16 +196,20 @@ class _Frame:
             self.north - self.south,
         )
 
+    @property
+    def digits(self) -> int:
+        wanted = math.ceil(-math.log10(self.size * PRECISION_SHARE))
+        return min(max(wanted, MIN_DIGITS), MAX_DIGITS)
+
+    def num(self, value: float) -> str:
+        return f"{value:.{self.digits}f}"
+
     def x(self, lon: float) -> float:
         return lon * self.kx
 
     @staticmethod
     def y(lat: float) -> float:
         return -lat
-
-
-def _num(value: float) -> str:
-    return f"{value:.{SVG_DIGITS}f}"
 
 
 class PostgisStaticMap:
@@ -211,7 +232,7 @@ class PostgisStaticMap:
     ) -> str:
         """Ver ``ReportMapPort.render``."""
         frame = _Frame.of(region)
-        geometry = {"tol": frame.size * SIMPLIFY_SHARE, "kx": frame.kx, "digits": SVG_DIGITS}
+        geometry = {"tol": frame.size * SIMPLIFY_SHARE, "kx": frame.kx, "digits": frame.digits}
         # Otro país o una localidad no tienen subregiones dibujables: se
         # dibujan a sí mismos.
         itself = level is AggregateLevel.COUNTRY or region.level is RegionLevel.LOCALITY
@@ -266,10 +287,10 @@ def _svg(
     max_count = max(by_code.values(), default=0)
     x0, y0, width, height = frame.view_box()
     pixel_height = round(SVG_WIDTH * height / width)
-    border = _num(frame.size * BORDER_SHARE)
+    border = frame.num(frame.size * BORDER_SHARE)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" class="report-map" '
-        f'viewBox="{_num(x0)} {_num(y0)} {_num(width)} {_num(height)}" '
+        f'viewBox="{frame.num(x0)} {frame.num(y0)} {frame.num(width)} {frame.num(height)}" '
         f'width="{SVG_WIDTH}" height="{pixel_height}" role="img">',
         f"<title>Notas por subregión en {escape(region.display_name)}</title>",
         f'<g fill="{CONTEXT_FILL}" stroke="#ffffff" stroke-width="{border}">',
@@ -286,7 +307,7 @@ def _svg(
     if outline:
         parts.append(
             f'<path d="{outline}" fill="none" stroke="{OUTLINE_COLOR}" '
-            f'stroke-width="{_num(frame.size * OUTLINE_SHARE)}"/>'
+            f'stroke-width="{frame.num(frame.size * OUTLINE_SHARE)}"/>'
         )
     parts.extend(_points(frame, points))
     parts.extend(_labels(frame, shapes, by_code))
@@ -296,21 +317,21 @@ def _svg(
 
 def _points(frame: _Frame, points: Sequence[MapPoint]) -> list[str]:
     radius = frame.size * POINT_SHARE
-    stroke = _num(radius / 3)
+    stroke = frame.num(radius / 3)
     out = []
     for point in points:
-        cx, cy = _num(frame.x(point.lon)), _num(frame.y(point.lat))
+        cx, cy = frame.num(frame.x(point.lon)), frame.num(frame.y(point.lat))
         if point.coarse:
             # Anillo punteado: solo se sabe el estado o el país (§14.2).
-            dash = _num(radius / 2)
+            dash = frame.num(radius / 2)
             out.append(
-                f'<circle cx="{cx}" cy="{cy}" r="{_num(radius * 1.6)}" fill="none" '
+                f'<circle cx="{cx}" cy="{cy}" r="{frame.num(radius * 1.6)}" fill="none" '
                 f'stroke="{POINT_COLOR}" stroke-width="{stroke}" '
                 f'stroke-dasharray="{dash} {dash}"/>'
             )
         else:
             out.append(
-                f'<circle cx="{cx}" cy="{cy}" r="{_num(radius)}" fill="{POINT_COLOR}" '
+                f'<circle cx="{cx}" cy="{cy}" r="{frame.num(radius)}" fill="{POINT_COLOR}" '
                 f'fill-opacity="0.85" stroke="#ffffff" stroke-width="{stroke}"/>'
             )
     return out
@@ -321,11 +342,11 @@ def _labels(frame: _Frame, shapes: list[RowMapping], by_code: dict[str, int]) ->
         (row for row in shapes if by_code.get(row["code"], 0) > 0),
         key=lambda row: (-by_code[row["code"]], row["name"]),
     )[:MAX_LABELS]
-    size = _num(frame.size * LABEL_SHARE)
-    halo = _num(frame.size * LABEL_SHARE / 4)
+    size = frame.num(frame.size * LABEL_SHARE)
+    halo = frame.num(frame.size * LABEL_SHARE / 4)
     out = []
     for row in ranked:
-        x, y = _num(frame.x(row["lon"])), _num(frame.y(row["lat"]))
+        x, y = frame.num(frame.x(row["lon"])), frame.num(frame.y(row["lat"]))
         name = escape(row["name"])
         # Primero un halo blanco y encima el texto: se lee sobre cualquier color.
         common = f'x="{x}" y="{y}" font-size="{size}" text-anchor="middle"'
