@@ -16,7 +16,7 @@ import io
 import json
 from typing import Any
 
-from app.adapters.reports.render import PRECISION_LABEL, PROVIDER_LABEL, mexico_datetime
+from app.adapters.reports.labels import PRECISION_LABEL, PROVIDER_LABEL, mexico_datetime
 from app.application.ports.search_reads import ArticleItem
 from app.application.use_cases.reports import ExportData
 

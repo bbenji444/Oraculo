@@ -5,19 +5,25 @@
   (``app/adapters/persistence/reports_repository.py``).
 - ``ReportMapPort``: el mapa estático en SVG, dibujado con PostGIS
   (``app/adapters/reports/static_map.py``).
+- ``ReportDocumentsPort``: el reporte en HTML o PDF y las notas en CSV o
+  GeoJSON (``app/adapters/reports/render.py``).
 
 No hace: no arma el reporte (eso es ``BuildReport``) ni lo convierte a PDF.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from app.application.audit import Actor
 from app.domain.aggregates import AggregateLevel
 from app.domain.enrichment import LLMUsage
 from app.domain.region import Region
+
+if TYPE_CHECKING:
+    # Solo para los tipos: el caso de uso importa este módulo al cargarse.
+    from app.application.use_cases.reports import ExportData, ReportData
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,5 +164,53 @@ class ReportMapPort(Protocol):
 
         Returns:
             Un elemento ``<svg>`` listo para incrustar en el HTML.
+        """
+        ...
+
+
+class ReportDocumentsPort(Protocol):
+    """Los archivos que se entregan: reporte y datos."""
+
+    def html(self, data: "ReportData") -> str:
+        """El reporte como página HTML (vista previa e "Imprimir").
+
+        Args:
+            data: Lo que lleva el reporte.
+
+        Returns:
+            El HTML completo.
+        """
+        ...
+
+    def pdf(self, data: "ReportData") -> bytes:
+        """El reporte en PDF. Es lento: quien lo llame debe usar un hilo aparte.
+
+        Args:
+            data: Lo que lleva el reporte.
+
+        Returns:
+            Los bytes del PDF.
+        """
+        ...
+
+    def csv(self, data: "ExportData") -> bytes:
+        """Las notas en CSV para Excel.
+
+        Args:
+            data: Notas de la búsqueda.
+
+        Returns:
+            El archivo.
+        """
+        ...
+
+    def geojson(self, data: "ExportData") -> bytes:
+        """Las notas ubicadas como puntos GeoJSON.
+
+        Args:
+            data: Notas de la búsqueda.
+
+        Returns:
+            El archivo.
         """
         ...

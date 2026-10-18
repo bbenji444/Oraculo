@@ -1,6 +1,7 @@
-"""Reporte en HTML y PDF desde una sola plantilla (especificación §15, ADR-0018).
+"""``ReportDocumentsPort``: reporte en HTML y PDF y datos en CSV y GeoJSON (§15, ADR-0018).
 
-``ReportRenderer`` llena ``templates/report.html.j2`` con un ``ReportData``:
+``ReportRenderer`` llena ``templates/report.html.j2`` con un ``ReportData``
+(los datos los arma ``exports.py``):
 - **HTML:** vista previa y versión para imprimir desde el navegador, con el
   CSS incrustado.
 - **PDF:** el mismo HTML convertido con WeasyPrint, con la fuente Noto Sans
@@ -19,7 +20,6 @@ muestra el texto completo de una nota (§8): solo título, resumen y link.
 """
 
 from collections.abc import Sequence
-from datetime import date, datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -28,65 +28,23 @@ from weasyprint import CSS, HTML
 from weasyprint.text.fonts import FontConfiguration
 from weasyprint.urls import URLFetcher
 
+from app.adapters.reports.exports import to_csv, to_geojson
+from app.adapters.reports.labels import (
+    GDELT_PROVIDERS,
+    LEVEL_LABEL,
+    PRECISION_LABEL,
+    PROVIDER_LABEL,
+    mexico_date,
+    mexico_datetime,
+)
 from app.adapters.reports.static_map import legend
-from app.application.clock import MEXICO_CITY
 from app.application.ports.reports import ProviderUsage
-from app.application.use_cases.reports import ReportData
-from app.domain.aggregates import AggregateLevel
+from app.application.use_cases.reports import ExportData, ReportData
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 FONTS_DIR = Path(__file__).parent / "fonts"
 TEMPLATE = "report.html.j2"
 STYLESHEET = TEMPLATES_DIR / "report.css"
-
-LEVEL_LABEL = {
-    AggregateLevel.COUNTRY: "País",
-    AggregateLevel.STATE: "Estado",
-    AggregateLevel.MUNICIPALITY: "Municipio",
-    AggregateLevel.LOCALITY: "Localidad",
-}
-# Mismas palabras que la leyenda de precisión del globo (§14.4).
-PRECISION_LABEL = {
-    "locality": "Localidad",
-    "municipality": "Municipio",
-    "state": "Solo estado",
-    "country": "Solo país",
-    "unknown": "Sin ubicación",
-}
-PROVIDER_LABEL = {
-    "searchapi": "Google News (SearchApi)",
-    "indice_local": "Índice local (GDELT y medios mexicanos)",
-    "gdelt": "GDELT",
-    "google_news_rss": "Google News RSS",
-}
-# Proveedores con datos de GDELT: piden citar "The GDELT Project" (§8).
-GDELT_PROVIDERS = frozenset({"indice_local", "gdelt"})
-
-
-def mexico_datetime(value: datetime | None) -> str:
-    """Fecha y hora en la Ciudad de México ("16/10/2026 11:38").
-
-    Args:
-        value: Momento con zona horaria, o ``None``.
-
-    Returns:
-        El texto, o "Sin fecha".
-    """
-    if value is None:
-        return "Sin fecha"
-    return value.astimezone(MEXICO_CITY).strftime("%d/%m/%Y %H:%M")
-
-
-def mexico_date(value: date) -> str:
-    """Fecha corta ("16/10/2026").
-
-    Args:
-        value: Día.
-
-    Returns:
-        El texto.
-    """
-    return value.strftime("%d/%m/%Y")
 
 
 def paragraphs(text: str) -> list[str]:
@@ -106,7 +64,7 @@ def _uses_gdelt(providers: Sequence[ProviderUsage]) -> bool:
 
 
 class ReportRenderer:
-    """Convierte un ``ReportData`` en HTML o PDF."""
+    """Convierte un ``ReportData`` en HTML o PDF, y un ``ExportData`` en CSV o GeoJSON."""
 
     def __init__(self) -> None:
         """Prepara la plantilla una sola vez (se reutiliza en cada reporte)."""
@@ -160,6 +118,14 @@ class ReportRenderer:
         )
         pdf: bytes = document.write_pdf(stylesheets=[stylesheet], font_config=fonts)
         return pdf
+
+    def csv(self, data: ExportData) -> bytes:
+        """Ver ``ReportDocumentsPort.csv``."""
+        return to_csv(data)
+
+    def geojson(self, data: ExportData) -> bytes:
+        """Ver ``ReportDocumentsPort.geojson``."""
+        return to_geojson(data)
 
     def _render(self, data: ReportData, *, inline_css: bool) -> str:
         total = len(data.articles)
