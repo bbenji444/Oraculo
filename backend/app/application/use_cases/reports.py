@@ -268,21 +268,24 @@ class BuildReport:
     async def _counts(
         self, search_id: UUID, region: Region, level: AggregateLevel
     ) -> tuple[tuple[SubregionCount, ...], int, int, int]:
-        result = aggregate(await self._articles.note_locations(search_id, ArticleFilters()), level)
-        inside = {
-            code: count
-            for code, count in result.counts.items()
-            if is_inside(code, region.code, region.level)
+        notes = await self._articles.note_locations(search_id, ArticleFilters())
+        unlocated = sum(1 for n in notes if n.code is None)
+        inside = [n for n in notes if is_inside(n, region.code, region.level)]
+        # Solo lo de dentro se sube a subregiones; lo que dentro de la región es
+        # menos preciso que el nivel ("solo Jalisco") queda en ``coarser``.
+        result = aggregate(inside, level)
+        names = {
+            r.code: r.name for r in await self._articles.regions_by_code(sorted(result.counts))
         }
-        names = {r.code: r.name for r in await self._articles.regions_by_code(sorted(inside))}
         counts = sorted(
-            (SubregionCount(code, names.get(code, code), count) for code, count in inside.items()),
+            (
+                SubregionCount(code, names.get(code, code), count)
+                for code, count in result.counts.items()
+            ),
             key=lambda c: (-c.count, c.name),
         )
-        # En los niveles de México, las notas de otro país vienen en ``abroad``:
-        # también son de fuera de la región.
-        outside = sum(result.counts.values()) - sum(inside.values()) + result.abroad
-        return tuple(counts), outside, result.coarser, result.unlocated
+        outside = len(notes) - len(inside) - unlocated
+        return tuple(counts), outside, result.coarser, unlocated
 
     async def _summary(
         self,

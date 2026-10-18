@@ -3,13 +3,13 @@
 - **Subregiones:** la tabla y el mapa del reporte cuentan las notas un nivel
   abajo de la región buscada: país → estados, estado → municipios,
   municipio → localidades. Una localidad se cuenta a sí misma.
-- **Dentro de la región:** solo las subregiones de la región buscada entran
+- **Dentro de la región:** solo las notas ubicadas en la región buscada entran
   en la tabla; las notas de fuera se cuentan aparte (§9 paso 7: no se borran).
 
 No hace: no consulta la base ni dibuja.
 """
 
-from app.domain.aggregates import AggregateLevel
+from app.domain.aggregates import AggregateLevel, NoteLocation
 from app.domain.geocoding import MEXICO_ISO3
 from app.domain.region import RegionLevel
 
@@ -41,19 +41,23 @@ def subregion_level(level: RegionLevel, code: str) -> AggregateLevel:
     return _SUBREGION[level]
 
 
-def is_inside(code: str, region_code: str, region_level: RegionLevel) -> bool:
-    """Dice si una subregión (por su clave) pertenece a la región buscada.
+def is_inside(note: NoteLocation, region_code: str, region_level: RegionLevel) -> bool:
+    """Dice si la ubicación principal de una nota cae dentro de la región buscada.
+
+    Igual que la pestaña "Dentro" de la pantalla (§9 paso 7): una nota que
+    solo dice "México" no se sabe si es de Jalisco, así que queda fuera.
 
     Args:
-        code: Clave de la subregión (INEGI, o ISO-A3 en otro país).
+        note: Ubicación principal de la nota (con clave).
         region_code: Clave de la región buscada (INEGI o ISO-A3).
         region_level: Nivel de la región buscada.
 
     Returns:
-        En México (país), todo estado está dentro; otro país solo se contiene
-        a sí mismo. Dentro de México, si la clave empieza con la de la región
-        (``14`` contiene a ``14039``, §6).
+        En un país, si la nota es de ese país. Dentro de México, si su clave
+        empieza con la de la región (``14`` contiene a ``14`` y a ``14039``, §6).
     """
+    if note.code is None:
+        return False
     if region_level is RegionLevel.COUNTRY:
-        return region_code in (MEXICO_ISO3, code)
-    return code.startswith(region_code)
+        return note.country_code == region_code
+    return note.country_code == MEXICO_ISO3 and note.code.startswith(region_code)

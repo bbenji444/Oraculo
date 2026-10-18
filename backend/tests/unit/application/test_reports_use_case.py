@@ -1,6 +1,7 @@
 """Armar el reporte y exportar notas, con puertos en memoria: sin base ni IA (§15)."""
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
@@ -41,7 +42,7 @@ from app.domain.errors import ProviderUnavailableError, RegionNotFoundError, Sea
 from app.domain.geocoding import Precision
 from app.domain.region import Region
 from app.domain.search import SearchStatus
-from tests.unit.fake_regions import CDMX, FakeRegionRepository
+from tests.unit.fake_regions import CDMX, MEXICO, FakeRegionRepository
 
 pytestmark = pytest.mark.anyio
 
@@ -141,6 +142,7 @@ class Articles:
             NoteLocation("09007", "MEX", Precision.LOCALITY),
             NoteLocation("09015", "MEX", Precision.MUNICIPALITY),  # Cuauhtémoc
             NoteLocation("09", "MEX", Precision.STATE),  # solo la CDMX
+            NoteLocation("16", "MEX", Precision.STATE),  # solo "Michoacán": fuera
             NoteLocation("14039", "MEX", Precision.MUNICIPALITY),  # Guadalajara: fuera
             NoteLocation("FRA", "FRA", Precision.COUNTRY),  # París: fuera
             NoteLocation(None, None, Precision.UNKNOWN),
@@ -245,7 +247,8 @@ async def test_reporte_completo_con_resumen_nuevo_que_se_guarda() -> None:
         SubregionCount("09007", "Iztapalapa", 2),
         SubregionCount("09015", "Cuauhtémoc", 1),
     )
-    assert (data.outside, data.coarser, data.unlocated) == (2, 1, 1)
+    # "Michoacán" a secas es de fuera, no "menos precisa" (no está en la CDMX).
+    assert (data.outside, data.coarser, data.unlocated) == (3, 1, 1)
     assert [a.article_id for a in data.articles] == [1, 2, 3]
     assert (data.summary, data.summary_model, data.summary_notice) == (
         "Predomina el cobro de piso.",
@@ -380,3 +383,14 @@ async def test_exportar_junta_las_notas_y_lo_deja_en_la_bitacora() -> None:
         await ExportSearch(
             Reader(running), Articles([]), FakeRegionRepository(), store, lambda: NOW
         ).execute(running.search_id, ReportFormat.GEOJSON, ACTOR)
+
+
+async def test_reporte_de_todo_mexico_cuenta_por_estado_y_deja_fuera_lo_de_otro_pais() -> None:
+    row = replace(search(), region_id=MEXICO.id, region_code="MEX", region_name="México")
+
+    data = await build(row).execute(row.search_id, ReportFormat.PDF, ACTOR)
+
+    assert (data.breadcrumb, data.level) == ("México", AggregateLevel.STATE)
+    # La CDMX junta sus 4 notas (alcaldías y "solo CDMX"); París queda fuera.
+    assert [(c.code, c.count) for c in data.counts] == [("09", 4), ("14", 1), ("16", 1)]
+    assert (data.outside, data.coarser, data.unlocated) == (1, 0, 1)
