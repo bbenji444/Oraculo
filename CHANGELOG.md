@@ -6,6 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Fase 7 — Reportes** (§15, ADR-0018):
+  - `POST /searches/{id}/report?format=pdf|html`: reporte A4 con portada (cifras clave, resumen ejecutivo con IA y datos clave calculados), página de análisis (mapa estático, tabla por subregión con barras, notas por día y medios con más notas), noticias agrupadas en dentro, fuera y sin ubicación, y anexo de metodología y fuentes. Nunca el texto de las notas.
+  - Mapa estático en SVG dibujado con PostGIS: subregiones coloreadas por número de notas, vecinas recortadas al marco y anillo punteado para lo poco preciso.
+  - Resumen ejecutivo con la IA (`summary_v1.md`) a partir de los resúmenes de las notas, guardado en la tabla nueva `reports` para no volver a pagarlo (~0.0003 USD medido).
+  - `GET /searches/{id}/export?format=csv|geojson`: las notas en CSV (UTF-8 con BOM, sin fórmulas de Excel) y GeoJSON.
+  - Cada reporte o exportación queda en la bitácora como `report.generated`; una búsqueda que corre responde `409 search_not_finished`.
+  - Panel de Descargas activo en Explorar: Reporte (PDF), Datos (CSV), Mapa de puntos (GeoJSON) e Imprimir.
+  - `/aggregates` acepta `level=locality`.
+  - WeasyPrint 70, Jinja2 y Noto Sans incluida (OFL) para que la Ñ y los acentos salgan iguales en cualquier servidor; el instalador de WSL agrega Pango y HarfBuzz.
+
 ## [0.6.0] - 2026-10-17
 
 ### Agregado
