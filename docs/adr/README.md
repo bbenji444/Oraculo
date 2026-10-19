@@ -31,3 +31,4 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0015](0015-extraccion-y-costo-de-ia.md) | Extracción de texto, su retención y el control de costo de la IA | Aceptado |
 | [0016](0016-openai-como-ia.md) | OpenAI como IA del enriquecimiento, elegible junto a Gemini | Aceptado |
 | [0017](0017-tierra-realista-y-fondo-espacial.md) | Tierra realista (texturas NASA), fondo espacial con three.js y movimiento del globo | Aceptado |
+| [0018](0018-reportes-pdf-y-datos.md) | Reportes en PDF con mapa dibujado en el servidor y datos en CSV y GeoJSON | Aceptado |

@@ -11,6 +11,7 @@ No hace: no contiene lógica de negocio ni rutas propias; las rutas están en
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
@@ -20,16 +21,25 @@ from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
 from app.adapters.health.postgres_probe import PostgresHealthProbe
 from app.adapters.health.redis_probe import RedisHealthProbe
-from app.adapters.llm.factory import llm_info
+from app.adapters.llm.factory import (
+    MissingLLMKeyError,
+    SummarizerSetup,
+    build_summarizer,
+    llm_info,
+)
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.adapters.persistence.reports_repository import PostgresReportStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.queue.celery_queue import CelerySearchQueue
+from app.adapters.reports.render import ReportRenderer
+from app.adapters.reports.static_map import PostgisStaticMap
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.plan_search import PlanSearch
+from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
 from app.worker.celery_app import create_celery_app
@@ -40,6 +50,19 @@ API_PREFIX = "/api/v1"
 # El ping al worker usa la mitad del tiempo total por componente para que,
 # si nadie responde, el mensaje sea "ningún worker respondió" y no un timeout.
 _WORKER_PING_FRACTION = 0.5
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _summarizer(settings: Settings) -> SummarizerSetup | None:
+    # Sin la llave de la IA, el reporte sale igual, con un aviso en lugar del
+    # resumen ejecutivo (ADR-0018).
+    try:
+        return build_summarizer(settings)
+    except MissingLLMKeyError:
+        return None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -96,9 +119,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.article_store = PostgresArticleStore(engine)
         app.state.search_queue = CelerySearchQueue(celery_app)
         app.state.max_queries_per_search = settings.max_queries_per_search
+        # Reportes (F7, ADR-0018): resumen ejecutivo, mapa estático y archivos.
+        report_store = PostgresReportStore(engine)
+        summarizer = _summarizer(settings)
+        app.state.report_builder = BuildReport(
+            searches=app.state.search_store,
+            articles=app.state.article_store,
+            regions=app.state.region_repository,
+            store=report_store,
+            static_map=PostgisStaticMap(engine),
+            summarizer=summarizer.summarizer if summarizer else None,
+            prices=(
+                LLMPrices(
+                    summarizer.provider,
+                    summarizer.price_input_per_million,
+                    summarizer.price_output_per_million,
+                )
+                if summarizer
+                else None
+            ),
+            clock=_utc_now,
+        )
+        app.state.search_exporter = ExportSearch(
+            app.state.search_store,
+            app.state.article_store,
+            app.state.region_repository,
+            report_store,
+            _utc_now,
+        )
+        app.state.report_documents = ReportRenderer()
         try:
             yield
         finally:
+            if summarizer:
+                await summarizer.summarizer.aclose()
             await redis_client.aclose()
             await engine.dispose()
 

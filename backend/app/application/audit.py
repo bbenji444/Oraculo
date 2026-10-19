@@ -19,6 +19,8 @@ CONCEPT_DELETED = "concept.deleted"
 SEARCH_FINISHED = "search.finished"
 # Notas de una búsqueda que se volvieron a pasar por la IA (gasto extra).
 SEARCH_REPROCESSED = "search.reprocessed"
+# Reporte o exportación de datos de una búsqueda (§16, ADR-0018).
+REPORT_GENERATED = "report.generated"
 
 
 @dataclass(frozen=True, slots=True)

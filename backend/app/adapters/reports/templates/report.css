@@ -1,0 +1,607 @@
+/*
+ * Estilos del reporte (especificación §15, ADR-0018).
+ *
+ * Sirven para el PDF (WeasyPrint, A4) y para la vista HTML que se imprime
+ * desde el navegador. La fuente Noto Sans viene de ../fonts/ (en el PDF); en
+ * el navegador, si no la encuentra, usa la sans-serif del sistema.
+ *
+ * Paleta: azul marino del encabezado, azul de la región (mismo tono que el
+ * globo), ámbar para lo de fuera y gris para lo sin ubicación. Se lee bien
+ * impreso en blanco y negro.
+ */
+
+@font-face {
+  font-family: "Noto Sans Reporte";
+  src: url("NotoSans-Regular.ttf");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Noto Sans Reporte";
+  src: url("NotoSans-Bold.ttf");
+  font-weight: 700;
+}
+
+:root {
+  --navy: #0b1f3a;
+  --ink: #0f172a;
+  --text: #1e293b;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --soft: #f1f5f9;
+  --inside: #0369a1;
+  --inside-soft: #e0f2fe;
+  --outside: #b45309;
+  --outside-soft: #fef3c7;
+  --unlocated: #64748b;
+  --alert: #be123c;
+}
+
+/* ---------------------------------------------------------------- Páginas */
+
+@page {
+  size: A4;
+  margin: 22mm 16mm 18mm;
+
+  @top-left {
+    content: "Monitor de Noticias · " string(doctitle) " · " string(docregion);
+    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+    vertical-align: bottom;
+    padding-bottom: 4mm;
+  }
+
+  @top-right {
+    content: "Uso interno";
+    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+    vertical-align: bottom;
+    padding-bottom: 4mm;
+  }
+
+  @bottom-left {
+    content: string(docdate);
+    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+  }
+
+  @bottom-right {
+    content: "Página " counter(page) " de " counter(pages);
+    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    color: #64748b;
+  }
+}
+
+/* La portada no lleva encabezado: la franja azul llega al borde superior. */
+@page :first {
+  margin-top: 0;
+
+  @top-left {
+    content: none;
+  }
+
+  @top-right {
+    content: none;
+  }
+}
+
+html {
+  font: 9.5pt/1.5 "Noto Sans Reporte", "Noto Sans", sans-serif;
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--ink);
+  line-height: 1.25;
+  margin: 0;
+}
+
+h2 {
+  font-size: 12pt;
+  margin: 16pt 0 6pt;
+  break-after: avoid;
+}
+
+h2.section {
+  font-size: 15pt;
+  margin: 0 0 10pt;
+  padding-bottom: 5pt;
+  border-bottom: 2pt solid var(--navy);
+}
+
+h3 {
+  font-size: 10pt;
+  margin: 0 0 6pt;
+  break-after: avoid;
+}
+
+p {
+  margin: 0 0 6pt;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 8pt;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- Portada */
+
+.band {
+  /* Llega a los bordes de la hoja (los márgenes son 16 mm a los lados). */
+  margin: 0 -16mm;
+  padding: 20mm 16mm 9mm;
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.band .kicker {
+  margin: 0 0 8pt;
+  font-size: 7.5pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.band h1 {
+  font-size: 26pt;
+  color: #ffffff;
+  string-set: doctitle content();
+}
+
+.band .region {
+  margin: 4pt 0 12pt;
+  font-size: 13pt;
+  color: #bfdbfe;
+  string-set: docregion content();
+}
+
+.band-meta {
+  /* Sin flex: WeasyPrint no toma string-set de un elemento dentro de flex. */
+  padding-top: 8pt;
+  border-top: 0.5pt solid #33507a;
+  font-size: 8pt;
+  color: #cbd5e1;
+}
+
+.band-meta .generated {
+  string-set: docdate content();
+}
+
+.band-meta span {
+  margin-right: 14pt;
+}
+
+.band-meta b {
+  margin-right: 3pt;
+  color: #ffffff;
+}
+
+.kpis {
+  display: flex;
+  gap: 8pt;
+  margin: 12pt 0 4pt;
+}
+
+.kpi {
+  flex: 1;
+  padding: 8pt 10pt;
+  border: 0.75pt solid var(--line);
+  border-top: 3pt solid var(--line);
+  border-radius: 3pt;
+}
+
+.kpi strong {
+  display: block;
+  font-size: 20pt;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.kpi span {
+  font-size: 7.5pt;
+  color: var(--muted);
+}
+
+.kpi-main {
+  border-top-color: var(--navy);
+}
+
+.kpi-inside {
+  border-top-color: var(--inside);
+}
+
+.kpi-outside {
+  border-top-color: var(--outside);
+}
+
+.kpi-unlocated {
+  border-top-color: var(--unlocated);
+}
+
+.summary {
+  padding: 10pt 12pt 4pt;
+  background: var(--soft);
+  border-left: 3pt solid var(--navy);
+  font-size: 10pt;
+  line-height: 1.55;
+}
+
+.summary .tag {
+  font-size: 7pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8pt;
+}
+
+.fact {
+  flex: 1 1 40%;
+  padding: 7pt 10pt;
+  border: 0.75pt solid var(--line);
+  border-radius: 3pt;
+}
+
+.fact-label {
+  display: block;
+  font-size: 7pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fact-value {
+  display: block;
+  font-size: 12pt;
+  color: var(--ink);
+}
+
+.fact-note {
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- Análisis */
+
+.analysis {
+  break-before: page;
+}
+
+.geo {
+  display: flex;
+  gap: 12pt;
+  align-items: flex-start;
+}
+
+.map {
+  flex: 0 0 58%;
+  margin: 0;
+}
+
+.map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 125mm;
+  border: 0.75pt solid var(--line);
+}
+
+.map figcaption {
+  margin-top: 4pt;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.legend-title {
+  margin-right: 4pt;
+  font-weight: 700;
+}
+
+.legend-item {
+  margin-right: 6pt;
+  white-space: nowrap;
+}
+
+.legend-item i {
+  display: inline-block;
+  width: 7pt;
+  height: 7pt;
+  margin-right: 2pt;
+  vertical-align: -0.5pt;
+  border: 0.5pt solid #94a3b8;
+}
+
+.legend-item i.dot {
+  border-radius: 50%;
+  border-color: #ffffff;
+  background: #e11d48;
+}
+
+.legend-item i.ring {
+  border-radius: 50%;
+  border: 1pt dashed #e11d48;
+}
+
+.ranking {
+  flex: 1;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.bars td {
+  padding: 2.5pt 0;
+  font-size: 8.5pt;
+  vertical-align: middle;
+}
+
+table.bars .name {
+  width: 42%;
+  padding-right: 6pt;
+}
+
+table.bars .bar span {
+  display: block;
+  height: 7pt;
+  min-width: 1.5pt;
+  background: var(--inside);
+  border-radius: 1pt;
+}
+
+table.bars .num {
+  width: 18pt;
+  padding-left: 6pt;
+  font-weight: 700;
+}
+
+table.totals {
+  margin-top: 8pt;
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+table.totals td {
+  padding: 2pt 0;
+  border-top: 0.5pt solid var(--line);
+}
+
+table.totals .total td {
+  color: var(--ink);
+  font-weight: 700;
+  border-top: 1pt solid var(--ink);
+}
+
+.charts {
+  display: flex;
+  gap: 14pt;
+  margin-top: 16pt;
+  break-inside: avoid;
+}
+
+.chart {
+  flex: 1;
+}
+
+.chart:first-child {
+  flex: 1.4;
+}
+
+.day-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------------------------------------------------------------- Noticias */
+
+.news {
+  break-before: page;
+}
+
+.group {
+  margin-bottom: 12pt;
+}
+
+.group-title {
+  padding: 4pt 8pt;
+  border-left: 3pt solid var(--inside);
+  background: var(--inside-soft);
+  font-size: 10pt;
+}
+
+.group-title span {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.group-outside .group-title {
+  border-left-color: var(--outside);
+  background: var(--outside-soft);
+}
+
+.group-unlocated .group-title {
+  border-left-color: var(--unlocated);
+  background: var(--soft);
+}
+
+.item {
+  display: flex;
+  gap: 8pt;
+  padding: 7pt 0;
+  border-bottom: 0.5pt solid var(--line);
+  break-inside: avoid;
+}
+
+.number {
+  flex: 0 0 16pt;
+  height: 16pt;
+  line-height: 16pt;
+  text-align: center;
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--inside);
+  border-radius: 50%;
+}
+
+.group-outside .number {
+  background: var(--outside);
+}
+
+.group-unlocated .number {
+  background: var(--unlocated);
+}
+
+.body {
+  flex: 1;
+}
+
+.item h4 {
+  font-size: 9.5pt;
+  margin-bottom: 2pt;
+}
+
+.item .meta {
+  margin-bottom: 3pt;
+  font-size: 7.5pt;
+  color: var(--muted);
+}
+
+.item .meta b {
+  color: var(--text);
+}
+
+.item .text {
+  margin-bottom: 2pt;
+  font-size: 8.5pt;
+}
+
+.item .link {
+  margin: 0;
+  font-size: 6.5pt;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.badge {
+  padding: 0 3pt;
+  border-radius: 2pt;
+  font-size: 6.5pt;
+  background: var(--soft);
+  border: 0.5pt solid var(--line);
+  color: var(--text);
+}
+
+.badge-state,
+.badge-country {
+  border: 0.5pt dashed var(--alert);
+  background: #fff1f2;
+}
+
+.badge-unknown {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- Anexo */
+
+.annex {
+  break-before: page;
+}
+
+.method {
+  display: flex;
+  gap: 14pt;
+  margin-bottom: 12pt;
+  font-size: 8.5pt;
+}
+
+.method > div {
+  flex: 1;
+}
+
+.method ol,
+.method ul {
+  margin: 0;
+  padding-left: 12pt;
+}
+
+.method li {
+  margin-bottom: 4pt;
+}
+
+ul.precision {
+  list-style: none;
+  padding-left: 0;
+}
+
+table.grid {
+  margin-bottom: 8pt;
+  font-size: 8pt;
+}
+
+table.grid th,
+table.grid td {
+  padding: 3pt 5pt;
+  border-bottom: 0.5pt solid var(--line);
+  text-align: left;
+}
+
+table.grid th {
+  font-size: 7pt;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1pt solid var(--ink);
+}
+
+table.grid th.num,
+table.grid td.num {
+  text-align: right;
+}
+
+/* En pantalla (vista previa o "Imprimir"), una hoja centrada. */
+@media screen {
+  body {
+    max-width: 180mm;
+    margin: 0 auto 24px;
+    padding: 0 16px;
+  }
+
+  .band {
+    margin: 0 -16px;
+    padding: 28px 16px 16px;
+  }
+
+  .analysis,
+  .news,
+  .annex {
+    margin-top: 32px;
+  }
+}

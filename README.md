@@ -9,7 +9,7 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
 - **Usar la API (con ejemplos de `curl`):** [docs/api.md](docs/api.md)
 
-> Estado actual: **Fase 6 (globo y búsqueda)**. La pantalla **Explorar** muestra la Tierra de la NASA sobre la Vía Láctea. Desde ahí se elige región, conceptos y fechas, se ve el costo antes de gastar, se lanza la búsqueda y se sigue su avance; las notas aparecen sobre el globo con su ficha, su lista y sus gráficas. **Historial** reabre búsquedas anteriores sin gastar nada. Los reportes (PDF, CSV, GeoJSON) llegan en la Fase 7.
+> Estado actual: **Fase 7 (reportes)**. La pantalla **Explorar** muestra la Tierra de la NASA sobre la Vía Láctea. Desde ahí se elige región, conceptos y fechas, se ve el costo antes de gastar, se lanza la búsqueda y se sigue su avance; las notas aparecen sobre el globo con su ficha, su lista y sus gráficas. **Historial** reabre búsquedas anteriores sin gastar nada. El panel **Descargas** entrega el reporte en PDF (portada, resumen ejecutivo, mapa, gráficas, noticias y metodología), las notas en CSV para Excel o en GeoJSON para un SIG, y una vista para imprimir.
 
 ---
 
@@ -78,7 +78,7 @@ Carga también los conceptos de ejemplo (Ciberseguridad, Secuestro, Extorsión, 
 wsl make seed      # solo crea los que falten; se puede repetir sin riesgo
 ```
 
-Abre <http://localhost:8080>: la cámara llega a México sobre la Tierra de noche. En **Explorar** busca "Jalisco" y elige un concepto: el panel muestra cuántas consultas y créditos gastaría la búsqueda **antes** de presionar **Buscar** (buscar sí gasta créditos de SearchApi y tokens de la IA). En **Historial** puedes reabrir una búsqueda anterior sin gastar nada. En **Conceptos**, "Probar concepto" muestra las consultas exactas sin gastar. **Estado del sistema** muestra los cuatro componentes en verde.
+Abre <http://localhost:8080>: la cámara llega a México sobre la Tierra de noche. En **Explorar** busca "Jalisco" y elige un concepto: el panel muestra cuántas consultas y créditos gastaría la búsqueda **antes** de presionar **Buscar** (buscar sí gasta créditos de SearchApi y tokens de la IA). En **Historial** puedes reabrir una búsqueda anterior sin gastar nada. Con una búsqueda terminada, el panel **Descargas** genera el reporte en PDF (el primero de cada búsqueda cuesta ~0.0003 USD de IA por el resumen ejecutivo) y las notas en CSV o GeoJSON. En **Conceptos**, "Probar concepto" muestra las consultas exactas sin gastar. **Estado del sistema** muestra los cuatro componentes en verde.
 
 ### 6. Comprobar que todo funciona
 

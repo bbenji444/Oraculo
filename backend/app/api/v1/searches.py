@@ -245,7 +245,7 @@ async def search_aggregates(
     articles: Articles,
     search_id: SearchId,
     level: Annotated[
-        AggregateLevel, Query(description="country, state o municipality.")
+        AggregateLevel, Query(description="country, state, municipality o locality.")
     ] = AggregateLevel.STATE,
     relevant: Annotated[
         Literal["true", "all"], Query(description="true: solo las relevantes; all: todas.")

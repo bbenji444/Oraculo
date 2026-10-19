@@ -32,6 +32,14 @@ def test_por_municipio_no_reparte_lo_que_solo_tiene_estado() -> None:
     assert (result.coarser, result.abroad, result.unlocated) == (2, 1, 1)
 
 
+def test_por_localidad_solo_cuenta_las_ubicadas_en_una_localidad() -> None:
+    # Lo usan los reportes de un municipio (§15): sus subregiones son localidades.
+    result = aggregate(NOTES, AggregateLevel.LOCALITY)
+
+    assert dict(result.counts) == {"141200001": 1}
+    assert (result.coarser, result.abroad, result.unlocated) == (4, 1, 1)
+
+
 def test_por_pais() -> None:
     result = aggregate(NOTES, AggregateLevel.COUNTRY)
 

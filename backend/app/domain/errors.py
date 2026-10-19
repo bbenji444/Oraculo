@@ -159,3 +159,9 @@ class CreditLimitReachedError(ConflictError):
     """La búsqueda haría pasar el tope mensual de créditos de SearchApi."""
 
     code = "credit_limit_reached"
+
+
+class SearchNotFinishedError(ConflictError):
+    """La búsqueda todavía corre: su reporte o sus datos se piden al terminar (§15)."""
+
+    code = "search_not_finished"

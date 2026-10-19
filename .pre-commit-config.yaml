@@ -12,19 +12,20 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-      # Las respuestas grabadas de los proveedores se guardan byte por byte
-      # como llegaron (son evidencia de cómo responde cada API): estos hooks
-      # no deben reescribirlas.
+      # Las respuestas grabadas de los proveedores (evidencia de cómo responde
+      # cada API) y la licencia de las fuentes de los reportes (su SHA-256
+      # está en el manifiesto) se guardan byte por byte como llegaron: estos
+      # hooks no deben reescribirlas.
       - id: trailing-whitespace
         # En Markdown dos espacios al final son un salto de línea.
         args: [--markdown-linebreak-ext=md]
-        exclude: ^backend/tests/fixtures/(providers|ingest)/
+        exclude: ^(backend/tests/fixtures/(providers|ingest)/|backend/app/adapters/reports/fonts/OFL\.txt$)
       - id: end-of-file-fixer
-        exclude: ^backend/tests/fixtures/(providers|ingest)/
+        exclude: ^(backend/tests/fixtures/(providers|ingest)/|backend/app/adapters/reports/fonts/OFL\.txt$)
       - id: mixed-line-ending
         # Refuerza .gitattributes: LF en todo salvo scripts de Windows.
         args: [--fix=lf]
-        exclude: (\.(ps1|bat|cmd)$|^backend/tests/fixtures/(providers|ingest)/)
+        exclude: (\.(ps1|bat|cmd)$|^(backend/tests/fixtures/(providers|ingest)/|backend/app/adapters/reports/fonts/OFL\.txt$))
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict

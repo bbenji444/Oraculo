@@ -2,9 +2,13 @@
  * Controles sobre el globo: giro, día/noche, velocidad de las animaciones y
  * leyenda de precisión (§14.2: lo ubicado solo por estado o país se dibuja con
  * anillo punteado, para no hacer creer que pasó en el centro exacto).
- * También el panel de Descargas, inactivo hasta la Fase 7 (decisión de Benji).
+ * También el panel de Descargas: reporte PDF, datos CSV y GeoJSON, e imprimir
+ * (Fase 7, ADR-0018).
  */
+import { type DownloadKind, useDownloads } from '../../hooks/useDownloads';
+import { useSearch } from '../../hooks/useSearches';
 import { MOTION_LABELS, MOTION_PRESETS } from '../../map/motion';
+import { isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
 import { SpinToggle } from '../GeoExplorer/SpinToggle';
@@ -67,22 +71,57 @@ export function PrecisionLegend() {
   );
 }
 
+const DOWNLOADS: { kind: DownloadKind; label: string; hint: string }[] = [
+  { kind: 'pdf', label: 'Reporte (PDF)', hint: 'Portada, resumen, mapa, gráficas y noticias' },
+  { kind: 'csv', label: 'Datos (CSV)', hint: 'Una fila por nota, para Excel' },
+  { kind: 'geojson', label: 'Mapa de puntos (GeoJSON)', hint: 'Para QGIS o Google Earth' },
+  { kind: 'print', label: 'Imprimir', hint: 'Abre el reporte en otra pestaña' },
+];
+
+/**
+ * Descargas de la búsqueda abierta (§15, ADR-0018). Se activan cuando la
+ * búsqueda termina; mientras se genera un archivo, su botón dice "Generando…".
+ */
 export function DownloadsPanel() {
+  const searchId = useExplorerStore((s) => s.searchId);
+  const search = useSearch(searchId).data;
+  const ready = search !== undefined && isFinished(search.status);
+  const downloads = useDownloads(ready ? searchId : null);
   return (
     <section aria-label="Descargas" className={`${GLASS} space-y-2 p-4`}>
       <h2 className={PANEL_TITLE}>Descargas</h2>
-      {['Reporte (PDF)', 'Datos (CSV / XML)', 'Imprimir'].map((label) => (
+      {DOWNLOADS.map(({ kind, label, hint }) => (
         <button
-          key={label}
+          key={kind}
           type="button"
-          disabled
-          title="Disponible en la Fase 7"
-          className={`${SMALL_BUTTON} w-full py-2`}
+          disabled={!ready || downloads.running !== null}
+          title={hint}
+          onClick={() => {
+            downloads.start(kind);
+          }}
+          className={`${SMALL_BUTTON} flex w-full items-center justify-between py-2 ${
+            kind === 'pdf' ? 'border-sky-400/40 bg-sky-500/15 text-sky-100' : ''
+          }`}
         >
-          {label}
+          <span>{downloads.running === kind ? 'Generando…' : label}</span>
+          {downloads.running === kind && (
+            <span
+              aria-hidden="true"
+              className="size-3 animate-spin rounded-full border-2 border-slate-500 border-t-sky-300"
+            />
+          )}
         </button>
       ))}
-      <p className="text-[11px] text-slate-500">Disponibles en la Fase 7 (reportes).</p>
+      {downloads.error && (
+        <p role="alert" className="text-[11px] text-rose-300">
+          {downloads.error.message}
+        </p>
+      )}
+      <p className="text-[11px] text-slate-500">
+        {ready
+          ? 'El primer reporte de una búsqueda escribe un resumen con IA (~0.001 USD); los siguientes no cuestan.'
+          : 'Disponibles cuando la búsqueda termine.'}
+      </p>
     </section>
   );
 }
