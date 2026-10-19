@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- Los créditos del mapa (INEGI, Natural Earth, NASA, OpenStreetMap) empiezan plegados en Explorar: solo se ve el botón "i" y aparecen al hacer clic. Antes MapLibre los dejaba abiertos porque el giro del globo no cuenta como arrastre.
+
 ## [0.7.0] - 2026-10-19
 
 ### Agregado

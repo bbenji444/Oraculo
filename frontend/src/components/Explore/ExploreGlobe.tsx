@@ -55,6 +55,7 @@ import {
   CLUSTER_RADIUS_PX,
   calloutPlacement,
 } from '../../map/newsLayers';
+import { collapseAttributionOnStart } from '../../map/attribution';
 import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
@@ -175,6 +176,8 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
+    // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
+    const stopAttribution = collapseAttributionOnStart(map.getContainer());
 
     let introDone = !intro;
     const spinStep = () => {
@@ -357,6 +360,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     mapRef.current = map;
     return () => {
       observer.disconnect();
+      stopAttribution();
       cancelAnimationFrame(calloutFrame);
       map.remove();
       mapRef.current = null;
