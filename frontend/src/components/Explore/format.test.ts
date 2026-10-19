@@ -2,12 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
-  conceptSlices,
   formatDay,
   formatMexicoCity,
   formatUsd,
   isCoarse,
-  NO_CONCEPT_COLOR,
   stageProgress,
   visibleArticles,
 } from './format';
@@ -75,28 +73,6 @@ describe('textos', () => {
     expect(formatUsd(0.0129)).toBe('0.0129 USD');
     expect(isCoarse('state')).toBe(true);
     expect(isCoarse('municipality')).toBe(false);
-  });
-});
-
-describe('notas por concepto', () => {
-  it('cuenta las relevantes por concepto y aparte las que no lo son', () => {
-    const slices = conceptSlices(
-      [
-        article([[3, 'Extorsión', true]]),
-        article([
-          [3, 'Extorsión', true],
-          [5, 'Secuestro', true],
-        ]),
-        article([[3, 'Extorsión', false]]),
-      ],
-      new Map([[3, '#AA0000']]),
-    );
-
-    expect(slices).toEqual([
-      { conceptId: 3, name: 'Extorsión', color: '#AA0000', count: 2 },
-      { conceptId: 5, name: 'Secuestro', color: NO_CONCEPT_COLOR, count: 1 },
-      { conceptId: null, name: 'No relevantes', color: NO_CONCEPT_COLOR, count: 1 },
-    ]);
   });
 });
 

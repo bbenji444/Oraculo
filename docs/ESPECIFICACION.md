@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.4 · Octubre 2026 · Responsable: Benji
+Versión 2.5 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -645,7 +645,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 **Apariencia (ADR-0017)**
 - El globo ocupa la pantalla, sobre un fondo de universo (Vía Láctea y estrellas que titilan) que gira con la cámara.
 - Tierra con textura satelital de la NASA. Por defecto de noche, con las ciudades iluminadas; un botón cambia a la de día. Al acercarse se funde con el mapa de calles y los límites de INEGI.
-- Paneles translúcidos a los lados (búsqueda, lista, gráficas y descargas) que no tapan el centro.
+- Paneles translúcidos a la izquierda (búsqueda, lista y descargas) que no tapan el centro; la derecha queda libre para el globo.
 
 **Vista inicial**
 - La cámara entra desde lejos y llega a México con frenado suave (~3.5 s).
@@ -917,3 +917,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.2 | 17 de octubre de 2026 | F5: parámetros finales de `/searches/{id}/articles` (`relevant`, `concept_id`, `in_region=none`) y de `/aggregates` (`level`, `coarser`); errores 500 y 503 uniformes; `docs/api.md`. |
 | 2.3 | 17 de octubre de 2026 | F6: Tierra realista con texturas de la NASA, fondo de universo con three.js y reglas de movimiento del globo (ADR-0017). |
 | 2.4 | 17 de octubre de 2026 | F7: reportes con mapa SVG dibujado en el servidor, resumen ejecutivo guardado en `reports`, fuente incluida y datos en CSV y GeoJSON (`/export`) (ADR-0018). |
+| 2.5 | 19 de octubre de 2026 | Explorar sin las gráficas "Top 5 estados" y "Tipos de noticias" (decisión de Benji): la derecha queda libre para el globo. |

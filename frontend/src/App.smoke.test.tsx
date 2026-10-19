@@ -20,7 +20,6 @@ import { App } from './App';
 import type { Search } from './services/searches';
 import { useExplorerStore } from './store/explorer';
 import articles from './test/fixtures/explorar/articles.json';
-import aggregatesState from './test/fixtures/explorar/aggregates-state.json';
 import concepts from './test/fixtures/explorar/concepts.json';
 import estimate from './test/fixtures/explorar/estimate.json';
 import jalisco from './test/fixtures/explorar/region-jalisco.json';
@@ -59,7 +58,6 @@ const ROUTES: Record<string, unknown> = {
   'regions/272/children': jaliscoChildren,
   'searches/estimate': estimate,
   [`searches/${SEARCH_ID}/articles`]: articles,
-  [`searches/${SEARCH_ID}/aggregates`]: aggregatesState,
   searches: { items: [search], next_cursor: null },
 };
 // Mientras corre, la búsqueda va en la etapa de la IA (como la real a los ~30 s).
@@ -174,11 +172,11 @@ describe('flujo principal (H1)', () => {
     );
     expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
 
-    // 4. Al terminar: costo real, notas en el globo, lista y gráficas.
+    // 4. Al terminar: costo real, notas en el globo y lista (sin gráficas a la derecha).
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
     const list = await screen.findByRole('region', { name: 'Noticias' });
-    const topStates = screen.getByRole('region', { name: 'Top 5 estados con más noticias' });
-    expect(within(topStates).getByLabelText(/^Jalisco: 7/)).toBeTruthy();
+    expect(screen.queryByText(/Top 5 estados/)).toBeNull();
+    expect(screen.queryByText('Tipos de noticias')).toBeNull();
 
     // Por defecto solo las relevantes, en la lista y en el globo por igual; la
     // pestaña "Fuera" las separa (§9 paso 7).

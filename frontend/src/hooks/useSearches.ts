@@ -5,14 +5,12 @@
  * - Lanzar es una mutación: solo al presionar "Buscar".
  * - El avance se consulta cada 2 s mientras la búsqueda corre y se detiene
  *   al terminar.
- * - Las notas y el mapa de calor se piden cuando la búsqueda terminó.
+ * - Las notas se piden cuando la búsqueda terminó.
  */
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 
 import {
-  type AggregateLevel,
   estimateSearch,
-  getAggregates,
   getArticle,
   getSearch,
   isFinished,
@@ -71,16 +69,6 @@ export function useSearchArticles(searchId: string | null, finished: boolean) {
   return useQuery({
     queryKey: ['searches', 'articles', searchId],
     queryFn: ({ signal }) => listAllArticles(searchId ?? '', { relevant: 'all' }, signal),
-    enabled: searchId !== null && finished,
-    staleTime: FINISHED_STALE_MS,
-  });
-}
-
-/** Conteo de notas por región para el mapa de calor. */
-export function useAggregates(searchId: string | null, level: AggregateLevel, finished: boolean) {
-  return useQuery({
-    queryKey: ['searches', 'aggregates', searchId, level],
-    queryFn: ({ signal }) => getAggregates(searchId ?? '', level, signal),
     enabled: searchId !== null && finished,
     staleTime: FINISHED_STALE_MS,
   });

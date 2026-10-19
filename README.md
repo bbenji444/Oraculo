@@ -9,7 +9,7 @@ Módulo que busca noticias sobre temas definidos por el usuario (**conceptos**, 
 - **Consultar o migrar la base de datos:** [docs/base-de-datos.md](docs/base-de-datos.md)
 - **Usar la API (con ejemplos de `curl`):** [docs/api.md](docs/api.md)
 
-> Estado actual: **Fase 7 (reportes)**. La pantalla **Explorar** muestra la Tierra de la NASA sobre la Vía Láctea. Desde ahí se elige región, conceptos y fechas, se ve el costo antes de gastar, se lanza la búsqueda y se sigue su avance; las notas aparecen sobre el globo con su ficha, su lista y sus gráficas. **Historial** reabre búsquedas anteriores sin gastar nada. El panel **Descargas** entrega el reporte en PDF (portada, resumen ejecutivo, mapa, gráficas, noticias y metodología), las notas en CSV para Excel o en GeoJSON para un SIG, y una vista para imprimir.
+> Estado actual: **Fase 7 (reportes)**. La pantalla **Explorar** muestra la Tierra de la NASA sobre la Vía Láctea. Desde ahí se elige región, conceptos y fechas, se ve el costo antes de gastar, se lanza la búsqueda y se sigue su avance; las notas aparecen sobre el globo con su ficha y su lista. **Historial** reabre búsquedas anteriores sin gastar nada. El panel **Descargas** entrega el reporte en PDF (portada, resumen ejecutivo, mapa, gráficas, noticias y metodología), las notas en CSV para Excel o en GeoJSON para un SIG, y una vista para imprimir.
 
 ---
 

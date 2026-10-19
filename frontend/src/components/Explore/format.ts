@@ -107,51 +107,6 @@ export function formatUsd(value: number): string {
   return `${value.toFixed(4)} USD`;
 }
 
-/** Rebanada de la gráfica "Tipos de noticias" (por concepto). */
-export interface ConceptSlice {
-  conceptId: number | null;
-  name: string;
-  color: string;
-  count: number;
-}
-
-// Color de las notas que no fueron relevantes para ningún concepto.
-export const NO_CONCEPT_COLOR = '#64748B';
-
-/**
- * Notas por concepto (una nota relevante para dos conceptos cuenta en ambos).
- *
- * @param articles Notas de la búsqueda.
- * @param colors Color de cada concepto (de su ficha).
- */
-export function conceptSlices(
-  articles: readonly Article[],
-  colors: ReadonlyMap<number, string>,
-): ConceptSlice[] {
-  const counts = new Map<number, { name: string; count: number }>();
-  let none = 0;
-  for (const article of articles) {
-    const relevant = article.concepts.filter((c) => c.is_relevant);
-    if (relevant.length === 0) none += 1;
-    for (const judgement of relevant) {
-      const current = counts.get(judgement.concept_id) ?? { name: judgement.name, count: 0 };
-      counts.set(judgement.concept_id, { ...current, count: current.count + 1 });
-    }
-  }
-  const slices: ConceptSlice[] = [...counts.entries()]
-    .map(([conceptId, { name, count }]) => ({
-      conceptId,
-      name,
-      color: colors.get(conceptId) ?? NO_CONCEPT_COLOR,
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
-  if (none > 0) {
-    slices.push({ conceptId: null, name: 'No relevantes', color: NO_CONCEPT_COLOR, count: none });
-  }
-  return slices;
-}
-
 /**
  * Notas que se ven en la lista y en el globo: por defecto solo las relevantes
  * para algún concepto. Las dos vistas usan esta misma función para que nunca
