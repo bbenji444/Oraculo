@@ -4,9 +4,11 @@ import csv
 import io
 import json
 from dataclasses import replace
+from typing import cast
 
 import pytest
 from pypdf import PdfReader
+from pypdf.generic import DictionaryObject
 
 from app.adapters.reports.exports import CSV_COLUMNS, to_csv, to_geojson
 from app.adapters.reports.render import ReportRenderer, paragraphs
@@ -111,11 +113,12 @@ async def test_el_pdf_trae_la_n_y_los_acentos_con_la_fuente_incluida(report: Rep
     assert "México › Ciudad de México" in text
     assert "Resumen ejecutivo" in text
     assert "Página 1 de" in text
-    fonts = {
-        str(font["/BaseFont"])
-        for page in reader.pages
-        for font in page["/Resources"]["/Font"].values()
-    }
+    fonts = set()
+    for page in reader.pages:
+        # pypdf tipa cada valor como PdfObject; aquí son diccionarios del PDF.
+        resources = cast(DictionaryObject, page["/Resources"])
+        for font in cast(DictionaryObject, resources["/Font"]).values():
+            fonts.add(str(cast(DictionaryObject, font.get_object())["/BaseFont"]))
     # WeasyPrint nombra la fuente con la familia del @font-face (report.css).
     assert any("Noto-Sans-Reporte" in name for name in fonts)
     assert not any("DejaVu" in name for name in fonts)
