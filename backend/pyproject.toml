@@ -10,6 +10,10 @@
 # HTTP externo (F3): httpx2 + tenacity (ADR-0010); defusedxml lee el RSS de
 # Google News sin exponerse a "bombas XML". httpx2 también es el cliente de
 # pruebas de FastAPI (Starlette).
+#
+# Reportes (F7, ADR-0018): jinja2 arma el HTML y weasyprint lo convierte a
+# PDF (necesita Pango >= 1.44 del sistema). pypdf, solo en pruebas, lee el
+# texto del PDF para comprobar la Ñ y los acentos.
 
 [project]
 name = "monitor-noticias-backend"
@@ -27,6 +31,7 @@ dependencies = [
     # (ADR-0010); la 1.20 es oficial y soporta Gemini 2.5 Flash con JSON.
     "google-genai>=1.20,<2",
     "httpx2>=2.13.1",
+    "jinja2>=3.1",
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
@@ -36,11 +41,13 @@ dependencies = [
     "tenacity>=9.2.1",
     "trafilatura>=2",
     "uvicorn[standard]>=0.54.0",
+    "weasyprint>=70.0",
 ]
 
 [dependency-groups]
 dev = [
     "mypy>=2.4.0",
+    "pypdf>=6",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.1",
@@ -124,6 +131,12 @@ ignore_missing_imports = true
 # instala). Su resultado se trata como xml.etree.ElementTree.Element, que sí
 # tiene tipos, en el adaptador de Google News RSS.
 module = ["defusedxml", "defusedxml.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# WeasyPrint 70 no publica tipos (no trae py.typed). Solo lo usa el
+# adaptador de reportes, que anota lo que recibe y devuelve (bytes del PDF).
+module = ["weasyprint", "weasyprint.*"]
 ignore_missing_imports = true
 
 # --- pytest --------------------------------------------------------------------

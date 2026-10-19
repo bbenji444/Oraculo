@@ -1,8 +1,8 @@
 """Conteos por región para el mapa de calor (especificación §13 y §14).
 
 Cada nota cuenta una vez, en su **ubicación principal**, subida al nivel que
-se pide por el prefijo de la clave INEGI (2 dígitos = estado, 5 = municipio;
-§6). Una nota menos precisa que el nivel **no se reparte**: se cuenta aparte
+se pide por el prefijo de la clave INEGI (2 dígitos = estado, 5 = municipio,
+9 = localidad; §6). Una nota menos precisa que el nivel **no se reparte**: se cuenta aparte
 como ``coarser``, para no inventar precisión (§11). Las de otro país van en
 ``abroad`` en los niveles de México.
 
@@ -16,9 +16,10 @@ from enum import StrEnum
 
 from app.domain.geocoding import MEXICO_ISO3, Precision
 
-# Largo de la clave INEGI por nivel (§6): estado 2, municipio 5.
+# Largo de la clave INEGI por nivel (§6): estado 2, municipio 5, localidad 9.
 STATE_CODE_LENGTH = 2
 MUNICIPALITY_CODE_LENGTH = 5
+LOCALITY_CODE_LENGTH = 9
 
 
 class AggregateLevel(StrEnum):
@@ -27,16 +28,20 @@ class AggregateLevel(StrEnum):
     COUNTRY = "country"
     STATE = "state"
     MUNICIPALITY = "municipality"
+    # Las subregiones de un municipio en los reportes (§15).
+    LOCALITY = "locality"
 
 
 # Precisiones que alcanzan cada nivel de México.
 _REACHES = {
     AggregateLevel.STATE: {Precision.STATE, Precision.MUNICIPALITY, Precision.LOCALITY},
     AggregateLevel.MUNICIPALITY: {Precision.MUNICIPALITY, Precision.LOCALITY},
+    AggregateLevel.LOCALITY: {Precision.LOCALITY},
 }
 _CODE_LENGTH = {
     AggregateLevel.STATE: STATE_CODE_LENGTH,
     AggregateLevel.MUNICIPALITY: MUNICIPALITY_CODE_LENGTH,
+    AggregateLevel.LOCALITY: LOCALITY_CODE_LENGTH,
 }
 
 

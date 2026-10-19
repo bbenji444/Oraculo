@@ -1,8 +1,10 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v1.md``) y su
-respuesta se valida con el mismo modelo de Pydantic (``EnrichmentOut``).
-Así, cambiar de proveedor no cambia lo que se pide ni lo que se acepta.
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v1.md`` para
+enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
+reporte) y su respuesta se valida con el mismo modelo de Pydantic
+(``EnrichmentOut``, ``SummaryOut``). Así, cambiar de proveedor no cambia lo
+que se pide ni lo que se acepta.
 
 No hace: no llama a ninguna IA.
 """
@@ -10,11 +12,12 @@ No hace: no llama a ninguna IA.
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
-from app.application.ports.llm import EnrichmentRequest
+from app.application.clock import MEXICO_CITY
+from app.application.ports.llm import EnrichmentRequest, SummaryNote, SummaryRequest
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.region import RegionLevel
@@ -35,6 +38,18 @@ RETRY_NOTE = (
 RETRY_ERROR_CHARS = 500
 
 LocationKind = Literal["country", "state", "municipality", "locality"]
+
+# Resumen ejecutivo de los reportes (§15, ADR-0018).
+SUMMARY_PROMPT_VERSION = "summary_v1"
+SUMMARY_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{SUMMARY_PROMPT_VERSION}.md"
+# Unos 180 palabras de respuesta caben de sobra; el tope evita respuestas
+# desbocadas que cuestan.
+SUMMARY_MAX_OUTPUT_TOKENS = 1024
+# Igual que el tope de notas que se enriquecen por búsqueda
+# (LLM_MAX_ARTICLES_PER_SEARCH): a ~60 tokens por nota, el prompt queda
+# en ~10 000 tokens (~0.001 USD con gpt-6-luna).
+MAX_SUMMARY_NOTES = 150
+_DAY = "%d/%m/%Y"
 
 
 class LocationOut(BaseModel):
@@ -122,4 +137,44 @@ def to_enrichment(out: EnrichmentOut, concept_ids: set[int]) -> Enrichment:
             )
             for loc in out.locations
         ),
+    )
+
+
+class SummaryOut(BaseModel):
+    """Esquema de la respuesta del resumen ejecutivo."""
+
+    # Sin espacios sobrantes; un texto vacío o solo de espacios no valida y se
+    # reintenta (§10).
+    executive_summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+def _summary_line(note: SummaryNote) -> str:
+    # La fecha se muestra en hora de la Ciudad de México (CLAUDE.md §6.3).
+    day = note.published_at.astimezone(MEXICO_CITY).strftime(_DAY) if note.published_at else None
+    return (
+        f"- [{day or 'sin fecha'}] {note.title} — {note.place or 'sin ubicación'}: {note.summary}"
+    )
+
+
+def build_summary_prompt(request: SummaryRequest) -> str:
+    """Llena la plantilla ``summary_v1.md`` con las notas relevantes.
+
+    Solo lleva título, fecha, lugar y el resumen ya generado de cada nota,
+    nunca su texto (§8). Si hay más de ``MAX_SUMMARY_NOTES``, se mandan las
+    primeras (las más recientes), pero el conteo dice cuántas son en total.
+
+    Args:
+        request: Búsqueda y notas relevantes.
+
+    Returns:
+        El texto que se manda a la IA.
+    """
+    template = SUMMARY_PROMPT_PATH.read_text(encoding="utf-8")
+    return template.format(
+        concepts=", ".join(request.concepts),
+        region=request.region,
+        date_from=request.date_from.strftime(_DAY),
+        date_to=request.date_to.strftime(_DAY),
+        count=len(request.notes),
+        notes="\n".join(_summary_line(n) for n in request.notes[:MAX_SUMMARY_NOTES]),
     )

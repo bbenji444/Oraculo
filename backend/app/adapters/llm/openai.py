@@ -1,4 +1,4 @@
-"""``LLMPort`` con OpenAI por HTTP (ADR-0016).
+"""``LLMPort`` y ``SummarizerPort`` con OpenAI por HTTP (ADR-0016, ADR-0018).
 
 Confirmado en la documentación de OpenAI (17/10/2026):
 
@@ -25,19 +25,30 @@ No hace: no decide qué notas se enriquecen ni guarda nada.
 import json
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.adapters.llm.common import (
     MAX_OUTPUT_TOKENS,
     PROMPT_VERSION,
     RETRY_ERROR_CHARS,
     RETRY_NOTE,
+    SUMMARY_MAX_OUTPUT_TOKENS,
+    SUMMARY_PROMPT_VERSION,
     EnrichmentOut,
+    SummaryOut,
     build_prompt,
+    build_summary_prompt,
     to_enrichment,
 )
 from app.adapters.providers.http import ProviderHttpClient
-from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
+from app.application.ports.llm import (
+    EnrichmentError,
+    EnrichmentRequest,
+    EnrichmentResult,
+    SummaryError,
+    SummaryRequest,
+    SummaryResult,
+)
 from app.domain.enrichment import LLMUsage
 
 RESPONSES_URL = "https://api.openai.com/v1/responses"
@@ -90,13 +101,31 @@ ENRICHMENT_SCHEMA: dict[str, Any] = {
     },
 }
 
+# Esquema estricto del resumen ejecutivo (mismo contenido que SummaryOut).
+SUMMARY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["executive_summary"],
+    "properties": {"executive_summary": {"type": "string"}},
+}
 
-def request_body(model: str, prompt: str) -> dict[str, Any]:
+
+def request_body(
+    model: str,
+    prompt: str,
+    *,
+    name: str = "enrichment",
+    schema: dict[str, Any] = ENRICHMENT_SCHEMA,
+    max_output_tokens: int = MAX_OUTPUT_TOKENS,
+) -> dict[str, Any]:
     """Cuerpo de la petición a ``/v1/responses``.
 
     Args:
         model: Modelo (``OPENAI_MODEL``).
         prompt: Prompt ya lleno.
+        name: Nombre del esquema JSON (lo exige el modo estricto).
+        schema: Esquema estricto de la respuesta.
+        max_output_tokens: Tope de la respuesta.
 
     Returns:
         El cuerpo JSON.
@@ -105,12 +134,12 @@ def request_body(model: str, prompt: str) -> dict[str, Any]:
         "model": model,
         "input": [{"role": "user", "content": prompt}],
         "reasoning": {"effort": REASONING_EFFORT},
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_output_tokens": max_output_tokens,
         "text": {
             "format": {
                 "type": "json_schema",
-                "name": "enrichment",
-                "schema": ENRICHMENT_SCHEMA,
+                "name": name,
+                "schema": schema,
                 "strict": True,
             }
         },
@@ -172,41 +201,87 @@ class OpenAIEnricher:
         """Ver ``LLMPort.prompt_version``."""
         return PROMPT_VERSION
 
+    @property
+    def summary_prompt_version(self) -> str:
+        """Ver ``SummarizerPort.summary_prompt_version``."""
+        return SUMMARY_PROMPT_VERSION
+
     async def aclose(self) -> None:
         """Cierra las conexiones HTTP."""
         await self._http.aclose()
 
-    async def enrich(self, request: EnrichmentRequest) -> EnrichmentResult:
-        """Ver ``LLMPort.enrich``."""
-        prompt = build_prompt(request)
-        concept_ids = {c.concept_id for c in request.concepts}
+    async def _complete[T: BaseModel](
+        self,
+        prompt: str,
+        out_model: type[T],
+        *,
+        name: str,
+        schema: dict[str, Any],
+        max_output_tokens: int,
+    ) -> tuple[T | None, LLMUsage, str]:
+        """Pide un JSON, lo valida y reintenta una vez con el error (§10).
+
+        Args:
+            prompt: Prompt ya lleno.
+            out_model: Modelo de Pydantic que valida la respuesta.
+            name: Nombre del esquema JSON.
+            schema: Esquema estricto (mismo contenido que ``out_model``).
+            max_output_tokens: Tope de la respuesta.
+
+        Returns:
+            La respuesta validada (o ``None`` si no validó en los dos
+            intentos), los tokens de los dos intentos y el último error.
+        """
         tokens_in = tokens_out = 0
         contents = prompt
         last_error = ""
         for _attempt in range(2):
-            response = await self._http.post_json(
-                RESPONSES_URL, request_body(self._model, contents)
+            body = request_body(
+                self._model,
+                contents,
+                name=name,
+                schema=schema,
+                max_output_tokens=max_output_tokens,
             )
-            data = json.loads(response.text or "{}")
+            data = json.loads((await self._http.post_json(RESPONSES_URL, body)).text or "{}")
             usage = usage_of(data)
             tokens_in += usage.tokens_in
             tokens_out += usage.tokens_out
             try:
-                out = EnrichmentOut.model_validate_json(output_text(data))
+                out = out_model.model_validate_json(output_text(data))
             except ValidationError as error:
                 last_error = str(error)[:RETRY_ERROR_CHARS]
                 contents = prompt + RETRY_NOTE.format(error=last_error)
                 continue
-            return EnrichmentResult(
-                to_enrichment(out, concept_ids),
-                LLMUsage(tokens_in, tokens_out),
-                self._model,
-                PROMPT_VERSION,
-            )
-        raise EnrichmentError(
-            f"OpenAI no dio un JSON válido tras reintentar: {last_error}",
-            LLMUsage(tokens_in, tokens_out),
+            return out, LLMUsage(tokens_in, tokens_out), ""
+        return None, LLMUsage(tokens_in, tokens_out), last_error
+
+    async def enrich(self, request: EnrichmentRequest) -> EnrichmentResult:
+        """Ver ``LLMPort.enrich``."""
+        out, usage, error = await self._complete(
+            build_prompt(request),
+            EnrichmentOut,
+            name="enrichment",
+            schema=ENRICHMENT_SCHEMA,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
         )
+        if out is None:
+            raise EnrichmentError(f"OpenAI no dio un JSON válido tras reintentar: {error}", usage)
+        concept_ids = {c.concept_id for c in request.concepts}
+        return EnrichmentResult(to_enrichment(out, concept_ids), usage, self._model, PROMPT_VERSION)
+
+    async def summarize(self, request: SummaryRequest) -> SummaryResult:
+        """Ver ``SummarizerPort.summarize``."""
+        out, usage, error = await self._complete(
+            build_summary_prompt(request),
+            SummaryOut,
+            name="executive_summary",
+            schema=SUMMARY_SCHEMA,
+            max_output_tokens=SUMMARY_MAX_OUTPUT_TOKENS,
+        )
+        if out is None:
+            raise SummaryError(f"OpenAI no dio un resumen válido tras reintentar: {error}", usage)
+        return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
 
 
 def build_openai(

@@ -30,6 +30,11 @@ class SearchStatus(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
 
+    @property
+    def is_finished(self) -> bool:
+        """Si ya no va a cambiar (bien, a medias o con falla): tiene reporte."""
+        return self in (SearchStatus.COMPLETED, SearchStatus.PARTIAL, SearchStatus.FAILED)
+
 
 class Stage(StrEnum):
     """Etapas del pipeline (§9), para ``progress`` y ``processing_errors``."""

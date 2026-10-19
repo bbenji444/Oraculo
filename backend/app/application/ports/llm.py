@@ -1,14 +1,16 @@
-"""Puerto de la IA que enriquece notas (``LLMPort``, especificación §10).
+"""Puertos de la IA: enriquecer notas (``LLMPort``, §10) y resumir reportes (§15).
 
-La implementación vigente es Gemini (``app/adapters/llm/gemini.py``); cambiar
-de modelo o de proveedor es escribir otro adaptador.
+Los implementan los adaptadores de OpenAI y Gemini (``app/adapters/llm/``),
+elegidos con ``LLM_PROVIDER`` (ADR-0016). Son dos puertos porque los usan
+casos de uso distintos: el pipeline de búsqueda solo enriquece y el reporte
+solo resume.
 
 No hace: no decide qué notas se enriquecen ni guarda nada.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.enrichment import ConceptBrief, Enrichment, LLMUsage
@@ -117,3 +119,109 @@ class LLMInfo:
     price_input_per_million: float
     price_output_per_million: float
     configured: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryNote:
+    """Una nota relevante tal como se le da a la IA para el resumen ejecutivo.
+
+    Solo metadatos y el resumen ya generado: nunca el texto de la nota (§8).
+
+    Attributes:
+        title: Título.
+        summary: Resumen generado al enriquecerla.
+        place: Lugar principal ya ubicado ("Municipio Zapopan"), o ``None``.
+        published_at: Fecha de publicación, si se conoce.
+    """
+
+    title: str
+    summary: str
+    place: str | None
+    published_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryRequest:
+    """Lo que se le pide a la IA para el resumen ejecutivo de un reporte.
+
+    Attributes:
+        concepts: Nombres de los conceptos buscados.
+        region: Región de la búsqueda ("México › Jalisco").
+        date_from: Primer día del rango.
+        date_to: Último día del rango.
+        notes: Notas relevantes, de la más reciente a la más vieja.
+    """
+
+    concepts: Sequence[str]
+    region: str
+    date_from: date
+    date_to: date
+    notes: Sequence[SummaryNote]
+
+
+@dataclass(frozen=True, slots=True)
+class SummaryResult:
+    """El resumen ejecutivo con su costo y procedencia.
+
+    Attributes:
+        text: Párrafos separados por una línea en blanco, sin Markdown.
+        usage: Tokens gastados (suma de intentos, si hubo reintento).
+        model: Modelo usado.
+        prompt_version: Versión del prompt (``summary_v1``).
+    """
+
+    text: str
+    usage: LLMUsage
+    model: str
+    prompt_version: str
+
+
+class SummaryError(RuntimeError):
+    """La IA no dio un resumen válido tras el reintento (el reporte sale sin él).
+
+    Attributes:
+        usage: Tokens que sí se gastaron en los intentos fallidos.
+    """
+
+    def __init__(self, message: str, usage: LLMUsage) -> None:
+        """Guarda el mensaje y lo gastado.
+
+        Args:
+            message: Qué falló, en español.
+            usage: Tokens gastados aunque haya fallado.
+        """
+        super().__init__(message)
+        self.usage = usage
+
+
+class SummarizerPort(Protocol):
+    """La IA que escribe el resumen ejecutivo de un reporte (§15)."""
+
+    @property
+    def model(self) -> str:
+        """Modelo que se usa."""
+        ...
+
+    @property
+    def summary_prompt_version(self) -> str:
+        """Versión del prompt del resumen (se guarda con el resumen)."""
+        ...
+
+    async def aclose(self) -> None:
+        """Libera las conexiones al terminar."""
+        ...
+
+    async def summarize(self, request: SummaryRequest) -> SummaryResult:
+        """Escribe el resumen ejecutivo a partir de los resúmenes de las notas.
+
+        Args:
+            request: Búsqueda y notas relevantes.
+
+        Returns:
+            El resumen con su costo.
+
+        Raises:
+            SummaryError: Si la respuesta no fue válida tras un reintento.
+            ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
+        """
+        ...

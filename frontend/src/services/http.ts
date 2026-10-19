@@ -58,21 +58,53 @@ export async function requestJson(url: string, options: RequestOptions = {}): Pr
     throw new ApiError('No se pudo contactar a la API.', 'network_error');
   }
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) {
-    const apiError = (
-      payload as { error?: { message?: unknown; code?: unknown; details?: unknown } } | null
-    )?.error;
-    const details =
-      typeof apiError?.details === 'object' && apiError.details !== null
-        ? (apiError.details as Record<string, unknown>)
-        : {};
-    throw new ApiError(
-      typeof apiError?.message === 'string'
-        ? apiError.message
-        : `La API respondió con error (${String(response.status)}).`,
-      typeof apiError?.code === 'string' ? apiError.code : 'http_error',
-      details,
-    );
-  }
+  if (!response.ok) throw errorFrom(response.status, payload);
   return payload;
+}
+
+/** Traduce el formato uniforme de error de la API a un `ApiError`. */
+function errorFrom(status: number, payload: unknown): ApiError {
+  const apiError = (
+    payload as { error?: { message?: unknown; code?: unknown; details?: unknown } } | null
+  )?.error;
+  const details =
+    typeof apiError?.details === 'object' && apiError.details !== null
+      ? (apiError.details as Record<string, unknown>)
+      : {};
+  return new ApiError(
+    typeof apiError?.message === 'string'
+      ? apiError.message
+      : `La API respondió con error (${String(status)}).`,
+    typeof apiError?.code === 'string' ? apiError.code : 'http_error',
+    details,
+  );
+}
+
+/** Un archivo que entregó la API (reporte o datos). */
+export interface ApiFile {
+  blob: Blob;
+  /** Nombre que sugiere la API en `Content-Disposition`, si lo manda. */
+  filename: string | null;
+}
+
+/**
+ * Pide un archivo a la API (PDF, HTML, CSV o GeoJSON).
+ *
+ * @param url URL relativa de la API (ver `apiUrl`).
+ * @param method `GET` o `POST` (el reporte se genera con POST, §13).
+ * @returns El contenido y el nombre sugerido.
+ * @throws {ApiError} `network_error` si no hay conexión, o el error de la API
+ *   (por ejemplo `search_not_finished` si la búsqueda todavía corre).
+ */
+export async function requestFile(url: string, method: 'GET' | 'POST' = 'GET'): Promise<ApiFile> {
+  let response: Response;
+  try {
+    response = await fetch(url, { method });
+  } catch {
+    throw new ApiError('No se pudo contactar a la API.', 'network_error');
+  }
+  if (!response.ok) throw errorFrom(response.status, await response.json().catch(() => null));
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? null;
+  return { blob: await response.blob(), filename };
 }

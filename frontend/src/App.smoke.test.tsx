@@ -71,6 +71,7 @@ const RUNNING: Search = {
 };
 
 let searchPolls = 0;
+const reportRequests: string[] = [];
 const startBodies: unknown[] = [];
 
 function respond(body: unknown, status = 200): Response {
@@ -88,6 +89,17 @@ function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   if (path === 'searches' && init?.method === 'POST') {
     startBodies.push(typeof init.body === 'string' ? JSON.parse(init.body) : init.body);
     return Promise.resolve(respond({ search_id: SEARCH_ID }, 202));
+  }
+  if (path === `searches/${SEARCH_ID}/report` && init?.method === 'POST') {
+    reportRequests.push(url.search);
+    return Promise.resolve(
+      new Response('%PDF-1.7', {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': 'attachment; filename="reporte-extorsion-jalisco-2026-10-17.pdf"',
+        },
+      }),
+    );
   }
   if (path === `searches/${SEARCH_ID}`) {
     // El primer sondeo la ve corriendo; los siguientes, terminada.
@@ -111,16 +123,21 @@ function renderApp() {
 beforeEach(() => {
   searchPolls = 0;
   startBodies.length = 0;
+  reportRequests.length = 0;
   window.location.hash = '#/explorar';
   useExplorerStore.setState(useExplorerStore.getInitialState(), true);
   vi.stubGlobal('fetch', vi.fn(fakeApi));
   // jsdom no implementa el desplazamiento; la lista lo usa al elegir una nota.
   Element.prototype.scrollIntoView = vi.fn();
+  // Tampoco crea URLs de archivos en memoria; las descargas las usan.
+  URL.createObjectURL = vi.fn(() => 'blob:prueba');
+  URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 // El avance se consulta cada 2 s (useSearch): las esperas dan margen a un sondeo.
@@ -151,6 +168,10 @@ describe('flujo principal (H1)', () => {
     // 3. Buscar: se envía lo elegido y se ve el avance por etapas.
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText('Resumiendo y clasificando con la IA')).toBeTruthy();
+    // Mientras corre, todavía no hay reporte.
+    expect(screen.getByRole('button', { name: 'Reporte (PDF)' }).hasAttribute('disabled')).toBe(
+      true,
+    );
     expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
 
     // 4. Al terminar: costo real, notas en el globo, lista y gráficas.
@@ -189,6 +210,19 @@ describe('flujo principal (H1)', () => {
     expect(screen.getByTestId('globo').dataset.notas).toBe(String(articles.items.length));
     fireEvent.click(showIrrelevant);
     expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
+
+    // 7. Reporte en PDF (H5): se pide con POST y se guarda con el nombre de la API.
+    const saved: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(this.download);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Reporte (PDF)' }));
+    await waitFor(() => {
+      expect(saved).toEqual(['reporte-extorsion-jalisco-2026-10-17.pdf']);
+    });
+    expect(reportRequests).toEqual(['?format=pdf']);
   }, 15000);
 
   it('reabrir una búsqueda del Historial no gasta nada', async () => {

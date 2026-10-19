@@ -18,7 +18,7 @@ Corre **solo en Windows** con Node 22; no instales sus dependencias desde Ubuntu
 
 ## Pantallas
 
-- **Explorar** (`#/explorar`, inicial; `#/geodatos` también lleva aquí): el globo con la Tierra de la NASA sobre la Vía Láctea. A la izquierda, la búsqueda (región, conceptos, fechas, estimación de costo y avance), la lista de noticias y Descargas (activas en la Fase 7). A la derecha, "Top 5 estados" y "Tipos de noticias". Un clic en un punto vuela a la nota y abre su ficha (historia H1, ADR-0017).
+- **Explorar** (`#/explorar`, inicial; `#/geodatos` también lleva aquí): el globo con la Tierra de la NASA sobre la Vía Láctea. A la izquierda, la búsqueda (región, conceptos, fechas, estimación de costo y avance), la lista de noticias y Descargas (reporte PDF, datos CSV y GeoJSON, e imprimir; se activan al terminar la búsqueda, ADR-0018). A la derecha, "Top 5 estados" y "Tipos de noticias". Un clic en un punto vuela a la nota y abre su ficha (historia H1, ADR-0017).
 - **Conceptos** (`#/conceptos`): tabla de conceptos con interruptor de activo, formulario para crear o editar (palabras clave y exclusiones como "chips", color) con los errores del backend junto a cada campo, y **Probar concepto**: eliges región y rango y ves las consultas exactas por proveedor, sin gastar créditos (historia H2).
 - **Historial** (`#/historial`): búsquedas anteriores con su estado, notas y costo; "Abrir en el globo" las vuelve a mostrar en Explorar sin gastar nada.
 - **Estado del sistema** (`#/estado`): semáforo de `/health`.
