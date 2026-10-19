@@ -19,7 +19,6 @@ No hace: no decide qué va en el reporte (eso es ``BuildReport``) y nunca
 muestra el texto completo de una nota (§8): solo título, resumen y link.
 """
 
-from collections.abc import Sequence
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -30,15 +29,12 @@ from weasyprint.urls import URLFetcher
 
 from app.adapters.reports.exports import to_csv, to_geojson
 from app.adapters.reports.labels import (
-    GDELT_PROVIDERS,
-    LEVEL_LABEL,
     PRECISION_LABEL,
     PROVIDER_LABEL,
     mexico_date,
     mexico_datetime,
 )
-from app.adapters.reports.static_map import legend
-from app.application.ports.reports import ProviderUsage
+from app.adapters.reports.view import build_view
 from app.application.use_cases.reports import ExportData, ReportData
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -57,10 +53,6 @@ def paragraphs(text: str) -> list[str]:
         Los párrafos sin espacios sobrantes.
     """
     return [p.strip() for p in text.split("\n\n") if p.strip()]
-
-
-def _uses_gdelt(providers: Sequence[ProviderUsage]) -> bool:
-    return any(p.provider in GDELT_PROVIDERS and p.queries > 0 for p in providers)
 
 
 class ReportRenderer:
@@ -128,18 +120,11 @@ class ReportRenderer:
         return to_geojson(data)
 
     def _render(self, data: ReportData, *, inline_css: bool) -> str:
-        total = len(data.articles)
-        inside = sum(c.count for c in data.counts) + data.coarser
-        max_count = max((c.count for c in data.counts), default=0)
         return self._env.get_template(TEMPLATE).render(
             data=data,
+            view=build_view(data),
             css=Markup(self._css) if inline_css else None,  # noqa: S704 — CSS propio del repositorio
             map_svg=Markup(data.map_svg),  # noqa: S704 — SVG de static_map con los textos ya escapados
-            legend=legend(max_count),
-            level_label=LEVEL_LABEL[data.level],
             precision_label=PRECISION_LABEL,
             provider_label=PROVIDER_LABEL,
-            total=total,
-            inside=inside,
-            uses_gdelt=_uses_gdelt(data.providers),
         )

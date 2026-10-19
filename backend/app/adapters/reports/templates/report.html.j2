@@ -1,125 +1,222 @@
 {#
-  Plantilla única del reporte (especificación §15, ADR-0018): la usan la
+  Plantilla única del reporte (especificación §15, ADR-0018). La usan la
   vista HTML (con el CSS incrustado) y el PDF (WeasyPrint, con el CSS aparte
-  para cargar la fuente). Todo el texto se escapa; solo el SVG del mapa va
-  tal cual. Nunca lleva el texto completo de una nota (§8).
+  para cargar la fuente).
+
+  Estructura:
+  1. Portada: título, cifras clave, resumen ejecutivo y datos clave.
+  2. Análisis: mapa y tabla por subregión, notas por día y medios.
+  3. Noticias agrupadas (en la región, fuera, sin ubicación) y numeradas.
+  4. Anexo: metodología, fuentes y costo.
+
+  Todo el texto se escapa; solo el SVG del mapa va tal cual. Nunca lleva el
+  texto completo de una nota (§8).
 #}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Reporte · {{ data.search.concepts | map(attribute="name") | join(", ") }} · {{ data.breadcrumb }}</title>
+  <title>{{ view.title }} · {{ data.breadcrumb }} · Reporte</title>
+  <meta name="author" content="Monitor de Noticias">
+  <meta name="description" content="Reporte de noticias: {{ view.title }} en {{ data.breadcrumb }}, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.">
   {% if css %}<style>{{ css }}</style>{% endif %}
 </head>
 <body>
-  <header class="cover">
-    <p class="kicker">Monitor de Noticias · Reporte</p>
-    <h1>{{ data.search.concepts | map(attribute="name") | join(", ") }}</h1>
-    <p class="region">{{ data.breadcrumb }}</p>
-    <dl class="facts">
-      <div><dt>Periodo</dt><dd>{{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}</dd></div>
-      <div><dt>Generado</dt><dd>{{ data.generated_at | mx_datetime }} (hora de la Ciudad de México)</dd></div>
-      <div><dt>Pedido por</dt><dd>{{ data.generated_by }}</dd></div>
-    </dl>
-    <ul class="numbers">
-      <li><strong>{{ total }}</strong><span>notas relevantes</span></li>
-      <li><strong>{{ inside }}</strong><span>dentro de la región</span></li>
-      <li><strong>{{ data.outside }}</strong><span>fuera de la región</span></li>
-      <li><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></li>
-    </ul>
-  </header>
 
-  <section class="summary">
-    <h2>Resumen ejecutivo</h2>
+{# ------------------------------------------------------------------ Portada #}
+<section class="cover">
+  <div class="band">
+    <p class="kicker">Monitor de Noticias · Reporte de análisis</p>
+    <h1 class="doc-title">{{ view.title }}</h1>
+    <p class="region doc-region">{{ data.breadcrumb }}</p>
+    <div class="band-meta">
+      <span><b>Periodo</b> {{ data.search.date_from | mx_date }} – {{ data.search.date_to | mx_date }}</span>
+      <span class="generated"><b>Generado</b> {{ data.generated_at | mx_datetime }} (Ciudad de México)</span>
+      <span><b>Solicitó</b> {{ data.generated_by }}</span>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi kpi-main"><strong>{{ view.total }}</strong><span>notas relevantes</span></div>
+    <div class="kpi kpi-inside"><strong>{{ view.inside }}</strong><span>en {{ data.region.name }} · {{ view.inside_percent }} %</span></div>
+    <div class="kpi kpi-outside"><strong>{{ data.outside }}</strong><span>fuera de la región</span></div>
+    <div class="kpi kpi-unlocated"><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></div>
+  </div>
+
+  <h2>Resumen ejecutivo</h2>
+  <div class="summary">
     {% if data.summary %}
-      <p class="auto">Resumen automático generado por IA ({{ data.summary_model }}) a partir de los resúmenes de las notas. Verifique en las fuentes antes de citarlo.</p>
+      <p class="tag">Generado por IA · {{ data.summary_model }} · verifique en las fuentes antes de citar</p>
       {% for paragraph in data.summary | paragraphs %}
         <p>{{ paragraph }}</p>
       {% endfor %}
     {% else %}
-      <p class="notice">{{ data.summary_notice }}</p>
+      <p class="muted">{{ data.summary_notice }}</p>
     {% endif %}
-  </section>
+  </div>
 
-  <section class="map-section">
-    <h2>Mapa</h2>
+  <h2>Datos clave</h2>
+  <div class="facts">
+    {% for fact in view.facts %}
+      <div class="fact">
+        <span class="fact-label">{{ fact.label }}</span>
+        <strong class="fact-value">{{ fact.value }}</strong>
+        <span class="fact-note">{{ fact.note }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# ----------------------------------------------------------------- Análisis #}
+<section class="analysis">
+  <h2 class="section">Distribución geográfica</h2>
+  <div class="geo">
     <figure class="map">
       {{ map_svg }}
       <figcaption>
-        {% if legend %}
-          <span class="legend-title">Notas por {{ level_label | lower }}:</span>
-          {% for item in legend %}
-            <span class="legend-item"><i style="background: {{ item.fill }}"></i>{{ item.label }}</span>
-          {% endfor %}
-        {% else %}
-          <span>Ninguna nota relevante se ubicó dentro de la región a nivel {{ level_label | lower }}.</span>
+        {% if view.legend %}
+          <span class="legend-title">Notas por {{ view.level_label | lower }}</span>
+          {% for item in view.legend %}<span class="legend-item"><i style="background: {{ item.fill }}"></i>{{ item.label }}</span>{% endfor %}
         {% endif %}
         <span class="legend-item"><i class="dot"></i>Lugar preciso</span>
-        <span class="legend-item"><i class="ring"></i>Solo estado o país (centro aproximado)</span>
+        <span class="legend-item"><i class="ring"></i>Solo estado o país</span>
       </figcaption>
     </figure>
-  </section>
 
-  <section class="counts">
-    <h2>Notas por {{ level_label | lower }}</h2>
-    <table>
-      <thead>
-        <tr><th>{{ level_label }}</th><th class="num">Notas</th><th class="num">%</th></tr>
-      </thead>
-      <tbody>
-        {% for row in data.counts %}
-          <tr><td>{{ row.name }}</td><td class="num">{{ row.count }}</td><td class="num">{{ (100 * row.count / total) | round | int if total else 0 }}</td></tr>
-        {% else %}
-          <tr><td colspan="3" class="empty">Sin notas ubicadas a este nivel.</td></tr>
+    <div class="ranking">
+      <h3>Notas por {{ view.level_label | lower }}</h3>
+      <table class="bars">
+        <tbody>
+          {% for bar in view.subregions %}
+            <tr>
+              <td class="name">{{ bar.label }}</td>
+              <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
+              <td class="num">{{ bar.count }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="muted">Ninguna nota ubicada en un {{ view.level_label | lower }} de la región.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <table class="totals">
+        {% if view.other_subregions %}<tr><td>Otros {{ view.other_subregions }} {{ view.level_plural }}</td><td class="num">{{ view.other_notes }}</td></tr>{% endif %}
+        {% if data.coarser %}<tr><td>En la región, sin {{ view.level_label | lower }} preciso</td><td class="num">{{ data.coarser }}</td></tr>{% endif %}
+        <tr><td>Fuera de la región</td><td class="num">{{ data.outside }}</td></tr>
+        <tr><td>Sin ubicación</td><td class="num">{{ data.unlocated }}</td></tr>
+        <tr class="total"><td>Total de notas relevantes</td><td class="num">{{ view.total }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <h3>Notas por {{ view.days_unit }}</h3>
+      {# Barras en SVG (WeasyPrint no maneja alturas en % dentro de flex).
+         Lienzo de 400 × 140: base en y = 110 y barra más alta de 90. Con
+         muchos días, solo se rotula uno de cada pocos para que no se encimen. #}
+      {% set n = view.days | length %}
+      {% set slot = 400 / n %}
+      {% set every = (n // 10) + 1 %}
+      <svg class="day-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 140" width="400" height="140" font-family="Noto Sans Reporte, sans-serif">
+        {% for bar in view.days %}
+          {% set x = slot * loop.index0 %}
+          {% set h = 90 * bar.share %}
+          {% if bar.count %}
+            <rect x="{{ '%.1f' | format(x + slot * 0.18) }}" y="{{ '%.1f' | format(110 - h) }}" width="{{ '%.1f' | format(slot * 0.64) }}" height="{{ '%.1f' | format(h) }}" rx="1.5" fill="#0b1f3a"/>
+            <text x="{{ '%.1f' | format(x + slot / 2) }}" y="{{ '%.1f' | format(106 - h) }}" text-anchor="middle" font-size="9" font-weight="700" fill="#0f172a">{{ bar.count }}</text>
+          {% endif %}
+          {% if loop.index0 % every == 0 %}
+            <text x="{{ '%.1f' | format(x + slot / 2) }}" y="123" text-anchor="middle" font-size="7.5" fill="#475569">{{ bar.label }}</text>
+            {% if n <= 14 %}<text x="{{ '%.1f' | format(x + slot / 2) }}" y="133" text-anchor="middle" font-size="7" fill="#94a3b8">{{ bar.detail }}</text>{% endif %}
+          {% endif %}
         {% endfor %}
-      </tbody>
-      <tfoot>
-        {% if data.coarser %}<tr><td>Dentro de la región, sin {{ level_label | lower }} preciso</td><td class="num">{{ data.coarser }}</td><td class="num">{{ (100 * data.coarser / total) | round | int }}</td></tr>{% endif %}
-        {% if data.outside %}<tr><td>Fuera de la región</td><td class="num">{{ data.outside }}</td><td class="num">{{ (100 * data.outside / total) | round | int }}</td></tr>{% endif %}
-        {% if data.unlocated %}<tr><td>Sin ubicación</td><td class="num">{{ data.unlocated }}</td><td class="num">{{ (100 * data.unlocated / total) | round | int }}</td></tr>{% endif %}
-        <tr class="total"><td>Total</td><td class="num">{{ total }}</td><td class="num">{{ 100 if total else 0 }}</td></tr>
-      </tfoot>
-    </table>
-  </section>
+        <line x1="0" y1="110.5" x2="400" y2="110.5" stroke="#0f172a" stroke-width="0.8"/>
+      </svg>
+      {% if view.undated %}<p class="muted small">{{ view.undated }} nota(s) sin fecha de publicación no aparecen en la gráfica.</p>{% endif %}
+    </div>
+    <div class="chart">
+      <h3>Medios con más notas</h3>
+      <table class="bars">
+        <tbody>
+          {% for bar in view.sources %}
+            <tr>
+              <td class="name">{{ bar.label }}</td>
+              <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
+              <td class="num">{{ bar.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
-  <section class="news">
-    <h2>Noticias ({{ total }})</h2>
-    {% for article in data.articles %}
-      <article>
-        <h3><a href="{{ article.url }}">{{ article.title }}</a></h3>
-        <p class="meta">
-          {{ article.source_name or article.source_domain or "Medio sin nombre" }}
-          · {{ article.published_at | mx_datetime }}
-          · {% if article.primary %}{{ article.primary.place or "Lugar sin nombre" }} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% else %}<span class="badge badge-unknown">Sin ubicación</span>{% endif %}
-          {% if article.in_region is false %}<span class="badge badge-outside">Fuera de la región</span>{% endif %}
-        </p>
-        {% if article.summary %}
-          <p class="text"><span class="auto">Resumen automático:</span> {{ article.summary }}</p>
-        {% endif %}
-        <p class="link">{{ article.url }}</p>
-      </article>
-    {% else %}
-      <p class="notice">La búsqueda no encontró notas relevantes.</p>
-    {% endfor %}
-  </section>
+{# ----------------------------------------------------------------- Noticias #}
+<section class="news">
+  <h2 class="section">Noticias</h2>
+  {% for group in view.groups %}
+    <div class="group group-{{ group.key }}">
+      <h3 class="group-title">{{ group.title }} <span>{{ group.articles | length }} {{ "nota" if group.articles | length == 1 else "notas" }}</span></h3>
+      {% for item in group.articles %}
+        {% set article = item.article %}
+        <article class="item">
+          <span class="number">{{ item.number }}</span>
+          <div class="body">
+            <h4><a href="{{ article.url }}">{{ article.title }}</a></h4>
+            <p class="meta">
+              <b>{{ article.source_name or article.source_domain or "Medio sin nombre" }}</b>
+              · {{ article.published_at | mx_datetime }}
+              {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
+            </p>
+            {% if article.summary %}<p class="text">{{ article.summary }}</p>{% endif %}
+            <p class="link">{{ article.url }}</p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">La búsqueda no encontró notas relevantes.</p>
+  {% endfor %}
+</section>
 
-  <footer class="sources">
-    <h2>Fuentes y costo</h2>
-    <table>
-      <thead>
-        <tr><th>Proveedor</th><th class="num">Consultas</th><th class="num">Notas recibidas</th><th class="num">Créditos</th><th class="num">De la caché</th><th class="num">Fallidas</th></tr>
-      </thead>
-      <tbody>
-        {% for p in data.providers %}
-          <tr><td>{{ provider_label.get(p.provider, p.provider) }}</td><td class="num">{{ p.queries }}</td><td class="num">{{ p.results }}</td><td class="num">{{ p.credits }}</td><td class="num">{{ p.from_cache }}</td><td class="num">{{ p.failed }}</td></tr>
-        {% else %}
-          <tr><td colspan="6" class="empty">Sin consultas registradas.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p>Créditos de SearchApi usados: <strong>{{ data.search.credits_used }}</strong> · Costo estimado de la IA en la búsqueda: <strong>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</strong>.</p>
-    {% if uses_gdelt %}<p>Incluye datos de The GDELT Project (gdeltproject.org).</p>{% endif %}
-    <p class="disclaimer">Los resúmenes y la ubicación de cada nota se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link.</p>
-  </footer>
+{# ------------------------------------------------------------------- Anexo #}
+<section class="annex">
+  <h2 class="section">Metodología y fuentes</h2>
+  <div class="method">
+    <div>
+      <h3>Cómo se hizo</h3>
+      <ol>
+        <li>Se consultaron los proveedores de noticias con las palabras clave de {{ view.title }} y el nombre de la región, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.</li>
+        <li>Una IA leyó cada nota, decidió si es relevante para el concepto y escribió un resumen propio. Este reporte solo incluye las relevantes.</li>
+        <li>Los lugares que menciona cada nota se ubicaron en el catálogo geográfico de INEGI. La ubicación principal decide si la nota está dentro o fuera de la región.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Precisión de la ubicación</h3>
+      <ul class="precision">
+        <li><span class="badge badge-locality">Localidad</span> o <span class="badge badge-municipality">Municipio</span>: el lugar exacto que nombra la nota.</li>
+        <li><span class="badge badge-state">Solo estado</span> o <span class="badge badge-country">Solo país</span>: la nota no da más detalle; en el mapa se dibuja en el centro con anillo punteado.</li>
+        <li><span class="badge badge-unknown">Sin ubicación</span>: la nota no nombra un lugar reconocible.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Proveedores consultados</h3>
+  <table class="grid">
+    <thead>
+      <tr><th>Proveedor</th><th class="num">Consultas</th><th class="num">Notas recibidas</th><th class="num">Créditos</th><th class="num">De la caché</th><th class="num">Fallidas</th></tr>
+    </thead>
+    <tbody>
+      {% for p in data.providers %}
+        <tr><td>{{ provider_label.get(p.provider, p.provider) }}</td><td class="num">{{ p.queries }}</td><td class="num">{{ p.results }}</td><td class="num">{{ p.credits }}</td><td class="num">{{ p.from_cache }}</td><td class="num">{{ p.failed }}</td></tr>
+      {% else %}
+        <tr><td colspan="6" class="muted">Sin consultas registradas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="small">Créditos de SearchApi: <b>{{ data.search.credits_used }}</b> · Costo estimado de la IA en la búsqueda: <b>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</b>{% if view.uses_gdelt %} · Incluye datos de The GDELT Project (gdeltproject.org){% endif %}.</p>
+  <p class="small muted">Los resúmenes y las ubicaciones se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link. Documento de uso interno.</p>
+</section>
+
 </body>
 </html>

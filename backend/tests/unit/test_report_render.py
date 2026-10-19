@@ -63,23 +63,30 @@ async def test_el_html_lleva_todas_las_secciones_y_escapa_lo_de_la_web(
 
     for section in (
         "Resumen ejecutivo",
-        "Mapa",
+        "Datos clave",
+        "Distribución geográfica",
         "Notas por municipio",
-        "Noticias (3)",
-        "Fuentes y costo",
+        "Notas por día",
+        "Medios con más notas",
+        "Noticias",
+        "Metodología y fuentes",
     ):
         assert section in page
+    # Notas agrupadas como las pestañas de la pantalla, numeradas.
+    assert "En Ciudad de México" in page
+    assert "Sin ubicación" in page
+    assert '<span class="number">3</span>' in page
     assert "México › Ciudad de México" in page
     assert "<p>Predomina el cobro de piso.</p>" in page
     assert "<p>Se concentra en Iztapalapa.</p>" in page
-    assert "Resumen automático generado por IA (gpt-6-luna)" in page
+    assert "Generado por IA · gpt-6-luna" in page
     # El HTML de un título nunca se ejecuta; el SVG del mapa sí va tal cual.
     assert "<script>" not in page
     assert "&lt;script&gt;" in page
     assert SVG in page
     # Tabla por alcaldía, con lo poco preciso, lo de fuera y lo sin ubicación aparte.
-    assert "<td>Iztapalapa</td>" in page
-    assert "Dentro de la región, sin municipio preciso" in page
+    assert '<td class="name">Iztapalapa</td>' in page
+    assert "En la región, sin municipio preciso" in page
     assert "Fuera de la región" in page
     # Proveedores con su nombre para personas y la cita de GDELT (§8).
     assert "Google News (SearchApi)" in page
@@ -91,7 +98,7 @@ async def test_sin_resumen_se_lee_el_aviso(report: ReportData) -> None:
     page = ReportRenderer().html(replace(report, summary=None, summary_notice="Falta la llave."))
 
     assert "Falta la llave." in page
-    assert "Resumen automático generado por IA" not in page
+    assert "Generado por IA" not in page
 
 
 async def test_el_pdf_trae_la_n_y_los_acentos_con_la_fuente_incluida(report: ReportData) -> None:
