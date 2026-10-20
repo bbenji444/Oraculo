@@ -57,6 +57,7 @@ import {
   calloutPlacement,
 } from '../../map/newsLayers';
 import { collapseAttributionOnStart } from '../../map/attribution';
+import { articleOffset, calloutWidth, flyPadding, type ScreenSize } from '../../map/framing';
 import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
@@ -97,19 +98,12 @@ interface Callout {
 // Vista inicial: México con el eje inclinado (map/spin.ts).
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
 const INITIAL_ZOOM = 1.8;
-// Márgenes al volar: libres el panel de la izquierda y las gráficas de la derecha.
-const FLY_PADDING = { top: 90, bottom: 90, left: 430, right: 330 };
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
-// Al volar a una nota: el punto queda a la izquierda y abajo del centro para
-// que su ficha quepa a la derecha.
-const ARTICLE_OFFSET: [number, number] = [-120, 70];
 // Zoom al volar a una nota: municipio o más cerca si es precisa; estado si no.
 const ARTICLE_ZOOM_PRECISE = 7.5;
 const ARTICLE_ZOOM_COARSE = 5;
-// Ancho de la ficha; su lugar lo decide calloutPlacement (nunca se sale del mapa).
-const CALLOUT_WIDTH = 330;
 // Alto supuesto de la ficha mientras se mide la real.
 const CALLOUT_INITIAL_HEIGHT = 280;
 // Revisión de inactividad para reanudar el giro.
@@ -450,7 +444,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
             [east, north],
           ] as LngLatBoundsLike,
           {
-            padding: FLY_PADDING,
+            padding: flyPadding(screenOf(map), useExplorerStore.getState().panelOpen),
             maxZoom: FLY_MAX_ZOOM[region.level],
           },
         );
@@ -516,7 +510,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     map.flyTo({
       center: [target.lng, target.lat],
       zoom,
-      offset: ARTICLE_OFFSET,
+      offset: articleOffset(screenOf(map)),
       pitch: flyPitch('article'),
       bearing: REGION_BEARING,
       curve: FLY_CURVE,
@@ -569,8 +563,9 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articleId]);
 
   // Lugar de la ficha: nunca se sale del mapa (map/newsLayers.ts).
+  const cardWidth = calloutWidth(viewport);
   const placement = (point: { x: number; y: number }) =>
-    calloutPlacement(point, { width: CALLOUT_WIDTH, height: cardHeight }, viewport);
+    calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
 
   return (
     <div className="absolute inset-0">
@@ -608,7 +603,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
             style={{
               left: placement(callout).left,
               top: placement(callout).top,
-              width: CALLOUT_WIDTH,
+              width: cardWidth,
             }}
           >
             <div className={`${GLASS} animate-[fadeIn_200ms_ease-out] p-4`}>
@@ -625,6 +620,12 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       )}
     </div>
   );
+}
+
+/** Tamaño del mapa en pantalla (para encuadrar sin taparlo con los paneles). */
+function screenOf(map: MapLibreMap): ScreenSize {
+  const container = map.getContainer();
+  return { width: container.clientWidth, height: container.clientHeight };
 }
 
 /** Dónde está la cámara (para calcular la duración de un vuelo). */

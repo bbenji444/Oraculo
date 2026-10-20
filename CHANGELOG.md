@@ -14,6 +14,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Explorar ya no muestra las gráficas "Top 5 estados con más noticias" ni "Tipos de noticias" (decisión de Benji: no aportaban y estorbaban). La derecha queda libre para el globo; el reporte en PDF conserva su página de análisis.
 - Los créditos del mapa (INEGI, Natural Earth, NASA, OpenStreetMap) empiezan plegados en Explorar: solo se ve el botón "i" y aparecen al hacer clic. Antes MapLibre los dejaba abiertos porque el giro del globo no cuenta como arrastre.
 
+### Corregido
+
+- El globo no volaba a la región ni a la nota en celular: los márgenes del encuadre eran fijos para escritorio (760 px de ancho) y MapLibre se negaba ("Map cannot fit within canvas"). Ahora se calculan según la pantalla y el panel (`map/framing.ts`); en celular la ficha de la nota va encima del punto y cabe completa.
+- En escritorio las regiones quedaban corridas a la izquierda porque el margen derecho seguía reservando el lugar de las gráficas que se quitaron.
+
 ## [0.7.0] - 2026-10-19
 
 ### Agregado

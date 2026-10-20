@@ -157,6 +157,17 @@ describe('acomodo de la ficha', () => {
     expect(edge.lineX).toBe(edge.left + 330);
   });
 
+  it('en celular, sin lugar a los lados, va encima del punto y centrada', () => {
+    const phone = { width: 375, height: 760 };
+    const placed = calloutPlacement({ x: 187, y: 560 }, { width: 330, height: 260 }, phone);
+
+    expect(placed.left).toBeGreaterThanOrEqual(12);
+    expect(placed.left + 330).toBeLessThanOrEqual(375 - 12);
+    expect(placed.top + 260).toBeLessThanOrEqual(560);
+    expect(placed.lineX).toBe(187);
+    expect(placed.lineY).toBe(placed.top + 260);
+  });
+
   it('en un mapa más chico que la ficha queda pegada arriba', () => {
     expect(calloutPlacement({ x: 100, y: 100 }, card, { width: 600, height: 200 }).top).toBe(12);
   });

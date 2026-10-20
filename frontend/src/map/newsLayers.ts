@@ -288,7 +288,8 @@ export interface CalloutPlacement {
  * Dónde dibujar la ficha para que nunca se salga del mapa.
  *
  * Prefiere arriba a la derecha del punto; si no cabe arriba, la baja; si no
- * cabe a la derecha, la pasa a la izquierda.
+ * cabe a la derecha, la pasa a la izquierda. Si no cabe a ningún lado (celular),
+ * va encima del punto, centrada, y la línea baja recta hasta él.
  *
  * @param point Punto de la nota en pantalla.
  * @param card Ancho y alto de la ficha.
@@ -299,11 +300,21 @@ export function calloutPlacement(
   card: { width: number; height: number },
   viewport: { width: number; height: number },
 ): CalloutPlacement {
-  const fitsRight = point.x + CALLOUT_GAP_X + card.width <= viewport.width - CALLOUT_MARGIN;
-  const left = fitsRight ? point.x + CALLOUT_GAP_X : point.x - CALLOUT_GAP_X - card.width;
   const preferredTop = point.y - CALLOUT_RISE_Y - card.height;
   const maxTop = Math.max(CALLOUT_MARGIN, viewport.height - card.height - CALLOUT_MARGIN);
   const top = Math.min(maxTop, Math.max(CALLOUT_MARGIN, preferredTop));
+  const fitsRight = point.x + CALLOUT_GAP_X + card.width <= viewport.width - CALLOUT_MARGIN;
+  const fitsLeft = point.x - CALLOUT_GAP_X - card.width >= CALLOUT_MARGIN;
+  if (!fitsRight && !fitsLeft) {
+    const maxLeft = Math.max(CALLOUT_MARGIN, viewport.width - card.width - CALLOUT_MARGIN);
+    const left = Math.min(maxLeft, Math.max(CALLOUT_MARGIN, point.x - card.width / 2));
+    const lineX = Math.min(
+      left + card.width - CALLOUT_LINE_INSET,
+      Math.max(left + CALLOUT_LINE_INSET, point.x),
+    );
+    return { left, top, lineX, lineY: top + card.height };
+  }
+  const left = fitsRight ? point.x + CALLOUT_GAP_X : point.x - CALLOUT_GAP_X - card.width;
   const lineY = Math.min(
     top + card.height - CALLOUT_LINE_INSET,
     Math.max(top + CALLOUT_LINE_INSET, point.y - CALLOUT_RISE_Y),
