@@ -57,6 +57,7 @@ import {
   calloutPlacement,
 } from '../../map/newsLayers';
 import { collapseAttributionOnStart } from '../../map/attribution';
+import { smoothFlights } from '../../map/flight';
 import { articleOffset, calloutWidth, flyPadding, type ScreenSize } from '../../map/framing';
 import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
@@ -117,6 +118,8 @@ const USER_EVENTS = ['mousedown', 'touchstart', 'wheel', 'dragstart'] as const;
 const NEWS_LAYERS = ['news-point', 'news-coarse', 'news-cluster'];
 const LEVEL_ORDER: RegionLevel[] = ['country', 'state', 'municipality', 'locality'];
 
+type FlyFn = ReturnType<typeof smoothFlights>;
+
 export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -146,6 +149,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const selectedRef = useRef<Article | null>(selected);
   // Notas por id para el tooltip (el evento del mapa lee la versión vigente).
   const articlesByIdRef = useRef(new Map<number, Article>());
+  // Vuela con menos resolución y la recupera al aterrizar (map/flight.ts).
+  const flyRef = useRef<FlyFn>((_duration, start) => {
+    start();
+  });
 
   useEffect(() => {
     motionRef.current = motion;
@@ -172,6 +179,8 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
     const stopAttribution = collapseAttributionOnStart(map.getContainer());
+    const fly = smoothFlights(map, () => window.devicePixelRatio);
+    flyRef.current = fly;
 
     let introDone = !intro;
     const spinStep = () => {
@@ -214,11 +223,13 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
           spinStartRef.current = performance.now();
           spinStep();
         });
-        map.easeTo({
-          center: INITIAL_CENTER,
-          zoom: INITIAL_ZOOM,
-          duration: INTRO_DURATION_MS,
-          easing: easeOutQuint,
+        fly(INTRO_DURATION_MS, () => {
+          map.easeTo({
+            center: INITIAL_CENTER,
+            zoom: INITIAL_ZOOM,
+            duration: INTRO_DURATION_MS,
+            easing: easeOutQuint,
+          });
         });
       }
     });
@@ -319,16 +330,14 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         const source = map.getSource<GeoJSONSource>(NEWS_SOURCE);
         const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
         void source?.getClusterExpansionZoom(Number(news.properties.cluster_id)).then((zoom) => {
-          map.easeTo({
-            center: coordinates,
-            zoom,
-            duration: flyDurationMs(
-              cameraOf(map),
-              { lng: coordinates[0], lat: coordinates[1], zoom },
-              'region',
-              motionRef.current,
-            ),
-            easing: easeInOutCubic,
+          const duration = flyDurationMs(
+            cameraOf(map),
+            { lng: coordinates[0], lat: coordinates[1], zoom },
+            'region',
+            motionRef.current,
+          );
+          fly(duration, () => {
+            map.easeTo({ center: coordinates, zoom, duration, easing: easeInOutCubic });
           });
         });
         return;
@@ -390,18 +399,21 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     spinStartRef.current = performance.now();
     if (spinDegrees(map.getZoom()) === 0) {
       // De cerca no se gira: primero se aleja a la vista de globo.
-      map.easeTo({
-        center: [map.getCenter().lng, INITIAL_CENTER[1]],
-        zoom: INITIAL_ZOOM,
-        pitch: 0,
-        bearing: GLOBE_BEARING,
-        duration: flyDurationMs(
-          cameraOf(map),
-          { lng: map.getCenter().lng, lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM },
-          'up',
-          motionRef.current,
-        ),
-        easing: easeInOutCubic,
+      const duration = flyDurationMs(
+        cameraOf(map),
+        { lng: map.getCenter().lng, lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM },
+        'up',
+        motionRef.current,
+      );
+      flyRef.current(duration, () => {
+        map.easeTo({
+          center: [map.getCenter().lng, INITIAL_CENTER[1]],
+          zoom: INITIAL_ZOOM,
+          pitch: 0,
+          bearing: GLOBE_BEARING,
+          duration,
+          easing: easeInOutCubic,
+        });
       });
     } else if (!map.isMoving()) {
       spinStepRef.current();
@@ -451,19 +463,18 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     if (camera?.center !== undefined && camera.zoom !== undefined) {
       const { lng, lat } = LngLat.convert(camera.center);
       const center = { lng, lat };
-      map.flyTo({
-        center: [center.lng, center.lat],
-        zoom: camera.zoom,
-        bearing: REGION_BEARING,
-        pitch: flyPitch(region.level),
-        curve: FLY_CURVE,
-        duration: flyDurationMs(
-          cameraOf(map),
-          { ...center, zoom: camera.zoom },
-          kind,
-          motionRef.current,
-        ),
-        essential: false,
+      const zoom = camera.zoom;
+      const duration = flyDurationMs(cameraOf(map), { ...center, zoom }, kind, motionRef.current);
+      flyRef.current(duration, () => {
+        map.flyTo({
+          center: [center.lng, center.lat],
+          zoom,
+          bearing: REGION_BEARING,
+          pitch: flyPitch(region.level),
+          curve: FLY_CURVE,
+          duration,
+          essential: false,
+        });
       });
     }
     return () => {
@@ -507,15 +518,18 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       const point = map.project([target.lng, target.lat]);
       setCallout({ articleId: selected.article_id, x: point.x, y: point.y, visible: true });
     });
-    map.flyTo({
-      center: [target.lng, target.lat],
-      zoom,
-      offset: articleOffset(screenOf(map)),
-      pitch: flyPitch('article'),
-      bearing: REGION_BEARING,
-      curve: FLY_CURVE,
-      duration: flyDurationMs(cameraOf(map), target, 'region', motionRef.current),
-      essential: false,
+    const duration = flyDurationMs(cameraOf(map), target, 'region', motionRef.current);
+    flyRef.current(duration, () => {
+      map.flyTo({
+        center: [target.lng, target.lat],
+        zoom,
+        offset: articleOffset(screenOf(map)),
+        pitch: flyPitch('article'),
+        bearing: REGION_BEARING,
+        curve: FLY_CURVE,
+        duration,
+        essential: false,
+      });
     });
 
     // Latido a 30 fps (sin animación: anillo fijo).

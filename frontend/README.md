@@ -5,16 +5,16 @@ Corre **solo en Windows** con Node 22; no instales sus dependencias desde Ubuntu
 
 ## Estructura
 
-| Carpeta           | Qué hay                                                                                                                                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/config/`     | Constantes de configuración (por ejemplo, la ruta base de la API).                                                                                                                                    |
-| `src/map/`        | Estilo del globo (MapLibre v6 + texturas de la NASA + Protomaps + capas INEGI), capas de noticias, fondo espacial, movimiento de la cámara (`motion.ts`) y encuadre según la pantalla (`framing.ts`). |
-| `src/services/`   | Llamadas HTTP a la API (`http.ts` es el cliente compartido). Los componentes nunca llaman a `fetch` directamente (CLAUDE.md §6.2).                                                                    |
-| `src/hooks/`      | Hooks que conectan los servicios con TanStack Query (búsquedas, regiones, conceptos, estado).                                                                                                         |
-| `src/store/`      | Estado global con Zustand: lo que se ve en Explorar (región, conceptos, fechas, búsqueda y nota elegidas) y la cámara.                                                                                |
-| `src/components/` | Componentes de React, pequeños y con una sola responsabilidad.                                                                                                                                        |
-| `src/styles/`     | Estilos globales, animaciones y configuración de Tailwind.                                                                                                                                            |
-| `public/`         | Archivos estáticos que se sirven tal cual (ícono).                                                                                                                                                    |
+| Carpeta           | Qué hay                                                                                                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/config/`     | Constantes de configuración (por ejemplo, la ruta base de la API).                                                                                                                                                                                                     |
+| `src/map/`        | Estilo del globo (MapLibre v6 + texturas de la NASA + Protomaps + capas INEGI), capas de noticias, fondo espacial, movimiento de la cámara (`motion.ts`), encuadre según la pantalla (`framing.ts`) y vuelos con menos resolución para que sean fluidos (`flight.ts`). |
+| `src/services/`   | Llamadas HTTP a la API (`http.ts` es el cliente compartido). Los componentes nunca llaman a `fetch` directamente (CLAUDE.md §6.2).                                                                                                                                     |
+| `src/hooks/`      | Hooks que conectan los servicios con TanStack Query (búsquedas, regiones, conceptos, estado).                                                                                                                                                                          |
+| `src/store/`      | Estado global con Zustand: lo que se ve en Explorar (región, conceptos, fechas, búsqueda y nota elegidas) y la cámara.                                                                                                                                                 |
+| `src/components/` | Componentes de React, pequeños y con una sola responsabilidad.                                                                                                                                                                                                         |
+| `src/styles/`     | Estilos globales, animaciones y configuración de Tailwind.                                                                                                                                                                                                             |
+| `public/`         | Archivos estáticos que se sirven tal cual (ícono).                                                                                                                                                                                                                     |
 
 ## Pantallas
 
