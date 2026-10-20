@@ -130,7 +130,8 @@ def test_estimar_no_crea_nada_y_dice_cuanto_costaria(
     assert [c["name"] for c in data["concepts"]] == [CONCEPT_NAME]
     assert data["region"] == "México › Ciudad de México"
     assert [q["provider"] for q in data["queries"]] == ["searchapi", "indice_local"]
-    assert data["credits"] == 1
+    # Hasta 3 páginas de SearchApi por consulta (ADR-0019): la estimación es el máximo.
+    assert data["credits"] == 3
     assert data["over_limit"] is False
     assert data["llm"] == {
         "provider": "openai",
@@ -174,7 +175,7 @@ def test_lanzar_crea_la_busqueda_pendiente_y_la_encola(
         "date_from": "2026-10-01",
         "date_to": "2026-10-07",
         "queries_planned": 2,
-        "credits_estimated": 1,
+        "credits_estimated": 3,
         "concept_name": CONCEPT_NAME,
         "exclude_terms": ["simulacro"],
     }
@@ -226,7 +227,7 @@ def test_sin_llave_de_la_ia_es_503_y_con_tope_es_409(
     assert estimate.json()["llm"]["configured"] is False
     assert (missing.status_code, missing.json()["error"]["code"]) == (503, "llm_not_configured")
     assert (over.status_code, over.json()["error"]["code"]) == (409, "credit_limit_reached")
-    assert over.json()["error"]["details"] == {"creditos": 1, "usados_en_el_mes": 0, "tope": 0}
+    assert over.json()["error"]["details"] == {"creditos": 3, "usados_en_el_mes": 0, "tope": 0}
     assert queue.sent == []
     with engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM searches")).scalar_one() == 0
@@ -247,7 +248,7 @@ def test_detalle_e_historial_con_cursor(client: TestClient, ids: dict[str, int])
         "09",
     )
     assert data["concepts"] == [{"id": ids["concept"], "name": CONCEPT_NAME}]
-    assert (data["credits_estimated"], data["credits_used"], data["progress"]) == (1, 0, {})
+    assert (data["credits_estimated"], data["credits_used"], data["progress"]) == (3, 0, {})
     # La más reciente primero; la segunda página trae la que falta.
     assert [s["search_id"] for s in first.json()["items"]] == created[:0:-1]
     assert [s["search_id"] for s in second.json()["items"]] == created[:1]
