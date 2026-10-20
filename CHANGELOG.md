@@ -21,6 +21,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- Al saltar entre notas la animación del globo empezaba a fallar: los vuelos fluidos bajaban la resolución con el mapa quieto, y MapLibre en ese caso detiene lo que se mueve y avisa "terminó de moverse", así que se cortaban vuelos y la ficha salía antes de tiempo. Ahora la resolución baja con el vuelo ya en marcha.
 - El globo no volaba a la región ni a la nota en celular: los márgenes del encuadre eran fijos para escritorio (760 px de ancho) y MapLibre se negaba ("Map cannot fit within canvas"). Ahora se calculan según la pantalla y el panel (`map/framing.ts`); en celular la ficha de la nota va encima del punto y cabe completa.
 - En escritorio las regiones quedaban corridas a la izquierda porque el margen derecho seguía reservando el lugar de las gráficas que se quitaron.
 

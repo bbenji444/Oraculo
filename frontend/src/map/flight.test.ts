@@ -8,8 +8,16 @@ function fakeMap(initial: number) {
   const listeners: (() => void)[] = [];
   return {
     redraws: 0,
+    /** Lo que hace `start`: con animación, el mapa queda en movimiento. */
+    moving: false,
+    /** Orden de las llamadas, para comprobar que primero despega. */
+    calls: [] as string[],
+    isMoving() {
+      return this.moving;
+    },
     getPixelRatio: () => ratio,
     setPixelRatio(value: number) {
+      this.calls.push(`resolución ${String(value)}`);
       ratio = value;
     },
     redraw() {
@@ -19,6 +27,7 @@ function fakeMap(initial: number) {
       listeners.push(listener);
     },
     land() {
+      this.moving = false;
       for (const listener of listeners.splice(0)) listener();
     },
   };
@@ -49,13 +58,17 @@ describe('resolución durante un vuelo', () => {
     expect(flightPixelRatio(2)).toBe(1.6);
   });
 
-  it('baja al despegar y vuelve al aterrizar, redibujando en el mismo cuadro', () => {
+  it('baja ya en vuelo y vuelve al aterrizar, redibujando en el mismo cuadro', () => {
     const map = fakeMap(1.25);
     const fly = smoothFlights(map, () => 1.25);
-    const start = vi.fn();
 
-    fly(2400, start);
-    expect(start).toHaveBeenCalledOnce();
+    fly(2400, () => {
+      map.calls.push('despega');
+      map.moving = true;
+    });
+    // Primero despega: con el mapa quieto, MapLibre detendría el vuelo al
+    // cambiar la resolución y avisaría "terminó de moverse".
+    expect(map.calls).toEqual(['despega', 'resolución 1']);
     expect(map.getPixelRatio()).toBe(1);
 
     map.land();
@@ -69,14 +82,32 @@ describe('resolución durante un vuelo', () => {
     const map = fakeMap(1.25);
     const fly = smoothFlights(map, () => 1.25);
 
-    fly(2400, () => undefined);
+    const takeOff = () => {
+      map.moving = true;
+    };
+    fly(2400, takeOff);
     map.land(); // el segundo vuelo detiene al primero
-    fly(1800, () => undefined);
+    fly(1800, takeOff);
     nextFrame();
     expect(map.getPixelRatio()).toBe(1);
 
     map.land();
     nextFrame();
+    expect(map.getPixelRatio()).toBe(1.25);
+  });
+
+  it('si saltó sin animar (menos movimiento) no la baja, y devuelve la de un vuelo anterior', () => {
+    const map = fakeMap(1.25);
+    const fly = smoothFlights(map, () => 1.25);
+
+    fly(2400, () => {
+      map.moving = true;
+    });
+    expect(map.getPixelRatio()).toBe(1);
+    map.moving = false;
+    fly(2400, () => undefined); // MapLibre saltó: el mapa no se mueve
+    nextFrame();
+
     expect(map.getPixelRatio()).toBe(1.25);
   });
 
