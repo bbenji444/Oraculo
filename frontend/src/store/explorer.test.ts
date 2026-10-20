@@ -44,6 +44,17 @@ describe('cuerpo de la búsqueda', () => {
 });
 
 describe('store de Explorar', () => {
+  it('volver a elegir la misma nota vuelve a pedir el vuelo', () => {
+    const store = useExplorerStore.getState();
+    store.selectArticle(11);
+    const first = useExplorerStore.getState().articleRequest;
+    store.selectArticle(11);
+
+    expect(useExplorerStore.getState()).toMatchObject({ articleId: 11, articleRequest: first + 1 });
+    store.selectArticle(null);
+    expect(useExplorerStore.getState().articleRequest).toBe(first + 1);
+  });
+
   it('elegir región o nota detiene el giro', () => {
     const store = useExplorerStore.getState();
     store.setSpinning(true);

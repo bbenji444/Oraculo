@@ -40,6 +40,16 @@ export const MIN_FRAME_PX = 160;
 export const DESKTOP_ARTICLE_OFFSET: [number, number] = [-120, 70];
 // En celular la ficha no cabe a un lado: el punto baja y la ficha va encima.
 export const NARROW_ARTICLE_DROP = 0.22;
+// Zoom al volar a una nota, según qué tan preciso es su lugar: siempre el
+// mismo para la misma precisión (antes era "el mayor entre el actual y este" y,
+// ya de cerca, elegir otra nota no acercaba nada). Municipio a 9 y localidad a
+// 11 dejan ver el lugar y sus vecinos; estado 5 y país 4, todo el territorio.
+export const ARTICLE_ZOOM: Record<'country' | 'state' | 'municipality' | 'locality', number> = {
+  country: 4,
+  state: 5,
+  municipality: 9,
+  locality: 11,
+};
 // Ancho preferido de la ficha de una nota.
 export const CALLOUT_WIDTH = 330;
 // Margen de la ficha a cada lado en pantallas más angostas que ella.
@@ -90,7 +100,205 @@ export function articleOffset(screen: ScreenSize): [number, number] {
   return [0, Math.round(screen.height * NARROW_ARTICLE_DROP)];
 }
 
+// El mapa de calles detallado solo cubre este rectángulo (el mismo MEXICO_BBOX de
+// backend/app/geodata/mapa_base.py). Fuera, el del mundo llega a zoom 6 y sus
+// etiquetas se ven hasta 7 (BASEMAP_SWITCH_ZOOM): más cerca el mapa queda vacío.
+export const MEXICO_DETAIL_BBOX: Bbox = [-118.6, 14.3, -86.5, 32.9];
+export const WORLD_DETAIL_MAX_ZOOM = 6.5;
+
+/**
+ * Zoom al volar a una nota.
+ *
+ * @param precision Precisión de su lugar; `unknown` se trata como estado.
+ * @param lng Longitud de la nota.
+ * @param lat Latitud de la nota.
+ * @returns Zoom de destino, el mismo esté donde esté la cámara; fuera de México,
+ *   nunca más cerca de lo que alcanza el mapa del mundo.
+ */
+export function articleZoom(precision: string, lng: number, lat: number): number {
+  const zoom =
+    precision in ARTICLE_ZOOM
+      ? ARTICLE_ZOOM[precision as keyof typeof ARTICLE_ZOOM]
+      : ARTICLE_ZOOM.state;
+  const [west, south, east, north] = MEXICO_DETAIL_BBOX;
+  const inMexico = lng >= west && lng <= east && lat >= south && lat <= north;
+  return inMexico ? zoom : Math.min(zoom, WORLD_DETAIL_MAX_ZOOM);
+}
+
 /** Ancho de la ficha: el preferido, o lo que quepa en pantallas más angostas. */
 export function calloutWidth(screen: ScreenSize): number {
   return Math.min(CALLOUT_WIDTH, Math.max(0, screen.width - 2 * CALLOUT_SIDE_MARGIN));
+}
+
+export type Bbox = [west: number, south: number, east: number, north: number];
+
+export interface GlobeCamera {
+  /** Punto que queda en el centro de la pantalla (no el de la región). */
+  center: [lng: number, lat: number];
+  zoom: number;
+}
+
+// Tamaño del mundo en píxeles a zoom 0 (teselas de 512 px en MapLibre).
+const TILE_SIZE = 512;
+// Puntos por borde del rectángulo: los bordes de latitud se curvan en el globo
+// y con las esquinas solas se cortaría la región.
+const EDGE_SAMPLES = 16;
+// Zoom mínimo al encuadrar: el globo completo se ve a 1.2 en una laptop.
+export const MIN_FRAME_ZOOM = 1.2;
+// Vueltas de ajuste: al alejarse, la cámara se corre un poco y la región se ve
+// de otro ángulo. Con 8 vueltas y 2 % de aire Canadá y Rusia ya caben (pruebas).
+const FRAME_ITERATIONS = 8;
+const FRAME_SHRINK_MARGIN = 0.98;
+const DEGREES = Math.PI / 180;
+
+/** Vista ortográfica de un punto desde `center`, en una esfera de radio 1. */
+function orthographic(lng: number, lat: number, center: [number, number]): [number, number] {
+  const [lng0, lat0] = center;
+  const dLng = (lng - lng0) * DEGREES;
+  const phi = lat * DEGREES;
+  const phi0 = lat0 * DEGREES;
+  const x = Math.cos(phi) * Math.sin(dLng);
+  const y = Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * Math.cos(phi) * Math.cos(dLng);
+  const facing =
+    Math.sin(phi0) * Math.sin(phi) + Math.cos(phi0) * Math.cos(phi) * Math.cos(dLng) >= 0;
+  if (facing) return [x, y];
+  // Del otro lado del globo: se cuenta en el borde visible, en su dirección.
+  const length = Math.hypot(x, y) || 1;
+  return [x / length, y / length];
+}
+
+/** Inversa de `orthographic`: el punto del globo que se ve en (x, y). */
+function fromOrthographic(x: number, y: number, center: [number, number]): [number, number] {
+  const rho = Math.hypot(x, y);
+  if (rho < 1e-12) return center;
+  const c = Math.asin(Math.min(1, rho));
+  const phi0 = center[1] * DEGREES;
+  const lat = Math.asin(Math.cos(c) * Math.sin(phi0) + (y * Math.sin(c) * Math.cos(phi0)) / rho);
+  const lng =
+    center[0] * DEGREES +
+    Math.atan2(
+      x * Math.sin(c),
+      rho * Math.cos(phi0) * Math.cos(c) - y * Math.sin(phi0) * Math.sin(c),
+    );
+  return [normalizeLng(lng / DEGREES), lat / DEGREES];
+}
+
+function normalizeLng(lng: number): number {
+  return ((((lng + 180) % 360) + 360) % 360) - 180;
+}
+
+/** Puntos de los cuatro bordes del rectángulo (el este puede pasar de 180). */
+function edgePoints([west, south, east, north]: Bbox): [number, number][] {
+  const eastUnwrapped = east < west ? east + 360 : east;
+  const points: [number, number][] = [];
+  for (let i = 0; i <= EDGE_SAMPLES; i += 1) {
+    const t = i / EDGE_SAMPLES;
+    const lng = west + (eastUnwrapped - west) * t;
+    const lat = south + (north - south) * t;
+    points.push([lng, south], [lng, north], [west, lat], [eastUnwrapped, lat]);
+  }
+  return points;
+}
+
+/** Extensión de los puntos vistos desde `center`: mínimo y máximo en x y en y. */
+function extent(points: [number, number][], center: [number, number]) {
+  const projected = points.map(([lng, lat]) => orthographic(lng, lat, center));
+  const xs = projected.map(([x]) => x);
+  const ys = projected.map(([, y]) => y);
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+  };
+}
+
+/** Radio del globo en píxeles a ese zoom, con el centro en esa latitud. */
+function radiusAt(zoom: number, lat: number): number {
+  return (TILE_SIZE * 2 ** zoom) / (2 * Math.PI * Math.cos(lat * DEGREES));
+}
+
+/** Radio máximo para que una extensión (en radios) quepa en `room` píxeles. */
+function radiusToFit(room: number, reach: number): number {
+  return reach > 1e-9 ? Math.max(1, room) / reach : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Cámara que encuadra un rectángulo en el globo, dentro del espacio libre.
+ *
+ * `cameraForBounds` de MapLibre encuadra como si el mapa fuera plano
+ * (Mercator), donde los polos se estiran sin fin: Canadá (hasta 83° N)
+ * quedaba centrado en el Ártico y alejado. Aquí se mide la región como se ve
+ * en la esfera desde el punto que quedará al centro de la pantalla. En el
+ * globo de MapLibre el radio en píxeles es `512·2^zoom / (2π·cos(latitud del
+ * centro))` (medido en Explorar el 20/10/2026). La vista real tiene perspectiva
+ * y los bordes se ven más chicos que en la ortográfica, así que siempre cabe.
+ *
+ * El espacio libre no está centrado (el panel tapa la izquierda): en lugar de
+ * desplazar la imagen, se mueve la cámara para que la región quede al centro de
+ * ese espacio. Desplazar la imagen hacía ver la región desde otro ángulo y
+ * Canadá o Rusia se salían unos 30 px.
+ *
+ * @param bbox Rectángulo [oeste, sur, este, norte]; si el este es menor que el
+ *   oeste, cruza el meridiano 180. Un punto (oeste = este) se acerca al zoom máximo.
+ * @param screen Ancho y alto del mapa en píxeles.
+ * @param padding Márgenes que tapan los paneles (`flyPadding`).
+ * @param maxZoom Zoom máximo para el nivel de la región.
+ * @returns Centro de la pantalla y zoom para `flyTo`.
+ *
+ * @example
+ *   globeCamera([-105.7, 18.9, -101.5, 22.75], { width: 1920, height: 879 }, padding, 7)
+ *   // zoom ≈ 6.9, como cameraForBounds en una región chica
+ */
+export function globeCamera(
+  bbox: Bbox,
+  screen: ScreenSize,
+  padding: FlyPadding,
+  maxZoom: number,
+): GlobeCamera {
+  const [west, south, east, north] = bbox;
+  const eastUnwrapped = east < west ? east + 360 : east;
+  const points = edgePoints(bbox);
+  // Centro del espacio libre, en píxeles desde el centro de la pantalla.
+  const freeX = (padding.left - padding.right) / 2;
+  const freeY = (padding.top - padding.bottom) / 2;
+  const halfWidth = screen.width / 2;
+  const halfHeight = screen.height / 2;
+  // 1. Centro de la región tal como se ve (los bordes de latitud alta se
+  //    curvan hacia el polo, así que no es el centro del rectángulo).
+  let region: [number, number] = [normalizeLng((west + eastUnwrapped) / 2), (south + north) / 2];
+  const first = extent(points, region);
+  region = fromOrthographic((first.minX + first.maxX) / 2, (first.minY + first.maxY) / 2, region);
+  // 2. Radio para que quepa en el espacio libre, vista desde su centro.
+  const box = extent(points, region);
+  const clampRadius = (value: number, lat: number) =>
+    Math.min(radiusAt(maxZoom, lat), Math.max(radiusAt(MIN_FRAME_ZOOM, lat), value));
+  let radius = clampRadius(
+    Math.min(
+      radiusToFit((screen.width - padding.left - padding.right) / 2, Math.max(-box.minX, box.maxX)),
+      radiusToFit(
+        (screen.height - padding.top - padding.bottom) / 2,
+        Math.max(-box.minY, box.maxY),
+      ),
+    ),
+    region[1],
+  );
+  // 3. La cámara se corre para que la región quede en el centro del espacio
+  //    libre. Vista desde ahí, la región se ve de otro ángulo y puede crecer
+  //    un poco: si algún borde se sale, solo se aleja (nunca va y viene).
+  let center = fromOrthographic(-freeX / radius, freeY / radius, region);
+  for (let i = 0; i < FRAME_ITERATIONS; i += 1) {
+    const seen = extent(points, center);
+    const wanted = Math.min(
+      radiusToFit(halfWidth - padding.right, seen.maxX),
+      radiusToFit(halfWidth - padding.left, -seen.minX),
+      radiusToFit(halfHeight - padding.top, seen.maxY),
+      radiusToFit(halfHeight - padding.bottom, -seen.minY),
+    );
+    if (wanted >= radius) break;
+    radius = clampRadius(wanted * FRAME_SHRINK_MARGIN, center[1]);
+    center = fromOrthographic(-freeX / radius, freeY / radius, region);
+  }
+  const zoom = Math.log2((radius * 2 * Math.PI * Math.cos(center[1] * DEGREES)) / TILE_SIZE);
+  return { center, zoom: Math.min(maxZoom, Math.max(MIN_FRAME_ZOOM, zoom)) };
 }

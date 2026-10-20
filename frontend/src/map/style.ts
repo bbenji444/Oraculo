@@ -344,9 +344,13 @@ export function featureLabel(props: RegionFeatureProps): string | null {
     : props.name;
 }
 
-/** Zoom máximo al volar a una región, para no acercarse de más a un estado. */
+/**
+ * Zoom máximo al volar a una región, para no acercarse de más a un estado.
+ * Países hasta 6 (el último zoom del mapa base del mundo): con 4, los chicos
+ * como Países Bajos o El Salvador quedaban lejos.
+ */
 export const FLY_MAX_ZOOM: Record<RegionLevel, number> = {
-  country: 4,
+  country: 6,
   state: 7,
   municipality: 11,
   locality: 14,

@@ -21,6 +21,7 @@ const iztapalapa: Region = {
   parent_id: 2,
   point: { lon: -99.05, lat: 19.34 },
   bbox: [-99.14, 19.28, -98.96, 19.4],
+  focus_bbox: [-99.14, 19.28, -98.96, 19.4],
   has_polygon: true,
   aliases: [],
 };

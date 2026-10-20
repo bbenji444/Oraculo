@@ -37,6 +37,11 @@ export interface ExplorerState {
   range: DateRange;
   searchId: string | null;
   articleId: number | null;
+  /**
+   * Cuántas veces se ha pedido ver una nota. Volver a elegir la misma nota no
+   * cambia `articleId`, pero sí esto: así el globo vuelve a volar hacia ella.
+   */
+  articleRequest: number;
   listFilter: ListFilter;
   /** Interruptor "No relevantes": vale para la lista y el globo a la vez. */
   showIrrelevant: boolean;
@@ -122,6 +127,7 @@ export const useExplorerStore = create<ExplorerState>()(
       range: { kind: '7' },
       searchId: null,
       articleId: null,
+      articleRequest: 0,
       listFilter: 'all',
       showIrrelevant: false,
       panelOpen: true,
@@ -160,7 +166,11 @@ export const useExplorerStore = create<ExplorerState>()(
         });
       },
       selectArticle: (articleId) => {
-        set(articleId === null ? { articleId } : { articleId, spinning: false });
+        set((state) =>
+          articleId === null
+            ? { articleId }
+            : { articleId, articleRequest: state.articleRequest + 1, spinning: false },
+        );
       },
       setListFilter: (listFilter) => {
         set({ listFilter });

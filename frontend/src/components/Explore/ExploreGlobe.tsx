@@ -19,8 +19,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   type FeatureIdentifier,
   type GeoJSONSource,
-  LngLat,
-  type LngLatBoundsLike,
   Map as MapLibreMap,
   NavigationControl,
 } from 'maplibre-gl';
@@ -58,7 +56,14 @@ import {
 } from '../../map/newsLayers';
 import { collapseAttributionOnStart } from '../../map/attribution';
 import { smoothFlights } from '../../map/flight';
-import { articleOffset, calloutWidth, flyPadding, type ScreenSize } from '../../map/framing';
+import {
+  articleOffset,
+  articleZoom,
+  calloutWidth,
+  flyPadding,
+  globeCamera,
+  type ScreenSize,
+} from '../../map/framing';
 import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
@@ -102,9 +107,6 @@ const INITIAL_ZOOM = 1.8;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
-// Zoom al volar a una nota: municipio o más cerca si es precisa; estado si no.
-const ARTICLE_ZOOM_PRECISE = 7.5;
-const ARTICLE_ZOOM_COARSE = 5;
 // Alto supuesto de la ficha mientras se mide la real.
 const CALLOUT_INITIAL_HEIGHT = 280;
 // Revisión de inactividad para reanudar el giro.
@@ -132,6 +134,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
 
   const regionId = useExplorerStore((s) => s.regionId);
   const articleId = useExplorerStore((s) => s.articleId);
+  const articleRequest = useExplorerStore((s) => s.articleRequest);
   const spinning = useExplorerStore((s) => s.spinning);
   const earth = useExplorerStore((s) => s.earth);
   const motion = useExplorerStore((s) => s.motion);
@@ -446,37 +449,28 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         ? 'up'
         : 'region';
     levelRef.current = region.level;
-    const [west, south, east, north] = region.bbox;
-    const isPoint = west === east && south === north;
-    const camera = isPoint
-      ? { center: { lng: west, lat: south }, zoom: FLY_MAX_ZOOM.locality }
-      : map.cameraForBounds(
-          [
-            [west, south],
-            [east, north],
-          ] as LngLatBoundsLike,
-          {
-            padding: flyPadding(screenOf(map), useExplorerStore.getState().panelOpen),
-            maxZoom: FLY_MAX_ZOOM[region.level],
-          },
-        );
-    if (camera?.center !== undefined && camera.zoom !== undefined) {
-      const { lng, lat } = LngLat.convert(camera.center);
-      const center = { lng, lat };
-      const zoom = camera.zoom;
-      const duration = flyDurationMs(cameraOf(map), { ...center, zoom }, kind, motionRef.current);
-      flyRef.current(duration, () => {
-        map.flyTo({
-          center: [center.lng, center.lat],
-          zoom,
-          bearing: REGION_BEARING,
-          pitch: flyPitch(region.level),
-          curve: FLY_CURVE,
-          duration,
-          essential: false,
-        });
+    // Encuadre de la parte principal (sin territorios lejanos), medido sobre
+    // la esfera y no en el mapa plano (map/framing.ts).
+    const box = region.focus_bbox;
+    const padding = flyPadding(screenOf(map), useExplorerStore.getState().panelOpen);
+    // Una localidad sin polígono es un punto: se acerca al zoom de localidad.
+    const isPoint = box[0] === box[2] && box[1] === box[3];
+    const maxZoom = FLY_MAX_ZOOM[isPoint ? 'locality' : region.level];
+    const camera = globeCamera(box, screenOf(map), padding, maxZoom);
+    const [lng, lat] = camera.center;
+    const { zoom } = camera;
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, kind, motionRef.current);
+    flyRef.current(duration, () => {
+      map.flyTo({
+        center: camera.center,
+        zoom,
+        bearing: REGION_BEARING,
+        pitch: flyPitch(region.level),
+        curve: FLY_CURVE,
+        duration,
+        essential: false,
       });
-    }
+    });
     return () => {
       if (mapRef.current === map) map.setFeatureState(key, { selected: false });
     };
@@ -502,26 +496,29 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articles, colors, ready]);
 
   // --- Nota elegida: latido, vuelo y ficha -----------------------------------
+  // Se vuelve a volar cada vez que se elige una nota, aunque sea la misma
+  // (`articleRequest`), y no cuando solo se recarga la lista.
+  const selectedId = selected?.article_id ?? null;
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    map.setFilter('news-pulse', selectedFilter(selected?.article_id ?? null));
-    const loc = selected?.primary_location;
+    map.setFilter('news-pulse', selectedFilter(selectedId));
+    const article = selectedRef.current;
+    const loc = article?.primary_location;
     const lng = loc?.lon ?? null;
     const lat = loc?.lat ?? null;
-    if (selected === null || lng === null || lat === null) return;
-    const coarse = loc?.precision === 'state' || loc?.precision === 'country';
-    const zoom = Math.max(map.getZoom(), coarse ? ARTICLE_ZOOM_COARSE : ARTICLE_ZOOM_PRECISE);
-    const target = { lng, lat, zoom };
+    if (article === null || !loc || lng === null || lat === null) return;
+    const zoom = articleZoom(loc.precision, lng, lat);
     // La ficha aparece cuando la cámara llega (no persigue al punto en vuelo).
-    map.once('moveend', () => {
-      const point = map.project([target.lng, target.lat]);
-      setCallout({ articleId: selected.article_id, x: point.x, y: point.y, visible: true });
-    });
-    const duration = flyDurationMs(cameraOf(map), target, 'region', motionRef.current);
+    setCallout(null);
+    const onArrive = () => {
+      const point = map.project([lng, lat]);
+      setCallout({ articleId: article.article_id, x: point.x, y: point.y, visible: true });
+    };
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
     flyRef.current(duration, () => {
       map.flyTo({
-        center: [target.lng, target.lat],
+        center: [lng, lat],
         zoom,
         offset: articleOffset(screenOf(map)),
         pitch: flyPitch('article'),
@@ -531,9 +528,17 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         essential: false,
       });
     });
+    // Se escucha el aterrizaje hasta que el vuelo arrancó: si interrumpió otro
+    // vuelo, ese "terminó" no es el de esta nota. Sin animación, ya llegó.
+    if (map.isMoving()) map.once('moveend', onArrive);
+    else onArrive();
 
     // Latido a 30 fps (sin animación: anillo fijo).
-    if (motionRef.current === 'off') return;
+    if (motionRef.current === 'off') {
+      return () => {
+        map.off('moveend', onArrive);
+      };
+    }
     let frame = 0;
     let last = 0;
     const tick = (now: number) => {
@@ -546,9 +551,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     };
     frame = requestAnimationFrame(tick);
     return () => {
+      map.off('moveend', onArrive);
       cancelAnimationFrame(frame);
     };
-  }, [selected, ready]);
+  }, [selectedId, articleRequest, ready]);
 
   // Alto real de la ficha (cambia con el largo del resumen) para acomodarla.
   const calloutShown = callout?.visible === true && callout.articleId === articleId;

@@ -21,8 +21,10 @@ export interface Region {
   country_code: string;
   parent_id: number | null;
   point: { lon: number; lat: number };
-  /** [oeste, sur, este, norte] */
+  /** [oeste, sur, este, norte]: contiene toda la región. */
   bbox: [number, number, number, number];
+  /** [oeste, sur, este, norte] de la parte principal: con él se encuadra el globo. */
+  focus_bbox: [number, number, number, number];
   has_polygon: boolean;
   aliases: string[];
 }
@@ -51,7 +53,9 @@ function isRegion(value: unknown): value is Region {
     typeof r.code === 'string' &&
     typeof r.display_name === 'string' &&
     Array.isArray(r.bbox) &&
-    r.bbox.length === 4
+    r.bbox.length === 4 &&
+    Array.isArray(r.focus_bbox) &&
+    r.focus_bbox.length === 4
   );
 }
 
