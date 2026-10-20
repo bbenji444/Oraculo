@@ -44,12 +44,12 @@ El mapa base de México ya descargado (`basemap_mexico.pmtiles`, Protomaps a par
    - Resultado: precisión `locality`, punto de la colonia, región = municipio de INEGI, y `article_locations.place_name` con el nombre de la colonia ("Polanco, Alcaldía Miguel Hidalgo").
    - Confianza 0.85 si el nombre es exacto y 0.75 si es por familia (menos que INEGI, porque los nombres los capturan voluntarios).
 5. **Último recurso.** Si nada más funciona y la IA dijo el estado, la mención se ubica en ese estado con confianza 0.6, que es justo el umbral. Se pinta con anillo punteado ("aproximada").
-7. **Municipio sugerido por la IA** (`municipality_hint`, prompt v2). Solo cuentan las colonias de ese municipio: "Ajusco, Tlalpan" no es la Colonia Ajusco de Coyoacán. Si ninguna coincide, la mención se ubica en el municipio con confianza 0.8. Es el caso de "Parque Bicentenario, Miguel Hidalgo".
-8. **Artículos.** Si el nombre completo no está, se prueba sin el artículo inicial: "El Rosario" → municipio "Rosario" (Sinaloa).
-9. **Localidad cabecera homónima.** Buscar la localidad "Miguel Hidalgo" (090160001) cuenta como buscar la alcaldía 09016. En la CDMX esa localidad cubre casi toda la alcaldía, y la búsqueda real marcaba "fuera" todo lo ubicado en Polanco.
 6. **Ubicación principal.**
    - Se prefiere el lugar del hecho dentro de la región buscada.
    - Si la IA no marcó ningún lugar del hecho utilizable, se usa el lugar mencionado más específico dentro de la región buscada. Conserva su papel "mencionado", para que la ficha lo diga.
+7. **Municipio sugerido por la IA** (`municipality_hint`, prompt v2). Solo cuentan las colonias de ese municipio: "Ajusco, Tlalpan" no es la Colonia Ajusco de Coyoacán. Si ninguna coincide, la mención se ubica en el municipio con confianza 0.8. Es el caso de "Parque Bicentenario, Miguel Hidalgo".
+8. **Artículos.** Si el nombre completo no está, se prueba sin el artículo inicial: "El Rosario" → municipio "Rosario" (Sinaloa).
+9. **Localidad cabecera homónima.** Buscar la localidad "Miguel Hidalgo" (090160001) cuenta como buscar la alcaldía 09016. En la CDMX esa localidad cubre casi toda la alcaldía, y la búsqueda real marcaba "fuera" todo lo ubicado en Polanco.
 
 ## Alternativas consideradas
 
