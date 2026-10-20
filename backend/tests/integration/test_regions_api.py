@@ -142,6 +142,13 @@ def test_hijas_de_la_cdmx(client: TestClient) -> None:
     assert names == ["Cuauhtémoc", "Iztapalapa"]
 
 
+def test_pais_con_territorios_lejanos_encuadra_su_parte_principal(client: TestClient) -> None:
+    francia = get(client, "/search", q="francia")["items"][0]
+
+    assert francia["bbox"][0] == pytest.approx(-54.5)
+    assert francia["focus_bbox"] == pytest.approx([-5, 41.4, 9.5, 51])
+
+
 def test_localidad_puntual_sin_poligono(client: TestClient) -> None:
     body = get(client, "/search", q="la canada")["items"][0]
 

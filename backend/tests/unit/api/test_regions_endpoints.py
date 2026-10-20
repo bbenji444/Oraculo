@@ -42,6 +42,8 @@ def test_forma_de_una_region(client: TestClient) -> None:
 
     assert body["display_name"] == "Alcaldía Iztapalapa"
     assert body["bbox"] == [-99.1, 18.9, -98.9, 19.1]
+    # Región de una sola parte: el encuadre es el mismo bbox.
+    assert body["focus_bbox"] == body["bbox"]
     assert body["point"] == {"lon": -99.0, "lat": 19.0}
     assert body["breadcrumb"] == "México › Ciudad de México › Iztapalapa"
     assert [a["code"] for a in body["ancestors"]] == ["MEX", "09"]

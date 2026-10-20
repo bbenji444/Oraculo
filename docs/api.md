@@ -367,7 +367,7 @@ titulo,medio,publicada,lugar,precision,dentro_de_la_region,latitud,longitud,conc
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
-- **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto.
+- **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
 
 Las rutas temporales `/local-index/*` se retiraron en la Fase 6: el índice local se consulta como un proveedor más dentro de cada búsqueda.

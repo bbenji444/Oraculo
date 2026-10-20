@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.5 · Octubre 2026 · Responsable: Benji
+Versión 2.6 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -267,7 +267,8 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `display_prefix` (`Alcaldía`, `Municipio`, `Estado`...)
 - `geom` geometry(MultiPolygon, 4326), nulo en localidades sin polígono
 - `centroid` geometry(Point, 4326)
-- `bbox` (para volar la cámara)
+- `bbox`: rectángulo que contiene toda la región
+- `focus_bbox`: rectángulo de su parte principal, sin islas ni territorios lejanos (Francia sin Guayana, Estados Unidos contiguo); `NULL` si es de una sola parte. Con él vuela la cámara y se encuadra el mapa del reporte
 - `population` (si la fuente la trae)
 - Índices: GIST(`geom`), GIST(`centroid`), GIN(`name_norm gin_trgm_ops`), GIN(`aliases_norm`), BTREE(`level`, `parent_id`), BTREE(`code text_pattern_ops`)
 
@@ -659,7 +660,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 **Interacción**
 - **Hover:** resalta la región bajo el cursor y muestra un tooltip con nombre y tipo ("Alcaldía Iztapalapa").
 - **Click en país:** selecciona el país. Si es México, la cámara vuela y se muestran los estados.
-- **Click en estado:** vuela al `bbox`, resalta y muestra los municipios.
+- **Click en estado:** vuela al `focus_bbox` (encuadre medido sobre la esfera, no en el mapa plano), resalta y muestra los municipios.
 - **Click en municipio:** lo selecciona; con más zoom aparecen las localidades.
 - **Click en localidad:** la selecciona.
 
@@ -918,3 +919,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.3 | 17 de octubre de 2026 | F6: Tierra realista con texturas de la NASA, fondo de universo con three.js y reglas de movimiento del globo (ADR-0017). |
 | 2.4 | 17 de octubre de 2026 | F7: reportes con mapa SVG dibujado en el servidor, resumen ejecutivo guardado en `reports`, fuente incluida y datos en CSV y GeoJSON (`/export`) (ADR-0018). |
 | 2.5 | 19 de octubre de 2026 | Explorar sin las gráficas "Top 5 estados" y "Tipos de noticias" (decisión de Benji): la derecha queda libre para el globo. |
+| 2.6 | 20 de octubre de 2026 | `regions.focus_bbox` (§6): la cámara encuadra la parte principal de cada región; al elegir Estados Unidos, Rusia o Francia el globo ya no se aleja (§14.2). |

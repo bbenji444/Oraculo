@@ -88,6 +88,8 @@ class Region:
         parent_id: Región padre (``None`` en países).
         point: Punto representativo, siempre dentro de la región.
         bbox: Rectángulo que la contiene.
+        focus_bbox: Rectángulo de su parte principal, sin islas ni territorios
+            lejanos (``None`` si es de una sola parte). Ver ``focus``.
         has_polygon: ``False`` en localidades que solo tienen punto.
         aliases: Otros nombres con que se le conoce ("CDMX").
         population: Habitantes, si la fuente los trae.
@@ -106,6 +108,16 @@ class Region:
     has_polygon: bool
     aliases: tuple[str, ...]
     population: int | None
+    focus_bbox: BoundingBox | None = None
+
+    @property
+    def focus(self) -> BoundingBox:
+        """Rectángulo para encuadrar la región en un mapa.
+
+        El de su parte principal si tiene varias (Francia sin Guayana ni
+        Reunión); si no, el ``bbox`` completo.
+        """
+        return self.focus_bbox or self.bbox
 
     @property
     def display_name(self) -> str:

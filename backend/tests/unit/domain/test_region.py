@@ -1,6 +1,8 @@
 """Entidad Region: nombre para mostrar, profundidad y migas de pan."""
 
-from app.domain.region import RegionDetail, RegionLevel
+from dataclasses import replace
+
+from app.domain.region import BoundingBox, RegionDetail, RegionLevel
 from tests.unit.fake_regions import CDMX, IZTAPALAPA, MEXICO, make_region
 
 
@@ -34,3 +36,15 @@ def test_referencia_corta() -> None:
         "09007",
         "Iztapalapa",
     )
+
+
+def test_encuadre_de_la_parte_principal_o_del_bbox() -> None:
+    francia = replace(
+        make_region(17, "Francia", RegionLevel.COUNTRY),
+        bbox=BoundingBox(-61.8, -21.4, 55.9, 51.1),
+        focus_bbox=BoundingBox(-4.8, 41.4, 9.6, 51.1),
+    )
+
+    # Con varias partes se encuadra la principal; con una sola, el bbox.
+    assert francia.focus == BoundingBox(-4.8, 41.4, 9.6, 51.1)
+    assert CDMX.focus == CDMX.bbox
