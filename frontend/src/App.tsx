@@ -54,23 +54,29 @@ export function App() {
   return (
     <div className="flex h-dvh flex-col bg-slate-950 font-sans text-slate-100">
       <header className="z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
-        <div className="flex items-center gap-6 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
+        {/* En celular las pestañas bajan a su propio renglón y se deslizan si no caben. */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:flex-nowrap sm:px-6 sm:py-3">
+          <div className="flex shrink-0 items-center gap-3">
             <img src="/globo.svg" alt="" className="size-7" />
             <div>
               <h1 className="text-base font-semibold leading-tight tracking-tight">
                 Monitor de Noticias
               </h1>
-              <p className="text-xs text-slate-400">Noticias geolocalizadas sobre México</p>
+              <p className="hidden text-xs text-slate-400 sm:block">
+                Noticias geolocalizadas sobre México
+              </p>
             </div>
           </div>
-          <nav aria-label="Secciones" className="flex gap-1">
+          <nav
+            aria-label="Secciones"
+            className="flex w-full min-w-0 gap-0.5 overflow-x-auto sm:w-auto sm:gap-1"
+          >
             {TABS.map((item) => (
               <a
                 key={item.id}
                 href={`#/${item.id}`}
                 aria-current={tab === item.id ? 'page' : undefined}
-                className={`rounded-lg px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
+                className={`shrink-0 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] sm:px-3 sm:text-sm transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
                   tab === item.id
                     ? 'bg-slate-800 text-slate-50'
                     : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
