@@ -1,6 +1,6 @@
 /**
  * Construye el estilo de MapLibre del globo: mapa base de Protomaps (en
- * español, variante oscura) y las capas de INEGI encima.
+ * español; variante oscura de noche y clara de día) y las capas de INEGI encima.
  *
  * Es una función pura (no toca el DOM ni la red) para poder probarla.
  *
@@ -189,12 +189,30 @@ function regionLayers(): LayerSpecification[] {
   ];
 }
 
+/** Variante de colores del mapa de calles de Protomaps. */
+export type BasemapFlavor = 'light' | 'dark';
+
+/**
+ * Variante del mapa de calles que acompaña a cada cara de la Tierra.
+ *
+ * Al acercarse, la textura de la NASA se funde con el mapa de calles: con la
+ * Tierra de día, un mapa oscuro hacía parecer que era de noche (lo notó Benji
+ * el 20/10/2026).
+ *
+ * @param earth Cara de la Tierra visible.
+ * @returns `light` de día y `dark` de noche.
+ */
+export function basemapFlavor(earth: EarthMode): BasemapFlavor {
+  return earth === 'day' ? 'light' : 'dark';
+}
+
 /** Copia las capas del mapa base apuntando a una fuente y un rango de zoom. */
 function basemapFor(
   source: 'basemap_world' | 'basemap_mexico',
   range: { minzoom?: number; maxzoom?: number },
+  flavor: BasemapFlavor,
 ): LayerSpecification[] {
-  const all = basemapLayers(source, namedFlavor('dark'), { lang: 'es' });
+  const all = basemapLayers(source, namedFlavor(flavor), { lang: 'es' });
   return all
     .filter((layer) => layer.type !== 'background')
     .map((layer) => ({
@@ -252,26 +270,30 @@ function earthLayer(mode: EarthMode, visible: boolean): LayerSpecification {
  *
  * @param origin Origen del sitio (por ejemplo `http://localhost:8080`); las
  *   teselas, fuentes y sprite se piden al mismo origen, nunca a terceros.
- * @param earth Cara de la Tierra visible al cargar.
+ * @param earth Cara de la Tierra visible; también decide si el mapa de calles
+ *   es claro (día) u oscuro (noche).
  * @returns El estilo listo para `new maplibregl.Map({ style })`.
  */
 export function buildMapStyle(origin: string, earth: EarthMode = 'night'): StyleSpecification {
   const assets = `${origin}/tiles/basemap-assets`;
-  const background = basemapLayers('basemap_world', namedFlavor('dark'), { lang: 'es' }).find(
+  const flavor = basemapFlavor(earth);
+  const background = basemapLayers('basemap_world', namedFlavor(flavor), { lang: 'es' }).find(
     (layer) => layer.type === 'background',
   ) as LayerSpecification | undefined;
-  const world = basemapFor('basemap_world', { maxzoom: BASEMAP_SWITCH_ZOOM });
-  const worldPolygons = basemapFor('basemap_world', {
-    maxzoom: BASEMAP_SWITCH_ZOOM + WORLD_POLYGON_OVERLAP_ZOOMS,
-  });
-  const mexico = basemapFor('basemap_mexico', { minzoom: BASEMAP_SWITCH_ZOOM });
+  const world = basemapFor('basemap_world', { maxzoom: BASEMAP_SWITCH_ZOOM }, flavor);
+  const worldPolygons = basemapFor(
+    'basemap_world',
+    { maxzoom: BASEMAP_SWITCH_ZOOM + WORLD_POLYGON_OVERLAP_ZOOMS },
+    flavor,
+  );
+  const mexico = basemapFor('basemap_mexico', { minzoom: BASEMAP_SWITCH_ZOOM }, flavor);
   return {
     version: 8,
     projection: { type: 'globe' },
     // Halo atmosférico alrededor del globo, que se desvanece al acercarse.
     sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
     glyphs: `${assets}/fonts/{fontstack}/{range}.pbf`,
-    sprite: `${assets}/sprites/v4/dark`,
+    sprite: `${assets}/sprites/v4/${flavor}`,
     sources: {
       basemap_world: pmtilesSource(origin, 'basemap_world.pmtiles', ATTRIBUTION_OSM),
       basemap_mexico: pmtilesSource(origin, 'basemap_mexico.pmtiles', ATTRIBUTION_OSM),

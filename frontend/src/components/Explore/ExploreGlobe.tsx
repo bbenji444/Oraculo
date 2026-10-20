@@ -46,6 +46,7 @@ import {
   DASHED_RING_IMAGE,
   dashedRingPixels,
   isOnVisibleSide,
+  keepNewsLayers,
   NEWS_SOURCE,
   newsFeatures,
   newsLayers,
@@ -60,7 +61,6 @@ import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
   buildMapStyle,
-  EARTH_LAYER,
   featureLabel,
   FLY_MAX_ZOOM,
   INTERACTIVE_LAYERS,
@@ -374,13 +374,18 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articles]);
 
   // --- Día / noche ---------------------------------------------------------
+  // Cambia la textura de la Tierra y también los colores del mapa de calles
+  // (claro de día, oscuro de noche). MapLibre aplica solo las diferencias y
+  // keepNewsLayers conserva los puntos de noticias, que no vienen en el estilo.
   useEffect(() => {
+    const previous = earthRef.current;
     earthRef.current = earth;
     const map = mapRef.current;
-    if (!map || !ready) return;
-    for (const mode of ['night', 'day'] as const) {
-      map.setLayoutProperty(EARTH_LAYER[mode], 'visibility', mode === earth ? 'visible' : 'none');
-    }
+    if (!map || !ready || previous === earth) return;
+    map.setStyle(buildMapStyle(window.location.origin, earth), {
+      diff: true,
+      transformStyle: keepNewsLayers,
+    });
   }, [earth, ready]);
 
   // --- Giro ----------------------------------------------------------------

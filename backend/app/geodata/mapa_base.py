@@ -8,8 +8,8 @@ no dependa de ningún servidor externo (ADR-0004):
 - ``basemap_mexico.pmtiles``: México y sus islas hasta zoom 14, todas las
   calles (≈1.3 GB). Zoom elegido por Benji el 2026-10-15 tras medir los
   tamaños con ``pmtiles extract --dry-run``.
-- ``basemap-assets/``: fuentes Noto Sans (Regular, Medium, Italic) y el
-  sprite ``dark`` de ``protomaps/basemaps-assets``.
+- ``basemap-assets/``: fuentes Noto Sans (Regular, Medium, Italic) y
+  los sprites ``dark`` y ``light`` de ``protomaps/basemaps-assets``.
 
 Todo se descarga a la carpeta de trabajo en el disco de Linux, se verifica
 (``pmtiles verify`` y SHA-256) y se copia a ``geodata/output``. Queda un
@@ -62,7 +62,9 @@ ASSETS_COMMIT = "028c18f713baecad011301ff7a69acc39bcc2ae7"
 ASSETS_URL = f"https://codeload.github.com/protomaps/basemaps-assets/zip/{ASSETS_COMMIT}"
 # Fuentes que usa el estilo de @protomaps/basemaps 5.7.2 (verificado con layers()).
 FONTSTACKS = ("Noto Sans Regular", "Noto Sans Medium", "Noto Sans Italic")
-SPRITE_FLAVOR = "dark"
+# Íconos del mapa de calles: oscuros para la Tierra de noche y claros para la
+# de día (@protomaps/basemaps namedFlavor "dark" y "light").
+SPRITE_FLAVORS = ("dark", "light")
 ASSETS_DIR_NAME = "basemap-assets"
 ATTRIBUTION = "© colaboradores de OpenStreetMap (ODbL) · Protomaps"
 
@@ -112,7 +114,7 @@ def build_extract_command(extract: Extract, output: Path) -> list[str]:
 
 
 def extract_assets(zip_bytes: bytes, destination: Path) -> list[Path]:
-    """Extrae del ZIP de basemaps-assets solo las fuentes y el sprite que se usan.
+    """Extrae del ZIP de basemaps-assets solo las fuentes y los sprites que se usan.
 
     Args:
         zip_bytes: Contenido del ZIP descargado.
@@ -123,7 +125,9 @@ def extract_assets(zip_bytes: bytes, destination: Path) -> list[Path]:
     """
     wanted_prefixes = tuple(f"fonts/{stack}/" for stack in FONTSTACKS)
     wanted_files = {
-        f"sprites/v4/{SPRITE_FLAVOR}{suffix}" for suffix in (".json", ".png", "@2x.json", "@2x.png")
+        f"sprites/v4/{flavor}{suffix}"
+        for flavor in SPRITE_FLAVORS
+        for suffix in (".json", ".png", "@2x.json", "@2x.png")
     } | {"fonts/OFL.txt"}
     extracted: list[Path] = []
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:

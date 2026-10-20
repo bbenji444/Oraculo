@@ -11,7 +11,7 @@
  *
  * Funciones puras (sin mapa ni DOM): datos GeoJSON y estilos de las capas.
  */
-import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
 
 import type { Article } from '../services/searches';
 
@@ -309,4 +309,32 @@ export function calloutPlacement(
     Math.max(top + CALLOUT_LINE_INSET, point.y - CALLOUT_RISE_Y),
   );
   return { left, top, lineX: fitsRight ? left : left + card.width, lineY };
+}
+
+/**
+ * Pasa los puntos de noticias del estilo anterior al nuevo al cambiar de día a
+ * noche (`map.setStyle(..., { diff: true, transformStyle })`).
+ *
+ * El estilo nuevo trae el mapa de calles con otra variante de colores, pero no
+ * sabe de las noticias: el globo las agrega después de cargar. Sin esto, el
+ * cambio las borraría junto con el filtro del punto elegido.
+ *
+ * @param previous Estilo actual (serializado por MapLibre), si hay.
+ * @param next Estilo nuevo de `buildMapStyle`.
+ * @returns El estilo nuevo con la fuente y las capas de noticias al final.
+ */
+export function keepNewsLayers(
+  previous: StyleSpecification | undefined,
+  next: StyleSpecification,
+): StyleSpecification {
+  const news = previous?.sources[NEWS_SOURCE];
+  if (!previous || !news) return next;
+  return {
+    ...next,
+    sources: { ...next.sources, [NEWS_SOURCE]: news },
+    layers: [
+      ...next.layers,
+      ...previous.layers.filter((layer) => 'source' in layer && layer.source === NEWS_SOURCE),
+    ],
+  };
 }

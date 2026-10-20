@@ -5,6 +5,7 @@ import {
   calloutPlacement,
   dashedRingPixels,
   isOnVisibleSide,
+  keepNewsLayers,
   NEWS_DEFAULT_COLOR,
   newsFeatures,
   newsLayers,
@@ -158,5 +159,41 @@ describe('acomodo de la ficha', () => {
 
   it('en un mapa más chico que la ficha queda pegada arriba', () => {
     expect(calloutPlacement({ x: 100, y: 100 }, card, { width: 600, height: 200 }).top).toBe(12);
+  });
+});
+
+describe('cambio de día a noche', () => {
+  const base = { version: 8 as const, sources: {}, layers: [] };
+  const news = {
+    type: 'geojson' as const,
+    data: { type: 'FeatureCollection' as const, features: [] },
+  };
+
+  it('el estilo nuevo conserva la fuente y las capas de noticias, encima de todo', () => {
+    const previous = {
+      ...base,
+      sources: { news, states: { type: 'vector' as const, url: 'pmtiles://a' } },
+      layers: [{ id: 'states-fill', type: 'fill' as const, source: 'states' }, ...newsLayers()],
+    };
+    const next = {
+      ...base,
+      sprite: 'light',
+      sources: { states: { type: 'vector' as const, url: 'pmtiles://a' } },
+      layers: [{ id: 'states-fill', type: 'fill' as const, source: 'states' }],
+    };
+
+    const merged = keepNewsLayers(previous, next);
+
+    expect(merged.sprite).toBe('light');
+    expect(merged.sources.news).toBe(news);
+    expect(merged.layers.map((l) => l.id)).toEqual([
+      'states-fill',
+      ...newsLayers().map((l) => l.id),
+    ]);
+  });
+
+  it('sin noticias todavía, el estilo nuevo queda igual', () => {
+    expect(keepNewsLayers(undefined, base)).toBe(base);
+    expect(keepNewsLayers(base, base)).toBe(base);
   });
 });

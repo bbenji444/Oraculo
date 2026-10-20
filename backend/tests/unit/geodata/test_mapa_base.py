@@ -30,13 +30,15 @@ def make_assets_zip() -> bytes:
             zf.writestr(f"{PREFIX}fonts/{stack}/0-255.pbf", b"glifos")
         zf.writestr(f"{PREFIX}fonts/Noto Sans Devanagari Regular v1/0-255.pbf", b"no se usa")
         zf.writestr(f"{PREFIX}fonts/OFL.txt", "licencia")
-        for name in ("dark.json", "dark.png", "dark@2x.json", "dark@2x.png", "light.json"):
-            zf.writestr(f"{PREFIX}sprites/v4/{name}", name)
+        for flavor in ("dark", "light", "white"):
+            for suffix in (".json", ".png", "@2x.json", "@2x.png"):
+                name = f"{flavor}{suffix}"
+                zf.writestr(f"{PREFIX}sprites/v4/{name}", name)
         zf.writestr(f"{PREFIX}sprites/v3/dark.json", "versión vieja")
     return buffer.getvalue()
 
 
-def test_solo_extrae_las_fuentes_y_el_sprite_que_usa_el_estilo(tmp_path: Path) -> None:
+def test_solo_extrae_las_fuentes_y_los_sprites_de_noche_y_de_dia(tmp_path: Path) -> None:
     extracted = mapa_base.extract_assets(make_assets_zip(), tmp_path)
 
     names = sorted(p.relative_to(tmp_path).as_posix() for p in extracted)
@@ -49,6 +51,11 @@ def test_solo_extrae_las_fuentes_y_el_sprite_que_usa_el_estilo(tmp_path: Path) -
         "sprites/v4/dark.png",
         "sprites/v4/dark@2x.json",
         "sprites/v4/dark@2x.png",
+        # El modo día usa la variante clara (antes el mapa de calles siempre era oscuro).
+        "sprites/v4/light.json",
+        "sprites/v4/light.png",
+        "sprites/v4/light@2x.json",
+        "sprites/v4/light@2x.png",
     ]
 
 
