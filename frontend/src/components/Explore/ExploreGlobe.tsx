@@ -53,6 +53,8 @@ import {
   CLUSTER_MAX_ZOOM,
   CLUSTER_RADIUS_PX,
   calloutPlacement,
+  STACK_LIMIT,
+  stackedIds,
 } from '../../map/newsLayers';
 import { collapseAttributionOnStart } from '../../map/attribution';
 import { smoothFlights } from '../../map/flight';
@@ -79,6 +81,7 @@ import type { Article } from '../../services/searches';
 import { useCameraStore } from '../../store/camera';
 import { useExplorerStore } from '../../store/explorer';
 import { NewsCard } from './NewsCard';
+import { NewsStack } from './NewsStack';
 import { GLASS } from './ui';
 
 interface ExploreGlobeProps {
@@ -91,6 +94,18 @@ interface Tooltip {
   y: number;
   label: string;
   detail: string;
+}
+
+/** Lista abierta de las notas de un mismo lugar (grupo o puntos encimados). */
+interface Stack {
+  lng: number;
+  lat: number;
+  x: number;
+  y: number;
+  ids: number[];
+  total: number;
+  /** Zoom que separa el grupo; `null` si son notas en el mismo punto. */
+  expandZoom: number | null;
 }
 
 interface Callout {
@@ -107,6 +122,12 @@ const INITIAL_ZOOM = 1.8;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
+// Lista de un grupo: 20 rem de ancho; alto según cuántas notas (encabezado +
+// renglones de dos líneas), con tope y desplazamiento dentro.
+const STACK_WIDTH = 320;
+const STACK_BASE_HEIGHT = 56;
+const STACK_ROW_HEIGHT = 56;
+const STACK_MAX_HEIGHT = 380;
 // Alto supuesto de la ficha mientras se mide la real.
 const CALLOUT_INITIAL_HEIGHT = 280;
 // Revisión de inactividad para reanudar el giro.
@@ -128,6 +149,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const [ready, setReady] = useState(false);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
+  const [stack, setStack] = useState<Stack | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [cardHeight, setCardHeight] = useState(CALLOUT_INITIAL_HEIGHT);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -206,6 +228,13 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         useExplorerStore.getState().setSpinning(false);
       });
     }
+    // Arrastrar o girar la rueda cierra la lista de un grupo: ya no apunta a nada.
+    map.on('dragstart', () => {
+      setStack(null);
+    });
+    map.on('wheel', () => {
+      setStack(null);
+    });
 
     map.on('load', () => {
       const size = 44;
@@ -250,6 +279,11 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       });
       cancelAnimationFrame(calloutFrame);
       calloutFrame = requestAnimationFrame(() => {
+        setStack((current) => {
+          if (!current) return current;
+          const point = map.project([current.lng, current.lat]);
+          return { ...current, x: point.x, y: point.y };
+        });
         const loc = selectedRef.current?.primary_location;
         const lng = loc?.lon ?? null;
         const lat = loc?.lat ?? null;
@@ -325,30 +359,51 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       clearHover();
       setTooltip(null);
     });
+    const openStack = (
+      coordinates: [number, number],
+      ids: number[],
+      total: number,
+      expandZoom: number | null,
+    ) => {
+      const [lng, lat] = coordinates;
+      const point = map.project(coordinates);
+      setStack({ lng, lat, x: point.x, y: point.y, ids, total, expandZoom });
+    };
     map.on('click', (event) => {
       const news = firstAt(event.point, NEWS_LAYERS);
       const store = useExplorerStore.getState();
       if (news?.properties.cluster) {
-        // Grupo: acercarse hasta que se separen sus notas.
+        // Grupo: la lista dice qué notas son; "Acercar" las separa en el mapa.
         const source = map.getSource<GeoJSONSource>(NEWS_SOURCE);
         const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
-        void source?.getClusterExpansionZoom(Number(news.properties.cluster_id)).then((zoom) => {
-          const duration = flyDurationMs(
-            cameraOf(map),
-            { lng: coordinates[0], lat: coordinates[1], zoom },
-            'region',
-            motionRef.current,
-          );
-          fly(duration, () => {
-            map.easeTo({ center: coordinates, zoom, duration, easing: easeInOutCubic });
-          });
+        const clusterId = Number(news.properties.cluster_id);
+        const total = Number(news.properties.point_count);
+        if (!source) return;
+        void Promise.all([
+          source.getClusterLeaves(clusterId, STACK_LIMIT, 0),
+          source.getClusterExpansionZoom(clusterId),
+        ]).then(([leaves, zoom]) => {
+          openStack(coordinates, stackedIds(leaves), total, zoom);
         });
         return;
       }
+      // Notas encimadas en el mismo punto (p. ej. varias "solo por estado").
+      const stacked = stackedIds(
+        map.queryRenderedFeatures([event.point.x, event.point.y], {
+          layers: NEWS_LAYERS.filter((id) => map.getLayer(id)),
+        }),
+      );
+      if (news && stacked.length > 1) {
+        const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
+        openStack(coordinates, stacked, stacked.length, null);
+        return;
+      }
       if (news?.id !== undefined) {
+        setStack(null);
         store.selectArticle(Number(news.id));
         return;
       }
+      setStack(null);
       const region = firstAt(event.point, INTERACTIVE_LAYERS);
       if (region?.id !== undefined) store.selectRegion(Number(region.id));
     });
@@ -587,6 +642,34 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const placement = (point: { x: number; y: number }) =>
     calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
 
+  // Lista de un grupo: las notas más recientes primero, junto al punto.
+  const stackArticles = articles
+    .filter((article) => stack?.ids.includes(article.article_id))
+    .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''));
+  const stackPlacement =
+    stack &&
+    calloutPlacement(
+      stack,
+      {
+        width: STACK_WIDTH,
+        height: Math.min(
+          STACK_MAX_HEIGHT,
+          STACK_BASE_HEIGHT + stackArticles.length * STACK_ROW_HEIGHT,
+        ),
+      },
+      viewport,
+    );
+  const zoomIntoStack = () => {
+    const map = mapRef.current;
+    if (!map || stack?.expandZoom == null) return;
+    const { lng, lat, expandZoom: zoom } = stack;
+    setStack(null);
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
+    flyRef.current(duration, () => {
+      map.easeTo({ center: [lng, lat], zoom, duration, easing: easeInOutCubic });
+    });
+  };
+
   return (
     <div className="absolute inset-0">
       <div ref={containerRef} className="h-full w-full" aria-label="Globo interactivo" />
@@ -637,6 +720,26 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
             </div>
           </div>
         </>
+      )}
+      {stack && stackPlacement && (
+        <div
+          className="absolute z-30 animate-[fadeIn_150ms_ease-out]"
+          style={{ left: stackPlacement.left, top: stackPlacement.top }}
+        >
+          <NewsStack
+            articles={stackArticles}
+            colors={colors}
+            total={stack.total}
+            onSelect={(articleId) => {
+              setStack(null);
+              useExplorerStore.getState().selectArticle(articleId);
+            }}
+            onZoom={stack.expandZoom === null ? undefined : zoomIntoStack}
+            onClose={() => {
+              setStack(null);
+            }}
+          />
+        </div>
       )}
     </div>
   );

@@ -349,3 +349,28 @@ export function keepNewsLayers(
     ],
   };
 }
+
+// Máximo de notas en la lista de un grupo: más ya no se leen; se pide acercar.
+export const STACK_LIMIT = 50;
+
+/**
+ * Notas distintas entre las figuras bajo un clic (sin contar grupos).
+ *
+ * Cuando varias notas comparten el mismo punto (todas las ubicadas solo por
+ * estado caen en su centro), se dibujan encimadas y el clic las alcanza todas.
+ *
+ * @param features Figuras de `queryRenderedFeatures` o de `getClusterLeaves`.
+ * @returns Ids de nota en el orden recibido, sin repetir.
+ */
+export function stackedIds(
+  features: readonly { properties?: Record<string, unknown> | null }[],
+): number[] {
+  const ids: number[] = [];
+  for (const feature of features) {
+    const props = feature.properties ?? {};
+    if (props.cluster) continue;
+    const id = Number(props.id);
+    if (Number.isFinite(id) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}

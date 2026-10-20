@@ -11,6 +11,7 @@ import {
   newsLayers,
   pulseStyle,
   selectedFilter,
+  stackedIds,
 } from './newsLayers';
 
 function article(
@@ -206,5 +207,19 @@ describe('cambio de día a noche', () => {
   it('sin noticias todavía, el estilo nuevo queda igual', () => {
     expect(keepNewsLayers(undefined, base)).toBe(base);
     expect(keepNewsLayers(base, base)).toBe(base);
+  });
+});
+
+describe('notas encimadas', () => {
+  it('cuenta cada nota una vez y deja fuera los grupos', () => {
+    expect(
+      stackedIds([
+        { properties: { id: 7 } },
+        { properties: { cluster: true, point_count: 3 } },
+        { properties: { id: 9 } },
+        { properties: { id: 7 } },
+        { properties: null },
+      ]),
+    ).toEqual([7, 9]);
   });
 });
