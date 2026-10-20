@@ -25,6 +25,9 @@ class ProviderResponse:
         params: Parámetros enviados, **sin la llave**, para el registro.
         body: Respuesta cruda (texto), para guardarla como fixture.
         discarded: Resultados descartados por inválidos (sin URL o título).
+        credits_used: Créditos que de verdad costó (un proveedor con páginas
+            puede gastar menos que su estimación); ``None`` = la estimación.
+        pages: Páginas pedidas (1 si el proveedor no pagina).
     """
 
     articles: tuple[RawArticle, ...]
@@ -32,6 +35,8 @@ class ProviderResponse:
     params: Mapping[str, str]
     body: str
     discarded: int = 0
+    credits_used: int | None = None
+    pages: int = 1
 
 
 class NewsProviderPort(Protocol):

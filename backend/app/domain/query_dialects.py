@@ -34,8 +34,10 @@ GOOGLE_MAX_WORDS = 32
 # VERIFICAR: límite prudente para GDELT, que tampoco lo documenta (F3).
 GDELT_MAX_CHARS = 400
 # Según https://www.searchapi.io/pricing solo se cobran las búsquedas que
-# responden 200, una por petición. VERIFICAR en F3 si pedir más páginas
-# cuenta como búsquedas adicionales. GDELT y Google News RSS son gratuitos.
+# responden 200, una por petición. Cada página es una petición: medido el
+# 21/10/2026 con la cuenta (3 páginas = 3 créditos). Este es el costo de una
+# página; el adaptador pide hasta SEARCHAPI_MAX_PAGES (ADR-0019). GDELT y
+# Google News RSS son gratuitos.
 SEARCHAPI_CREDITS_PER_QUERY = 1
 FREE = 0
 

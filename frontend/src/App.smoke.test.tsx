@@ -161,7 +161,7 @@ describe('flujo principal (H1)', () => {
 
     // 2. Concepto y estimación antes de gastar.
     fireEvent.click(await screen.findByRole('button', { name: 'Extorsión' }));
-    expect(await screen.findByText(/2 consultas · 1 crédito\(s\)/)).toBeTruthy();
+    expect(await screen.findByText(/2 consultas · hasta 1 crédito\(s\)/)).toBeTruthy();
 
     // 3. Buscar: se envía lo elegido y se ve el avance por etapas.
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));

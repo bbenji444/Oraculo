@@ -250,7 +250,11 @@ class ExecuteQueries:
         ttl = int(self._limits.cache_ttl_hours * _SECONDS_PER_HOUR)
         if cacheable:
             await self._cache.set(key, response.articles, ttl)
-        outcome = QueryOutcome(query, "ok", response.articles, credits=cost)
+        # Con páginas, la reserva fue el máximo: se devuelve lo que no se gastó.
+        spent = cost if response.credits_used is None else response.credits_used
+        if monthly is not None and spent < cost:
+            monthly.release(cost - spent)
+        outcome = QueryOutcome(query, "ok", response.articles, credits=spent)
         return await self._record(
             outcome,
             response.params,

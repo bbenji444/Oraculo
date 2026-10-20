@@ -1,6 +1,7 @@
 /**
  * Panel de búsqueda (§14.3): región, conceptos (chips, solo activos), rango de
- * fechas, estimación ("2 consultas · 1 crédito"), botón Buscar y barra de
+ * fechas, estimación ("2 consultas · hasta 3 créditos": SearchApi pide páginas
+ * solo mientras vengan llenas), botón Buscar y barra de
  * avance por etapas.
  *
  * Lanzar gasta créditos y tokens: la estimación siempre se ve antes del botón,
@@ -260,8 +261,8 @@ export function SearchPanel() {
         {input && estimate.error && <p className="text-rose-300">{estimate.error.message}</p>}
         {input && estimate.data && (
           <p className="text-slate-300">
-            {estimate.data.queries.length} consultas · {estimate.data.credits} crédito(s) · IA máx.{' '}
-            {formatUsd(estimate.data.llm.max_cost_usd)}
+            {estimate.data.queries.length} consultas · hasta {estimate.data.credits} crédito(s) · IA
+            máx. {formatUsd(estimate.data.llm.max_cost_usd)}
             {estimate.data.over_limit && (
               <span className="block text-amber-200">
                 Se pasaría el tope mensual de créditos ({estimate.data.credits_month} de{' '}

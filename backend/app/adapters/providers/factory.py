@@ -89,7 +89,7 @@ def build_provider(
     if key is None or not key.get_secret_value():
         # Sin llave: el adaptador existe pero dice que no está configurado y
         # la consulta se salta con aviso.
-        return SearchApiProvider(None)
+        return SearchApiProvider(None, settings.searchapi_max_pages)
     return SearchApiProvider(
         ProviderHttpClient(
             provider,
@@ -99,5 +99,6 @@ def build_provider(
             # La llave viaja en el encabezado, nunca en la URL: así no
             # aparece en los registros de httpx2 ni en provider_queries.
             headers={"Authorization": f"Bearer {key.get_secret_value()}"},
-        )
+        ),
+        settings.searchapi_max_pages,
     )

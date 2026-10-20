@@ -46,9 +46,11 @@ class FakeProvider:
         cost: int = 0,
         configured: bool = True,
         error: Exception | None = None,
+        spent: int | None = None,
     ) -> None:
         self._provider = provider
         self.cost = cost
+        self.spent = spent
         self.configured = configured
         self.error = error
         self.calls = 0
@@ -70,7 +72,9 @@ class FakeProvider:
         self.calls += 1
         if self.error:
             raise self.error
-        return ProviderResponse((article(self._provider),), 200, {"q": query.text}, "{}")
+        return ProviderResponse(
+            (article(self._provider),), 200, {"q": query.text}, "{}", credits_used=self.spent
+        )
 
 
 class FakeCache:
@@ -198,6 +202,22 @@ async def test_un_proveedor_que_falla_no_tumba_la_busqueda_ni_cobra() -> None:
     failed = next(r for r in log.records if r.provider == "searchapi")
     assert (failed.status, failed.error_message, failed.cost_credits) == ("error", "caído", 0)
     assert len(cache.store) == 1
+
+
+async def test_con_paginas_se_cobra_lo_gastado_y_se_libera_la_reserva() -> None:
+    # SearchApi reserva 3 páginas, pero la segunda vino incompleta: gastó 2.
+    searchapi = FakeProvider(Provider.SEARCHAPI, cost=3, spent=2)
+    execute, _, log = use_case(searchapi, log=FakeLog(used=95), monthly_limit=100)
+
+    result = await execute.execute(
+        [planned(Provider.SEARCHAPI, "uno"), planned(Provider.SEARCHAPI, "dos")]
+    )
+
+    # Cada una reserva 3 y gasta 2. Sin devolver el sobrante, la segunda no
+    # cabría (95 + 3 + 3 = 101 > 100); devolviéndolo, sí (95 + 2 + 3 = 100).
+    assert searchapi.calls == 2
+    assert result.credits_used == 4
+    assert [r.cost_credits for r in log.records] == [2, 2]
 
 
 async def test_tope_mensual_salta_lo_que_no_cabe() -> None:

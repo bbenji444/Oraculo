@@ -32,3 +32,4 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0016](0016-openai-como-ia.md) | OpenAI como IA del enriquecimiento, elegible junto a Gemini | Aceptado |
 | [0017](0017-tierra-realista-y-fondo-espacial.md) | Tierra realista (texturas NASA), fondo espacial con three.js y movimiento del globo | Aceptado |
 | [0018](0018-reportes-pdf-y-datos.md) | Reportes en PDF con mapa dibujado en el servidor y datos en CSV y GeoJSON | Aceptado |
+| [0019](0019-paginas-de-searchapi.md) | Hasta 3 páginas de SearchApi por consulta, solo mientras vengan llenas | Aceptado |

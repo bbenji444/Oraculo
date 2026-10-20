@@ -8,6 +8,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- SearchApi trae hasta 3 páginas por consulta (30 notas de Google en lugar de 10). Pide la siguiente solo si la anterior vino llena; cada página cuesta 1 crédito (medido con la cuenta) y la bitácora registra lo gastado de verdad. La estimación dice "hasta N créditos". Configurable con `SEARCHAPI_MAX_PAGES` (ADR-0019).
+- Al hacer clic en un grupo de notas, o en notas encimadas en el mismo punto, aparece la lista de cuáles son; elegir una vuela a ella y "Acercar" separa el grupo.
 - Aviso al terminar una búsqueda: "✓ Búsqueda lista: 18 notas" abajo al centro de Explorar durante 8 s y, si la pestaña estaba oculta, también en su título hasta que la persona regresa. Reabrir una búsqueda del Historial no avisa.
 
 ### Cambiado

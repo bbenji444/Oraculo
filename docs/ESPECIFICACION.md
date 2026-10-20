@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.6 · Octubre 2026 · Responsable: Benji
+Versión 2.7 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -431,7 +431,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
-| **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
+| **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Hasta `SEARCHAPI_MAX_PAGES` páginas de 10 notas por consulta (3 por defecto); la siguiente solo si la anterior vino llena, 1 crédito por página (ADR-0019). |
 | **Índice local** (`indice_local`, ADR-0013 y ADR-0014) | Notas que la ingesta periódica junta cada 15 minutos: **ngramas de GDELT** (texto completo, español + México; ADR-0014), archivos GKG de GDELT (solo título; apagados por defecto cuando los ngramas funcionan) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~1 GB de descarga al día) | Busca en título, fragmento y frases del cuerpo (`body_terms`, solo para buscar; nunca se muestran). Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
 | **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
 | **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
@@ -920,3 +920,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.4 | 17 de octubre de 2026 | F7: reportes con mapa SVG dibujado en el servidor, resumen ejecutivo guardado en `reports`, fuente incluida y datos en CSV y GeoJSON (`/export`) (ADR-0018). |
 | 2.5 | 19 de octubre de 2026 | Explorar sin las gráficas "Top 5 estados" y "Tipos de noticias" (decisión de Benji): la derecha queda libre para el globo. |
 | 2.6 | 20 de octubre de 2026 | `regions.focus_bbox` (§6): la cámara encuadra la parte principal de cada región; al elegir Estados Unidos, Rusia o Francia el globo ya no se aleja (§14.2). |
+| 2.7 | 21 de octubre de 2026 | SearchApi pide hasta 3 páginas por consulta, solo mientras vengan llenas (§8, ADR-0019). |
