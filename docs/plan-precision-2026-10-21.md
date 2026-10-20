@@ -79,3 +79,42 @@ Ejemplo: "Hecho: 29 sep 2025 · nota del 16 oct 2026". Así se nota cuando la no
 - Conteos antes y después en la base.
 - 5 ejemplos reales.
 - Capturas del globo.
+
+## Resultado (21/10/2026)
+
+Todo lo del plan quedó hecho y verificado. Commits en `feat/precision-y-paginacion`, sin subir.
+
+### Historial de 5 búsquedas, antes y después
+
+Notas distintas; reubicadas con las reglas nuevas y releídas con el prompt v2.
+
+| | Antes | Después |
+|---|---|---|
+| Notas sin ubicación | 22 de 72 | 8 |
+| Notas relevantes sin ubicación | 16 de 51 | 3 de 49 |
+| Menciones sin resolver | 140 | 11 |
+| Menciones ubicadas en su colonia | 0 | 29 |
+| Homicidio · Miguel Hidalgo, notas dentro de la región | 0 | 12 |
+
+- **Costo del reproceso:** ~0.026 USD de IA y 0 créditos.
+- **Caso Micky Hair:** sus 5 notas quedaron en "Polanco, Alcaldía Miguel Hidalgo", dentro de la región.
+
+### Búsqueda real nueva
+
+Homicidio · Alcaldía Miguel Hidalgo · 7 días:
+
+| | |
+|---|---|
+| Notas | 43 (antes 19 con 1 página) |
+| SearchApi | 3 páginas, 30 notas, 3 créditos (bitácora) |
+| IA | 0.0092 USD |
+| Dentro de la región | 18 |
+| Fuera de la región | 22 |
+| Sin ubicación | 3 |
+
+### Pendientes y límites conocidos
+
+- **"Ajusco".** Si la nota solo trae título (sin texto completo), la IA no da municipio y gana la Colonia Ajusco de Coyoacán, en lugar de la zona del Ajusco en Tlalpan.
+- **Fecha del hecho.** Cuando la IA solo sabe el mes, pone el día 1 ("1 sep 2025").
+- **Ruido en las páginas 2 y 3.** Hay notas del Día de Muertos por la palabra "Muertos" del concepto Homicidio. El prompt v2 las marca como no relevantes, pero se pagan. Conviene agregar exclusiones al concepto.
+- **Siguiente paso natural:** lugares de interés de OpenStreetMap (parques, plazas, hospitales) y calles.
