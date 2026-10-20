@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.7 · Octubre 2026 · Responsable: Benji
+Versión 2.8 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -272,6 +272,8 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `population` (si la fuente la trae)
 - Índices: GIST(`geom`), GIST(`centroid`), GIN(`name_norm gin_trgm_ops`), GIN(`aliases_norm`), BTREE(`level`, `parent_id`), BTREE(`code text_pattern_ops`)
 
+**Tabla `places`** (ADR-0020): colonias, zonas y parajes de OpenStreetMap que trae el mapa base, cada uno con `name`, `name_core` (normalizado sin palabra genérica, índice `text_pattern_ops`), `kind`, `point` y `municipality_id` (municipio de INEGI que lo contiene, con índice). Se llena con `make geo-places`. `article_locations` guarda además `place_name` (la colonia usada) y `municipality_hint` (el municipio que sugiere la IA).
+
 **Truco clave:** la jerarquía INEGI está en el prefijo del código. "¿La noticia ubicada en `09007` está dentro de `09`?" se resuelve con `code LIKE '09%'`, sin geometría.
 
 **`concepts`**
@@ -538,8 +540,8 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ### Algoritmo para cada mención
 
 1. **País distinto de México:** resolver a la región `country`. Fin.
-2. **Normalizar** la mención: mayúsculas, sin acentos, conservando Ñ. Aplicar alias (`CDMX` → `CIUDAD DE MEXICO`; `EDOMEX` → `MEXICO`, estado 15; `LA CAPITAL DEL PAIS` → estado 09).
-3. **Coincidencia exacta** de `name_norm`, en el nivel sugerido y, si hay `state_hint`, dentro de ese estado.
+2. **Normalizar** la mención: mayúsculas, sin acentos, conservando Ñ, y sin la palabra genérica del inicio ("alcaldía", "colonia", "calle"…; ADR-0020). Aplicar alias (`CDMX` → `CIUDAD DE MEXICO`; `EDOMEX` → `MEXICO`, estado 15; `LA CAPITAL DEL PAIS` → estado 09).
+3. **Coincidencia exacta** de `name_norm`, en el nivel sugerido y, si hay `state_hint`, **solo** dentro de ese estado: un homónimo de otro estado nunca gana.
 4. **Varias coincidencias.** Desempatar en este orden:
    1. otras menciones del mismo artículo con estado;
    2. la región buscada;
@@ -547,7 +549,9 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 
    Si sigue ambigua, **no asignar ese nivel**: subir al nivel común (estado si todas coinciden en uno) o marcar `unknown`.
 5. **Sin coincidencia exacta:** similitud trigram ≥ 0.85 con confianza reducida.
-6. **Ubicación principal:** la mención `role=event` más específica con confianza ≥ umbral (`GEO_MIN_CONFIDENCE`, por defecto 0.6).
+   - Si tampoco: **colonias de OpenStreetMap** (`places`, ADR-0020) del estado conocido, por nombre exacto o familia, solo si todas caen en un municipio (o en el que sugiere la IA). Precisión `locality`, punto de la colonia.
+   - Si tampoco y la IA dio el estado: el estado, con confianza 0.6 (aproximada).
+6. **Ubicación principal:** la mención `role=event` más específica con confianza ≥ umbral (`GEO_MIN_CONFIDENCE`, por defecto 0.6), prefiriendo las que caen dentro de la región buscada. Si no hay ninguna, la mención `role=mentioned` más específica dentro de la región buscada (la ficha dice "lugar mencionado").
 7. **Punto para el mapa:** coordenadas de la localidad o centroide de la región. **Nunca coordenadas inventadas por el LLM.**
 
 ### Casos de prueba obligatorios
@@ -565,6 +569,9 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | "Nezahualcóyotl" / "Neza" | — | Municipio en el Estado de México (alias "Neza") |
 | "Madrid" | Ataque en España | País España, `in_region = false` si se buscó en México |
 | "Peñón de los Baños" | — | Comparación correcta con Ñ, sin convertirla en N |
+| "Polanco" (estado CDMX) | La nota también nombra Jalisco | Colonia Polanco, Alcaldía Miguel Hidalgo; nunca la localidad Polanco de Jalisco |
+| "alcaldía Iztapalapa" | — | Municipio Iztapalapa |
+| "calle Molière" (estado CDMX) | — | Estado 09, aproximada |
 | (sin lugar) | — | Precisión `unknown`; no se pinta en el mapa y aparece en la lista "Sin ubicación" |
 
 ---
@@ -921,3 +928,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.5 | 19 de octubre de 2026 | Explorar sin las gráficas "Top 5 estados" y "Tipos de noticias" (decisión de Benji): la derecha queda libre para el globo. |
 | 2.6 | 20 de octubre de 2026 | `regions.focus_bbox` (§6): la cámara encuadra la parte principal de cada región; al elegir Estados Unidos, Rusia o Francia el globo ya no se aleja (§14.2). |
 | 2.7 | 21 de octubre de 2026 | SearchApi pide hasta 3 páginas por consulta, solo mientras vengan llenas (§8, ADR-0019). |
+| 2.8 | 21 de octubre de 2026 | Geolocalizador: colonias de OpenStreetMap (`places`, `make geo-places`), palabras genéricas, estado de la IA obligatorio y ubicación principal dentro de la región buscada (§6, §11, ADR-0020). |

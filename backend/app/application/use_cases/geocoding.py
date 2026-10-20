@@ -28,16 +28,19 @@ from app.domain.geocoding import (
     FUZZY_CONFIDENCE_FACTOR,
     FUZZY_MIN_SIMILARITY,
     MEXICO_ISO3,
+    STATE_HINT_CONFIDENCE,
     UNKNOWN_CONFIDENCE,
     Choice,
     Mention,
     Place,
     Precision,
     Resolution,
+    choose_neighborhood,
     disambiguate,
     is_mexico_name,
     mark_primary,
     most_general,
+    strip_generic_prefix,
 )
 from app.domain.names import normalize_name
 from app.domain.region import RegionLevel
@@ -71,7 +74,7 @@ class GeocodeMentions:
         """
         context = await self._context_states(mentions)
         resolved = [await self._resolve(m, context, searched) for m in mentions]
-        return mark_primary(resolved, self._min_confidence)
+        return mark_primary(resolved, self._min_confidence, searched)
 
     async def _state_of(self, name: str) -> str | None:
         """Clave del estado con ese nombre o alias, si es uno solo."""
@@ -105,20 +108,64 @@ class GeocodeMentions:
             return Resolution(mention, None, Precision.UNKNOWN, UNKNOWN_CONFIDENCE)
         if mention.is_abroad or mention.kind_hint is RegionLevel.COUNTRY:
             return await self._resolve_country(mention, name)
-        candidates = [p for p in await self._gazetteer.exact(name) if p.country_code == MEXICO_ISO3]
+        hint = await self._state_of(mention.state_hint) if mention.state_hint else None
+        bare = strip_generic_prefix(name)
+        candidates: list[Place] = []
         confidence_factor = 1.0
-        if not candidates:
-            similar = await self._gazetteer.similar(name, FUZZY_MIN_SIMILARITY)
+        for option in dict.fromkeys((name, bare)):
+            if option:
+                candidates = [
+                    p for p in await self._gazetteer.exact(option) if p.country_code == MEXICO_ISO3
+                ]
+            if candidates:
+                break
+        if not candidates and bare:
+            similar = await self._gazetteer.similar(bare, FUZZY_MIN_SIMILARITY)
             candidates = [place for place, _ in similar]
             confidence_factor = FUZZY_CONFIDENCE_FACTOR
         if mention.kind_hint is not None:
             hinted = [c for c in candidates if c.level is mention.kind_hint]
             candidates = hinted or candidates
-        if mention.state_hint and (hint := await self._state_of(mention.state_hint)):
-            in_state = [c for c in candidates if hint in (c.state_code, c.code)]
-            candidates = in_state or candidates
+        if hint:
+            # El estado que dice la IA manda: un homónimo de otro estado nunca
+            # gana (antes "Polanco, CDMX" terminaba en Jalisco).
+            candidates = [c for c in candidates if hint in (c.state_code, c.code)]
         choice = disambiguate(most_general(candidates), context, searched)
-        return await self._from_choice(mention, choice, confidence_factor)
+        resolution = await self._from_choice(mention, choice, confidence_factor)
+        if resolution.place is not None:
+            return resolution
+        # INEGI no la tiene: ¿es una colonia? Solo dentro de un estado conocido.
+        state = hint or (searched.state_code if searched is not None else None)
+        if state and bare and mention.kind_hint in (None, RegionLevel.LOCALITY):
+            municipality = await self._municipality_of(mention.municipality_hint, state)
+            found = choose_neighborhood(
+                bare, await self._gazetteer.neighborhoods(bare, state), municipality
+            )
+            if found is not None:
+                place, confidence = found
+                return Resolution(mention, place, Precision.LOCALITY, confidence)
+        if hint:
+            return await self._state_from_hint(mention, hint)
+        return resolution
+
+    async def _municipality_of(self, name: str | None, state_code: str) -> str | None:
+        """Clave del municipio que sugiere la IA, si es uno solo en ese estado."""
+        if not name:
+            return None
+        core = strip_generic_prefix(normalize_name(name))
+        found = {
+            p.code
+            for p in await self._gazetteer.exact(core)
+            if p.level is RegionLevel.MUNICIPALITY and p.state_code == state_code
+        }
+        return found.pop() if len(found) == 1 else None
+
+    async def _state_from_hint(self, mention: Mention, state_code: str) -> Resolution:
+        """Último recurso: el lugar no está en el catálogo, pero sí su estado."""
+        state = await self._gazetteer.by_code(state_code)
+        if state is None:
+            return Resolution(mention, None, Precision.UNKNOWN, UNKNOWN_CONFIDENCE)
+        return Resolution(mention, state, Precision.STATE, STATE_HINT_CONFIDENCE)
 
     async def _resolve_country(self, mention: Mention, name: str) -> Resolution:
         country_name = (

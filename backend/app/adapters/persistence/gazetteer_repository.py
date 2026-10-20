@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.domain.geocoding import MEXICO_ISO3, Place
+from app.domain.geocoding import MEXICO_ISO3, Neighborhood, Place
 from app.domain.region import RegionLevel
 
 _COLUMNS = """
@@ -22,6 +22,14 @@ _COLUMNS = """
 # Tope de parecidos que se leen: suficientes para desempatar sin traer las
 # 296 mil localidades si el nombre es muy común.
 MAX_SIMILAR = 50
+# Colonias por consulta: una familia grande ("Polanco" tiene 5 secciones) cabe
+# de sobra; un nombre muy común en un estado se resuelve como ambiguo.
+MAX_NEIGHBORHOODS = 50
+
+
+def _escape_like(value: str) -> str:
+    """Escapa los comodines de LIKE para que el nombre se busque literal."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _place(row: RowMapping) -> Place:
@@ -92,6 +100,37 @@ class PostgresGazetteer:
             {"n": name_norm},
         )
         return _place(rows[0]) if rows else None
+
+    async def neighborhoods(self, name_core: str, state_code: str) -> list[Neighborhood]:
+        """Ver ``GazetteerPort.neighborhoods``."""
+        rows = await self._fetch(
+            f"""
+            SELECT p.name AS p_name, p.name_core AS p_core, p.kind AS p_kind,
+                ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat,
+                {_COLUMNS}
+            FROM places p JOIN regions r ON r.id = p.municipality_id
+            WHERE (p.name_core = :n OR p.name_core LIKE :family) AND left(r.code, 2) = :state
+            ORDER BY (p.name_core = :n) DESC, p.name
+            LIMIT :limit
+            """,  # noqa: S608 — columnas constantes del módulo
+            {
+                "n": name_core,
+                "family": f"{_escape_like(name_core)} %",
+                "state": state_code,
+                "limit": MAX_NEIGHBORHOODS,
+            },
+        )
+        return [
+            Neighborhood(
+                name=row["p_name"],
+                name_core=row["p_core"],
+                kind=row["p_kind"],
+                municipality=_place(row),
+                lon=row["p_lon"],
+                lat=row["p_lat"],
+            )
+            for row in rows
+        ]
 
     async def by_code(self, code: str) -> Place | None:
         """Ver ``GazetteerPort.by_code``."""
