@@ -10,4 +10,4 @@ Instrucciones de arranque de cada fase, tal como las preparó Benji (20/10/2026)
 
 El orden es estricto: 9 completa, luego 10, luego 11.
 
-Los tres prompts remiten al detalle en `docs/PLAN_FASES_9-10-11.md`. ⚠️ Ese archivo todavía no está en el repositorio (no venía en el ZIP); se agrega en cuanto Benji lo comparta.
+Los tres prompts remiten al detalle en [`docs/PLAN_FASES_9-10-11.md`](../PLAN_FASES_9-10-11.md).
