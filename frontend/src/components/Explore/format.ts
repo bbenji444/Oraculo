@@ -121,3 +121,25 @@ export function visibleArticles(articles: readonly Article[], showIrrelevant: bo
   if (showIrrelevant) return [...articles];
   return articles.filter((article) => article.concepts.some((c) => c.is_relevant));
 }
+
+// Meses cortos en español para formatRange (sin depender del idioma del equipo).
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/**
+ * Periodo de una búsqueda en corto, para el renglón compacto del panel.
+ *
+ * @param from Primer día (AAAA-MM-DD).
+ * @param to Último día (AAAA-MM-DD).
+ * @returns "10 – 17 oct 2026", o "28 sep – 5 oct 2026" si cambia el mes.
+ * @example formatRange('2026-10-10', '2026-10-17') // '10 – 17 oct 2026'
+ */
+export function formatRange(from: string, to: string): string {
+  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
+  const [toYear, toMonth, toDay] = to.split('-').map(Number);
+  const month = (m: number | undefined) => MONTHS[(m ?? 1) - 1] ?? '';
+  const start =
+    fromMonth === toMonth && fromYear === toYear
+      ? String(fromDay)
+      : `${String(fromDay)} ${month(fromMonth)}${fromYear === toYear ? '' : ` ${String(fromYear)}`}`;
+  return `${start} – ${String(toDay)} ${month(toMonth)} ${String(toYear)}`;
+}

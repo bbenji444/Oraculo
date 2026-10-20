@@ -2,17 +2,15 @@
  * Controles sobre el globo: giro, día/noche, velocidad de las animaciones y
  * leyenda de precisión (§14.2: lo ubicado solo por estado o país se dibuja con
  * anillo punteado, para no hacer creer que pasó en el centro exacto).
- * También el panel de Descargas: reporte PDF, datos CSV y GeoJSON, e imprimir
- * (Fase 7, ADR-0018).
+ * También los botones de Descargas: reporte PDF, datos CSV y GeoJSON, e imprimir
+ * (Fase 7, ADR-0018), que van dentro del renglón de la búsqueda terminada.
  */
 import { type DownloadKind, useDownloads } from '../../hooks/useDownloads';
-import { useSearch } from '../../hooks/useSearches';
 import { MOTION_LABELS, MOTION_PRESETS } from '../../map/motion';
-import { isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
 import { SpinToggle } from '../GeoExplorer/SpinToggle';
-import { GLASS, PANEL_TITLE, SMALL_BUTTON } from './ui';
+import { SMALL_BUTTON } from './ui';
 
 export function GlobeControls() {
   const spinning = useExplorerStore((s) => s.spinning);
@@ -71,57 +69,71 @@ export function PrecisionLegend() {
   );
 }
 
-const DOWNLOADS: { kind: DownloadKind; label: string; hint: string }[] = [
-  { kind: 'pdf', label: 'Reporte (PDF)', hint: 'Portada, resumen, mapa, gráficas y noticias' },
-  { kind: 'csv', label: 'Datos (CSV)', hint: 'Una fila por nota, para Excel' },
-  { kind: 'geojson', label: 'Mapa de puntos (GeoJSON)', hint: 'Para QGIS o Google Earth' },
-  { kind: 'print', label: 'Imprimir', hint: 'Abre el reporte en otra pestaña' },
+const DOWNLOADS: { kind: DownloadKind; short: string; label: string; hint: string }[] = [
+  {
+    kind: 'pdf',
+    short: 'PDF',
+    label: 'Reporte (PDF)',
+    hint: 'Reporte: portada, resumen, mapa, gráficas y noticias. El primero de cada búsqueda cuesta ~0.0003 USD de IA; los siguientes, nada.',
+  },
+  { kind: 'csv', short: 'CSV', label: 'Datos (CSV)', hint: 'Una fila por nota, para Excel' },
+  {
+    kind: 'geojson',
+    short: 'GeoJSON',
+    label: 'Puntos (GeoJSON)',
+    hint: 'Mapa de puntos para QGIS o Google Earth',
+  },
+  { kind: 'print', short: 'Imprimir', label: 'Imprimir', hint: 'Abre el reporte en otra pestaña' },
 ];
 
 /**
- * Descargas de la búsqueda abierta (§15, ADR-0018). Se activan cuando la
- * búsqueda termina; mientras se genera un archivo, su botón dice "Generando…".
+ * Descargas de una búsqueda terminada (§15, ADR-0018), en una fila de botones
+ * cortos dentro del renglón de la búsqueda: así no le quitan espacio a la lista
+ * de noticias. Mientras se genera un archivo, su botón dice "Generando…"; el
+ * nombre completo y lo que cuesta van en la ayuda del botón.
+ *
+ * @param props.searchId Búsqueda terminada.
  */
-export function DownloadsPanel() {
-  const searchId = useExplorerStore((s) => s.searchId);
-  const search = useSearch(searchId).data;
-  const ready = search !== undefined && isFinished(search.status);
-  const downloads = useDownloads(ready ? searchId : null);
+export function DownloadButtons({ searchId }: { searchId: string }) {
+  const downloads = useDownloads(searchId);
   return (
-    <section aria-label="Descargas" className={`${GLASS} space-y-2 p-4`}>
-      <h2 className={PANEL_TITLE}>Descargas</h2>
-      {DOWNLOADS.map(({ kind, label, hint }) => (
-        <button
-          key={kind}
-          type="button"
-          disabled={!ready || downloads.running !== null}
-          title={hint}
-          onClick={() => {
-            downloads.start(kind);
-          }}
-          className={`${SMALL_BUTTON} flex w-full items-center justify-between py-2 ${
-            kind === 'pdf' ? 'border-sky-400/40 bg-sky-500/15 text-sky-100' : ''
-          }`}
-        >
-          <span>{downloads.running === kind ? 'Generando…' : label}</span>
-          {downloads.running === kind && (
-            <span
-              aria-hidden="true"
-              className="size-3 animate-spin rounded-full border-2 border-slate-500 border-t-sky-300"
-            />
-          )}
-        </button>
-      ))}
+    <div aria-label="Descargas" role="group" className="space-y-1">
+      <div className="grid grid-cols-4 gap-1">
+        {DOWNLOADS.map(({ kind, short, label, hint }) => (
+          <button
+            key={kind}
+            type="button"
+            aria-label={label}
+            disabled={downloads.running !== null}
+            title={hint}
+            onClick={() => {
+              downloads.start(kind);
+            }}
+            className={`${SMALL_BUTTON} flex items-center justify-center gap-1 px-1 py-1 text-[11px] ${
+              kind === 'pdf' ? 'border-sky-400/40 bg-sky-500/15 text-sky-100' : ''
+            }`}
+          >
+            {downloads.running === kind ? (
+              <span
+                aria-hidden="true"
+                className="size-3 animate-spin rounded-full border-2 border-slate-500 border-t-sky-300"
+              />
+            ) : (
+              short
+            )}
+          </button>
+        ))}
+      </div>
+      {downloads.running && (
+        <p aria-live="polite" className="text-[11px] text-slate-400">
+          Generando…
+        </p>
+      )}
       {downloads.error && (
         <p role="alert" className="text-[11px] text-rose-300">
           {downloads.error.message}
         </p>
       )}
-      <p className="text-[11px] text-slate-500">
-        {ready
-          ? 'El primer reporte de una búsqueda escribe un resumen con IA (~0.001 USD); los siguientes no cuestan.'
-          : 'Disponibles cuando la búsqueda termine.'}
-      </p>
-    </section>
+    </div>
   );
 }

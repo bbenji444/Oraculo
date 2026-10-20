@@ -80,6 +80,19 @@ describe('store de Explorar', () => {
     });
   });
 
+  it('el panel se oculta y se muestra, y no se recuerda entre visitas', () => {
+    useExplorerStore.getState().setPanelOpen(false);
+
+    expect(useExplorerStore.getState().panelOpen).toBe(false);
+    expect(useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState())).toEqual(
+      {
+        earth: useExplorerStore.getState().earth,
+        motion: useExplorerStore.getState().motion,
+      },
+    );
+    useExplorerStore.getState().setPanelOpen(true);
+  });
+
   it('"sin animación" también detiene el giro', () => {
     const store = useExplorerStore.getState();
     store.setSpinning(true);

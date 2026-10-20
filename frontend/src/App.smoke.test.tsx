@@ -166,10 +166,8 @@ describe('flujo principal (H1)', () => {
     // 3. Buscar: se envía lo elegido y se ve el avance por etapas.
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText('Resumiendo y clasificando con la IA')).toBeTruthy();
-    // Mientras corre, todavía no hay reporte.
-    expect(screen.getByRole('button', { name: 'Reporte (PDF)' }).hasAttribute('disabled')).toBe(
-      true,
-    );
+    // Mientras corre, todavía no hay descargas.
+    expect(screen.queryByRole('button', { name: 'Reporte (PDF)' })).toBeNull();
     expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
 
     // 4. Al terminar: costo real, notas en el globo y lista (sin gráficas a la derecha).
@@ -177,6 +175,32 @@ describe('flujo principal (H1)', () => {
     const list = await screen.findByRole('region', { name: 'Noticias' });
     expect(screen.queryByText(/Top 5 estados/)).toBeNull();
     expect(screen.queryByText('Tipos de noticias')).toBeNull();
+
+    // La búsqueda terminada se reduce a un renglón para dejarle espacio a la lista;
+    // "Editar" la abre y "Listo" la vuelve a cerrar sin buscar de nuevo.
+    const searchSection = screen.getByRole('region', { name: 'Búsqueda' });
+    expect(within(searchSection).getByText('10 – 17 oct 2026', { exact: false })).toBeTruthy();
+    // Las descargas van en el mismo renglón, no en un panel aparte.
+    expect(
+      within(searchSection)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label'))
+        .filter(Boolean),
+    ).toEqual(['Reporte (PDF)', 'Datos (CSV)', 'Puntos (GeoJSON)', 'Imprimir']);
+    fireEvent.click(within(searchSection).getByRole('button', { name: 'Editar' }));
+    expect(
+      screen.getByRole('combobox', { name: 'Buscar estado, municipio o localidad' }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Listo' }));
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeTruthy();
+
+    // "Ocultar" deja el globo completo; el botón flotante vuelve a mostrar el panel.
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar ‹' }));
+    const reopen = screen.getByRole('button', { name: /Búsqueda y noticias/ });
+    expect(useExplorerStore.getState().panelOpen).toBe(false);
+    fireEvent.click(reopen);
+    expect(useExplorerStore.getState().panelOpen).toBe(true);
+    expect(screen.queryByRole('button', { name: /Búsqueda y noticias/ })).toBeNull();
 
     // Por defecto solo las relevantes, en la lista y en el globo por igual; la
     // pestaña "Fuera" las separa (§9 paso 7).

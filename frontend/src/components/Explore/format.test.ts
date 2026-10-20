@@ -4,6 +4,7 @@ import type { Article } from '../../services/searches';
 import {
   formatDay,
   formatMexicoCity,
+  formatRange,
   formatUsd,
   isCoarse,
   stageProgress,
@@ -86,5 +87,13 @@ describe('notas visibles (lista y globo)', () => {
 
   it('con "No relevantes" se ven todas', () => {
     expect(visibleArticles([kept, discarded], true)).toEqual([kept, discarded]);
+  });
+});
+
+describe('periodo corto', () => {
+  it('mismo mes, otro mes y otro año', () => {
+    expect(formatRange('2026-10-10', '2026-10-17')).toBe('10 – 17 oct 2026');
+    expect(formatRange('2026-09-28', '2026-10-05')).toBe('28 sep – 5 oct 2026');
+    expect(formatRange('2025-12-28', '2026-01-04')).toBe('28 dic 2025 – 4 ene 2026');
   });
 });

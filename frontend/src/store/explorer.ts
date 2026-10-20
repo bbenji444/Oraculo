@@ -40,6 +40,8 @@ export interface ExplorerState {
   listFilter: ListFilter;
   /** Interruptor "No relevantes": vale para la lista y el globo a la vez. */
   showIrrelevant: boolean;
+  /** Panel izquierdo visible; se oculta para ver el globo completo. */
+  panelOpen: boolean;
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
@@ -58,6 +60,7 @@ export interface ExplorerState {
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
   setShowIrrelevant: (showIrrelevant: boolean) => void;
+  setPanelOpen: (panelOpen: boolean) => void;
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
@@ -121,6 +124,7 @@ export const useExplorerStore = create<ExplorerState>()(
       articleId: null,
       listFilter: 'all',
       showIrrelevant: false,
+      panelOpen: true,
       earth: 'night',
       // "Menos movimiento" del sistema manda sobre la preferencia guardada.
       motion: prefersReducedMotion() ? 'off' : 'normal',
@@ -163,6 +167,9 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       setShowIrrelevant: (showIrrelevant) => {
         set({ showIrrelevant });
+      },
+      setPanelOpen: (panelOpen) => {
+        set({ panelOpen });
       },
       setEarth: (earth) => {
         set({ earth });
