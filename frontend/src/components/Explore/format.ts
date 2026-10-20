@@ -163,3 +163,29 @@ export function finishNotice(search: Pick<Search, 'status' | 'results_count'>): 
     return { tone: 'warn', text: `Búsqueda lista con avisos: ${notes}` };
   return { tone: 'ok', text: `Búsqueda lista: ${notes}` };
 }
+
+// Diferencia mínima entre el hecho y la publicación para avisarlo: con menos,
+// es la misma noticia del día ("ayer", "el lunes").
+const OLD_EVENT_DAYS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Fecha del hecho para la ficha, solo si es distinta de la publicación.
+ *
+ * Muchas notas son avances de casos viejos (una orden de captura por un
+ * homicidio de hace un año, historial del 20/10/2026): sin esto parecía un
+ * hecho reciente.
+ *
+ * @param eventDate Fecha del hecho según la IA (AAAA-MM-DD), si hay.
+ * @param publishedAt Publicación (ISO, UTC), si hay.
+ * @returns "Fecha del hecho: 29 sep 2025", o `null` si no aplica.
+ * @example eventDateNote('2025-09-29', '2026-10-16T14:00:00Z') // 'Fecha del hecho: 29 sep 2025'
+ */
+export function eventDateNote(eventDate: string | null, publishedAt: string | null): string | null {
+  if (!eventDate || !publishedAt) return null;
+  const [year, month, day] = eventDate.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const gap = Math.abs(Date.parse(publishedAt) - Date.UTC(year, month - 1, day));
+  if (!Number.isFinite(gap) || gap < OLD_EVENT_DAYS * DAY_MS) return null;
+  return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
+}

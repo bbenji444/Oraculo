@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
+  eventDateNote,
   finishNotice,
   formatDay,
   formatMexicoCity,
@@ -113,5 +114,22 @@ describe('aviso al terminar', () => {
       tone: 'error',
       text: 'La búsqueda falló',
     });
+  });
+});
+
+describe('fecha del hecho', () => {
+  it('se avisa cuando la nota es un avance de un hecho de otro momento', () => {
+    expect(eventDateNote('2025-09-29', '2026-10-16T14:00:00Z')).toBe(
+      'Fecha del hecho: 29 sep 2025',
+    );
+    expect(eventDateNote('2026-10-30', '2026-10-15T14:00:00Z')).toBe(
+      'Fecha del hecho: 30 oct 2026',
+    );
+  });
+
+  it('no se repite si es del mismo día o casi', () => {
+    expect(eventDateNote('2026-10-15', '2026-10-16T05:00:00Z')).toBeNull();
+    expect(eventDateNote(null, '2026-10-16T05:00:00Z')).toBeNull();
+    expect(eventDateNote('2026-10-15', null)).toBeNull();
   });
 });

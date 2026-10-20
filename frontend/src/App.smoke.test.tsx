@@ -221,11 +221,11 @@ describe('flujo principal (H1)', () => {
       within(list).getByRole('button', { name: new RegExp(note.title.slice(0, 20)) }),
     );
     const card = await within(screen.getByTestId('globo')).findByRole('article');
-    expect(
-      within(card)
-        .getByRole('link', { name: /Ver nota original/ })
-        .getAttribute('href'),
-    ).toBe(note.url);
+    const original = within(card).getByRole('link', { name: /Ver nota original/ });
+    expect(original.getAttribute('href')).toBe(note.url);
+    // Siempre en otra pestaña: el monitor no se pierde (pedido de Benji, 20/10/2026).
+    expect(original.getAttribute('target')).toBe('_blank');
+    expect(original.getAttribute('rel')).toContain('noopener');
 
     // 6. "No relevantes" muestra las descartadas en la lista y en el globo a la vez.
     const showIrrelevant = within(list).getByRole('checkbox', { name: 'No relevantes' });

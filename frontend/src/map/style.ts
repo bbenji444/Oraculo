@@ -47,7 +47,7 @@ export const EARTH_FADE_END_ZOOM = 7;
 // ensucian la Tierra (como en las imágenes de referencia de Benji).
 export const LABELS_MIN_ZOOM = 3.5;
 export const ATTRIBUTION_OSM =
-  '© <a href="https://openstreetmap.org/copyright">colaboradores de OpenStreetMap</a> · <a href="https://protomaps.com">Protomaps</a>';
+  '© <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a> · <a href="https://protomaps.com" target="_blank" rel="noopener noreferrer">Protomaps</a>';
 
 export type RegionLevel = 'country' | 'state' | 'municipality' | 'locality';
 

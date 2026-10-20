@@ -1,13 +1,15 @@
 /**
  * Tarjeta de noticia (especificación §14.4): título, medio y fecha (hora de
- * CDMX), conceptos con su color, resumen marcado como automático, ubicación con
- * insignia de precisión, proveedores y "Ver nota original".
+ * CDMX), fecha del hecho si es de otro momento, conceptos con su color, resumen
+ * marcado como automático, ubicación con insignia de precisión (y "lugar
+ * mencionado" si no es la del hecho), proveedores y "Ver nota original", que
+ * abre en otra pestaña.
  *
  * Nunca muestra el texto completo de la nota (CLAUDE.md §8): solo el resumen
  * propio y el link al medio.
  */
 import type { Article } from '../../services/searches';
-import { formatMexicoCity, isCoarse, PRECISION_LABEL } from './format';
+import { eventDateNote, formatMexicoCity, isCoarse, PRECISION_LABEL } from './format';
 
 interface NewsCardProps {
   article: Article;
@@ -24,6 +26,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 export function NewsCard({ article, colors, onClose }: NewsCardProps) {
   const location = article.primary_location;
+  const eventDate = eventDateNote(article.event_date, article.published_at);
   const relevant = article.concepts.filter((c) => c.is_relevant);
   return (
     <article className="space-y-2.5 text-sm" aria-label={article.title}>
@@ -46,6 +49,14 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
         {article.source_name ?? article.source_domain ?? 'Medio sin nombre'}
         {article.published_at && ` · ${formatMexicoCity(article.published_at)}`}
       </p>
+      {eventDate && (
+        <p
+          className="-mt-1.5 text-xs text-amber-200/90"
+          title="Según la nota: el hecho ocurrió en otro momento"
+        >
+          {eventDate}
+        </p>
+      )}
       {relevant.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {relevant.map((c) => (
@@ -84,6 +95,14 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
           {PRECISION_LABEL[location?.precision ?? 'unknown']}
         </span>
         {location?.place ?? 'Sin ubicación'}
+        {location?.role === 'mentioned' && (
+          <span
+            className="text-slate-400"
+            title="La nota no dice dónde ocurrió; es el lugar que nombra dentro de la región buscada"
+          >
+            · lugar mencionado
+          </span>
+        )}
         {article.in_region === false && (
           <span className="text-amber-200">· fuera de la región</span>
         )}

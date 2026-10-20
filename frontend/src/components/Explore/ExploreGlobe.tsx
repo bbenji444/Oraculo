@@ -106,6 +106,8 @@ interface Stack {
   total: number;
   /** Zoom que separa el grupo; `null` si son notas en el mismo punto. */
   expandZoom: number | null;
+  /** `articleRequest` al abrirla: elegir otra nota (desde donde sea) la cierra. */
+  request: number;
 }
 
 interface Callout {
@@ -367,7 +369,8 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     ) => {
       const [lng, lat] = coordinates;
       const point = map.project(coordinates);
-      setStack({ lng, lat, x: point.x, y: point.y, ids, total, expandZoom });
+      const request = useExplorerStore.getState().articleRequest;
+      setStack({ lng, lat, x: point.x, y: point.y, ids, total, expandZoom, request });
     };
     map.on('click', (event) => {
       const news = firstAt(event.point, NEWS_LAYERS);
@@ -721,7 +724,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
           </div>
         </>
       )}
-      {stack && stackPlacement && (
+      {stack?.request === articleRequest && stackPlacement && (
         <div
           className="absolute z-30 animate-[fadeIn_150ms_ease-out]"
           style={{ left: stackPlacement.left, top: stackPlacement.top }}
