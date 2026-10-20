@@ -64,6 +64,9 @@ TABASCO = place(40, "27", RegionLevel.STATE, "Tabasco")
 VERACRUZ = place(41, "30", RegionLevel.STATE, "Veracruz de Ignacio de la Llave")
 DOS_BOCAS_VER = place(42, "301310045", RegionLevel.LOCALITY, "Dos Bocas")
 
+# "El Rosario" en las notas; INEGI lo registra como "Rosario" (Sinaloa).
+SINALOA = place(46, "25", RegionLevel.STATE, "Sinaloa")
+ROSARIO_SIN = place(47, "25014", RegionLevel.MUNICIPALITY, "Rosario")
 SAN_LUIS_POTOSI = place(43, "24", RegionLevel.STATE, "San Luis Potosí")
 SLP_CAPITAL = place(44, "24028", RegionLevel.MUNICIPALITY, "San Luis Potosí")
 
@@ -128,6 +131,8 @@ ALL = (
     DOS_BOCAS_VER,
     SAN_LUIS_POTOSI,
     SLP_CAPITAL,
+    SINALOA,
+    ROSARIO_SIN,
 )
 
 

@@ -139,6 +139,31 @@ def strip_generic_prefix(name_norm: str) -> str:
     return name_norm
 
 
+# Artículos con que los medios nombran municipios que INEGI registra sin
+# ellos ("El Rosario" → "Rosario", "La Concordia" → "Concordia"; Sinaloa,
+# búsqueda real del 19/10/2026). Solo se prueban si el nombre completo no está.
+LEADING_ARTICLES = ("LOS ", "LAS ", "EL ", "LA ")
+
+
+def strip_leading_article(name_norm: str) -> str:
+    """Quita un artículo del inicio de un nombre normalizado.
+
+    Args:
+        name_norm: Nombre normalizado.
+
+    Returns:
+        El nombre sin el artículo; el mismo si no lo tenía.
+
+    Example:
+        >>> strip_leading_article("EL ROSARIO")
+        'ROSARIO'
+    """
+    for article in LEADING_ARTICLES:
+        if name_norm.startswith(article):
+            return name_norm[len(article) :].strip()
+    return name_norm
+
+
 def is_mexico_name(name: str) -> bool:
     """Dice si un texto es el nombre del país ("México"), no del Estado de México.
 
@@ -304,8 +329,10 @@ def choose_neighborhood(
 
     Se prefieren las de nombre exacto; si no hay, las de la misma familia
     ("Polanco" → "Polanco 1ª Sección"...). Con municipio sugerido por la IA,
-    solo cuentan las de ese municipio. Solo se acepta si todas las que quedan
-    caen en **un** municipio: "Colonia Centro" existe en cientos y no dice nada.
+    solo cuentan las de ese municipio: "Ajusco, Tlalpan" no es la Colonia
+    Ajusco de Coyoacán (historial del 20/10/2026). Solo se acepta si todas las
+    que quedan caen en **un** municipio: "Colonia Centro" existe en cientos y
+    no dice nada.
 
     Args:
         name_core: Mención normalizada, sin palabra genérica.
@@ -322,7 +349,7 @@ def choose_neighborhood(
     """
     pool = list(matches)
     if municipality_code is not None:
-        pool = [m for m in pool if m.municipality.code == municipality_code] or pool
+        pool = [m for m in pool if m.municipality.code == municipality_code]
     exact = [m for m in pool if m.name_core == name_core]
     chosen = exact or pool
     if not chosen or len({m.municipality.region_id for m in chosen}) != 1:
@@ -337,6 +364,34 @@ def choose_neighborhood(
     place = replace(best.municipality, lon=best.lon, lat=best.lat, detail=best.name)
     confidence = NEIGHBORHOOD_EXACT_CONFIDENCE if exact else NEIGHBORHOOD_FAMILY_CONFIDENCE
     return place, confidence
+
+
+def seat_area(searched: Place, municipality: Place | None) -> Place:
+    """Zona real de una búsqueda: la localidad cabecera homónima vale por su municipio.
+
+    En la CDMX cada alcaldía tiene una localidad urbana con su mismo nombre que
+    cubre casi toda la alcaldía (090160001 "Miguel Hidalgo" dentro de 09016).
+    Ni las notas ni las personas las distinguen: una búsqueda en esa localidad
+    marcaba "fuera de la región" todo lo ubicado en la alcaldía o sus colonias
+    (búsqueda real del 20/10/2026: 0 notas dentro).
+
+    Args:
+        searched: Región elegida para la búsqueda.
+        municipality: Su municipio, si es una localidad.
+
+    Returns:
+        El municipio si la búsqueda es su localidad cabecera con el mismo nombre;
+        si no, la misma región.
+    """
+    if (
+        searched.level is RegionLevel.LOCALITY
+        and municipality is not None
+        and municipality.level is RegionLevel.MUNICIPALITY
+        and searched.code.startswith(municipality.code)
+        and normalize_name(searched.name) == normalize_name(municipality.name)
+    ):
+        return municipality
+    return searched
 
 
 def most_general(candidates: Sequence[Place]) -> list[Place]:

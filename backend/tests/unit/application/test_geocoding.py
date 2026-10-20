@@ -331,3 +331,42 @@ async def test_sin_lugar_del_hecho_ni_mencion_en_la_region_queda_sin_ubicar() ->
     results = await resolve(Mention("Nuevo León", MENTIONED, RegionLevel.STATE), searched=cat.CDMX)
 
     assert not any(r.is_primary for r in results)
+
+
+async def test_con_municipio_de_la_ia_no_vale_la_colonia_homonima_de_otra_alcaldia() -> None:
+    # "Ajusco, Tlalpan" caía en la Colonia Ajusco de Coyoacán. Aquí: "Roma"
+    # con municipio Iztapalapa no es la Roma Norte de Cuauhtémoc.
+    result = await one(
+        Mention("colonia Roma", EVENT, state_hint="CDMX", municipality_hint="Iztapalapa")
+    )
+
+    assert result.place == cat.IZTAPALAPA
+    assert result.precision is Precision.MUNICIPALITY
+    assert result.confidence == TIEBREAK_CONFIDENCE
+
+
+async def test_un_parque_que_nadie_tiene_queda_en_el_municipio_que_dice_la_ia() -> None:
+    result = await one(
+        Mention(
+            "Parque Bicentenario",
+            EVENT,
+            RegionLevel.LOCALITY,
+            "CDMX",
+            municipality_hint="Iztapalapa",
+        )
+    )
+
+    assert (result.place, result.precision) == (cat.IZTAPALAPA, Precision.MUNICIPALITY)
+
+
+async def test_el_rosario_de_las_notas_es_el_municipio_rosario_de_inegi() -> None:
+    result = await one(Mention("El Rosario", EVENT, RegionLevel.MUNICIPALITY, state_hint="Sinaloa"))
+
+    assert result.place == cat.ROSARIO_SIN
+
+
+async def test_el_nombre_completo_con_articulo_gana_si_existe() -> None:
+    # "La Gloria" no se recorta: existe tal cual (localidad "Colonia la Gloria").
+    result = await one(Mention("colonia La Gloria", EVENT, state_hint="Guanajuato"))
+
+    assert result.place == cat.LA_GLORIA_GTO

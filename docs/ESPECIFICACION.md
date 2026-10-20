@@ -573,6 +573,8 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | "Polanco" (estado CDMX) | La nota también nombra Jalisco | Colonia Polanco, Alcaldía Miguel Hidalgo; nunca la localidad Polanco de Jalisco |
 | "alcaldía Iztapalapa" | — | Municipio Iztapalapa |
 | "calle Molière" (estado CDMX) | — | Estado 09, aproximada |
+| "El Rosario" (estado Sinaloa) | — | Municipio Rosario (INEGI lo registra sin artículo) |
+| (búsqueda en la localidad "Miguel Hidalgo") | Nota en Polanco | Dentro de la región: la localidad cabecera homónima vale por su alcaldía |
 | (sin lugar) | — | Precisión `unknown`; no se pinta en el mapa y aparece en la lista "Sin ubicación" |
 
 ---
