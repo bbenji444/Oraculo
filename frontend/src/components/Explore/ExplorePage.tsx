@@ -10,6 +10,7 @@
  * - Derecha: libre, para que el globo se vea completo (Benji quitó las
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
  * - Abajo: giro, día/noche, velocidad y leyenda de precisión.
+ * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
  *
  * Lee el store y pide los datos con los hooks; el globo y los paneles se
  * sincronizan a través del store.
@@ -21,12 +22,13 @@ import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { SpaceBackground } from '../Space/SpaceBackground';
-import { GlobeControls, PrecisionLegend } from './Controls';
+import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
 import { visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
 import { GLASS } from './ui';
+import { useFinishNotice } from './useFinishNotice';
 
 // Lista vacía estable: un arreglo nuevo en cada render haría redibujar el globo.
 const NO_ARTICLES: Article[] = [];
@@ -59,6 +61,7 @@ export function ExplorePage() {
   const panelOpen = useExplorerStore((s) => s.panelOpen);
   const setPanelOpen = useExplorerStore((s) => s.setPanelOpen);
   const articleId = useExplorerStore((s) => s.articleId);
+  const finishedNotice = useFinishNotice(search);
 
   useEffect(() => {
     if (articleId !== null && isNarrowScreen()) setPanelOpen(false);
@@ -106,6 +109,8 @@ export function ExplorePage() {
           <GlobeControls />
         </div>
       </div>
+
+      <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />
     </div>
   );
 }

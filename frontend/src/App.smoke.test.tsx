@@ -172,6 +172,8 @@ describe('flujo principal (H1)', () => {
 
     // 4. Al terminar: costo real, notas en el globo y lista (sin gráficas a la derecha).
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
+    // Un aviso dice que ya terminó (la persona pudo irse a otra pestaña).
+    expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
     const list = await screen.findByRole('region', { name: 'Noticias' });
     expect(screen.queryByText(/Top 5 estados/)).toBeNull();
     expect(screen.queryByText('Tipos de noticias')).toBeNull();

@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- Aviso al terminar una búsqueda: "✓ Búsqueda lista: 18 notas" abajo al centro de Explorar durante 8 s y, si la pestaña estaba oculta, también en su título hasta que la persona regresa. Reabrir una búsqueda del Historial no avisa.
+
 ### Cambiado
 
 - Explorar en pantallas bajas: al terminar, la búsqueda se reduce a un renglón ("Extorsión · Jalisco · 10 – 17 oct 2026 · 18 notas…") con "Editar" y una fila de descargas (PDF, CSV, GeoJSON, Imprimir), y la lista de noticias se queda con el resto. A 1366×650 pasan de 2 a 3–4 noticias visibles. "Ocultar ‹" esconde el panel para ver el globo completo; en celular se oculta solo al elegir una noticia.

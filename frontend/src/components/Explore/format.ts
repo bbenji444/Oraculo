@@ -143,3 +143,23 @@ export function formatRange(from: string, to: string): string {
       : `${String(fromDay)} ${month(fromMonth)}${fromYear === toYear ? '' : ` ${String(fromYear)}`}`;
   return `${start} – ${String(toDay)} ${month(toMonth)} ${String(toYear)}`;
 }
+
+export interface FinishNotice {
+  tone: 'ok' | 'warn' | 'error';
+  text: string;
+}
+
+/**
+ * Aviso de que una búsqueda terminó, para quien se fue a otra pestaña o dejó
+ * de mirar la barra de avance. `partial` es que algún proveedor falló pero hay
+ * notas (§9 paso 8).
+ *
+ * @example finishNotice({ status: 'completed', results_count: 18 }) // 'Búsqueda lista: 18 notas'
+ */
+export function finishNotice(search: Pick<Search, 'status' | 'results_count'>): FinishNotice {
+  const notes = `${String(search.results_count)} ${search.results_count === 1 ? 'nota' : 'notas'}`;
+  if (search.status === 'failed') return { tone: 'error', text: 'La búsqueda falló' };
+  if (search.status === 'partial')
+    return { tone: 'warn', text: `Búsqueda lista con avisos: ${notes}` };
+  return { tone: 'ok', text: `Búsqueda lista: ${notes}` };
+}

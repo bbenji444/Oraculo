@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
+  finishNotice,
   formatDay,
   formatMexicoCity,
   formatRange,
@@ -95,5 +96,22 @@ describe('periodo corto', () => {
     expect(formatRange('2026-10-10', '2026-10-17')).toBe('10 – 17 oct 2026');
     expect(formatRange('2026-09-28', '2026-10-05')).toBe('28 sep – 5 oct 2026');
     expect(formatRange('2025-12-28', '2026-01-04')).toBe('28 dic 2025 – 4 ene 2026');
+  });
+});
+
+describe('aviso al terminar', () => {
+  it('dice cuántas notas hay y si hubo avisos o falla', () => {
+    expect(finishNotice({ status: 'completed', results_count: 18 })).toEqual({
+      tone: 'ok',
+      text: 'Búsqueda lista: 18 notas',
+    });
+    expect(finishNotice({ status: 'completed', results_count: 1 }).text).toBe(
+      'Búsqueda lista: 1 nota',
+    );
+    expect(finishNotice({ status: 'partial', results_count: 4 }).tone).toBe('warn');
+    expect(finishNotice({ status: 'failed', results_count: 0 })).toEqual({
+      tone: 'error',
+      text: 'La búsqueda falló',
+    });
   });
 });

@@ -3,13 +3,15 @@
  * leyenda de precisión (§14.2: lo ubicado solo por estado o país se dibuja con
  * anillo punteado, para no hacer creer que pasó en el centro exacto).
  * También los botones de Descargas: reporte PDF, datos CSV y GeoJSON, e imprimir
- * (Fase 7, ADR-0018), que van dentro del renglón de la búsqueda terminada.
+ * (Fase 7, ADR-0018), que van dentro del renglón de la búsqueda terminada, y el
+ * aviso de "Búsqueda lista".
  */
 import { type DownloadKind, useDownloads } from '../../hooks/useDownloads';
 import { MOTION_LABELS, MOTION_PRESETS } from '../../map/motion';
 import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
 import { SpinToggle } from '../GeoExplorer/SpinToggle';
+import type { FinishNotice } from './format';
 import { SMALL_BUTTON } from './ui';
 
 export function GlobeControls() {
@@ -133,6 +135,52 @@ export function DownloadButtons({ searchId }: { searchId: string }) {
         <p role="alert" className="text-[11px] text-rose-300">
           {downloads.error.message}
         </p>
+      )}
+    </div>
+  );
+}
+
+const NOTICE_TONE: Record<FinishNotice['tone'], string> = {
+  ok: 'text-emerald-300',
+  warn: 'text-amber-300',
+  error: 'text-rose-300',
+};
+
+/**
+ * Aviso flotante de "Búsqueda lista" (ver `useFinishNotice`), abajo al centro
+ * para no tapar el panel ni los controles del globo.
+ *
+ * @param props.notice Aviso a mostrar, o `null` para no mostrar nada.
+ * @param props.onClose Cierra el aviso antes de que se quite solo.
+ */
+export function FinishToast({
+  notice,
+  onClose,
+}: {
+  notice: FinishNotice | null;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center px-4"
+    >
+      {notice && (
+        <div className="pointer-events-auto flex animate-[fadeIn_200ms_ease-out] items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2.5 text-sm text-slate-100 shadow-lg shadow-black/40 backdrop-blur">
+          <span aria-hidden="true" className={NOTICE_TONE[notice.tone]}>
+            {notice.tone === 'ok' ? '✓' : notice.tone === 'warn' ? '⚠' : '✕'}
+          </span>
+          {notice.text}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar aviso"
+            className="rounded px-1 text-slate-400 hover:text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   );
