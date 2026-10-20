@@ -495,7 +495,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ## 10. Enriquecimiento con LLM
 
 - **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
-- **Prompts:** se guardan versionados en `adapters/llm/prompts/enrich_v1.md`. Cambiar el prompt implica subir la versión.
+- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigente: `enrich_v2.md`, que agrega `municipality_hint` para colonias y calles; ADR-0020). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
 - **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; se registran tokens y costo estimado por búsqueda.
@@ -520,6 +520,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
       "mention": "Iztapalapa",
       "kind_hint": "municipality",
       "state_hint": "Ciudad de México",
+      "municipality_hint": "Iztapalapa",
       "country": "México",
       "role": "event"
     }

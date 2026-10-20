@@ -29,7 +29,7 @@ Datos de la documentación de OpenAI, consultada el 17/10/2026:
 
 ## Decisión
 
-1. **`LLM_PROVIDER` elige la IA:** `openai` (por defecto) o `gemini`. Los dos adaptadores cumplen `LLMPort` y comparten el prompt `enrich_v1` y la validación con Pydantic.
+1. **`LLM_PROVIDER` elige la IA:** `openai` (por defecto) o `gemini`. Los dos adaptadores cumplen `LLMPort` y comparten el prompt versionado (hoy `enrich_v2`, ADR-0020) y la validación con Pydantic.
 2. **OpenAI usa `gpt-6-luna`** (`OPENAI_MODEL`) con `reasoning.effort = none`. El razonamiento se cobra como salida y no hace falta para extraer datos. Costo estimado por nota: ~0.00035 USD (2,000 tokens de entrada y 300 de salida), unas 4 veces menos que Gemini.
 3. **Sin SDK de OpenAI.** Se llama por HTTP con el cliente compartido (ADR-0010): tiempo máximo, reintentos ante 429 y 5xx, y la llave en el encabezado. No agrega dependencias.
 4. **Esquema estricto escrito a mano.** OpenAI exige, en modo estricto, que todos los campos estén en `required`, `additionalProperties: false` y los nulos como `["string", "null"]`. La respuesta se valida igual con Pydantic.

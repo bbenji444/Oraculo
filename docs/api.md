@@ -300,7 +300,7 @@ curl -s http://localhost:8080/api/v1/articles/11
   ],
   "first_seen_at": "2026-10-17T09:00:50.610884-06:00",
   "llm_model": "gpt-6-luna",
-  "prompt_version": "enrich_v1"
+  "prompt_version": "enrich_v2"
 }
 ```
 

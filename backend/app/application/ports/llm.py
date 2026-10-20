@@ -42,7 +42,7 @@ class EnrichmentResult:
         enrichment: Lo que aportó.
         usage: Tokens gastados (suma de intentos, si hubo reintento).
         model: Modelo usado.
-        prompt_version: Versión del prompt (``enrich_v1``).
+        prompt_version: Versión del prompt (``enrich_v2``).
     """
 
     enrichment: Enrichment
