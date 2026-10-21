@@ -205,3 +205,15 @@ class CaseOwnerRequiredError(ConflictError):
     """La acción dejaría al caso sin su único dueño (o le daría un segundo)."""
 
     code = "case_owner_required"
+
+
+class EntityNotFoundError(NotFoundError):
+    """No existe la entidad en ese caso (o la persona no es miembro del caso)."""
+
+    code = "entity_not_found"
+
+
+class EntityReviewError(InvalidRequestError):
+    """La confirmación no cumple sus reglas (por ejemplo, una persona sin estatus legal)."""
+
+    code = "invalid_entity_review"
