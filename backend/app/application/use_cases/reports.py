@@ -42,10 +42,10 @@ from app.application.ports.search_reads import (
     SearchReaderPort,
 )
 from app.application.use_cases.search_reads import MAX_ARTICLE_PAGE_SIZE, GetSearch
-from app.domain.aggregates import AggregateLevel, aggregate
+from app.domain.aggregates import MUNICIPALITY_CODE_LENGTH, AggregateLevel, aggregate
 from app.domain.errors import ProviderError, RegionNotFoundError, SearchNotFinishedError
-from app.domain.geocoding import Precision
-from app.domain.region import Region
+from app.domain.geocoding import Precision, seat_area
+from app.domain.region import Region, RegionLevel
 from app.domain.reports import is_inside, subregion_level
 
 logger = logging.getLogger(__name__)
@@ -162,6 +162,27 @@ async def _region_and_breadcrumb(
     return region, " › ".join([*names, region.display_name])
 
 
+async def _counting_area(regions: RegionRepositoryPort, region: Region) -> Region:
+    """Región sobre la que se cuenta "dentro" y se dibuja el mapa.
+
+    Es la de la búsqueda, salvo la localidad cabecera homónima, que vale por su
+    municipio (``seat_area``, ADR-0020): la misma regla que usa el
+    geolocalizador para la pestaña "Dentro", así el PDF y la pantalla cuentan
+    igual.
+
+    Args:
+        regions: Catálogo de regiones.
+        region: Región de la búsqueda.
+
+    Returns:
+        La región, o su municipio si es su localidad cabecera homónima.
+    """
+    if region.level is not RegionLevel.LOCALITY:
+        return region
+    municipality = await regions.get_by_code(region.code[:MUNICIPALITY_CODE_LENGTH])
+    return seat_area(region, municipality)
+
+
 async def _relevant_articles(
     articles: ArticleReaderPort, search_id: UUID
 ) -> tuple[ArticleItem, ...]:
@@ -236,8 +257,9 @@ class BuildReport:
         search = await _finished_search(self._searches, search_id)
         region, breadcrumb = await _region_and_breadcrumb(self._regions, search.region_id)
         articles = await _relevant_articles(self._articles, search_id)
-        level = subregion_level(region.level, region.code)
-        counts, outside, coarser, unlocated = await self._counts(search_id, region, level)
+        area = await _counting_area(self._regions, region)
+        level = subregion_level(area.level, area.code)
+        counts, outside, coarser, unlocated = await self._counts(search_id, area, level)
         points = [
             MapPoint(a.primary.lon, a.primary.lat, a.primary.precision in _COARSE)
             for a in articles
@@ -258,7 +280,7 @@ class BuildReport:
             summary_model=summary.model if summary else None,
             summary_notice=notice,
             providers=tuple(await self._store.provider_usage(search_id)),
-            map_svg=await self._map.render(region, level, counts, points),
+            map_svg=await self._map.render(area, level, counts, points),
             generated_at=self._clock(),
             generated_by=actor.user_id,
         )

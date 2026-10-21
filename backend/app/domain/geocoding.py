@@ -32,6 +32,7 @@ No hace: no consulta la base (eso lo hace el caso de uso con un puerto).
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Protocol
 
 from app.domain.names import normalize_name
 from app.domain.region import RegionLevel
@@ -366,14 +367,35 @@ def choose_neighborhood(
     return place, confidence
 
 
-def seat_area(searched: Place, municipality: Place | None) -> Place:
+class NamedArea(Protocol):
+    """Lo que necesita ``seat_area``: lo tienen ``Place`` y ``Region``."""
+
+    @property
+    def code(self) -> str:
+        """Clave INEGI."""
+        ...
+
+    @property
+    def level(self) -> RegionLevel:
+        """Nivel de la región."""
+        ...
+
+    @property
+    def name(self) -> str:
+        """Nombre oficial."""
+        ...
+
+
+def seat_area[A: NamedArea](searched: A, municipality: A | None) -> A:
     """Zona real de una búsqueda: la localidad cabecera homónima vale por su municipio.
 
     En la CDMX cada alcaldía tiene una localidad urbana con su mismo nombre que
     cubre casi toda la alcaldía (090160001 "Miguel Hidalgo" dentro de 09016).
     Ni las notas ni las personas las distinguen: una búsqueda en esa localidad
     marcaba "fuera de la región" todo lo ubicado en la alcaldía o sus colonias
-    (búsqueda real del 20/10/2026: 0 notas dentro).
+    (búsqueda real del 20/10/2026: 0 notas dentro). La usan el geolocalizador
+    (con ``Place``) y el reporte (con ``Region``), para que "dentro" sea lo
+    mismo en la pantalla y en el PDF.
 
     Args:
         searched: Región elegida para la búsqueda.
