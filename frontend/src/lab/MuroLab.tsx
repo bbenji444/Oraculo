@@ -5,7 +5,9 @@
  * Solo para desarrollo: se abre con `?laboratorio` en la URL (pestaña
  * "Laboratorio") y se carga aparte, así no pesa en Explorar.
  *
- * - Opción: sin muro (control), A (MapLibre propio) o B (deck.gl).
+ * - Opción: sin muro (control) o la capa propia de MapLibre que eligió el
+ *   ADR-0102. La opción B (deck.gl) se midió y se quitó; está en el commit
+ *   `1998e2b` por si hay que volver a compararla.
  * - Caso: el de prueba de Polanco (sin nombres reales) o sintéticos de 25, 150
  *   y 500 nodos.
  * - "Correr guion": 1 vuelta de calentamiento (carga teselas) y 3 medidas de
@@ -26,17 +28,15 @@ import { useCameraStore } from '../store/camera';
 import { type FrameStats, FRAME_BUDGET_MS, summarizeRuns } from './fpsMeter';
 import { DEMO_CASE, type LabCase, syntheticCase } from './labCase';
 import { PHASE_LABEL, PHASES, type Phase, runPhase } from './labScript';
-import { addDeckMuro } from './muroDeck';
 import type { MuroEngine } from './muroLabels';
 import { addMapLibreMuro } from './muroMapLibre';
 
-type EngineKey = 'control' | 'maplibre' | 'deck';
+type EngineKey = 'control' | 'maplibre';
 type CaseKey = 'demo' | '25' | '150' | '500';
 
 const ENGINES: { key: EngineKey; label: string }[] = [
   { key: 'control', label: 'Sin muro (control)' },
-  { key: 'maplibre', label: 'A · MapLibre propio' },
-  { key: 'deck', label: 'B · deck.gl 9.4' },
+  { key: 'maplibre', label: 'Capa propia de MapLibre' },
 ];
 const CASES: { key: CaseKey; label: string }[] = [
   { key: 'demo', label: 'Caso de prueba (9 nodos)' },
@@ -60,9 +60,7 @@ function caseFor(key: CaseKey): LabCase {
 }
 
 function addEngine(map: MapLibreMap, key: EngineKey, labCase: LabCase): MuroEngine | null {
-  if (key === 'maplibre') return addMapLibreMuro(map, labCase);
-  if (key === 'deck') return addDeckMuro(map, labCase);
-  return null;
+  return key === 'maplibre' ? addMapLibreMuro(map, labCase) : null;
 }
 
 /** Verde si cumple el criterio de la 9.1, ámbar si no. */

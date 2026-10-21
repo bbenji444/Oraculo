@@ -7,8 +7,8 @@
  *    `globeCamera` + `smoothFlights`).
  * 3. **Órbita:** la cámara orbita el primer nodo a zoom 11.5 e inclinada 55°,
  *    como al seleccionar una entidad (plan §9.5).
- * 4. **Cerca:** Polanco a zoom 14: donde `GlobeView` de deck.gl pierde
- *    precisión (su documentación: "no high-precision rendering at zoom > 12").
+ * 4. **Cerca:** Polanco a zoom 14, donde MapLibre ya dibuja el globo como
+ *    plano (variante "mercator") y donde deck.gl perdía precisión (ADR-0102).
  *
  * Antes de medir cada paso se espera a que el mapa termine de cargar
  * (`idle`): se mide el dibujo, no la red. El vuelo sí puede cargar teselas.

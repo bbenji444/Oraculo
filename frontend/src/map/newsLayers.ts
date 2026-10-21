@@ -378,8 +378,8 @@ export function stackedIds(
 /**
  * Coordenadas de una figura del mapa si es un punto (una nota o un grupo).
  *
- * Revisa la forma del dato en lugar de confiar en el tipo de GeoJSON, que
- * cambió con los tipos que trae deck.gl.
+ * Revisa la forma del dato en lugar de confiar en el tipo de GeoJSON: otra
+ * librería puede traer otra versión de esos tipos (pasó con deck.gl, ADR-0102).
  *
  * @param geometry Geometría de la figura (`feature.geometry`).
  * @returns `[lng, lat]`, o `null` si no es un punto.

@@ -1,11 +1,11 @@
 /**
  * Nodos del muro como datos de MapLibre: la fuente GeoJSON y las etiquetas.
  *
- * Las dos opciones del ADR-0102 ponen las etiquetas con MapLibre (texto nítido
- * con las fuentes del mapa, que ya traen la Ñ), así la comparación de fps es
- * solo del dibujo de nodos y arcos.
+ * Las etiquetas van con MapLibre (texto nítido con las fuentes del mapa, que
+ * ya traen la Ñ). Al comparar motores en el ADR-0102 las dos opciones las
+ * compartían, así los fps medían solo el dibujo de nodos y arcos.
  *
- * No hace: no dibuja los círculos ni los arcos (cada opción lo hace a su modo).
+ * No hace: no dibuja los círculos ni los arcos (eso es `muroMapLibre.ts`).
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
