@@ -113,6 +113,7 @@ function buildLayers(arcs: ArcDatum[], nodes: NodeDatum[], seconds: number): Lay
       getRadius: 4,
       radiusUnits: 'pixels',
       getFillColor: [255, 255, 255, 230],
+      billboard: true,
       parameters: GLOW_PARAMETERS,
     }),
     new ScatterplotLayer<NodeDatum>({
@@ -123,7 +124,11 @@ function buildLayers(arcs: ArcDatum[], nodes: NodeDatum[], seconds: number): Lay
       radiusUnits: 'pixels',
       getFillColor: (d): Rgba => [...d.color, 90],
       updateTriggers: { getRadius: haloRadius },
-      parameters: GLOW_PARAMETERS,
+      // De frente a la cámara y con mezcla normal, como los círculos de
+      // MapLibre de la opción A: sin billboard se recuestan sobre el globo y,
+      // con mezcla aditiva, los halos de una misma ciudad se vuelven blancos.
+      billboard: true,
+      parameters: { cullMode: 'none' },
     }),
     new ScatterplotLayer<NodeDatum>({
       id: 'muro-node-core',
@@ -136,6 +141,7 @@ function buildLayers(arcs: ArcDatum[], nodes: NodeDatum[], seconds: number): Lay
       getLineColor: (d) => d.ring,
       getLineWidth: 2,
       lineWidthUnits: 'pixels',
+      billboard: true,
       parameters: { cullMode: 'none' },
     }),
   ];
