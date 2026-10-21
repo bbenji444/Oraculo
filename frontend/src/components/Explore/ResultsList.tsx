@@ -4,12 +4,13 @@
  * Fuera y Sin ubicación (§9 paso 7: las de fuera no se borran, se muestran
  * aparte). Recibe las notas ya filtradas por relevancia (las mismas que el
  * globo); su interruptor "No relevantes" cambia el store y afecta a los dos.
+ * El encabezado dice cuántas se ven de cuántas trajo la búsqueda ("24 de 43").
  */
 import { useEffect, useRef } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
-import { formatDay, isCoarse, PRECISION_LABEL } from './format';
+import { formatDay, isCoarse, newsCount, PRECISION_LABEL } from './format';
 import { GLASS, PANEL_TITLE } from './ui';
 
 const TABS: { id: ListFilter; label: string }[] = [
@@ -28,10 +29,12 @@ function matches(article: Article, filter: ListFilter): boolean {
 interface ResultsListProps {
   /** Notas visibles (ver `visibleArticles`). */
   articles: readonly Article[];
+  /** Todas las notas de la búsqueda, relevantes o no. */
+  total: number;
   colors: ReadonlyMap<number, string>;
 }
 
-export function ResultsList({ articles, colors }: ResultsListProps) {
+export function ResultsList({ articles, total, colors }: ResultsListProps) {
   const filter = useExplorerStore((s) => s.listFilter);
   const setFilter = useExplorerStore((s) => s.setListFilter);
   const articleId = useExplorerStore((s) => s.articleId);
@@ -40,6 +43,7 @@ export function ResultsList({ articles, colors }: ResultsListProps) {
   const setShowIrrelevant = useExplorerStore((s) => s.setShowIrrelevant);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const shown = articles.filter((a) => matches(a, filter));
+  const count = newsCount(articles.length, total);
 
   useEffect(() => {
     // La nota elegida en el globo se trae a la vista en la lista.
@@ -49,7 +53,9 @@ export function ResultsList({ articles, colors }: ResultsListProps) {
   return (
     <section aria-label="Noticias" className={`${GLASS} flex min-h-0 flex-col p-4`}>
       <div className="flex items-center justify-between">
-        <h2 className={PANEL_TITLE}>Noticias ({articles.length})</h2>
+        <h2 className={PANEL_TITLE} title={count.hint}>
+          {count.label}
+        </h2>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <input
             type="checkbox"

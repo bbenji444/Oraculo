@@ -76,14 +76,19 @@ const DOWNLOADS: { kind: DownloadKind; short: string; label: string; hint: strin
     kind: 'pdf',
     short: 'PDF',
     label: 'Reporte (PDF)',
-    hint: 'Reporte: portada, resumen, mapa, gráficas y noticias. El primero de cada búsqueda cuesta ~0.0003 USD de IA; los siguientes, nada.',
+    hint: 'Reporte de las notas relevantes: portada, resumen, mapa, gráficas y noticias. El primero de cada búsqueda cuesta ~0.0003 USD de IA; los siguientes, nada.',
   },
-  { kind: 'csv', short: 'CSV', label: 'Datos (CSV)', hint: 'Una fila por nota, para Excel' },
+  {
+    kind: 'csv',
+    short: 'CSV',
+    label: 'Datos (CSV)',
+    hint: 'Una fila por nota relevante, para Excel',
+  },
   {
     kind: 'geojson',
     short: 'GeoJSON',
     label: 'Puntos (GeoJSON)',
-    hint: 'Mapa de puntos para QGIS o Google Earth',
+    hint: 'Las notas relevantes como puntos, para QGIS o Google Earth',
   },
   { kind: 'print', short: 'Imprimir', label: 'Imprimir', hint: 'Abre el reporte en otra pestaña' },
 ];

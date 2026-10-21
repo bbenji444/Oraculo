@@ -84,7 +84,7 @@ export function ExplorePage() {
         </div>
         {hasResults && (
           <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
-            <ResultsList articles={shown} colors={colors} />
+            <ResultsList articles={shown} total={articles.length} colors={colors} />
           </div>
         )}
       </aside>
