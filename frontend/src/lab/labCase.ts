@@ -220,6 +220,29 @@ export function greatCircleMeters(a: [number, number], b: [number, number]): num
   return Math.acos(dot) * EARTH_RADIUS_M;
 }
 
+// Circunferencia con el radio de MapLibre (`earthRadius`), para que la altura
+// en el plano coincida con `MercatorCoordinate.meterInMercatorCoordinateUnits`.
+const EARTH_CIRCUMFERENCE_M = 2 * Math.PI * EARTH_RADIUS_M;
+
+/**
+ * Convierte metros de altura a unidades del plano Mercator de MapLibre.
+ *
+ * Arriba de zoom ~12 MapLibre dibuja el globo como plano, y ahí la altura de
+ * una capa propia va en unidades Mercator (1 = el ancho del mundo), no en
+ * metros. Mercator estira con la latitud, así que un metro vale más cerca de
+ * los polos. Es la misma cuenta que `meterInMercatorCoordinateUnits`.
+ *
+ * @param lat Latitud del punto, en grados.
+ * @param meters Altura en metros.
+ * @returns La altura en unidades Mercator.
+ *
+ * @example
+ * metersInMercatorUnits(60, 1) // 2 / 40,030,229: a 60° un metro vale el doble
+ */
+export function metersInMercatorUnits(lat: number, meters: number): number {
+  return meters / (EARTH_CIRCUMFERENCE_M * Math.cos(lat * DEGREES));
+}
+
 /** Altura máxima del arco entre dos puntos, en metros. */
 export function arcHeightMeters(distanceMeters: number): number {
   return Math.min(ARC_MAX_HEIGHT_M, Math.max(ARC_MIN_HEIGHT_M, distanceMeters * ARC_HEIGHT_SHARE));

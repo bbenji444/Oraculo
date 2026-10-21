@@ -7,6 +7,7 @@ import {
   arcPath,
   DEMO_CASE,
   greatCircleMeters,
+  metersInMercatorUnits,
   nodesById,
   syntheticCase,
 } from './labCase';
@@ -66,5 +67,17 @@ describe('geometría de los arcos', () => {
     const path = arcPath([-99.2, 19.43], [-99.2, 19.43], 5);
 
     expect(path.every(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))).toBe(true);
+  });
+
+  it('en el plano Mercator la altura no se mide en metros', () => {
+    // MapLibre (meterInMercatorCoordinateUnits): un metro es 1 / circunferencia
+    // en el ecuador y el doble a 60°, donde Mercator estira al doble.
+    const circumference = 2 * Math.PI * 6_371_008.8;
+
+    expect(metersInMercatorUnits(0, 1)).toBeCloseTo(1 / circumference, 15);
+    expect(metersInMercatorUnits(60, 1)).toBeCloseTo(2 / circumference, 15);
+    // El error de la 9.1: los 1,500 m del arco más bajo se mandaban tal cual y,
+    // a zoom 14, MapLibre los leía como 1,500 veces el ancho del mundo.
+    expect(metersInMercatorUnits(19.434, ARC_MIN_HEIGHT_M)).toBeLessThan(1e-4);
   });
 });

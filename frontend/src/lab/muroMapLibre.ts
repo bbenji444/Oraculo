@@ -3,9 +3,11 @@
  *
  * - **Arcos de luz:** una capa propia (`CustomLayerInterface`, modo 3D) que
  *   dibuja cada arco como una cinta en pantalla, levantada sobre el globo con
- *   `projectTileWithElevation` (la función del preludio de MapLibre que además
- *   recorta lo que queda detrás del horizonte). El brillo es un halo aditivo en
- *   el shader y un pulso de luz recorre cada arco. Los sugeridos van punteados.
+ *   las piezas del preludio de MapLibre (`projectToSphere` y
+ *   `globeComputeClippingZ`, que recorta lo que queda detrás del horizonte) y
+ *   con la altura en las unidades de cada proyección (`projectArc`). El brillo
+ *   es un halo aditivo en el shader y un pulso de luz recorre cada arco. Los
+ *   sugeridos van punteados.
  * - **Nodos:** dos capas de círculo de MapLibre: halo difuso que late y núcleo
  *   con borde del color del estatus legal.
  *
@@ -21,7 +23,7 @@ import {
   MercatorCoordinate,
 } from 'maplibre-gl';
 
-import { arcPath, type LabCase, nodesById } from './labCase';
+import { arcPath, type LabCase, metersInMercatorUnits, nodesById } from './labCase';
 import { addNodeLabels, MURO_SOURCE, type MuroEngine, removeNodeSource } from './muroLabels';
 
 const ARCS_LAYER = 'muro-arcs';
@@ -37,11 +39,28 @@ const PULSE_FRAME_MS = 1000 / 30;
 const ARC_CONFIRMED_COLOR: [number, number, number] = [0.49, 0.83, 0.99];
 const ARC_SUGGESTED_COLOR: [number, number, number] = [0.8, 0.84, 0.9];
 
+// Proyección de los arcos. MapLibre cambia de variante según el zoom
+// (`shaderData.variantName`): "globe" hasta ~12 y "mercator" de ahí en
+// adelante, y entre ~11 y 12 mezcla el globo con el plano. La altura va en
+// metros sobre la esfera, pero en el plano (la variante "mercator" y la matriz
+// de respaldo de la mezcla) va en unidades Mercator, como dicen los tipos de
+// `CustomRenderMethodInput`. `projectTileWithElevation` usa el mismo número
+// para las dos, así que a zoom 14 los arcos salían disparados hacia arriba y
+// entre 11 y 12 se veían rectos. Por eso la mezcla se hace aquí, con las piezas
+// del preludio (`projectToSphere`, `globeComputeClippingZ`) y la misma
+// regla que `interpolateProjection` de maplibre-gl 6.14. Cada vértice trae
+// las dos alturas: en metros (`a_elev`) y en unidades Mercator
+// (`a_elev_flat`, de `metersInMercatorUnits`).
+
+// Umbral `z_globeness_threshold` de `interpolateProjection`: por debajo de esa
+// mezcla el plano no recorta nada detrás del horizonte.
+const Z_GLOBENESS_THRESHOLD = 0.2;
 const VERTEX = `
 in vec2 a_pos;
 in vec2 a_prev;
 in vec2 a_next;
 in vec3 a_elev;
+in vec3 a_elev_flat;
 in vec2 a_side_t;
 in vec4 a_color;
 in vec2 a_meta;
@@ -51,10 +70,26 @@ out float v_side;
 out float v_t;
 out vec4 v_color;
 out vec2 v_meta;
+vec4 projectArc(vec2 mercator, float meters, float flatElevation) {
+#ifdef GLOBE
+  vec3 elevated = projectToSphere(mercator) * (1.0 + meters / GLOBE_RADIUS);
+  vec4 globePosition = u_projection_matrix * vec4(elevated, 1.0);
+  globePosition.z = globeComputeClippingZ(elevated) * globePosition.w;
+  if (u_projection_transition > 0.999) return globePosition;
+  vec4 flatPosition = u_projection_fallback_matrix * vec4(mercator, flatElevation, 1.0);
+  vec4 result = globePosition;
+  result.xyw = mix(flatPosition.xyw, globePosition.xyw, u_projection_transition);
+  float globeness = (u_projection_transition - ${Z_GLOBENESS_THRESHOLD.toFixed(1)}) / ${(1 - Z_GLOBENESS_THRESHOLD).toFixed(1)};
+  result.z = mix(0.0, globePosition.z, clamp(globeness, 0.0, 1.0));
+  return result;
+#else
+  return u_projection_matrix * vec4(mercator, flatElevation, 1.0);
+#endif
+}
 void main() {
-  vec4 cur = projectTileWithElevation(a_pos, a_elev.x);
-  vec4 prev = projectTileWithElevation(a_prev, a_elev.y);
-  vec4 next = projectTileWithElevation(a_next, a_elev.z);
+  vec4 cur = projectArc(a_pos, a_elev.x, a_elev_flat.x);
+  vec4 prev = projectArc(a_prev, a_elev.y, a_elev_flat.y);
+  vec4 next = projectArc(a_next, a_elev.z, a_elev_flat.z);
   vec2 sp = prev.xy / prev.w * u_viewport;
   vec2 sn = next.xy / next.w * u_viewport;
   vec2 dir = normalize(sn - sp + vec2(1e-6, 0.0));
@@ -104,7 +139,7 @@ export function arcRibbons(labCase: LabCase, samples = ARC_SAMPLES) {
     if (!a || !b) return;
     const path = arcPath([a.lng, a.lat], [b.lng, b.lat], samples).map(([lng, lat, h]) => {
       const m = MercatorCoordinate.fromLngLat([lng, lat]);
-      return [m.x, m.y, h] as const;
+      return [m.x, m.y, h, metersInMercatorUnits(lat, h)] as const;
     });
     const color = link.confirmed ? ARC_CONFIRMED_COLOR : ARC_SUGGESTED_COLOR;
     // Fase del pulso distinta por arco: no laten todos al mismo tiempo.
@@ -123,6 +158,9 @@ export function arcRibbons(labCase: LabCase, samples = ARC_SAMPLES) {
           point[2],
           prev[2],
           next[2],
+          point[3],
+          prev[3],
+          next[3],
           side,
           i / (path.length - 1),
           ...color,
@@ -147,6 +185,7 @@ const ATTRIBUTES: [string, number][] = [
   ['a_prev', 2],
   ['a_next', 2],
   ['a_elev', 3],
+  ['a_elev_flat', 3],
   ['a_side_t', 2],
   ['a_color', 4],
   ['a_meta', 2],
