@@ -555,6 +555,7 @@ Las entidades (personas, organizaciones, lugares y vehículos) **no** salen del 
 - **Texto:** el cuerpo extraído y recortado (`text_for_llm`); si ya se borró a los 30 días, título y fragmento del medio, y se marca `title_snippet`. El resumen propio nunca se usa como evidencia.
 - **Salida (validada con Pydantic, un reintento):** `{"entities": [{type, label, aliases, role, legal_status_hint, confidence, evidence_span}]}`. En OpenAI el esquema estricto solo admite los tipos `person`, `org`, `place`, `vehicle` y los siete estatus legales.
 - **Revisión contra el texto** (`domain/entity_extraction.py`): se descarta, con su motivo, la propuesta cuya cita no aparece literal en lo que leyó la IA o cuyo nombre no está escrito en la nota. La cita que se guarda es la del texto, recortada a 300 caracteres.
+- **Agrupación en el caso:** las propuestas con el mismo tipo y el mismo nombre de comparación forman una sola sugerencia. El nombre de comparación (`entity_name_norm`, Fase 9.5) es el `name_norm` del proyecto sin comillas: "Eduardo “N”", "Eduardo 'N'" y "Eduardo N" son el mismo.
 - **Reglas del prompt:** solo lo que dice el texto; la nota es aislada (no se cruza con otras notas ni bases); el estatus legal es lo que afirma la nota y nunca "culpable"; cada entidad con su cita literal; todo entra como sugerido.
 
 ---

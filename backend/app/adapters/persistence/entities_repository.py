@@ -55,11 +55,11 @@ from app.domain.entity_extraction import (
     TextSource,
     match_region,
 )
+from app.domain.entity_resolution import entity_name_norm
 from app.domain.errors import EntityNotFoundError
 from app.domain.extraction import ExtractionStatus
 from app.domain.geocoding import MentionRole
 from app.domain.investigation import EntityType, LegalStatus, ReviewStatus
-from app.domain.names import normalize_name
 
 # Primer número del candado de la base (pg_advisory_xact_lock(int, int)):
 # separa estos candados de cualquier otro que use el sistema. 904 = fase 9.4.
@@ -145,7 +145,8 @@ def _reviewed_from(data: Mapping[str, Any]) -> ReviewedProposals:
             Proposal(
                 type=EntityType(p["type"]),
                 label=p["label"],
-                label_norm=p["label_norm"],
+                # Se recalcula: las lecturas de la 9.4 lo guardaron con comillas.
+                label_norm=entity_name_norm(p["label"]),
                 aliases=tuple(p["aliases"]),
                 role=MentionRole(p["role"]),
                 legal_status_hint=(
@@ -432,7 +433,7 @@ class PostgresEntityRepository:
             return "skipped"
         region_id = (
             match_region(
-                [proposal.label_norm, *(normalize_name(a) for a in proposal.aliases)], locations
+                [proposal.label_norm, *(entity_name_norm(a) for a in proposal.aliases)], locations
             )
             if proposal.type is EntityType.PLACE
             else None
@@ -476,7 +477,7 @@ class PostgresEntityRepository:
                     "INSERT INTO entity_aliases (entity_id, alias, alias_norm) "
                     "VALUES (:entity, :alias, :norm) ON CONFLICT (entity_id, alias_norm) DO NOTHING"
                 ),
-                {"entity": target, "alias": alias, "norm": normalize_name(alias)},
+                {"entity": target, "alias": alias, "norm": entity_name_norm(alias)},
             )
         await conn.execute(
             text(

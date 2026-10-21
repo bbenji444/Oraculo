@@ -7,6 +7,7 @@ ubicada y que revisar firma y deja bitácora.
 """
 
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -85,7 +86,9 @@ def new_case(engine: Engine) -> UUID:
         )
 
 
-def new_article(engine: Engine, case_id: UUID, *, polanco_region: int | None = None) -> int:
+def new_article(
+    engine: Engine, case_id: UUID, *, polanco_region: int | None = None, body: str = BODY
+) -> int:
     with engine.begin() as conn:
         article = int(
             conn.execute(
@@ -99,7 +102,7 @@ def new_article(engine: Engine, case_id: UUID, *, polanco_region: int | None = N
         )
         conn.execute(
             text("INSERT INTO article_texts (article_id, body) VALUES (:a, :b)"),
-            {"a": article, "b": BODY},
+            {"a": article, "b": body},
         )
         if polanco_region is not None:
             conn.execute(
@@ -121,8 +124,8 @@ def add_to_case(conn: Connection, case_id: UUID, article: int) -> None:
     )
 
 
-def extraction(article: int, *proposals: RawProposal) -> StoredExtraction:
-    text_ = AnalyzedText("Orden en Polanco", BODY, TextSource.FULL_TEXT)
+def extraction(article: int, *proposals: RawProposal, body: str = BODY) -> StoredExtraction:
+    text_ = AnalyzedText("Orden en Polanco", body, TextSource.FULL_TEXT)
     return StoredExtraction(
         article,
         "entities_v1",
@@ -235,6 +238,52 @@ async def test_lo_confirmado_no_recibe_menciones_nuevas_solas(
             .all()
         )
     assert actions == ["case.entities_extracted", "entity.confirmed", "case.entities_extracted"]
+
+
+QUOTED_BODY = "Detienen a Julián “N” en Polanco."
+QUOTED = RawProposal("person", "Julián “N”", (), "event", "detained", 0.9, "Detienen a Julián “N”")
+PLAIN_BODY = "Julián N fue vinculado a proceso."
+PLAIN = RawProposal("person", "Julián N", (), "event", "charged", 0.9, "Julián N fue vinculado")
+
+
+async def test_el_mismo_nombre_con_otras_comillas_es_una_sola_sugerencia(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Bug de la 9.4: "Julián “N”" y "Julián N" quedaban como dos sugerencias.
+    repo = PostgresEntityRepository(test_engine)
+    case_id = new_case(sync_engine)
+    quoted = new_article(sync_engine, case_id, body=QUOTED_BODY)
+    plain = new_article(sync_engine, case_id, body=PLAIN_BODY)
+
+    await repo.materialize(case_id, extraction(quoted, QUOTED, body=QUOTED_BODY), 0.0, audit())
+    await repo.materialize(case_id, extraction(plain, PLAIN, body=PLAIN_BODY), 0.0, audit())
+
+    [entity] = await repo.list_entities(case_id, ReviewStatus.SUGGESTED)
+    assert entity.label == "Julián “N”"
+    assert entity.article_count == 2
+
+
+async def test_una_lectura_guardada_antes_del_arreglo_se_agrupa_igual(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Las lecturas de la 9.4 guardaron el nombre normalizado con comillas; al
+    # reutilizarlas en otro caso (sin volver a pagar) se recalcula.
+    repo = PostgresEntityRepository(test_engine)
+    case_id = new_case(sync_engine)
+    quoted = new_article(sync_engine, case_id, body=QUOTED_BODY)
+    plain = new_article(sync_engine, case_id, body=PLAIN_BODY)
+    fresh = extraction(quoted, QUOTED, body=QUOTED_BODY)
+    (item,) = fresh.reviewed.proposals
+    old_style = replace(fresh.reviewed, proposals=(replace(item, label_norm="JULIAN “N”"),))
+    await repo.save_extraction(replace(fresh, reviewed=old_style))
+
+    stored = await repo.get_extraction(quoted, "entities_v1")
+    assert stored is not None
+    await repo.materialize(case_id, stored, 0.0, audit())
+    await repo.materialize(case_id, extraction(plain, PLAIN, body=PLAIN_BODY), 0.0, audit())
+
+    assert [p.label_norm for p in stored.reviewed.proposals] == ["JULIAN N"]
+    assert len(await repo.list_entities(case_id, ReviewStatus.SUGGESTED)) == 1
 
 
 async def test_un_lugar_toma_la_region_que_ya_ubico_la_nota(

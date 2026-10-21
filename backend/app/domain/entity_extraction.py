@@ -31,6 +31,7 @@ from enum import StrEnum
 
 from app.domain.concept import clean_text
 from app.domain.enrichment import LLMUsage, text_for_llm
+from app.domain.entity_resolution import entity_name_norm
 from app.domain.errors import EntityReviewError
 from app.domain.geocoding import MentionRole
 from app.domain.investigation import (
@@ -158,7 +159,7 @@ class Proposal:
     Attributes:
         type: Tipo de entidad.
         label: Nombre, tal como aparece en la nota.
-        label_norm: Nombre normalizado (``normalize_name``) para agrupar.
+        label_norm: Nombre normalizado (``entity_name_norm``: sin comillas) para agrupar.
         aliases: Otros nombres, todos presentes en la nota.
         role: Si participa en el hecho o solo se nombra.
         legal_status_hint: Lo que la nota dice de la persona, o ``None``.
@@ -404,7 +405,7 @@ def _aliases(raw_aliases: Iterable[str], label_norm: str, text: AnalyzedText) ->
     seen = {label_norm}
     for alias in raw_aliases:
         cleaned = clean_text(alias)
-        norm = normalize_name(cleaned)
+        norm = entity_name_norm(cleaned)
         if not norm or norm in seen or not _in_text(cleaned, text):
             continue
         seen.add(norm)
@@ -442,10 +443,10 @@ def review_proposals(raw: Sequence[RawProposal], text: AnalyzedText) -> Reviewed
         if kind is None:
             rejected.append(_rejection(item, RejectionReason.UNSUPPORTED_TYPE))
             continue
-        if not normalize_name(label):
+        if not entity_name_norm(label):
             rejected.append(_rejection(item, RejectionReason.BLANK_LABEL))
             continue
-        aliases = _aliases(item.aliases, normalize_name(label), text)
+        aliases = _aliases(item.aliases, entity_name_norm(label), text)
         if not _in_text(label, text):
             if not aliases:
                 rejected.append(_rejection(item, RejectionReason.NAME_NOT_IN_TEXT))
@@ -456,7 +457,7 @@ def review_proposals(raw: Sequence[RawProposal], text: AnalyzedText) -> Reviewed
             rejected.append(_rejection(item, RejectionReason.EVIDENCE_NOT_IN_TEXT))
             continue
         span, start, end = evidence
-        key = (kind, normalize_name(label), span)
+        key = (kind, entity_name_norm(label), span)
         if key in seen:
             rejected.append(_rejection(item, RejectionReason.DUPLICATE))
             continue
@@ -465,7 +466,7 @@ def review_proposals(raw: Sequence[RawProposal], text: AnalyzedText) -> Reviewed
             Proposal(
                 type=kind,
                 label=label,
-                label_norm=normalize_name(label),
+                label_norm=entity_name_norm(label),
                 aliases=tuple(aliases),
                 role=MentionRole.EVENT if item.role == MentionRole.EVENT else MentionRole.MENTIONED,
                 legal_status_hint=(
@@ -546,7 +547,7 @@ def match_region(names: Iterable[str], locations: Iterable[tuple[str, int | None
         (
             region_id
             for mention, region_id in locations
-            if region_id is not None and normalize_name(mention) in wanted
+            if region_id is not None and entity_name_norm(mention) in wanted
         ),
         None,
     )

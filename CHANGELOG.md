@@ -34,6 +34,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- Entidades de un caso: "Eduardo “N”", "Eduardo 'N'" y "Eduardo N" quedaban como tres sugerencias distintas de la misma persona, porque las comillas del medio contaban al comparar nombres (en el caso de prueba, 8 pares así). Ahora se comparan sin comillas (`entity_name_norm`) y la migración 0021 corrige los nombres ya guardados; las sugerencias que ya estaban separadas se ofrecen para unir en la 9.5, nunca se juntan solas.
 - Modo día: sobre el mapa claro de calles, los paneles translúcidos de Explorar quedaban grises y la línea "medio · fecha · lugar" de cada noticia casi no se leía (contraste 1.6 : 1 medido en pantalla). En modo día el vidrio se oscurece y esa línea va un tono más clara: 6.1 : 1. De noche no cambia.
 - Buscador de regiones con errores de dedo: "monterey" ponía primero el país Montenegro y después el municipio Monterrey, porque en las coincidencias aproximadas mandaba el nivel (país antes que municipio) y no el parecido. Ahora, cuando el nombre solo se parece, gana lo más parecido; lo exacto y lo que empieza igual siguen ordenados por nivel.
 - "Probar concepto" decía "4 consultas" (SearchApi, Google News RSS, GDELT e índice local) aunque una búsqueda real solo manda 2: SearchApi y el índice local. Ahora muestra solo los proveedores configurados, los mismos que usa la estimación de Explorar.
