@@ -17,6 +17,9 @@ export type LegalStatus =
 
 /** Una cita de la nota donde aparece la entidad. */
 export interface Mention {
+  id: number;
+  /** Entidad dueña: la misma, o una que se le unió (9.5). Solo las propias se separan. */
+  entity_id: number;
   article_id: number;
   article_title: string;
   article_url: string;
@@ -28,6 +31,13 @@ export interface Mention {
   legal_status_hint_label: string | null;
   confidence: number;
   evidence_span: string;
+}
+
+/** Una entidad que se unió a otra (9.5). */
+export interface MergedEntity {
+  id: number;
+  label: string;
+  merged_into: number;
 }
 
 /** Una entidad del caso con su evidencia. */
@@ -50,6 +60,8 @@ export interface Entity {
   mention_count: number;
   article_count: number;
   mentions: Mention[];
+  /** Entidades que se le unieron (9.5); se pueden separar. */
+  merged: MergedEntity[];
 }
 
 /** En qué va la lectura de las notas del caso por la IA. */
@@ -71,13 +83,14 @@ export interface CaseEntities {
   items: Entity[];
 }
 
-function isEntity(value: unknown): value is Entity {
+export function isEntity(value: unknown): value is Entity {
   return (
     isRecord(value) &&
     typeof value.id === 'number' &&
     typeof value.label === 'string' &&
     typeof value.review_status === 'string' &&
-    Array.isArray(value.mentions)
+    Array.isArray(value.mentions) &&
+    Array.isArray(value.merged)
   );
 }
 
@@ -91,7 +104,7 @@ function isCaseEntities(value: unknown): value is CaseEntities {
   );
 }
 
-function asEntity(value: unknown): Entity {
+export function asEntity(value: unknown): Entity {
   if (!isEntity(value)) throw badFormat();
   return value;
 }

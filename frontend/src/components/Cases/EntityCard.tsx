@@ -6,13 +6,18 @@
  * puede editar la confirma (en personas, eligiendo el estatus legal según la
  * nota; no existe "culpable") o la descarta.
  *
+ * Desde la 9.5 (§9.8) también muestra qué entidades se le unieron (con
+ * «Separar»), permite decir «Es la misma que…» otra entidad del caso y separar
+ * menciones propias en una sugerencia nueva cuando juntó a dos homónimos.
+ *
  * No hace: no pide datos (los recibe de `CaseEntities`).
  */
 import { useState } from 'react';
 
+import type { ResolutionAction } from '../../hooks/useResolution';
 import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
-import { LEGAL_STATUS_OPTIONS } from './labels';
+import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
 
 interface EntityCardProps {
   entity: Entity;
@@ -20,13 +25,28 @@ interface EntityCardProps {
   busy: boolean;
   onConfirm: (legal: LegalStatus | undefined) => void;
   onDiscard: () => void;
+  /** Otras entidades del caso del mismo tipo con las que se puede unir (9.5). */
+  mergeTargets: Entity[];
+  onResolve: (action: ResolutionAction) => void;
 }
 
 const BUTTON =
   'rounded-lg px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
 
-export function EntityCard({ entity, canEdit, busy, onConfirm, onDiscard }: EntityCardProps) {
+export function EntityCard({
+  entity,
+  canEdit,
+  busy,
+  onConfirm,
+  onDiscard,
+  mergeTargets,
+  onResolve,
+}: EntityCardProps) {
   const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState(0);
+  const [split, setSplit] = useState<number[]>([]);
+  const own = entity.mentions.filter((m) => m.entity_id === entity.id);
+  const canSplit = canEdit && own.length > 1;
   const isPerson = entity.type === 'person';
   const [legal, setLegal] = useState<LegalStatus>(
     entity.legal_status ?? entity.suggested_legal_status ?? 'mentioned',
@@ -68,6 +88,63 @@ export function EntityCard({ entity, canEdit, busy, onConfirm, onDiscard }: Enti
                 entity.reviewed_at ? ` el ${formatDay(entity.reviewed_at)}` : ''
               }`}
           </p>
+          {entity.merged.length > 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Se le unió:{' '}
+              {entity.merged.map((m, index) => (
+                <span key={m.id}>
+                  {index > 0 && ', '}
+                  <span className="text-slate-200">{m.label}</span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        onResolve({ kind: 'unmerge', entityId: m.id });
+                      }}
+                      className="ml-1 text-sky-300 hover:underline disabled:opacity-50"
+                    >
+                      (separar)
+                    </button>
+                  )}
+                </span>
+              ))}
+            </p>
+          )}
+          {canEdit && entity.review_status !== 'discarded' && mergeTargets.length > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+              <label htmlFor={`unir-${String(entity.id)}`}>Es la misma que</label>
+              <select
+                id={`unir-${String(entity.id)}`}
+                value={target}
+                onChange={(event) => {
+                  setTarget(Number(event.target.value));
+                }}
+                className="max-w-[16rem] rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-100"
+              >
+                <option value={0}>elige…</option>
+                {mergeTargets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label} ({t.review_status_label})
+                  </option>
+                ))}
+              </select>
+              {target > 0 && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    const chosen = mergeTargets.find((t) => t.id === target);
+                    if (chosen) onResolve(mergeAction(entity, chosen));
+                    setTarget(0);
+                  }}
+                  className={`${BUTTON} bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}
+                >
+                  Unir
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {canEdit && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -115,8 +192,23 @@ export function EntityCard({ entity, canEdit, busy, onConfirm, onDiscard }: Enti
       {open && (
         <ul className="mt-2 space-y-2 border-l border-slate-700 pl-3">
           {entity.mentions.map((m) => (
-            <li key={`${String(m.article_id)}-${m.evidence_span}`} className="text-xs">
-              <blockquote className="text-slate-200">«{m.evidence_span}»</blockquote>
+            <li key={m.id} className="text-xs">
+              <blockquote className="text-slate-200">
+                {canSplit && m.entity_id === entity.id && (
+                  <input
+                    type="checkbox"
+                    aria-label={`Separar la mención «${m.evidence_span}»`}
+                    checked={split.includes(m.id)}
+                    onChange={(event) => {
+                      setSplit(
+                        event.target.checked ? [...split, m.id] : split.filter((id) => id !== m.id),
+                      );
+                    }}
+                    className="mr-2 align-middle"
+                  />
+                )}
+                «{m.evidence_span}»
+              </blockquote>
               <p className="mt-0.5 text-slate-400">
                 <a
                   href={m.article_url}
@@ -132,6 +224,23 @@ export function EntityCard({ entity, canEdit, busy, onConfirm, onDiscard }: Enti
               </p>
             </li>
           ))}
+          {canSplit && (
+            <li className="text-xs text-slate-400">
+              ¿Son dos personas distintas con el mismo nombre? Marca las menciones de la otra y{' '}
+              <button
+                type="button"
+                disabled={busy || split.length === 0 || split.length === own.length}
+                onClick={() => {
+                  onResolve({ kind: 'split', entityId: entity.id, mentionIds: split });
+                  setSplit([]);
+                }}
+                className="text-sky-300 hover:underline disabled:text-slate-500 disabled:no-underline"
+              >
+                sepáralas en otra entidad
+              </button>
+              .
+            </li>
+          )}
         </ul>
       )}
     </li>

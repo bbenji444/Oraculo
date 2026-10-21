@@ -1,7 +1,8 @@
 /**
- * Hooks de las entidades de un caso con TanStack Query (Fase 9.4).
+ * Hooks de las entidades de un caso con TanStack Query (Fases 9.4 y 9.5).
  *
- * Las claves empiezan con `cases` para que cualquier cambio del caso las
+ * Confirmar o descartar también vuelve a pedir duplicados y vínculos
+ * (`caseKeys`). Las claves empiezan con `cases` para que cualquier cambio del caso las
  * invalide junto con el resto. Mientras haya notas en la cola del worker, la
  * lista se vuelve a pedir cada `POLL_MS` para que las sugerencias aparezcan
  * solas.
@@ -16,6 +17,7 @@ import {
   listCaseEntities,
   type ReviewStatus,
 } from '../services/entities';
+import { entitiesKey, invalidateCaseEntities } from './caseKeys';
 
 // Cada nota tarda unos segundos en la IA; 3 s muestra el avance sin cargar
 // al servidor.
@@ -24,7 +26,7 @@ export const POLL_MS = 3000;
 /** Entidades del caso en un estado; se actualiza sola mientras la IA lee. */
 export function useCaseEntities(caseId: string, status: ReviewStatus) {
   return useQuery({
-    queryKey: ['cases', 'entities', caseId, status],
+    queryKey: [...entitiesKey(caseId), status],
     queryFn: ({ signal }) => listCaseEntities(caseId, status, signal),
     refetchInterval: (query) => ((query.state.data?.analysis.queued ?? 0) > 0 ? POLL_MS : false),
   });
@@ -32,7 +34,7 @@ export function useCaseEntities(caseId: string, status: ReviewStatus) {
 
 function useInvalidate(caseId: string) {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ queryKey: ['cases', 'entities', caseId] });
+  return () => invalidateCaseEntities(client, caseId);
 }
 
 /** "Analizar pendientes". */
