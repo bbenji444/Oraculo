@@ -32,7 +32,7 @@ wsl make db-shell
 
 Abre `psql` ya conectado. Para salir: `\q`.
 
-## Qué hay en la base (Fase 2)
+## Qué hay en la base
 
 | Tabla | Qué guarda |
 |---|---|
@@ -50,7 +50,14 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `article_locations` | Cada lugar que menciona una nota, resuelto contra el catálogo INEGI: región, precisión, confianza y si es la ubicación principal. El punto sale del catálogo, nunca de la IA. Guarda también las pistas de la IA (tipo de lugar, estado y país, migración 0014) para volver a ubicar sin pagar (`make reubicar`). |
 | `search_results` | Qué notas encontró cada búsqueda, con qué proveedor y en qué posición, y si caen dentro de la región buscada. |
 | `processing_errors` | Lo que falló al procesar una nota o una búsqueda (etapa, tipo, mensaje). Un error en una nota no detiene a las demás. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0014`. |
+| `reports` | El resumen ejecutivo de cada búsqueda, escrito una vez por la IA y guardado para no volver a pagarlo (F7, ADR-0018). |
+| `places` | ~107 mil colonias y zonas de OpenStreetMap, sacadas del mapa base, para ubicar lo que INEGI no tiene (ADR-0020). |
+| `entities` | Tablero de investigación (Fase 9): personas, organizaciones, lugares y vehículos como objetos propios. Las personas llevan estatus legal (lo que dice la nota, nunca "culpable"); todo nace `suggested` y solo una persona lo confirma o descarta, con su nombre y la hora (ADR-0101, 0104, 0105). Los lugares se ligan a `regions` o `places`. |
+| `entity_aliases` | Otros nombres de cada entidad ("Eduardo N", "Micky Hair"). |
+| `entity_mentions` | La evidencia: en qué nota aparece cada entidad, con su rol, su confianza y una cita corta (máximo 300 caracteres) que sobrevive al borrado del texto de la nota. |
+| `relationships` | Vínculos entre dos entidades (aparecen juntas, mismo hecho, familiar…), con su origen (coocurrencia, IA o humano), confianza y revisión. |
+| `external_links` | **Reservada y vacía** (ADR-0101): enchufe futuro hacia registros de otras bases del sistema Oráculo. Ninguna lógica de la Fase 9 la usa; una prueba lo vigila. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0018`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
