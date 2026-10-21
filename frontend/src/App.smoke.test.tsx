@@ -5,6 +5,8 @@
  * Recorre la app como lo haría un analista: Explorar → buscar "Jalisco" →
  * elegir Extorsión → ver el costo → Buscar → seguir el avance → ver las notas,
  * las gráficas y la ficha de una nota. Y reabrir esa búsqueda desde Historial.
+ * La historia H9.1 (Fase 9.3): agregar notas a un caso desde su ficha y verlas
+ * en la pestaña Casos.
  *
  * La API responde con respuestas reales grabadas de la base local
  * (src/test/fixtures/explorar/, búsqueda "Extorsión · Jalisco"): nunca hay red
@@ -13,11 +15,12 @@
  * recibe las mismas notas y muestra la ficha de la elegida.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
-import type { Search } from './services/searches';
+import type { Case } from './services/cases';
+import type { Article, Search } from './services/searches';
 import { useExplorerStore } from './store/explorer';
 import articles from './test/fixtures/explorar/articles.json';
 import concepts from './test/fixtures/explorar/concepts.json';
@@ -69,6 +72,25 @@ const RUNNING: Search = {
 };
 
 let searchPolls = 0;
+// Caso de la historia H9.1 y las notas que se le van agregando.
+const CASE_ID = '2d6f9438-886a-444f-84e9-d47a146903c4';
+const CASE: Case = {
+  id: CASE_ID,
+  name: 'Homicidio estilista Polanco',
+  description: '',
+  status: 'open',
+  status_label: 'abierto',
+  sensitivity: 'restricted',
+  sensitivity_label: 'reservado',
+  created_by: 'desarrollo',
+  closed_at: null,
+  created_at: '2026-10-21T16:40:42Z',
+  updated_at: '2026-10-21T16:40:42Z',
+  article_count: 0,
+  role: 'owner',
+  has_article: null,
+};
+const caseArticles: number[] = [];
 const reportRequests: string[] = [];
 const startBodies: unknown[] = [];
 
@@ -99,6 +121,7 @@ function fakeApi(input: string, init?: RequestInit): Promise<Response> {
       }),
     );
   }
+  if (path.startsWith('cases')) return Promise.resolve(fakeCases(path, url, init));
   if (path === `searches/${SEARCH_ID}`) {
     // El primer sondeo la ve corriendo; los siguientes, terminada.
     searchPolls += 1;
@@ -107,6 +130,30 @@ function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   const body = ROUTES[path];
   if (body === undefined) return Promise.resolve(respond({ error: { message: path } }, 404));
   return Promise.resolve(respond(body));
+}
+
+function fakeCases(path: string, url: URL, init?: RequestInit): Response {
+  const current = { ...CASE, article_count: caseArticles.length };
+  if (path === 'cases') {
+    const article = Number(url.searchParams.get('contains_article'));
+    return respond({
+      items: [{ ...current, has_article: article ? caseArticles.includes(article) : null }],
+      next_cursor: null,
+    });
+  }
+  if (path === `cases/${CASE_ID}/articles` && init?.method === 'POST') {
+    // requestJson manda el cuerpo ya convertido a JSON (texto).
+    const body = JSON.parse(init.body as string) as { article_id: number };
+    const added = !caseArticles.includes(body.article_id);
+    if (added) caseArticles.push(body.article_id);
+    return respond({ article_id: body.article_id, added });
+  }
+  if (path === `cases/${CASE_ID}/articles`) {
+    const items = (articles.items as Article[]).filter((a) => caseArticles.includes(a.article_id));
+    return respond({ items, next_cursor: null });
+  }
+  if (path === `cases/${CASE_ID}`) return respond(current);
+  return respond({ error: { message: path } }, 404);
 }
 
 function renderApp() {
@@ -120,6 +167,7 @@ function renderApp() {
 
 beforeEach(() => {
   searchPolls = 0;
+  caseArticles.length = 0;
   startBodies.length = 0;
   reportRequests.length = 0;
   window.location.hash = '#/explorar';
@@ -259,5 +307,44 @@ describe('flujo principal (H1)', () => {
     expect(window.location.hash).toBe('#/explorar');
     expect(startBodies).toEqual([]);
     expect(useExplorerStore.getState()).toMatchObject({ regionId: 272, conceptIds: [3] });
+  }, 15000);
+});
+
+describe('caso de investigación (H9.1)', () => {
+  it('agregar notas al caso desde su ficha y verlas en la pestaña Casos', async () => {
+    // La búsqueda ya terminó: el primer sondeo la ve lista.
+    searchPolls = 1;
+    const [first, second] = (articles.items as Article[]).filter((a) =>
+      a.concepts.some((c) => c.is_relevant),
+    );
+    if (!first || !second) throw new Error('La grabación necesita dos notas relevantes.');
+    useExplorerStore.setState({ searchId: SEARCH_ID, articleId: first.article_id });
+    renderApp();
+
+    // Primera nota: se elige el caso de la lista.
+    fireEvent.click(await screen.findByRole('button', { name: '+ Agregar al caso' }, POLL_WAIT));
+    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
+    expect(await screen.findByText('Agregada a «Homicidio estilista Polanco».')).toBeTruthy();
+
+    // Siguiente nota: el último caso usado queda a un clic.
+    act(() => {
+      useExplorerStore.getState().selectArticle(second.article_id);
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: '+ Agregar a «Homicidio estilista Polanco»' }),
+    );
+    await waitFor(() => {
+      expect(caseArticles).toEqual([first.article_id, second.article_id]);
+    });
+
+    // En Casos: el caso con sus dos noticias.
+    act(() => {
+      window.location.hash = '#/casos';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
+    expect(await screen.findByText('Noticias del caso (2)')).toBeTruthy();
+    expect(await screen.findByText(first.title)).toBeTruthy();
+    expect(screen.getByText(second.title)).toBeTruthy();
   }, 15000);
 });

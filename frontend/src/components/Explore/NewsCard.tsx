@@ -3,12 +3,13 @@
  * CDMX), fecha del hecho si es de otro momento, conceptos con su color, resumen
  * marcado como automático, ubicación con insignia de precisión (y "lugar
  * mencionado" si no es la del hecho), proveedores y "Ver nota original", que
- * abre en otra pestaña.
+ * abre en otra pestaña. Abajo, «Agregar al caso» (Fase 9.3, `AddToCase`).
  *
  * Nunca muestra el texto completo de la nota (CLAUDE.md §8): solo el resumen
  * propio y el link al medio.
  */
 import type { Article } from '../../services/searches';
+import { AddToCase } from './AddToCase';
 import { eventDateNote, formatMexicoCity, isCoarse, PRECISION_LABEL } from './format';
 
 interface NewsCardProps {
@@ -120,6 +121,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
           Ver nota original ↗
         </a>
       </div>
+      <AddToCase articleId={article.article_id} />
     </article>
   );
 }
