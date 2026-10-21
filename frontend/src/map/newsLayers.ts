@@ -374,3 +374,20 @@ export function stackedIds(
   }
   return ids;
 }
+
+/**
+ * Coordenadas de una figura del mapa si es un punto (una nota o un grupo).
+ *
+ * Revisa la forma del dato en lugar de confiar en el tipo de GeoJSON, que
+ * cambió con los tipos que trae deck.gl.
+ *
+ * @param geometry Geometría de la figura (`feature.geometry`).
+ * @returns `[lng, lat]`, o `null` si no es un punto.
+ */
+export function pointCoordinates(geometry: unknown): [number, number] | null {
+  if (typeof geometry !== 'object' || geometry === null) return null;
+  const { type, coordinates } = geometry as { type?: unknown; coordinates?: unknown };
+  if (type !== 'Point' || !Array.isArray(coordinates)) return null;
+  const [lng, lat] = coordinates as unknown[];
+  return typeof lng === 'number' && typeof lat === 'number' ? [lng, lat] : null;
+}

@@ -10,6 +10,7 @@ import {
   newsFeatures,
   newsLayers,
   pulseStyle,
+  pointCoordinates,
   selectedFilter,
   stackedIds,
 } from './newsLayers';
@@ -221,5 +222,14 @@ describe('notas encimadas', () => {
         { properties: null },
       ]),
     ).toEqual([7, 9]);
+  });
+});
+
+describe('coordenadas de una figura', () => {
+  it('solo de puntos con números', () => {
+    expect(pointCoordinates({ type: 'Point', coordinates: [-99.2, 19.4] })).toEqual([-99.2, 19.4]);
+    expect(pointCoordinates({ type: 'LineString', coordinates: [[0, 0]] })).toBeNull();
+    expect(pointCoordinates({ type: 'Point', coordinates: ['a', 1] })).toBeNull();
+    expect(pointCoordinates(null)).toBeNull();
   });
 });
