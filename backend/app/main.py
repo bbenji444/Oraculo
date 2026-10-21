@@ -32,6 +32,7 @@ from app.adapters.persistence.concepts_repository import PostgresConceptReposito
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.adapters.persistence.relationships_repository import PostgresRelationshipRepository
 from app.adapters.persistence.reports_repository import PostgresReportStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
@@ -114,6 +115,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.extraction_queue = QueueExtraction(
             app.state.entity_repository, CeleryEntityQueue(celery_app)
         )
+        # Vínculos de los casos (Fase 9.5): la coocurrencia se calcula al leer.
+        app.state.relationship_repository = PostgresRelationshipRepository(engine)
         info = llm_info(settings)
         app.state.llm_prices = LLMPrices(
             info.provider, info.price_input_per_million, info.price_output_per_million

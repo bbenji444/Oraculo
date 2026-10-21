@@ -9,7 +9,7 @@
 Cada ruta solo traduce HTTP ↔ casos de uso; permisos y reglas viven en
 ``app.application.use_cases.entities``.
 
-No hace: no fusiona ni vincula entidades (9.5).
+No hace: no une ni vincula entidades (``resolution.py`` y ``relationships.py``, 9.5).
 """
 
 from typing import Annotated

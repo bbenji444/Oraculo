@@ -111,6 +111,13 @@ class Origin(StrEnum):
     HUMAN = "human"
 
 
+ORIGIN_LABEL: dict[Origin, str] = {
+    Origin.COOCCURRENCE: "aparecen en la misma nota",
+    Origin.LLM: "propuesto por la IA",
+    Origin.HUMAN: "dibujado por una persona",
+}
+
+
 class RelationshipType(StrEnum):
     """Columna ``relationships.type``."""
 
