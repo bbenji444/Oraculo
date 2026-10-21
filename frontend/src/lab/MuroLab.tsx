@@ -27,12 +27,14 @@ import { type FrameStats, FRAME_BUDGET_MS, summarizeRuns } from './fpsMeter';
 import { DEMO_CASE, type LabCase, syntheticCase } from './labCase';
 import { PHASE_LABEL, PHASES, type Phase, runPhase } from './labScript';
 import type { MuroEngine } from './muroLabels';
+import { addMapLibreMuro } from './muroMapLibre';
 
-type EngineKey = 'control';
+type EngineKey = 'control' | 'maplibre';
 type CaseKey = 'demo' | '25' | '150' | '500';
 
 const ENGINES: { key: EngineKey; label: string }[] = [
   { key: 'control', label: 'Sin muro (control)' },
+  { key: 'maplibre', label: 'A · MapLibre propio' },
 ];
 const CASES: { key: CaseKey; label: string }[] = [
   { key: 'demo', label: 'Caso de prueba (9 nodos)' },
@@ -55,8 +57,8 @@ function caseFor(key: CaseKey): LabCase {
   return key === 'demo' ? DEMO_CASE : syntheticCase(Number(key));
 }
 
-// Las opciones del muro se agregan en los siguientes pasos de la 9.1.
-function addEngine(): MuroEngine | null {
+function addEngine(map: MapLibreMap, key: EngineKey, labCase: LabCase): MuroEngine | null {
+  if (key === 'maplibre') return addMapLibreMuro(map, labCase);
   return null;
 }
 
@@ -72,7 +74,7 @@ export default function MuroLab() {
   const mapRef = useRef<MapLibreMap | null>(null);
   const engineRef = useRef<MuroEngine | null>(null);
   const [ready, setReady] = useState(false);
-  const [engine, setEngine] = useState<EngineKey>('control');
+  const [engine, setEngine] = useState<EngineKey>('maplibre');
   const [size, setSize] = useState<CaseKey>('demo');
   const [status, setStatus] = useState('');
   const [running, setRunning] = useState(false);
@@ -119,7 +121,7 @@ export default function MuroLab() {
     const map = mapRef.current;
     if (!map || !ready) return;
     engineRef.current?.remove();
-    engineRef.current = addEngine();
+    engineRef.current = addEngine(map, engine, labCase);
     return () => {
       engineRef.current?.remove();
       engineRef.current = null;
