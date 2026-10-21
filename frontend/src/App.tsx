@@ -1,10 +1,11 @@
 /**
  * Componente raíz: encabezado con pestañas y la pantalla activa.
  *
- * Pestañas: "Explorar" (globo, búsqueda y resultados, F6), "Conceptos"
- * (administración y "Probar concepto", F2), "Historial" (búsquedas anteriores,
- * F6) y "Estado del sistema" (F0). La pestaña vive en la URL (#/explorar,
- * #/conceptos, #/historial, #/estado) para que se pueda compartir o recargar
+ * Pestañas: "Explorar" (globo, búsqueda y resultados, F6), "Casos" (casos de
+ * investigación con sus noticias, F9.3), "Conceptos" (administración y "Probar
+ * concepto", F2), "Historial" (búsquedas anteriores, F6) y "Estado del sistema"
+ * (F0). La pestaña vive en la URL (#/explorar, #/casos, #/conceptos, #/historial,
+ * #/estado) para que se pueda compartir o recargar
  * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
  *
  * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
@@ -13,12 +14,13 @@
  */
 import { lazy, Suspense, useEffect, useState } from 'react';
 
+import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
 import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'explorar' | 'conceptos' | 'historial' | 'estado' | 'laboratorio';
+type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'estado' | 'laboratorio';
 
 const MuroLab = lazy(() => import('./lab/MuroLab'));
 // El laboratorio es solo para desarrollo: se pide a propósito en la URL.
@@ -26,6 +28,7 @@ const LAB_ENABLED = new URLSearchParams(window.location.search).has('laboratorio
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'explorar', label: 'Explorar' },
+  { id: 'casos', label: 'Casos' },
   { id: 'conceptos', label: 'Conceptos' },
   { id: 'historial', label: 'Historial' },
   { id: 'estado', label: 'Estado del sistema' },
@@ -36,12 +39,14 @@ function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === '#/laboratorio' && LAB_ENABLED) return 'laboratorio';
   if (hash === '#/estado') return 'estado';
+  if (hash === '#/casos') return 'casos';
   if (hash === '#/conceptos') return 'conceptos';
   if (hash === '#/historial') return 'historial';
   return 'explorar';
 }
 
 function Screen({ tab }: { tab: Tab }) {
+  if (tab === 'casos') return <CasesPage />;
   if (tab === 'conceptos') return <ConceptsPage />;
   if (tab === 'historial') return <HistoryPage />;
   if (tab === 'estado') return <SystemStatusPanel />;

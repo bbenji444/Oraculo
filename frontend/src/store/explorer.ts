@@ -50,6 +50,8 @@ export interface ExplorerState {
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
+  /** Último caso al que se agregó una nota: va primero en «Agregar al caso» (9.3). */
+  lastCaseId: string | null;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
   setRange: (range: DateRange) => void;
@@ -69,6 +71,7 @@ export interface ExplorerState {
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
+  setLastCaseId: (caseId: string) => void;
 }
 
 // Días de cada rango rápido; "hoy" es el último día (la API cuenta hasta hoy).
@@ -135,6 +138,7 @@ export const useExplorerStore = create<ExplorerState>()(
       // "Menos movimiento" del sistema manda sobre la preferencia guardada.
       motion: prefersReducedMotion() ? 'off' : 'normal',
       spinning: !prefersReducedMotion(),
+      lastCaseId: null,
       selectRegion: (regionId) => {
         // Elegir una región detiene el giro: la cámara vuela hacia ella.
         set(regionId === null ? { regionId } : { regionId, spinning: false });
@@ -190,12 +194,20 @@ export const useExplorerStore = create<ExplorerState>()(
       setSpinning: (spinning) => {
         set({ spinning });
       },
+      setLastCaseId: (lastCaseId) => {
+        set({ lastCaseId });
+      },
     }),
     {
       name: 'monitor-noticias:explorar',
       storage: createJSONStorage(() => safeStorage),
       // Solo preferencias de la persona; la búsqueda y la región no se recuerdan.
-      partialize: (state) => ({ earth: state.earth, motion: state.motion }),
+      // El último caso usado sí: H9.1 agrega varias notas seguidas al mismo caso.
+      partialize: (state) => ({
+        earth: state.earth,
+        motion: state.motion,
+        lastCaseId: state.lastCaseId,
+      }),
     },
   ),
 );

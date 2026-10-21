@@ -27,6 +27,7 @@ from app.adapters.llm.factory import (
     build_summarizer,
     llm_info,
 )
+from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
@@ -103,6 +104,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.region_repository = PostgresRegionRepository(engine)
         app.state.concept_repository = PostgresConceptRepository(engine)
+        # Casos de investigación (Fase 9.3): acceso por caso y bitácora.
+        app.state.case_repository = PostgresCaseRepository(engine)
         app.state.dev_user = settings.dev_user
         # Búsquedas (F5): la misma planeación que make buscar y la cola del worker.
         concepts = app.state.concept_repository

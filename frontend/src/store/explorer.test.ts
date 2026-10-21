@@ -95,13 +95,23 @@ describe('store de Explorar', () => {
     useExplorerStore.getState().setPanelOpen(false);
 
     expect(useExplorerStore.getState().panelOpen).toBe(false);
+    // Se recuerdan las preferencias y el último caso usado (9.3), nunca el panel.
     expect(useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState())).toEqual(
       {
         earth: useExplorerStore.getState().earth,
         motion: useExplorerStore.getState().motion,
+        lastCaseId: useExplorerStore.getState().lastCaseId,
       },
     );
     useExplorerStore.getState().setPanelOpen(true);
+  });
+
+  it('recuerda el último caso al que se agregó una nota', () => {
+    useExplorerStore.getState().setLastCaseId('2d6f9438-886a-444f-84e9-d47a146903c4');
+
+    const saved = useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState());
+
+    expect(saved).toMatchObject({ lastCaseId: '2d6f9438-886a-444f-84e9-d47a146903c4' });
   });
 
   it('"sin animación" también detiene el giro', () => {

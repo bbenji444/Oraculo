@@ -186,6 +186,13 @@ class CaseStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+CASE_STATUS_LABEL: dict[CaseStatus, str] = {
+    CaseStatus.OPEN: "abierto",
+    CaseStatus.CLOSED: "cerrado",
+    CaseStatus.ARCHIVED: "archivado",
+}
+
+
 class Sensitivity(StrEnum):
     """Columna ``cases.sensitivity``: nivel de reserva del caso (§9.10)."""
 
@@ -214,6 +221,13 @@ class CaseMemberRole(StrEnum):
     VIEWER = "viewer"
 
 
+CASE_MEMBER_ROLE_LABEL: dict[CaseMemberRole, str] = {
+    CaseMemberRole.OWNER: "dueño",
+    CaseMemberRole.EDITOR: "editor",
+    CaseMemberRole.VIEWER: "lector",
+}
+
+
 class CaseEntityStatus(StrEnum):
     """Columna ``case_entities.case_status``: cómo ve el analista a la entidad en ESTE caso."""
 
@@ -239,9 +253,13 @@ class InvestigationAction(StrEnum):
     CASE_CREATED = "case.created"
     CASE_UPDATED = "case.updated"
     CASE_CLOSED = "case.closed"
+    CASE_ARCHIVED = "case.archived"
+    CASE_REOPENED = "case.reopened"
     CASE_VIEWED = "case.viewed"
     CASE_MEMBER_ADDED = "case.member_added"
+    CASE_MEMBER_REMOVED = "case.member_removed"
     CASE_ARTICLE_ADDED = "case.article_added"
+    CASE_ARTICLE_REMOVED = "case.article_removed"
     CASE_ENTITY_ADDED = "case.entity_added"
     CASE_NOTE_ADDED = "case.note_added"
     ENTITY_CONFIRMED = "entity.confirmed"

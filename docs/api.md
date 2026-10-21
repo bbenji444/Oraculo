@@ -16,9 +16,10 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 | HTTP | Cuándo | Ejemplos de `code` |
 |---|---|---|
-| 404 | Lo pedido no existe | `search_not_found`, `article_not_found`, `concept_not_found`, `region_not_found` |
-| 409 | Choca con algo que ya existe, con un tope o con una búsqueda que aún corre | `credit_limit_reached`, `concept_name_taken`, `search_not_finished` |
-| 422 | Parámetros inválidos | `invalid_request`, `query_budget_exceeded` |
+| 403 | Tu rol no permite la acción (por ejemplo, un lector que edita un caso) | `case_forbidden` |
+| 404 | Lo pedido no existe (o es un caso del que no eres miembro) | `search_not_found`, `article_not_found`, `concept_not_found`, `region_not_found`, `case_not_found` |
+| 409 | Choca con algo que ya existe, con un tope, con una búsqueda que aún corre o con un caso cerrado | `credit_limit_reached`, `concept_name_taken`, `search_not_finished`, `case_closed` |
+| 422 | Parámetros inválidos | `invalid_request`, `query_budget_exceeded`, `invalid_case` |
 | 500 | Falla inesperada (el detalle queda en el registro, nunca en la respuesta) | `internal_error` |
 | 503 | Falta configurar el sistema | `llm_not_configured`, `service_unavailable` |
 
@@ -363,6 +364,85 @@ titulo,medio,publicada,lugar,precision,dentro_de_la_region,latitud,longitud,conc
 
 - **CSV:** va en UTF-8 con BOM, para que Excel muestre la Ñ al abrirlo con doble clic. Las fechas van en hora de la Ciudad de México. Si un título empieza con `=`, `+`, `-` o `@`, se le antepone un apóstrofo para que Excel no lo tome por fórmula.
 - **GeoJSON** (`application/geo+json`): un punto por nota ubicada, con las coordenadas en orden `[longitud, latitud]`. En el ejemplo son 12 puntos: las 14 notas menos las 2 sin ubicación. El objeto `busqueda` dice la región, los conceptos y el periodo.
+
+## Casos de investigación
+
+Un caso agrupa las noticias de una investigación (Fase 9). Reglas que aplican a todas las rutas:
+
+- **Acceso por caso.** Cada persona ve solo los casos de los que es miembro (`case_members`). Quien crea un caso queda como dueño (`owner`). Un caso ajeno responde `404` `case_not_found`, igual que uno que no existe, para no revelar que existe.
+- **Roles:**
+  - `owner` y `editor` cambian el caso;
+  - `viewer` solo lo consulta; si intenta cambiarlo, recibe `403` `case_forbidden`.
+- **Casos cerrados o archivados:** solo cambian de estado (reabrir, o archivar uno cerrado). Cualquier otro cambio responde `409` `case_closed`.
+- **Bitácora.** Todo queda registrado: crear (`case.created`), editar (`case.updated`), cerrar, archivar o reabrir (`case.closed`, `case.archived`, `case.reopened`) y **abrir** el caso (`case.viewed`). La vista se registra una vez por persona cada 5 minutos, para que las recargas de la pantalla no llenen la bitácora.
+
+**Crear.** `POST /cases` con `name` (de 1 a 120 caracteres), `description` (hasta 2,000) y `sensitivity` (`normal`, `restricted` o `confidential`). Ejemplo real del 21/10/2026:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/cases -H 'Content-Type: application/json'   -d '{"name": "Homicidio estilista Polanco", "description": "Asesinato del estilista conocido como Micky Hair en Polanco (septiembre de 2025) y su seguimiento.", "sensitivity": "restricted"}'
+```
+
+```json
+{
+  "id": "2d6f9438-886a-444f-84e9-d47a146903c4",
+  "name": "Homicidio estilista Polanco",
+  "description": "Asesinato del estilista conocido como Micky Hair en Polanco (septiembre de 2025) y su seguimiento.",
+  "status": "open", "status_label": "abierto",
+  "sensitivity": "restricted", "sensitivity_label": "reservado",
+  "created_by": "desarrollo", "closed_at": null,
+  "created_at": "2026-10-21T10:40:42.530224-06:00", "updated_at": "2026-10-21T10:40:42.530224-06:00",
+  "article_count": 0, "role": "owner", "has_article": null
+}
+```
+
+Con datos inválidos responde `422` `invalid_case`, con un problema por campo en `details.problemas`, como los conceptos.
+
+**Listar.** `GET /cases` devuelve mis casos, del cambio más reciente al más viejo, con cursor.
+- Sin filtro trae abiertos y cerrados; `?status=archived` trae los archivados.
+- Con `?contains_article=<id de nota>`, cada caso dice en `has_article` si ya tiene esa nota. Lo usa el botón "Agregar al caso".
+
+**Abrir.** `GET /cases/{id}` devuelve el caso con el rol de quien lo pide y registra `case.viewed`.
+
+```json
+{ "error": { "code": "case_not_found", "message": "No existe el caso o no tienes acceso.", "details": { "id": "00000000-0000-0000-0000-000000000000" } } }
+```
+
+**Editar.** `PATCH /cases/{id}` cambia solo los campos enviados. Con `status`:
+- `closed` cierra el caso y guarda `closed_at`;
+- `archived` lo archiva;
+- `open` lo reabre y borra `closed_at`.
+
+Una petición sin cambios no escribe nada.
+
+**Noticias del caso.** Agregarlas o quitarlas exige rol `owner` o `editor` y el caso abierto. Cada cambio queda en la bitácora (`case.article_added`, `case.article_removed`) y sube el caso en la lista.
+
+- `POST /cases/{id}/articles` con `{"article_id": 67}` agrega la nota. Si ya estaba, responde `"added": false` y no repite la bitácora; así un doble clic no duplica nada. Una nota inexistente responde `404` `article_not_found`.
+- `DELETE /cases/{id}/articles/{article_id}` la quita del caso (`204`). La noticia sigue en el sistema.
+- `GET /cases/{id}/articles` lista las notas con el mismo formato de "Notas de una búsqueda", de la más reciente a la más vieja y con cursor. `in_region` va vacío: un caso no tiene región buscada.
+
+Ejemplo real: la primera nota de la historia H9.1 agregada dos veces.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/cases/2d6f9438-886a-444f-84e9-d47a146903c4/articles \
+  -H 'Content-Type: application/json' -d '{"article_id": 67}'
+```
+
+```json
+{ "article_id": 67, "added": true }
+```
+
+La segunda vez responde `{ "article_id": 67, "added": false }`. La lista del caso, recortada:
+
+```json
+{ "items": [ { "article_id": 67, "title": "Micky Hair: Qué se sabe del asesinato de estilista de Micky Hair Salon- Grupo Milenio", "published_at": "2026-10-17T20:46:00-06:00", "primary_location": { "place": "Polanco, Alcaldía Miguel Hidalgo", "precision": "locality", … }, "in_region": null, … } ], "next_cursor": null }
+```
+
+**Miembros.** Hasta la Fase 8 no hay usuarios reales: el usuario es un texto, como `created_by`, y no hay pantalla para esto.
+- `GET /cases/{id}/members` lista quién tiene acceso, el dueño primero. Cualquier miembro lo puede ver.
+- `POST /cases/{id}/members` con `{"user_id": "analista-2", "role": "viewer"}` da acceso o cambia el rol. Solo lo hace el dueño (`403` si no), y responde `"changed": false` si ya tenía ese rol.
+- `DELETE /cases/{id}/members/{user_id}` quita el acceso: el caso deja de existir para esa persona.
+
+El caso tiene **un solo dueño**: pedir un segundo dueño, cambiarle el rol o quitarlo responde `409` `case_owner_required`. En la bitácora queda `case.member_added` o `case.member_removed`.
 
 ## Otras rutas
 

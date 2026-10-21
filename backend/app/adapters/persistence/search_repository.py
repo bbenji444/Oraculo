@@ -19,9 +19,18 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import RowMapping, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from app.adapters.persistence.article_rows import (
+    ALL_JUDGEMENTS,
+    ALL_PROVIDERS,
+    ARTICLE_COLUMNS,
+    LOCATION_COLUMNS,
+    PRIMARY_COLUMNS,
+    article_item,
+    location_view,
+)
 from app.application.audit import SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
 from app.application.pagination import TimeCursor
 from app.application.ports.llm import EnrichmentResult
@@ -31,8 +40,6 @@ from app.application.ports.search_reads import (
     ArticleItem,
     ConceptRef,
     InRegion,
-    JudgementView,
-    LocationView,
     RegionPoint,
     SearchDetail,
 )
@@ -778,7 +785,7 @@ class PostgresArticleStore:
                 params["after_moment"] = after.moment
             params["after_id"] = int(after.id)
         sql = f"""
-            SELECT {_ARTICLE_COLUMNS}, sr.in_region, sr.providers, {_PRIMARY_COLUMNS},
+            SELECT {ARTICLE_COLUMNS}, sr.in_region, sr.providers, {PRIMARY_COLUMNS},
                 {_JUDGEMENTS_IN_SEARCH} AS judgements
             FROM (SELECT article_id, bool_or(in_region) AS in_region,
                     array_agg(provider ORDER BY provider_rank, provider) AS providers
@@ -792,22 +799,17 @@ class PostgresArticleStore:
         """  # noqa: S608 — columnas y condiciones son texto fijo de este módulo
         async with self._engine.connect() as conn:
             rows = (await conn.execute(text(sql), params)).mappings().all()
-        return [_article_item(row) for row in rows]
+        return [article_item(row) for row in rows]
 
     async def article_detail(self, article_id: int) -> ArticleDetail | None:
         """Ver ``ArticleReaderPort.article_detail``."""
         sql = f"""
-            SELECT {_ARTICLE_COLUMNS}, a.first_seen_at, a.llm_model, a.prompt_version,
+            SELECT {ARTICLE_COLUMNS}, a.first_seen_at, a.llm_model, a.prompt_version,
                 (SELECT bool_or(in_region) FROM search_results WHERE article_id = a.id)
                     AS in_region,
-                ARRAY(SELECT DISTINCT provider FROM search_results WHERE article_id = a.id
-                    ORDER BY provider) AS providers,
-                {_PRIMARY_COLUMNS},
-                COALESCE((SELECT json_agg(json_build_array(ac.concept_id, c.name,
-                    ac.is_relevant, ac.relevance_score, ac.relevance_reason)
-                    ORDER BY ac.concept_id)
-                    FROM article_concepts ac JOIN concepts c ON c.id = ac.concept_id
-                    WHERE ac.article_id = a.id), '[]') AS judgements
+                {ALL_PROVIDERS} AS providers,
+                {PRIMARY_COLUMNS},
+                {ALL_JUDGEMENTS} AS judgements
             FROM articles a
             LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
             LEFT JOIN regions r ON r.id = p.region_id
@@ -821,7 +823,7 @@ class PostgresArticleStore:
                 (
                     await conn.execute(
                         text(
-                            f"SELECT {_LOCATION_COLUMNS} FROM article_locations p "  # noqa: S608 — columnas fijas
+                            f"SELECT {LOCATION_COLUMNS} FROM article_locations p "  # noqa: S608 — columnas fijas
                             "LEFT JOIN regions r ON r.id = p.region_id "
                             "WHERE p.article_id = :id ORDER BY p.id"
                         ),
@@ -832,8 +834,8 @@ class PostgresArticleStore:
                 .all()
             )
         return ArticleDetail(
-            item=_article_item(row),
-            locations=tuple(_location(loc) for loc in locations),
+            item=article_item(row),
+            locations=tuple(location_view(loc) for loc in locations),
             first_seen_at=row["first_seen_at"],
             llm_model=row["llm_model"],
             prompt_version=row["prompt_version"],
@@ -1001,23 +1003,6 @@ async def _write_locations(
         )
 
 
-_ARTICLE_COLUMNS = """
-    a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
-    a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status
-"""
-_LOCATION_COLUMNS = """
-    p.mention_text, p.role, p.precision, p.confidence, p.is_primary, r.id AS region_id,
-    r.code AS region_code, r.level::text AS region_level, r.name AS region_name,
-    r.display_prefix, p.place_name, ST_X(p.point) AS lon, ST_Y(p.point) AS lat
-"""
-# La ubicación principal, con el prefijo "p_" para no chocar con las de la nota.
-_PRIMARY_COLUMNS = """
-    p.id AS p_id, p.mention_text AS p_mention_text, p.role AS p_role,
-    p.precision AS p_precision, p.confidence AS p_confidence, p.is_primary AS p_is_primary,
-    r.id AS p_region_id, r.code AS p_region_code, r.level::text AS p_region_level,
-    r.name AS p_region_name, r.display_prefix AS p_display_prefix,
-    p.place_name AS p_place_name, ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat
-"""
 # Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces.
 _JUDGEMENTS_IN_SEARCH = """
     COALESCE((SELECT json_agg(json_build_array(ac.concept_id, sc.concept_name,
@@ -1058,56 +1043,3 @@ def _article_filters(filters: ArticleFilters) -> tuple[list[str], dict[str, obje
         where.append(f"({' OR '.join(parts)})")
         params["precisions"] = located
     return where, params
-
-
-def _place_name(
-    level: str | None, prefix: str | None, name: str | None, detail: str | None = None
-) -> str | None:
-    # Igual que Region.display_name: municipios y localidades con su prefijo.
-    # Con una colonia de OpenStreetMap, va primero: "Polanco, Alcaldía Miguel Hidalgo".
-    if name is None:
-        return None
-    region = f"{prefix} {name}" if level in ("municipality", "locality") and prefix else name
-    return f"{detail}, {region}" if detail else region
-
-
-def _location(row: RowMapping, prefix: str = "") -> LocationView:
-    return LocationView(
-        mention=row[f"{prefix}mention_text"],
-        role=row[f"{prefix}role"],
-        precision=row[f"{prefix}precision"],
-        confidence=float(row[f"{prefix}confidence"]),
-        is_primary=row[f"{prefix}is_primary"],
-        region_id=row[f"{prefix}region_id"],
-        region_code=row[f"{prefix}region_code"],
-        place=_place_name(
-            row[f"{prefix}region_level"],
-            row[f"{prefix}display_prefix"],
-            row[f"{prefix}region_name"],
-            row[f"{prefix}place_name"],
-        ),
-        lon=row[f"{prefix}lon"],
-        lat=row[f"{prefix}lat"],
-    )
-
-
-def _article_item(row: RowMapping) -> ArticleItem:
-    return ArticleItem(
-        article_id=row["id"],
-        title=row["title"],
-        source_name=row["source_name"],
-        source_domain=row["source_domain"],
-        url=row["url_canonical"],
-        published_at=row["published_at"],
-        summary=row["summary"],
-        event_type=row["event_type"],
-        event_date=row["event_date"],
-        extraction_status=row["extraction_status"],
-        enrichment_status=row["enrichment_status"],
-        judgements=tuple(
-            JudgementView(j[0], j[1], j[2], float(j[3]), j[4]) for j in row["judgements"]
-        ),
-        primary=_location(row, "p_") if row["p_id"] is not None else None,
-        in_region=row["in_region"],
-        providers=tuple(row["providers"]),
-    )
