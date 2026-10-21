@@ -567,6 +567,15 @@ El sistema **sugiere** qué entidades del caso podrían ser la misma; **solo una
 - **Deshacer:** «Separar» borra el `merged_into` (lo que se le había unido a ella se va con ella). «Separar menciones» pasa menciones propias a una sugerencia nueva, para cuando la agrupación juntó a dos personas con el mismo nombre.
 - **Bitácora:** `entity.merged`, `entity.unmerged`, `entity.split` y `entity.merge_dismissed`, con quién y qué quedó.
 
+### 10.3 Vínculos entre entidades de un caso (Fase 9.5)
+
+Solo entre entidades **confirmadas** del caso (cada una como la raíz de su grupo de fusión).
+
+- **Coocurrencia** (`domain/relationships.py`): dos entidades confirmadas que aparecen en la misma nota del caso forman «aparecen juntas», sugerido, con confianza 0.5 (una nota), 0.7 (dos) o 0.9 (tres o más). Se calcula al leer: confirmar, unir, separar o quitar una nota se refleja sin refrescar. Se guarda en `relationships` solo al confirmarlo o descartarlo; lo descartado no vuelve.
+- **Dibujado por el analista:** cualquier tipo (`family`, `associate`, `employer`, `located_in`, `owns`, `same_event`, `appears_with` o `custom` con su etiqueta de hasta 80 caracteres) y una nota opcional. Nace confirmado, con origen `human`, confianza 1 y la firma de quien lo dibuja. Los simétricos se guardan con el id menor primero; los dirigidos respetan el sentido. Si ya existía con las mismas entidades y tipo, se confirma ese.
+- **Evidencia:** cada vínculo muestra las notas del caso donde aparecen las dos entidades.
+- **Bitácora:** `relationship.created`, `relationship.confirmed` y `relationship.discarded`.
+
 ---
 
 ## 11. Geolocalización

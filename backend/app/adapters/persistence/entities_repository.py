@@ -19,7 +19,7 @@ separa entidades del caso.
   unido a otra o separado desde entonces.
 - **Grupos de fusión (9.5, D4):** unir solo escribe ``merged_into``. Las
   lecturas resuelven cada entidad raíz con las que se le unieron
-  (``_GROUPS_CTE``) y muestran sus menciones y alias juntos; separar es
+  (``GROUPS_CTE``) y muestran sus menciones y alias juntos; separar es
   borrar ese ``merged_into``.
 - **Sugerencias de fusión (9.5, D2 y D3):** se calculan al leer
   (``_MERGE_SUGGESTIONS_SQL``); solo se guarda el «No son la misma».
@@ -90,7 +90,7 @@ _ENTITY_COLUMNS = """
 # otra) con las que se le unieron, directo o en cadena. Las filas unidas no
 # cambian al fusionar: las lecturas las resuelven aquí, y separar es solo
 # borrar su ``merged_into``. Va acotado al caso: solo se une dentro de uno.
-_GROUPS_CTE = """
+GROUPS_CTE = """
     WITH RECURSIVE grp(root, id) AS (
         SELECT e.id, e.id FROM case_entities ce JOIN entities e ON e.id = ce.entity_id
         WHERE ce.case_id = :case AND e.merged_into IS NULL
@@ -109,7 +109,7 @@ _VISIBLE = """
 
 
 _ENTITIES_OF_CASE = f"""
-    {_GROUPS_CTE}
+    {GROUPS_CTE}
     SELECT {_ENTITY_COLUMNS}
     FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
@@ -123,7 +123,7 @@ _ONE_SQL = f"""
     {_ENTITIES_OF_CASE} AND e.id = :entity
 """
 _COUNTS_SQL = f"""
-    {_GROUPS_CTE}
+    {GROUPS_CTE}
     SELECT e.review_status, count(*)
     FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
@@ -137,7 +137,7 @@ _COUNTS_SQL = f"""
 # entre el índice GIN entities_label_trgm. Se quitan los pares que alguien
 # descartó, aunque el descarte se haya hecho sobre otro miembro del grupo.
 _MERGE_SUGGESTIONS_SQL = f"""
-    {_GROUPS_CTE},
+    {GROUPS_CTE},
     roots AS (
         SELECT e.id, e.type, e.label_norm FROM case_entities ce
         JOIN entities e ON e.id = ce.entity_id
