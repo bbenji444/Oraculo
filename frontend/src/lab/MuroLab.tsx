@@ -158,7 +158,10 @@ export default function MuroLab() {
   return (
     <div className="relative h-full overflow-hidden bg-[#02030a]">
       <SpaceBackground />
-      <div ref={containerRef} className="absolute inset-0" aria-label="Globo del laboratorio" />
+      {/* Envoltorio: el CSS de MapLibre pone position: relative al contenedor del mapa. */}
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" aria-label="Globo del laboratorio" />
+      </div>
       <section
         aria-label="Laboratorio del muro"
         className={`${GLASS} absolute left-4 top-4 w-[26rem] max-h-[calc(100%-2rem)] space-y-3 overflow-y-auto p-4 text-sm`}
