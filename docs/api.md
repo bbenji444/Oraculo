@@ -444,6 +444,19 @@ La segunda vez responde `{ "article_id": 67, "added": false }`. La lista del cas
 
 El caso tiene **un solo dueño**: pedir un segundo dueño, cambiarle el rol o quitarlo responde `409` `case_owner_required`. En la bitácora queda `case.member_added` o `case.member_removed`.
 
+## Entidades de un caso (Fase 9.4)
+
+La IA propone las entidades de cada nota que entra a un caso (ADR-0103). Todo nace sugerido; una persona confirma o descarta.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/cases/{id}/entities?status=suggested` | Entidades en ese estado (`suggested`, `confirmed`, `discarded`), las de más menciones primero. Cada una trae su estatus legal (y el sugerido), sus alias, su región y sus menciones con la cita (`evidence_span`) y la nota. Incluye `counts` por estado y `analysis`: notas pendientes, en cola, leídas, fallidas, costo gastado y costo estimado de lo pendiente. Cualquier miembro. |
+| POST | `/cases/{id}/extract` | «Analizar con IA»: encola las notas pendientes o fallidas. Responde `{queued, estimated_cost_usd}`. Gasta tokens. Editor o dueño, caso abierto. |
+| POST | `/entities/{id}/confirm` | Cuerpo `{case_id, legal_status}`. En personas, `legal_status` es obligatorio: `mentioned`, `alleged`, `detained`, `charged`, `victim`, `witness` u `official`; nunca "culpable" (422 `invalid_entity_review`). Firma quién y cuándo y va a la bitácora (`entity.confirmed`). |
+| POST | `/entities/{id}/discard` | Cuerpo `{case_id}`. Deja de proponerse sin borrarse (`entity.discarded`). |
+
+Agregar una nota con `POST /cases/{id}/articles` la encola sola. Cada lectura queda en la bitácora como `case.entities_extracted`, con modelo, tokens y costo.
+
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
