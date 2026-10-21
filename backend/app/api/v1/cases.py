@@ -8,7 +8,10 @@ los que es miembro: un caso ajeno responde 404 igual que uno inexistente.
 Las noticias se agregan y se quitan sin duplicar; quitarla del caso no borra
 la noticia.
 
-No hace: no agrega entidades (9.4) ni dibuja el muro (9.6).
+Agregar una nota la manda a la cola para que la IA proponga sus entidades
+(9.4, ``app.api.v1.entities``).
+
+No hace: no dibuja el muro (9.6).
 """
 
 from typing import Annotated
@@ -36,6 +39,7 @@ from app.application.use_cases.cases import (
     DEFAULT_PAGE_SIZE,
     AddCaseArticle,
     AddCaseMember,
+    ArticlesAdded,
     CreateCase,
     GetCase,
     ListCaseArticles,
@@ -49,6 +53,19 @@ from app.application.use_cases.search_reads import DEFAULT_ARTICLE_PAGE_SIZE
 from app.domain.investigation import CaseStatus
 
 router = APIRouter(prefix="/cases", tags=["casos"], responses=ERROR_RESPONSES)
+
+
+def get_on_article_added(request: Request) -> ArticlesAdded | None:
+    """Lo que se hace con cada nota nueva del caso (encolar su lectura por la IA, 9.4).
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        Quien encola, o ``None`` si la aplicación no lo configuró.
+    """
+    hook: ArticlesAdded | None = getattr(request.app.state, "extraction_queue", None)
+    return hook
 
 
 def get_case_repository(request: Request) -> CaseRepositoryPort:
@@ -151,10 +168,14 @@ async def list_case_articles(
     responses=error_responses(403, 404, 409),
 )
 async def add_case_article(
-    body: CaseArticleIn, cases: Cases, actor: CurrentActor, case_id: CaseId
+    body: CaseArticleIn,
+    cases: Cases,
+    actor: CurrentActor,
+    case_id: CaseId,
+    on_added: Annotated[ArticlesAdded | None, Depends(get_on_article_added)],
 ) -> CaseArticleOut:
-    """Agrega la nota; si ya estaba, responde ``added: false`` sin repetir la bitácora."""
-    added = await AddCaseArticle(cases).execute(case_id, body.article_id, actor)
+    """Agrega la nota y la encola para la IA; si ya estaba, responde ``added: false``."""
+    added = await AddCaseArticle(cases, on_added).execute(case_id, body.article_id, actor)
     return CaseArticleOut(article_id=body.article_id, added=added)
 
 

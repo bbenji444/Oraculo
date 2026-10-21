@@ -270,6 +270,7 @@ make geo-places      # colonias y barrios de OpenStreetMap desde el mapa base (A
 make seed            # carga los conceptos semilla que falten (no pisa ediciones)
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make buscar ARGS="--concepto Extorsión --region 14 --dias 7"  # búsqueda real de punta a punta: muestra costo, pide "si" y enseña 5 notas (--aqui sin worker)
+make extraer-entidades ARGS="--caso <id> --muestra 5"  # la IA lee notas del caso y muestra sus entidades; pide "si"
 make reubicar          # vuelve a ubicar las notas de la última búsqueda sin pagar a la IA (ARGS="--busqueda <id>"; --con-ia las vuelve a pasar por la IA desde su texto guardado, pide "si")
 make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
 make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)

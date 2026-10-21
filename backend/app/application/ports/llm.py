@@ -1,9 +1,11 @@
-"""Puertos de la IA: enriquecer notas (``LLMPort``, §10) y resumir reportes (§15).
+"""Puertos de la IA: enriquecer notas, resumir reportes y proponer entidades.
 
-Los implementan los adaptadores de OpenAI y Gemini (``app/adapters/llm/``),
-elegidos con ``LLM_PROVIDER`` (ADR-0016). Son dos puertos porque los usan
-casos de uso distintos: el pipeline de búsqueda solo enriquece y el reporte
-solo resume.
+``LLMPort`` enriquece (§10), ``SummarizerPort`` resume (§15) y
+``EntityExtractorPort`` propone las entidades de una nota de un caso (Fase
+9.4). Los implementan los adaptadores de OpenAI y Gemini (``app/adapters/llm/``),
+elegidos con ``LLM_PROVIDER`` (ADR-0016). Son tres puertos porque los usan
+casos de uso distintos: el pipeline de búsqueda solo enriquece, el reporte
+solo resume y los casos de investigación solo extraen entidades.
 
 No hace: no decide qué notas se enriquecen ni guarda nada.
 """
@@ -14,6 +16,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.enrichment import ConceptBrief, Enrichment, LLMUsage
+from app.domain.entity_extraction import RawProposal
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +225,91 @@ class SummarizerPort(Protocol):
 
         Raises:
             SummaryError: Si la respuesta no fue válida tras un reintento.
+            ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class EntityExtractionRequest:
+    """Lo que se le manda a la IA para que proponga las entidades de una nota.
+
+    Attributes:
+        title: Título.
+        text: Cuerpo recortado, o el fragmento si el texto ya se borró
+            (``AnalyzedText``).
+        published_at: Fecha de publicación, si se conoce.
+    """
+
+    title: str
+    text: str
+    published_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class EntityExtractionResult:
+    """Las entidades que propuso la IA, sin revisar todavía contra el texto.
+
+    Attributes:
+        proposals: Propuestas con la forma del esquema (``RawProposal``).
+        usage: Tokens gastados (suma de intentos, si hubo reintento).
+        model: Modelo usado.
+        prompt_version: Versión del prompt (``entities_v1``).
+    """
+
+    proposals: tuple[RawProposal, ...]
+    usage: LLMUsage
+    model: str
+    prompt_version: str
+
+
+class EntityExtractionError(RuntimeError):
+    """La IA no dio una respuesta válida tras el reintento (la nota queda ``failed``).
+
+    Attributes:
+        usage: Tokens que sí se gastaron en los intentos fallidos.
+    """
+
+    def __init__(self, message: str, usage: LLMUsage) -> None:
+        """Guarda el mensaje y lo gastado.
+
+        Args:
+            message: Qué falló, en español.
+            usage: Tokens gastados aunque haya fallado.
+        """
+        super().__init__(message)
+        self.usage = usage
+
+
+class EntityExtractorPort(Protocol):
+    """La IA que propone las entidades de una nota de un caso (Fase 9.4)."""
+
+    @property
+    def model(self) -> str:
+        """Modelo que se usa."""
+        ...
+
+    @property
+    def entities_prompt_version(self) -> str:
+        """Versión del prompt (llave de ``entity_extractions``: con otra, se vuelve a leer)."""
+        ...
+
+    async def aclose(self) -> None:
+        """Libera las conexiones al terminar."""
+        ...
+
+    async def extract_entities(self, request: EntityExtractionRequest) -> EntityExtractionResult:
+        """Propone las entidades que menciona una nota, cada una con su cita.
+
+        Args:
+            request: Título y texto de la nota.
+
+        Returns:
+            Las propuestas con su costo; el caso de uso las revisa contra el
+            texto antes de guardarlas.
+
+        Raises:
+            EntityExtractionError: Si la respuesta no fue válida tras un reintento.
             ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
         """
         ...

@@ -59,10 +59,11 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `external_links` | **Reservada y vacía** (ADR-0101): enchufe futuro hacia registros de otras bases del sistema Oráculo. Ninguna lógica de la Fase 9 la usa; una prueba lo vigila. |
 | `cases` | Casos de investigación (Fase 9): nombre, estado (abierto, cerrado, archivado) y sensibilidad (normal, reservado, confidencial). La fecha de cierre va con el estado. |
 | `case_members` | Quién puede ver o editar cada caso (dueño, editor, lector). Un solo dueño. Hasta la Fase 8, el usuario es el de desarrollo. |
-| `case_articles` | Noticias que forman parte de cada caso. Borrar el caso no borra la noticia. |
+| `case_articles` | Noticias que forman parte de cada caso. Borrar el caso no borra la noticia. Desde la 9.4, `entities_status` dice si la IA ya leyó la nota (`pending`, `queued`, `done`, `failed`, `skipped`) y `entities_cost_usd` cuánto pagó ESTE caso por ella (0 si se reutilizó). |
+| `entity_extractions` | Lo que respondió la IA de cada nota al proponer entidades (Fase 9.4, ADR-0103): las propuestas que pasaron la revisión contra el texto y las descartadas con su motivo, modelo, tokens y costo. Una por nota y versión de prompt: si la nota entra a otro caso se reutiliza sin volver a pagar. |
 | `case_entities` | Entidades de cada caso, con su rol, su estado en ESE caso (en el caso, línea de investigación, descartada) y una etiqueta del analista. |
 | `case_notes` | Notas del investigador, ancladas a lo más a una entidad, noticia o vínculo. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0019`. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0020`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
@@ -132,6 +133,15 @@ LIMIT 20;
 
 -- Con qué palabras se busca cada lugar (vacío = su nombre oficial)
 SELECT code, name, search_terms FROM regions WHERE cardinality(search_terms) > 0;
+
+-- En qué va el análisis de entidades de cada caso y cuánto lleva gastado
+SELECT c.name, ca.entities_status, count(*) AS notas, sum(ca.entities_cost_usd) AS usd
+FROM case_articles ca JOIN cases c ON c.id = ca.case_id
+GROUP BY c.name, ca.entities_status ORDER BY c.name;
+
+-- Lo que la IA propuso y se descartó por no estar en la nota (para medirla)
+SELECT article_id, rejected_count, output->'rejected' AS descartadas
+FROM entity_extractions WHERE rejected_count > 0 ORDER BY id DESC LIMIT 20;
 ```
 
 > Consejo: compara siempre con `name_norm` (y escribe la búsqueda en mayúsculas sin acentos), no con `name`. Así "Peñón" y "PEÑON" coinciden, pero "Penon" no.

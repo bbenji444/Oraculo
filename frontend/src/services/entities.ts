@@ -1,0 +1,145 @@
+/**
+ * Servicio de las entidades de un caso (Fase 9.4, historia H9.2; docs/api.md).
+ *
+ * La IA propone personas, organizaciones, lugares y vehículos de cada nota
+ * del caso; aquí se piden, se confirman (con estatus legal en personas) o se
+ * descartan. Las llaves de la IA nunca llegan aquí: todo pasa por el backend.
+ *
+ * No hace: no guarda estado (eso es TanStack Query en `hooks/useEntities`).
+ */
+import { apiUrl } from '../config/api';
+import { badFormat, requestJson } from './http';
+import { isRecord } from './searches';
+
+export type ReviewStatus = 'suggested' | 'confirmed' | 'discarded';
+export type LegalStatus =
+  'mentioned' | 'alleged' | 'detained' | 'charged' | 'victim' | 'witness' | 'official';
+
+/** Una cita de la nota donde aparece la entidad. */
+export interface Mention {
+  article_id: number;
+  article_title: string;
+  article_url: string;
+  source_name: string | null;
+  published_at: string | null;
+  mention_text: string;
+  role: 'event' | 'mentioned';
+  legal_status_hint: LegalStatus | null;
+  legal_status_hint_label: string | null;
+  confidence: number;
+  evidence_span: string;
+}
+
+/** Una entidad del caso con su evidencia. */
+export interface Entity {
+  id: number;
+  type: string;
+  type_label: string;
+  label: string;
+  aliases: string[];
+  review_status: ReviewStatus;
+  review_status_label: string;
+  legal_status: LegalStatus | null;
+  legal_status_label: string | null;
+  suggested_legal_status: LegalStatus | null;
+  suggested_legal_status_label: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  region_id: number | null;
+  region_name: string | null;
+  mention_count: number;
+  article_count: number;
+  mentions: Mention[];
+}
+
+/** En qué va la lectura de las notas del caso por la IA. */
+export interface Analysis {
+  articles: number;
+  pending: number;
+  queued: number;
+  done: number;
+  failed: number;
+  skipped: number;
+  title_snippet: number;
+  cost_usd: number;
+  estimated_pending_cost_usd: number;
+}
+
+export interface CaseEntities {
+  analysis: Analysis;
+  counts: Record<ReviewStatus, number>;
+  items: Entity[];
+}
+
+function isEntity(value: unknown): value is Entity {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'number' &&
+    typeof value.label === 'string' &&
+    typeof value.review_status === 'string' &&
+    Array.isArray(value.mentions)
+  );
+}
+
+function isCaseEntities(value: unknown): value is CaseEntities {
+  return (
+    isRecord(value) &&
+    isRecord(value.analysis) &&
+    isRecord(value.counts) &&
+    Array.isArray(value.items) &&
+    value.items.every(isEntity)
+  );
+}
+
+function asEntity(value: unknown): Entity {
+  if (!isEntity(value)) throw badFormat();
+  return value;
+}
+
+/** Entidades del caso en un estado, con conteos y avance de la IA. */
+export async function listCaseEntities(
+  caseId: string,
+  status: ReviewStatus,
+  signal?: AbortSignal,
+): Promise<CaseEntities> {
+  const data = await requestJson(`${apiUrl(`cases/${caseId}/entities`)}?status=${status}`, {
+    signal,
+  });
+  if (!isCaseEntities(data)) throw badFormat();
+  return data;
+}
+
+/** "Analizar pendientes": manda al worker las notas que faltan. */
+export async function analyzePending(caseId: string): Promise<number> {
+  const data = await requestJson(apiUrl(`cases/${caseId}/extract`), { method: 'POST' });
+  if (!isRecord(data) || typeof data.queued !== 'number') throw badFormat();
+  return data.queued;
+}
+
+/**
+ * Confirma una entidad. Una persona exige su estatus legal según la nota.
+ *
+ * @throws {ApiError} `invalid_entity_review`, `case_forbidden` o `case_closed`.
+ */
+export async function confirmEntity(
+  caseId: string,
+  entityId: number,
+  legalStatus: LegalStatus | null,
+): Promise<Entity> {
+  return asEntity(
+    await requestJson(apiUrl(`entities/${String(entityId)}/confirm`), {
+      method: 'POST',
+      body: { case_id: caseId, legal_status: legalStatus },
+    }),
+  );
+}
+
+/** Descarta una entidad: deja de proponerse, sin borrarse. */
+export async function discardEntity(caseId: string, entityId: number): Promise<Entity> {
+  return asEntity(
+    await requestJson(apiUrl(`entities/${String(entityId)}/discard`), {
+      method: 'POST',
+      body: { case_id: caseId },
+    }),
+  );
+}

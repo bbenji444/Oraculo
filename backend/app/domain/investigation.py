@@ -261,6 +261,8 @@ class InvestigationAction(StrEnum):
     CASE_ARTICLE_ADDED = "case.article_added"
     CASE_ARTICLE_REMOVED = "case.article_removed"
     CASE_ENTITY_ADDED = "case.entity_added"
+    # La IA leyó una nota del caso (9.4): con su modelo, tokens y costo, o el error.
+    CASE_ENTITIES_EXTRACTED = "case.entities_extracted"
     CASE_NOTE_ADDED = "case.note_added"
     ENTITY_CONFIRMED = "entity.confirmed"
     ENTITY_DISCARDED = "entity.discarded"

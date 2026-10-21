@@ -29,16 +29,18 @@ from app.adapters.llm.factory import (
 )
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
+from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.reports_repository import PostgresReportStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
-from app.adapters.queue.celery_queue import CelerySearchQueue
+from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
 from app.application.use_cases.check_health import CheckSystemHealth
+from app.application.use_cases.entities import QueueExtraction
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
 from app.core.config import APP_VERSION, Settings, get_settings
@@ -107,6 +109,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Casos de investigación (Fase 9.3): acceso por caso y bitácora.
         app.state.case_repository = PostgresCaseRepository(engine)
         app.state.dev_user = settings.dev_user
+        # Entidades de los casos (Fase 9.4): la IA lee cada nota nueva en el worker.
+        app.state.entity_repository = PostgresEntityRepository(engine)
+        app.state.extraction_queue = QueueExtraction(
+            app.state.entity_repository, CeleryEntityQueue(celery_app)
+        )
+        info = llm_info(settings)
+        app.state.llm_prices = LLMPrices(
+            info.provider, info.price_input_per_million, info.price_output_per_million
+        )
         # Búsquedas (F5): la misma planeación que make buscar y la cola del worker.
         concepts = app.state.concept_repository
         app.state.search_planner = PlanSearch(

@@ -2,9 +2,10 @@
 
 Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v2.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
-reporte) y su respuesta se valida con el mismo modelo de Pydantic
-(``EnrichmentOut``, ``SummaryOut``). Así, cambiar de proveedor no cambia lo
-que se pide ni lo que se acepta.
+reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
+caso) y su respuesta se valida con el mismo modelo de Pydantic
+(``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``). Así, cambiar de
+proveedor no cambia lo que se pide ni lo que se acepta.
 
 No hace: no llama a ninguna IA.
 """
@@ -17,8 +18,14 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.application.clock import MEXICO_CITY
-from app.application.ports.llm import EnrichmentRequest, SummaryNote, SummaryRequest
+from app.application.ports.llm import (
+    EnrichmentRequest,
+    EntityExtractionRequest,
+    SummaryNote,
+    SummaryRequest,
+)
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
+from app.domain.entity_extraction import RawProposal
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.region import RegionLevel
 
@@ -52,6 +59,14 @@ SUMMARY_MAX_OUTPUT_TOKENS = 1024
 # en ~10 000 tokens (~0.001 USD con gpt-6-luna).
 MAX_SUMMARY_NOTES = 150
 _DAY = "%d/%m/%Y"
+
+# Entidades de las notas de un caso (Fase 9.4, ADR-0103).
+ENTITIES_PROMPT_VERSION = "entities_v1"
+ENTITIES_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{ENTITIES_PROMPT_VERSION}.md"
+# Cada entidad lleva su cita de hasta 300 caracteres (~100 tokens): 4,096
+# alcanzan para ~30 entidades, más de las que trae una nota; el tope evita
+# respuestas desbocadas que cuestan.
+ENTITIES_MAX_OUTPUT_TOKENS = 4096
 
 
 class LocationOut(BaseModel):
@@ -181,4 +196,64 @@ def build_summary_prompt(request: SummaryRequest) -> str:
         date_to=request.date_to.strftime(_DAY),
         count=len(request.notes),
         notes="\n".join(_summary_line(n) for n in request.notes[:MAX_SUMMARY_NOTES]),
+    )
+
+
+class EntityOut(BaseModel):
+    """Una entidad en la respuesta (salida esperada del plan §9.7).
+
+    Tipo, papel y estatus legal se aceptan como texto: lo que no sea un valor
+    conocido lo descarta o lo deja vacío la revisión del dominio
+    (``review_proposals``), sin gastar un reintento.
+    """
+
+    type: str
+    label: str
+    aliases: list[str] = Field(default_factory=list)
+    role: str
+    legal_status_hint: str | None = None
+    confidence: float
+    evidence_span: str
+
+
+class EntitiesOut(BaseModel):
+    """Esquema de la respuesta de ``entities_v1``."""
+
+    entities: list[EntityOut]
+
+
+def build_entities_prompt(request: EntityExtractionRequest) -> str:
+    """Llena la plantilla ``entities_v1.md`` con la nota.
+
+    Args:
+        request: Título y texto de la nota.
+
+    Returns:
+        El texto que se manda a la IA.
+    """
+    template = ENTITIES_PROMPT_PATH.read_text(encoding="utf-8")
+    published = request.published_at.date().isoformat() if request.published_at else "desconocida"
+    return template.format(published_at=published, title=request.title, text=request.text)
+
+
+def to_raw_proposals(out: EntitiesOut) -> tuple[RawProposal, ...]:
+    """Convierte la respuesta validada a propuestas sin revisar.
+
+    Args:
+        out: Respuesta validada.
+
+    Returns:
+        Una propuesta por entidad, en el orden de la respuesta.
+    """
+    return tuple(
+        RawProposal(
+            type=e.type,
+            label=e.label,
+            aliases=tuple(e.aliases),
+            role=e.role,
+            legal_status_hint=e.legal_status_hint,
+            confidence=e.confidence,
+            evidence_span=e.evidence_span,
+        )
+        for e in out.entities
     )

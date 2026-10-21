@@ -1,10 +1,11 @@
-"""Tareas de Celery: ingesta al índice local, limpieza (ADR-0013) y búsquedas (§9).
+"""Tareas de Celery: ingesta, limpieza (ADR-0013), búsquedas (§9) y entidades (9.4).
 
 ``celery beat`` (el reloj que arranca ``make up``) las encola según
 ``beat_schedule`` en ``celery_app.py``; el worker las ejecuta. Cada tarea es
 una envoltura delgada: la lógica vive en ``app.worker.ingest_jobs``,
-``app.worker.search_jobs`` y los casos de uso. La búsqueda no la programa el
-reloj: la encola quien la pide (el comando ``make buscar`` y, en F5, la API).
+``app.worker.search_jobs``, ``app.worker.entity_jobs`` y los casos de uso. La
+búsqueda y la lectura de entidades no las programa el reloj: las encola quien
+las pide (la API y los comandos).
 
 No hace: no contiene lógica de negocio.
 """
@@ -13,10 +14,11 @@ import asyncio
 import logging
 from uuid import UUID
 
-from app.adapters.queue.celery_queue import SEARCH_TASK
+from app.adapters.queue.celery_queue import ENTITIES_TASK, SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
 from app.worker.celery_app import celery_app
+from app.worker.entity_jobs import run_entity_extraction
 from app.worker.ingest_jobs import run_ingest, run_purge
 from app.worker.search_jobs import purge_article_texts, run_search_job
 
@@ -95,4 +97,34 @@ def run_search(search_id: str) -> dict[str, object]:
         "llm_cost_usd": round(report.llm_cost_usd, 4),
     }
     logger.info("Búsqueda terminada", extra={"search_id": search_id, **result})
+    return result
+
+
+@celery_app.task(name=ENTITIES_TASK)
+def extract_case_entities(case_id: str, article_id: int, requested_by: str) -> dict[str, object]:
+    """Lee con la IA una nota de un caso y deja sus entidades como sugerencias (9.4).
+
+    Args:
+        case_id: Id del caso (texto: los mensajes de Celery son JSON).
+        article_id: Nota.
+        requested_by: Quién la pidió (va en la bitácora).
+
+    Returns:
+        Estado de la nota, cuántas sugerencias y el costo, para verlos en el
+        resultado.
+    """
+    outcome = asyncio.run(
+        run_entity_extraction(get_settings(), UUID(case_id), article_id, requested_by)
+    )
+    result: dict[str, object] = {"status": outcome.status.value if outcome else "nothing_to_do"}
+    if outcome is not None:
+        result |= {
+            "reused": outcome.reused,
+            "proposals": len(outcome.extraction.reviewed.proposals) if outcome.extraction else 0,
+            "cost_usd": round(outcome.cost_usd, 6),
+        }
+    logger.info(
+        "Entidades de una nota del caso",
+        extra={"case_id": case_id, "article_id": article_id, **result},
+    )
     return result
