@@ -6,25 +6,35 @@
  * F6) y "Estado del sistema" (F0). La pestaña vive en la URL (#/explorar,
  * #/conceptos, #/historial, #/estado) para que se pueda compartir o recargar
  * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
+ *
+ * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
+ * el laboratorio del muro de la Fase 9.1 (ADR-0102). Se carga aparte, solo al
+ * abrirlo, para no pesar en Explorar.
  */
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
 import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'explorar' | 'conceptos' | 'historial' | 'estado';
+type Tab = 'explorar' | 'conceptos' | 'historial' | 'estado' | 'laboratorio';
+
+const MuroLab = lazy(() => import('./lab/MuroLab'));
+// El laboratorio es solo para desarrollo: se pide a propósito en la URL.
+const LAB_ENABLED = new URLSearchParams(window.location.search).has('laboratorio');
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'explorar', label: 'Explorar' },
   { id: 'conceptos', label: 'Conceptos' },
   { id: 'historial', label: 'Historial' },
   { id: 'estado', label: 'Estado del sistema' },
+  ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
 ];
 
 function tabFromHash(): Tab {
   const hash = window.location.hash;
+  if (hash === '#/laboratorio' && LAB_ENABLED) return 'laboratorio';
   if (hash === '#/estado') return 'estado';
   if (hash === '#/conceptos') return 'conceptos';
   if (hash === '#/historial') return 'historial';
@@ -35,6 +45,13 @@ function Screen({ tab }: { tab: Tab }) {
   if (tab === 'conceptos') return <ConceptsPage />;
   if (tab === 'historial') return <HistoryPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
+  if (tab === 'laboratorio') {
+    return (
+      <Suspense fallback={<p className="p-6 text-sm text-slate-400">Cargando el laboratorio…</p>}>
+        <MuroLab />
+      </Suspense>
+    );
+  }
   return <ExplorePage />;
 }
 

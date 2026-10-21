@@ -53,6 +53,7 @@ import {
   CLUSTER_MAX_ZOOM,
   CLUSTER_RADIUS_PX,
   calloutPlacement,
+  pointCoordinates,
   STACK_LIMIT,
   stackedIds,
 } from '../../map/newsLayers';
@@ -378,7 +379,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       if (news?.properties.cluster) {
         // Grupo: la lista dice qué notas son; "Acercar" las separa en el mapa.
         const source = map.getSource<GeoJSONSource>(NEWS_SOURCE);
-        const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
+        // Como `unknown`: la forma la revisa pointCoordinates (ver newsLayers.ts).
+        const geometry: unknown = news.geometry;
+        const coordinates = pointCoordinates(geometry);
+        if (!coordinates) return;
         const clusterId = Number(news.properties.cluster_id);
         const total = Number(news.properties.point_count);
         if (!source) return;
@@ -396,9 +400,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
           layers: NEWS_LAYERS.filter((id) => map.getLayer(id)),
         }),
       );
-      if (news && stacked.length > 1) {
-        const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
-        openStack(coordinates, stacked, stacked.length, null);
+      const newsGeometry: unknown = news?.geometry;
+      const newsPoint = pointCoordinates(newsGeometry);
+      if (newsPoint && stacked.length > 1) {
+        openStack(newsPoint, stacked, stacked.length, null);
         return;
       }
       if (news?.id !== undefined) {

@@ -14,6 +14,7 @@ Corre **solo en Windows** con Node 22; no instales sus dependencias desde Ubuntu
 | `src/store/`      | Estado global con Zustand: lo que se ve en Explorar (región, conceptos, fechas, búsqueda y nota elegidas) y la cámara.                                                                                                                                                 |
 | `src/components/` | Componentes de React, pequeños y con una sola responsabilidad.                                                                                                                                                                                                         |
 | `src/styles/`     | Estilos globales, animaciones y configuración de Tailwind.                                                                                                                                                                                                             |
+| `src/lab/`        | Laboratorio del muro (Fase 9.1, ADR-0102), solo para desarrollo: se abre con `?laboratorio` en la URL (pestaña "Laboratorio"). Dibuja un caso de prueba sobre el mismo globo y mide fps con un guion de cámara fijo. Se carga aparte para no pesar en Explorar.        |
 | `public/`         | Archivos estáticos que se sirven tal cual (ícono).                                                                                                                                                                                                                     |
 
 ## Pantallas
