@@ -1,6 +1,7 @@
 """Arma la IA según ``LLM_PROVIDER`` (ADR-0016).
 
-Lo usan el pipeline de búsqueda, los reportes, la API y los comandos. ``llm_info`` dice
+Lo usan el pipeline de búsqueda, los reportes, la extracción de entidades
+de los casos (Fase 9.4), la API y los comandos. ``llm_info`` dice
 qué modelo se usaría y cuánto cobra sin crear el cliente (la estimación de
 costo no necesita la llave); ``build_llm`` crea el adaptador.
 
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 
 from app.adapters.llm.gemini import GeminiEnricher, build_gemini
 from app.adapters.llm.openai import OpenAIEnricher, build_openai
-from app.application.ports.llm import LLMInfo, LLMPort, SummarizerPort
+from app.application.ports.llm import EntityExtractorPort, LLMInfo, LLMPort, SummarizerPort
 from app.core.config import Settings
 
 
@@ -121,6 +122,42 @@ def build_summarizer(settings: Settings) -> SummarizerSetup:
     """
     info, llm = _adapter(settings)
     return SummarizerSetup(
+        info.provider, llm, info.price_input_per_million, info.price_output_per_million
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class EntityExtractorSetup:
+    """La IA que propone las entidades de las notas de un caso y lo que cuesta (Fase 9.4).
+
+    Attributes:
+        provider: ``openai`` o ``gemini``.
+        extractor: El adaptador.
+        price_input_per_million: Dólares por millón de tokens de entrada.
+        price_output_per_million: Dólares por millón de tokens de salida.
+    """
+
+    provider: str
+    extractor: EntityExtractorPort
+    price_input_per_million: float
+    price_output_per_million: float
+
+
+def build_entity_extractor(settings: Settings) -> EntityExtractorSetup:
+    """Crea la IA que propone entidades (la misma que elige ``LLM_PROVIDER``).
+
+    Args:
+        settings: Configuración (``LLM_PROVIDER`` y la llave y modelo de ese
+            proveedor).
+
+    Returns:
+        El adaptador con sus precios.
+
+    Raises:
+        MissingLLMKeyError: Si falta la llave del proveedor elegido.
+    """
+    info, llm = _adapter(settings)
+    return EntityExtractorSetup(
         info.provider, llm, info.price_input_per_million, info.price_output_per_million
     )
 

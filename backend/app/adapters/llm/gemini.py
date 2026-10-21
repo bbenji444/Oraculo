@@ -1,4 +1,4 @@
-"""``LLMPort`` y ``SummarizerPort`` con Gemini (especificación §10 y §15; ADR-0015, ADR-0018).
+"""``LLMPort``, ``SummarizerPort`` y ``EntityExtractorPort`` con Gemini (§10, §15 y Fase 9.4).
 
 Usa el SDK oficial ``google-genai`` 1.20 (la 2.x choca con tenacity 9.2.1,
 ADR-0010). Firmas confirmadas con la versión instalada:
@@ -29,6 +29,8 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from app.adapters.llm.common import (
+    ENTITIES_MAX_OUTPUT_TOKENS,
+    ENTITIES_PROMPT_VERSION,
     MAX_OUTPUT_TOKENS,
     PROMPT_VERSION,
     RETRY_ERROR_CHARS,
@@ -37,15 +39,21 @@ from app.adapters.llm.common import (
     SUMMARY_PROMPT_VERSION,
     TEMPERATURE,
     EnrichmentOut,
+    EntitiesOut,
     SummaryOut,
+    build_entities_prompt,
     build_prompt,
     build_summary_prompt,
     to_enrichment,
+    to_raw_proposals,
 )
 from app.application.ports.llm import (
     EnrichmentError,
     EnrichmentRequest,
     EnrichmentResult,
+    EntityExtractionError,
+    EntityExtractionRequest,
+    EntityExtractionResult,
     SummaryError,
     SummaryRequest,
     SummaryResult,
@@ -132,6 +140,11 @@ class GeminiEnricher:
         """Ver ``SummarizerPort.summary_prompt_version``."""
         return SUMMARY_PROMPT_VERSION
 
+    @property
+    def entities_prompt_version(self) -> str:
+        """Ver ``EntityExtractorPort.entities_prompt_version``."""
+        return ENTITIES_PROMPT_VERSION
+
     async def aclose(self) -> None:
         """Ver ``LLMPort.aclose``.
 
@@ -209,6 +222,19 @@ class GeminiEnricher:
         if out is None:
             raise SummaryError(f"Gemini no dio un resumen válido tras reintentar: {error}", usage)
         return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
+
+    async def extract_entities(self, request: EntityExtractionRequest) -> EntityExtractionResult:
+        """Ver ``EntityExtractorPort.extract_entities``."""
+        out, usage, error = await self._complete(
+            build_entities_prompt(request), EntitiesOut, ENTITIES_MAX_OUTPUT_TOKENS
+        )
+        if out is None:
+            raise EntityExtractionError(
+                f"Gemini no dio un JSON de entidades válido tras reintentar: {error}", usage
+            )
+        return EntityExtractionResult(
+            to_raw_proposals(out), usage, self._model, ENTITIES_PROMPT_VERSION
+        )
 
 
 def build_gemini(api_key: str, model: str, timeout_seconds: float) -> GeminiEnricher:

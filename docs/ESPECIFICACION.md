@@ -508,7 +508,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ## 10. Enriquecimiento con LLM
 
 - **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
-- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigente: `enrich_v2.md`, que agrega `municipality_hint` para colonias y calles; ADR-0020). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
+- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigentes: `enrich_v2.md`, que agrega `municipality_hint` para colonias y calles, ADR-0020; `summary_v1.md` para el reporte; `entities_v1.md` para las entidades de un caso, §10.1). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
 - **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; se registran tokens y costo estimado por búsqueda.
@@ -546,6 +546,16 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 - **Resumen:** 2–3 oraciones, neutral, en español, sin copiar frases textuales largas.
 - **Relevancia estricta.** "Secuestro" en sentido figurado ("secuestraron la agenda legislativa") no es relevante. Tampoco lo son cursos, webinars u ofertas de empleo.
 - **`role`:** `event` es donde ocurrió el hecho; `mentioned` es solo una mención (por ejemplo, la sede de la empresa afectada o el lugar desde donde declaró un funcionario).
+
+### 10.1 Entidades de las notas de un caso (Fase 9.4, ADR-0103)
+
+Las entidades (personas, organizaciones, lugares y vehículos) **no** salen del enriquecimiento de cada búsqueda: se piden en una llamada aparte, solo para las notas que entran a un caso (`EntityExtractorPort`, prompt `entities_v1.md`).
+
+- **Una vez por nota y versión de prompt** (`entity_extractions`); si la nota entra a otro caso se reutiliza sin volver a pagar.
+- **Texto:** el cuerpo extraído y recortado (`text_for_llm`); si ya se borró a los 30 días, título y fragmento del medio, y se marca `title_snippet`. El resumen propio nunca se usa como evidencia.
+- **Salida (validada con Pydantic, un reintento):** `{"entities": [{type, label, aliases, role, legal_status_hint, confidence, evidence_span}]}`. En OpenAI el esquema estricto solo admite los tipos `person`, `org`, `place`, `vehicle` y los siete estatus legales.
+- **Revisión contra el texto** (`domain/entity_extraction.py`): se descarta, con su motivo, la propuesta cuya cita no aparece literal en lo que leyó la IA o cuyo nombre no está escrito en la nota. La cita que se guarda es la del texto, recortada a 300 caracteres.
+- **Reglas del prompt:** solo lo que dice el texto; la nota es aislada (no se cruza con otras notas ni bases); el estatus legal es lo que afirma la nota y nunca "culpable"; cada entidad con su cita literal; todo entra como sugerido.
 
 ---
 

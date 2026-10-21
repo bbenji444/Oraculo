@@ -1,4 +1,4 @@
-"""``LLMPort`` y ``SummarizerPort`` con OpenAI por HTTP (ADR-0016, ADR-0018).
+"""``LLMPort``, ``SummarizerPort`` y ``EntityExtractorPort`` con OpenAI por HTTP (ADR-0016).
 
 Confirmado en la documentación de OpenAI (17/10/2026):
 
@@ -28,6 +28,8 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from app.adapters.llm.common import (
+    ENTITIES_MAX_OUTPUT_TOKENS,
+    ENTITIES_PROMPT_VERSION,
     MAX_OUTPUT_TOKENS,
     PROMPT_VERSION,
     RETRY_ERROR_CHARS,
@@ -35,21 +37,29 @@ from app.adapters.llm.common import (
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_PROMPT_VERSION,
     EnrichmentOut,
+    EntitiesOut,
     SummaryOut,
+    build_entities_prompt,
     build_prompt,
     build_summary_prompt,
     to_enrichment,
+    to_raw_proposals,
 )
 from app.adapters.providers.http import ProviderHttpClient
 from app.application.ports.llm import (
     EnrichmentError,
     EnrichmentRequest,
     EnrichmentResult,
+    EntityExtractionError,
+    EntityExtractionRequest,
+    EntityExtractionResult,
     SummaryError,
     SummaryRequest,
     SummaryResult,
 )
 from app.domain.enrichment import LLMUsage
+from app.domain.entity_extraction import EXTRACTABLE_TYPES
+from app.domain.investigation import LegalStatus
 
 RESPONSES_URL = "https://api.openai.com/v1/responses"
 OPENAI = "openai"
@@ -115,6 +125,48 @@ SUMMARY_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
     "required": ["executive_summary"],
     "properties": {"executive_summary": {"type": "string"}},
+}
+
+# Esquema estricto de las entidades (mismo contenido que EntitiesOut). Aquí
+# sí van los valores permitidos: el modo estricto de OpenAI los respeta, así
+# que nunca llega "culpable" ni un tipo que no se extrae.
+ENTITIES_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["entities"],
+    "properties": {
+        "entities": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "type",
+                    "label",
+                    "aliases",
+                    "role",
+                    "legal_status_hint",
+                    "confidence",
+                    "evidence_span",
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": sorted(kind.value for kind in EXTRACTABLE_TYPES),
+                    },
+                    "label": {"type": "string"},
+                    "aliases": {"type": "array", "items": {"type": "string"}},
+                    "role": {"type": "string", "enum": ["event", "mentioned"]},
+                    "legal_status_hint": {
+                        "type": ["string", "null"],
+                        "enum": [*(status.value for status in LegalStatus), None],
+                    },
+                    "confidence": {"type": "number"},
+                    "evidence_span": {"type": "string"},
+                },
+            },
+        }
+    },
 }
 
 
@@ -214,6 +266,11 @@ class OpenAIEnricher:
         """Ver ``SummarizerPort.summary_prompt_version``."""
         return SUMMARY_PROMPT_VERSION
 
+    @property
+    def entities_prompt_version(self) -> str:
+        """Ver ``EntityExtractorPort.entities_prompt_version``."""
+        return ENTITIES_PROMPT_VERSION
+
     async def aclose(self) -> None:
         """Cierra las conexiones HTTP."""
         await self._http.aclose()
@@ -290,6 +347,23 @@ class OpenAIEnricher:
         if out is None:
             raise SummaryError(f"OpenAI no dio un resumen válido tras reintentar: {error}", usage)
         return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
+
+    async def extract_entities(self, request: EntityExtractionRequest) -> EntityExtractionResult:
+        """Ver ``EntityExtractorPort.extract_entities``."""
+        out, usage, error = await self._complete(
+            build_entities_prompt(request),
+            EntitiesOut,
+            name="entities",
+            schema=ENTITIES_SCHEMA,
+            max_output_tokens=ENTITIES_MAX_OUTPUT_TOKENS,
+        )
+        if out is None:
+            raise EntityExtractionError(
+                f"OpenAI no dio un JSON de entidades válido tras reintentar: {error}", usage
+            )
+        return EntityExtractionResult(
+            to_raw_proposals(out), usage, self._model, ENTITIES_PROMPT_VERSION
+        )
 
 
 def build_openai(
