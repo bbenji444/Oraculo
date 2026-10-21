@@ -54,5 +54,12 @@
     "typescript-eslint": "8.71.2",
     "vite": "8.3.4",
     "vitest": "5.0.5"
+  },
+  "overrides": {
+    "@loaders.gl/images": "4.5.2",
+    "@loaders.gl/loader-utils": "4.5.2",
+    "@loaders.gl/schema": "4.5.1",
+    "@loaders.gl/schema-utils": "4.5.2",
+    "@loaders.gl/worker-utils": "4.5.2"
   }
 }
