@@ -2,13 +2,15 @@
  * Buscador de regiones con autocompletado ("izta" → Alcaldía Iztapalapa).
  *
  * Accesible con teclado: flechas para moverse, Enter para elegir, Escape para
- * cerrar. Los datos llegan con useRegionSearch (nunca fetch directo).
+ * cerrar. Cada resultado dice su estado, para distinguir homónimos ("San Pedro"
+ * de Coahuila o de Nuevo León). Los datos llegan con useRegionSearch y
+ * useRegionsByLevel (nunca fetch directo).
  */
 import { useId, useState } from 'react';
 
-import { useRegionSearch } from '../../hooks/useRegions';
+import { useRegionSearch, useRegionsByLevel } from '../../hooks/useRegions';
 import type { Region } from '../../services/regions';
-import { LEVEL_LABEL } from './labels';
+import { LEVEL_LABEL, stateOf } from './labels';
 
 interface SearchBoxProps {
   onSelect: (region: Region) => void;
@@ -21,6 +23,8 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
   const listId = useId();
   const search = useRegionSearch(query);
   const results = search.data ?? [];
+  // La misma lista del filtro "Estado" (ya en caché): no es otra petición.
+  const states = useRegionsByLevel('state').data;
   const showList = open && search.enabled;
 
   function choose(region: Region) {
@@ -101,28 +105,32 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
           {!search.error && search.isSuccess && results.length === 0 && (
             <li className="px-3 py-2 text-sm text-slate-400">Sin resultados.</li>
           )}
-          {results.map((region, index) => (
-            <li
-              key={region.id}
-              role="option"
-              aria-selected={index === active}
-              onMouseDown={(event) => {
-                event.preventDefault();
-                choose(region);
-              }}
-              onMouseEnter={() => {
-                setActive(index);
-              }}
-              className={`flex cursor-pointer items-baseline justify-between gap-3 px-3 py-2 text-sm ${
-                index === active ? 'bg-sky-500/15 text-slate-50' : 'text-slate-200'
-              }`}
-            >
-              <span className="truncate">{region.display_name}</span>
-              <span className="shrink-0 text-xs text-slate-500">
-                {LEVEL_LABEL[region.level]} · <span className="font-mono">{region.code}</span>
-              </span>
-            </li>
-          ))}
+          {results.map((region, index) => {
+            const state = stateOf(region, states);
+            return (
+              <li
+                key={region.id}
+                role="option"
+                aria-selected={index === active}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  choose(region);
+                }}
+                onMouseEnter={() => {
+                  setActive(index);
+                }}
+                className={`cursor-pointer px-3 py-2 text-sm ${
+                  index === active ? 'bg-sky-500/15 text-slate-50' : 'text-slate-200'
+                }`}
+              >
+                <span className="block truncate">{region.display_name}</span>
+                <span className="block truncate text-xs text-slate-400">
+                  {state && `${state} · `}
+                  {LEVEL_LABEL[region.level]} · <span className="font-mono">{region.code}</span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

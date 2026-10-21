@@ -15,6 +15,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- El buscador de regiones (Explorar y "Probar concepto") dice de qué estado es cada municipio o localidad: "Municipio San Pedro — Coahuila de Zaragoza" y "San Pedro Garza García — Nuevo León". Antes solo mostraba la clave INEGI y había que sabérsela para distinguir homónimos.
 - Prompt de la IA `enrich_v2`: pide el municipio o alcaldía de cada colonia, calle o lugar (`municipality_hint`), marca al menos un lugar del hecho cuando se puede saber, fecha el hecho original en avances de casos viejos y no confunde el Día de Muertos con homicidios. Las notas leídas con v1 se vuelven a leer en la siguiente búsqueda que las encuentre.
 - Vuelos del globo más fluidos: mientras vuela a una región, a una nota o a un grupo, el mapa se dibuja al 80 % de la resolución de la pantalla y recupera la nitidez al aterrizar (`map/flight.ts`). Medido a 1920×1080 con escala 125 %: de ~37 a ~46 cuadros por segundo y de 30 % a 12 % de cuadros lentos. El giro lento del globo no cambia.
 - Explorar en pantallas bajas: al terminar, la búsqueda se reduce a un renglón ("Extorsión · Jalisco · 10 – 17 oct 2026 · 18 notas…") con "Editar" y una fila de descargas (PDF, CSV, GeoJSON, Imprimir), y la lista de noticias se queda con el resto. A 1366×650 pasan de 2 a 3–4 noticias visibles. "Ocultar ‹" esconde el panel para ver el globo completo; en celular se oculta solo al elegir una noticia.
