@@ -558,6 +558,15 @@ Las entidades (personas, organizaciones, lugares y vehículos) **no** salen del 
 - **Agrupación en el caso:** las propuestas con el mismo tipo y el mismo nombre de comparación forman una sola sugerencia. El nombre de comparación (`entity_name_norm`, Fase 9.5) es el `name_norm` del proyecto sin comillas: "Eduardo “N”", "Eduardo 'N'" y "Eduardo N" son el mismo.
 - **Reglas del prompt:** solo lo que dice el texto; la nota es aislada (no se cruza con otras notas ni bases); el estatus legal es lo que afirma la nota y nunca "culpable"; cada entidad con su cita literal; todo entra como sugerido.
 
+### 10.2 Resolución de entidades de un caso (Fase 9.5, ADR-0104)
+
+El sistema **sugiere** qué entidades del caso podrían ser la misma; **solo una persona las une** (nunca se fusiona solo, ni entre casos).
+
+- **Cuándo se sugiere** (`domain/entity_resolution.py`): dos entidades del mismo caso y tipo, no unidas a otra, no descartadas y visibles, si tienen el mismo nombre de comparación, un nombre o alias en común (contando los de lo que ya se les unió) o nombres con trigramas ≥ 0.9. Se calcula al leer; «No son la misma» se guarda en `entity_merge_dismissals` y el par no vuelve.
+- **Unir:** solo se escribe `merged_into` en la que se une; menciones, alias y vínculos no se mueven. Las lecturas muestran la que queda con la evidencia de todo su grupo. Si una está confirmada, esa es la que queda; lo descartado no se une.
+- **Deshacer:** «Separar» borra el `merged_into` (lo que se le había unido a ella se va con ella). «Separar menciones» pasa menciones propias a una sugerencia nueva, para cuando la agrupación juntó a dos personas con el mismo nombre.
+- **Bitácora:** `entity.merged`, `entity.unmerged`, `entity.split` y `entity.merge_dismissed`, con quién y qué quedó.
+
 ---
 
 ## 11. Geolocalización

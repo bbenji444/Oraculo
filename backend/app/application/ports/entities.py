@@ -1,4 +1,4 @@
-"""Puertos de las entidades de un caso: guardarlas, leerlas y encolar su extracción (Fase 9.4).
+"""Puertos de las entidades de un caso: guardarlas, leerlas, unirlas y encolar su extracción.
 
 ``EntityRepositoryPort`` lo implementa ``PostgresEntityRepository``
 (``app/adapters/persistence/entities_repository.py``); ``EntityQueuePort``, la
@@ -23,6 +23,7 @@ from app.domain.entity_extraction import (
     TextSource,
     suggested_legal_status,
 )
+from app.domain.entity_resolution import MergeCandidate, MergeReason
 from app.domain.geocoding import MentionRole
 from app.domain.investigation import EntityType, LegalStatus, ReviewStatus
 
@@ -144,6 +145,8 @@ class MentionView:
 
     Attributes:
         mention_id: Id de la mención.
+        entity_id: Entidad dueña de la mención: la misma, o una que se le
+            unió (9.5). Solo las propias se pueden separar.
         article_id: Nota de donde salió.
         article_title: Título de la nota.
         article_url: Liga a la nota original.
@@ -157,6 +160,7 @@ class MentionView:
     """
 
     mention_id: int
+    entity_id: int
     article_id: int
     article_title: str
     article_url: str
@@ -170,22 +174,43 @@ class MentionView:
 
 
 @dataclass(frozen=True, slots=True)
+class MergedEntity:
+    """Una entidad que se unió a otra (9.5): se puede separar de nuevo.
+
+    Attributes:
+        entity_id: Id de la que se unió.
+        label: Su nombre.
+        merged_into: A cuál se unió directamente (puede ser otra del mismo
+            grupo, si se unieron en cadena).
+    """
+
+    entity_id: int
+    label: str
+    merged_into: int
+
+
+@dataclass(frozen=True, slots=True)
 class CaseEntity:
     """Una entidad de un caso con sus menciones en las notas del caso.
+
+    Si otras entidades se le unieron (9.5, decisión D4), sus menciones y sus
+    alias se ven aquí; las filas de las unidas no cambian, para poder
+    separarlas.
 
     Attributes:
         entity_id: Id.
         type: Tipo.
         label: Nombre.
-        aliases: Otros nombres.
+        aliases: Otros nombres (los suyos y los de las que se le unieron).
         review_status: Sugerida, confirmada o descartada (ADR-0104).
         legal_status: El que eligió quien la confirmó (solo personas).
         reviewed_by: Quién la revisó.
         reviewed_at: Cuándo.
         region_id: Región del catálogo, si es un lugar ya ubicado (D8).
         region_name: Nombre de esa región para mostrar.
-        mentions: Menciones en notas que siguen en el caso, de la más
-            reciente a la más vieja.
+        mentions: Menciones en notas que siguen en el caso (las suyas y las de
+            las que se le unieron), de la más reciente a la más vieja.
+        merged: Entidades que se le unieron.
     """
 
     entity_id: int
@@ -199,6 +224,7 @@ class CaseEntity:
     region_id: int | None
     region_name: str | None
     mentions: tuple[MentionView, ...]
+    merged: tuple[MergedEntity, ...] = ()
 
     @property
     def suggested_legal_status(self) -> LegalStatus | None:
@@ -213,6 +239,26 @@ class CaseEntity:
     def article_count(self) -> int:
         """En cuántas notas distintas del caso aparece."""
         return len({m.article_id for m in self.mentions})
+
+    @property
+    def own_mention_ids(self) -> tuple[int, ...]:
+        """Menciones propias (no de las que se le unieron): las que se pueden separar."""
+        return tuple(m.mention_id for m in self.mentions if m.entity_id == self.entity_id)
+
+
+@dataclass(frozen=True, slots=True)
+class MergeSuggestion:
+    """Dos entidades del caso que podrían ser la misma (9.5, decisión D2).
+
+    Attributes:
+        first: La de id menor.
+        second: La de id mayor.
+        reasons: Por qué se sugiere (al menos un motivo).
+    """
+
+    first: CaseEntity
+    second: CaseEntity
+    reasons: frozenset[MergeReason]
 
 
 class EntityRepositoryPort(Protocol):
@@ -391,6 +437,115 @@ class EntityRepositoryPort(Protocol):
 
         Returns:
             La entidad como quedó.
+        """
+        ...
+
+    async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
+        """Pares de entidades del caso que podrían ser la misma (9.5, D2 y D3).
+
+        Se calculan al leer, entre entidades no unidas a otra, no descartadas,
+        visibles y del mismo tipo: mismo nombre de comparación, un nombre o
+        alias en común (contando los de las que ya se les unieron) o nombres
+        con trigramas ≥ ``TRIGRAM_MERGE_THRESHOLD``. No incluye los pares que
+        alguien marcó como «No son la misma» (ni otros de los mismos grupos).
+
+        Args:
+            case_id: Caso.
+
+        Returns:
+            Las sugerencias, sin orden particular.
+        """
+        ...
+
+    async def merge_candidate(self, case_id: UUID, entity_id: int) -> MergeCandidate | None:
+        """Lo necesario para validar una fusión o una separación de esa entidad.
+
+        A diferencia de ``get_entity``, también encuentra entidades ya unidas a
+        otra.
+
+        Args:
+            case_id: Caso.
+            entity_id: Entidad.
+
+        Returns:
+            La entidad, o ``None`` si no es de ese caso.
+        """
+        ...
+
+    async def merge(
+        self, case_id: UUID, keep_id: int, merge_id: int, audit: AuditEntry
+    ) -> CaseEntity:
+        """Une ``merge_id`` a ``keep_id`` con bitácora, en una transacción (D4).
+
+        Solo escribe ``merge_id.merged_into``: menciones, alias y vínculos no se
+        mueven. Toma el candado del caso, igual que ``materialize``.
+
+        Args:
+            case_id: Caso.
+            keep_id: La que queda.
+            merge_id: La que se une.
+            audit: Registro de la bitácora.
+
+        Returns:
+            La que queda, con todo su grupo.
+
+        Raises:
+            EntityMergeError: Si alguna cambió desde que se validó (ya se unió
+                a otra o dejó de existir en el caso).
+        """
+        ...
+
+    async def unmerge(self, case_id: UUID, entity_id: int, audit: AuditEntry) -> CaseEntity:
+        """Separa una entidad de aquella a la que se unió, con bitácora (D5).
+
+        Lo que se le había unido a ella se va con ella.
+
+        Args:
+            case_id: Caso.
+            entity_id: La entidad unida que se separa.
+            audit: Registro de la bitácora.
+
+        Returns:
+            La entidad separada, de nuevo independiente.
+
+        Raises:
+            EntityMergeError: Si no está unida a otra.
+        """
+        ...
+
+    async def split(
+        self, case_id: UUID, entity_id: int, mention_ids: Sequence[int], audit: AuditEntry
+    ) -> CaseEntity:
+        """Pasa menciones propias de una entidad a una sugerencia nueva (D5).
+
+        La nueva toma el nombre de la primera mención elegida y nace sugerida
+        en el caso.
+
+        Args:
+            case_id: Caso.
+            entity_id: Entidad de donde salen.
+            mention_ids: Menciones que se separan (ya validadas).
+            audit: Registro de la bitácora.
+
+        Returns:
+            La entidad nueva.
+        """
+        ...
+
+    async def dismiss_merge(
+        self, case_id: UUID, first_id: int, second_id: int, audit: AuditEntry
+    ) -> bool:
+        """Guarda que dos entidades del caso no son la misma, con bitácora (D3).
+
+        Args:
+            case_id: Caso.
+            first_id: Entidad de id menor.
+            second_id: Entidad de id mayor.
+            audit: Registro de la bitácora.
+
+        Returns:
+            ``True`` si se guardó; ``False`` si ya estaba (sin repetir la
+            bitácora).
         """
         ...
 

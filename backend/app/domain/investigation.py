@@ -267,6 +267,11 @@ class InvestigationAction(StrEnum):
     ENTITY_CONFIRMED = "entity.confirmed"
     ENTITY_DISCARDED = "entity.discarded"
     ENTITY_MERGED = "entity.merged"
+    # Fase 9.5: deshacer una fusión, separar menciones de una sugerencia y
+    # decir que dos entidades no son la misma también llevan firma.
+    ENTITY_UNMERGED = "entity.unmerged"
+    ENTITY_SPLIT = "entity.split"
+    ENTITY_MERGE_DISMISSED = "entity.merge_dismissed"
     RELATIONSHIP_CREATED = "relationship.created"
     RELATIONSHIP_CONFIRMED = "relationship.confirmed"
     RELATIONSHIP_DISCARDED = "relationship.discarded"

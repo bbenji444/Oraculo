@@ -217,3 +217,21 @@ class EntityReviewError(InvalidRequestError):
     """La confirmación no cumple sus reglas (por ejemplo, una persona sin estatus legal)."""
 
     code = "invalid_entity_review"
+
+
+class EntityMergeError(InvalidRequestError):
+    """La fusión o la separación no cumple sus reglas (por ejemplo, tipos distintos)."""
+
+    code = "invalid_entity_merge"
+
+
+class RelationshipNotFoundError(NotFoundError):
+    """No existe ese vínculo entre entidades del caso."""
+
+    code = "relationship_not_found"
+
+
+class RelationshipValidationError(InvalidRequestError):
+    """El vínculo no cumple sus reglas (por ejemplo, una entidad sin confirmar)."""
+
+    code = "invalid_relationship"

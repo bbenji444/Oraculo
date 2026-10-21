@@ -2,8 +2,11 @@
 
 ``FakeEntityRepository`` imita lo que garantiza PostgreSQL en lo que importa a
 los casos de uso: el estado de cada nota del caso, una lectura guardada por
-nota y versión de prompt, y la revisión firmada de cada entidad. No agrupa
-propuestas (eso lo prueban las pruebas de integración del repositorio real).
+nota y versión de prompt, la revisión firmada de cada entidad y, desde la
+9.5, las fusiones, separaciones y descartes de fusión. No agrupa
+propuestas ni calcula sugerencias de fusión: la prueba las pone en
+``suggestions`` (eso lo prueban las pruebas de integración del repositorio
+real).
 """
 
 from collections.abc import Sequence
@@ -18,6 +21,8 @@ from app.application.ports.entities import (
     CaseEntity,
     FailedExtraction,
     Materialized,
+    MergedEntity,
+    MergeSuggestion,
     StoredExtraction,
 )
 from app.application.ports.llm import (
@@ -27,6 +32,7 @@ from app.application.ports.llm import (
 )
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import CaseArticleEntitiesStatus, RawProposal
+from app.domain.entity_resolution import MergeCandidate
 from app.domain.investigation import LegalStatus, ReviewStatus
 
 REVIEWED_AT = datetime(2026, 10, 21, 19, tzinfo=UTC)
@@ -54,6 +60,12 @@ class FakeEntityRepository:
     reviews: list[tuple[UUID, AuditEntry]] = field(default_factory=list)
     costs: dict[tuple[UUID, int], float] = field(default_factory=dict)
     saved: int = 0
+    # Fase 9.5: fusiones, sugerencias que pone la prueba y descartes.
+    merged_into: dict[tuple[UUID, int], int] = field(default_factory=dict)
+    suggestions: list[MergeSuggestion] = field(default_factory=list)
+    dismissed: set[tuple[UUID, int, int]] = field(default_factory=set)
+    resolution_audits: list[AuditEntry] = field(default_factory=list)
+    next_id: int = 1000
 
     def add_article(
         self,
@@ -154,13 +166,19 @@ class FakeEntityRepository:
         )
 
     async def list_entities(self, case_id: UUID, status: ReviewStatus) -> list[CaseEntity]:
-        return [e for e in self.entities.get(case_id, {}).values() if e.review_status is status]
+        return [
+            e
+            for e in self.entities.get(case_id, {}).values()
+            if e.review_status is status and (case_id, e.entity_id) not in self.merged_into
+        ]
 
     async def review_counts(self, case_id: UUID) -> dict[ReviewStatus, int]:
         found = list(self.entities.get(case_id, {}).values())
         return {s: sum(1 for e in found if e.review_status is s) for s in ReviewStatus}
 
     async def get_entity(self, case_id: UUID, entity_id: int) -> CaseEntity | None:
+        if (case_id, entity_id) in self.merged_into:
+            return None
         return self.entities.get(case_id, {}).get(entity_id)
 
     async def review(
@@ -183,6 +201,79 @@ class FakeEntityRepository:
         self.entities[case_id][entity_id] = reviewed
         self.reviews.append((case_id, audit))
         return reviewed
+
+    async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
+        return [
+            s
+            for s in self.suggestions
+            if (case_id, s.first.entity_id, s.second.entity_id) not in self.dismissed
+        ]
+
+    async def merge_candidate(self, case_id: UUID, entity_id: int) -> MergeCandidate | None:
+        entity = self.entities.get(case_id, {}).get(entity_id)
+        if entity is None:
+            return None
+        return MergeCandidate(
+            entity_id, entity.type, entity.review_status, self.merged_into.get((case_id, entity_id))
+        )
+
+    async def merge(
+        self, case_id: UUID, keep_id: int, merge_id: int, audit: AuditEntry
+    ) -> CaseEntity:
+        keep, merge = self.entities[case_id][keep_id], self.entities[case_id][merge_id]
+        self.merged_into[(case_id, merge_id)] = keep_id
+        kept = replace(
+            keep,
+            mentions=keep.mentions + merge.mentions,
+            merged=(*keep.merged, MergedEntity(merge_id, merge.label, keep_id)),
+        )
+        self.entities[case_id][keep_id] = kept
+        self.resolution_audits.append(audit)
+        return kept
+
+    async def unmerge(self, case_id: UUID, entity_id: int, audit: AuditEntry) -> CaseEntity:
+        self.merged_into.pop((case_id, entity_id))
+        self.resolution_audits.append(audit)
+        return self.entities[case_id][entity_id]
+
+    async def split(
+        self, case_id: UUID, entity_id: int, mention_ids: Sequence[int], audit: AuditEntry
+    ) -> CaseEntity:
+        source = self.entities[case_id][entity_id]
+        self.next_id += 1
+        moved = tuple(
+            replace(m, entity_id=self.next_id)
+            for m in source.mentions
+            if m.mention_id in mention_ids
+        )
+        created = replace(
+            source,
+            entity_id=self.next_id,
+            label=moved[0].mention_text,
+            aliases=(),
+            review_status=ReviewStatus.SUGGESTED,
+            legal_status=None,
+            reviewed_by=None,
+            reviewed_at=None,
+            mentions=moved,
+            merged=(),
+        )
+        self.entities[case_id][entity_id] = replace(
+            source, mentions=tuple(m for m in source.mentions if m.mention_id not in mention_ids)
+        )
+        self.entities[case_id][self.next_id] = created
+        self.resolution_audits.append(audit)
+        return created
+
+    async def dismiss_merge(
+        self, case_id: UUID, first_id: int, second_id: int, audit: AuditEntry
+    ) -> bool:
+        key = (case_id, first_id, second_id)
+        if key in self.dismissed:
+            return False
+        self.dismissed.add(key)
+        self.resolution_audits.append(audit)
+        return True
 
 
 @dataclass

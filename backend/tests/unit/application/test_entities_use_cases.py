@@ -72,9 +72,12 @@ async def new_case(cases: FakeCaseRepository) -> UUID:
     return view.case.id
 
 
-def mention(article_id: int, day: int, hint: LegalStatus | None, mention_id: int) -> MentionView:
+def mention(
+    article_id: int, day: int, hint: LegalStatus | None, mention_id: int, entity_id: int = 1
+) -> MentionView:
     return MentionView(
         mention_id,
+        entity_id,
         article_id,
         f"Nota {article_id}",
         f"https://medio.mx/{article_id}",
@@ -101,7 +104,7 @@ def person(entity_id: int = 1, mentions: int = 2) -> CaseEntity:
         None,
         None,
         None,
-        tuple(mention(10 + n, 1 + n, hints[n % 3], n) for n in range(mentions)),
+        tuple(mention(10 + n, 1 + n, hints[n % 3], n, entity_id) for n in range(mentions)),
     )
 
 
