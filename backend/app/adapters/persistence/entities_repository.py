@@ -22,7 +22,8 @@ separa entidades del caso.
   (``GROUPS_CTE``) y muestran sus menciones y alias juntos; separar es
   borrar ese ``merged_into``.
 - **Sugerencias de fusión (9.5, D2 y D3):** se calculan al leer
-  (``_MERGE_SUGGESTIONS_SQL``); solo se guarda el «No son la misma».
+  (las consultas traen las entidades; ``merge_reasons`` del dominio las compara);
+  solo se guarda el «No son la misma».
 - **Lo que se ve:** una sugerencia cuyas menciones son todas de notas que ya
   no están en el caso no aparece (vuelve si la nota regresa); lo ya revisado
   siempre aparece, porque lo decidió una persona.
@@ -35,6 +36,7 @@ uso); nunca toca la tabla reservada de enlaces externos (ADR-0101).
 """
 
 import json
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
@@ -67,10 +69,10 @@ from app.domain.entity_extraction import (
     match_region,
 )
 from app.domain.entity_resolution import (
-    TRIGRAM_MERGE_THRESHOLD,
     MergeCandidate,
-    MergeReason,
+    ResolutionRoot,
     entity_name_norm,
+    merge_reasons,
 )
 from app.domain.errors import EntityMergeError, EntityNotFoundError
 from app.domain.extraction import ExtractionStatus
@@ -96,16 +98,18 @@ GROUPS_CTE = """
         WHERE ce.case_id = :case AND e.merged_into IS NULL
         UNION ALL
         SELECT grp.root, c.id FROM grp JOIN entities c ON c.merged_into = grp.id
+    ),
+    -- Grupos con al menos una mención en una nota que sigue en el caso. Se
+    -- calcula una vez: como subconsulta por entidad costaba 330 ms con 3,000.
+    visible AS (
+        SELECT DISTINCT grp.root FROM grp
+        JOIN entity_mentions m ON m.entity_id = grp.id
+        JOIN case_articles ca ON ca.case_id = :case AND ca.article_id = m.article_id
     )
 """
 # Una sugerencia se ve solo si su grupo tiene al menos una mención en una nota
 # que sigue en el caso; lo revisado siempre se ve.
-_VISIBLE = """
-    (e.review_status <> 'suggested' OR EXISTS (
-        SELECT 1 FROM grp JOIN entity_mentions m ON m.entity_id = grp.id
-        JOIN case_articles ca ON ca.case_id = ce.case_id AND ca.article_id = m.article_id
-        WHERE grp.root = e.id))
-"""
+_VISIBLE = "(e.review_status <> 'suggested' OR e.id IN (SELECT root FROM visible))"
 
 
 _ENTITIES_OF_CASE = f"""
@@ -130,54 +134,34 @@ _COUNTS_SQL = f"""
     WHERE ce.case_id = :case AND e.merged_into IS NULL AND {_VISIBLE}
     GROUP BY e.review_status
 """  # noqa: S608 — condiciones fijas de este módulo; los datos van por parámetro
-# Sugerencias de fusión (D2): pares de raíces visibles, no descartadas y del
-# mismo tipo con el mismo nombre, un nombre o alias en común (contando los de
-# todo el grupo) o nombres parecidos. El parecido usa el operador % de
-# pg_trgm (umbral fijado con set_config en la misma transacción) para que
-# entre el índice GIN entities_label_trgm. Se quitan los pares que alguien
-# descartó, aunque el descarte se haya hecho sobre otro miembro del grupo.
-_MERGE_SUGGESTIONS_SQL = f"""
-    {GROUPS_CTE},
-    roots AS (
-        SELECT e.id, e.type, e.label_norm FROM case_entities ce
-        JOIN entities e ON e.id = ce.entity_id
-        WHERE ce.case_id = :case AND e.merged_into IS NULL
-          AND e.review_status <> 'discarded' AND {_VISIBLE}
-    ),
-    names AS (
-        SELECT grp.root, e.label_norm AS name FROM grp JOIN entities e ON e.id = grp.id
-        UNION
-        SELECT grp.root, a.alias_norm FROM grp JOIN entity_aliases a ON a.entity_id = grp.id
-    ),
-    candidates AS (
-        SELECT a.id AS first, b.id AS second, 'same_name' AS reason
-        FROM roots a JOIN roots b
-          ON b.type = a.type AND b.id > a.id AND b.label_norm = a.label_norm
-        UNION ALL
-        SELECT DISTINCT a.id, b.id, 'shared_name'
-        FROM roots a
-        JOIN names na ON na.root = a.id
-        JOIN names nb ON nb.name = na.name AND nb.root > a.id
-        JOIN roots b ON b.id = nb.root AND b.type = a.type
-        UNION ALL
-        SELECT a.id, b.id, 'similar_name'
-        FROM roots a
-        JOIN entities b ON b.label_norm % a.label_norm AND b.type = a.type AND b.id > a.id
-        JOIN roots rb ON rb.id = b.id
-    ),
-    dismissed AS (
-        SELECT least(g1.root, g2.root) AS first, greatest(g1.root, g2.root) AS second
-        FROM entity_merge_dismissals d
-        JOIN grp g1 ON g1.id = d.entity_low
-        JOIN grp g2 ON g2.id = d.entity_high
-        WHERE d.case_id = :case
-    )
-    SELECT c.first, c.second, array_agg(DISTINCT c.reason) AS reasons
-    FROM candidates c
-    WHERE NOT EXISTS (
-        SELECT 1 FROM dismissed x WHERE x.first = c.first AND x.second = c.second)
-    GROUP BY c.first, c.second
-"""  # noqa: S608 — consultas fijas de este módulo; los datos van por parámetro
+# Sugerencias de fusión (D2): la base trae las raíces visibles y no
+# descartadas con sus trigramas (los mismos de pg_trgm), los nombres y alias de
+# cada grupo y los pares descartados; ``merge_reasons`` (dominio) los compara.
+# Compararlos en SQL todos contra todos tardaba más de 50 s con 3,000
+# entidades: con una tabla así de chica PostgreSQL no usa el índice GIN.
+_MERGE_ROOTS_SQL = f"""
+    {GROUPS_CTE}
+    SELECT e.id, e.type, e.label_norm, show_trgm(e.label_norm) AS trigrams
+    FROM case_entities ce JOIN entities e ON e.id = ce.entity_id
+    WHERE ce.case_id = :case AND e.merged_into IS NULL
+      AND e.review_status <> 'discarded' AND {_VISIBLE}
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
+_GROUP_NAMES_SQL = f"""
+    {GROUPS_CTE}
+    SELECT grp.root, e.label_norm AS name FROM grp JOIN entities e ON e.id = grp.id
+    UNION
+    SELECT grp.root, a.alias_norm FROM grp JOIN entity_aliases a ON a.entity_id = grp.id
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
+# Un «No son la misma» cuenta para los grupos enteros, aunque se haya dicho
+# sobre una entidad que después se unió a otra.
+_DISMISSED_SQL = f"""
+    {GROUPS_CTE}
+    SELECT DISTINCT least(g1.root, g2.root) AS first, greatest(g1.root, g2.root) AS second
+    FROM entity_merge_dismissals d
+    JOIN grp g1 ON g1.id = d.entity_low
+    JOIN grp g2 ON g2.id = d.entity_high
+    WHERE d.case_id = :case
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
 
 
 def _lock_key(case_id: UUID) -> int:
@@ -724,21 +708,29 @@ class PostgresEntityRepository:
 
     async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
         """Ver ``EntityRepositoryPort.merge_suggestions``."""
-        # begin() y no connect(): set_config(..., true) vale solo dentro de la
-        # transacción, y así no se queda puesto en la conexión del pool.
-        async with self._engine.begin() as conn:
-            await conn.execute(
-                text("SELECT set_config('pg_trgm.similarity_threshold', :threshold, true)"),
-                {"threshold": str(TRIGRAM_MERGE_THRESHOLD)},
-            )
-            pairs = (
-                (await conn.execute(text(_MERGE_SUGGESTIONS_SQL), {"case": case_id}))
-                .mappings()
-                .all()
-            )
+        params = {"case": case_id}
+        async with self._engine.connect() as conn:
+            names: dict[int, set[str]] = defaultdict(set)
+            for root, name in await conn.execute(text(_GROUP_NAMES_SQL), params):
+                names[int(root)].add(name)
+            roots = [
+                ResolutionRoot(
+                    entity_id=row["id"],
+                    type=EntityType(row["type"]),
+                    label_norm=row["label_norm"],
+                    names=frozenset(names[row["id"]]),
+                    trigrams=frozenset(row["trigrams"]),
+                )
+                for row in (await conn.execute(text(_MERGE_ROOTS_SQL), params)).mappings()
+            ]
+            dismissed = [
+                (int(first), int(second))
+                for first, second in await conn.execute(text(_DISMISSED_SQL), params)
+            ]
+            pairs = merge_reasons(roots, dismissed)
             if not pairs:
                 return []
-            ids = sorted({row["first"] for row in pairs} | {row["second"] for row in pairs})
+            ids = sorted({entity for pair in pairs for entity in pair})
             rows = (
                 (
                     await conn.execute(
@@ -751,12 +743,8 @@ class PostgresEntityRepository:
             )
             by_id = {e.entity_id: e for e in await self._with_details(conn, case_id, rows)}
         return [
-            MergeSuggestion(
-                by_id[row["first"]],
-                by_id[row["second"]],
-                frozenset(MergeReason(reason) for reason in row["reasons"]),
-            )
-            for row in pairs
+            MergeSuggestion(by_id[first], by_id[second], reasons)
+            for (first, second), reasons in pairs.items()
         ]
 
     async def merge_candidate(self, case_id: UUID, entity_id: int) -> MergeCandidate | None:

@@ -8,9 +8,9 @@ qué reglas cumple una fusión o una separación que decide una persona.
 - ``entity_name_norm``: el nombre de comparación de una entidad
   (``entities.label_norm`` y ``entity_aliases.alias_norm``). Es la regla del
   proyecto (``normalize_name``) más una cosa: las comillas no cuentan.
-- ``MergeReason``: por qué el sistema cree que dos entidades son la misma
-  (decisión D2). La consulta vive en el repositorio; aquí, los motivos y su
-  orden.
+- ``MergeReason`` y ``merge_reasons``: qué pares se sugiere unir y por qué
+  (decisión D2). El repositorio trae las entidades del caso con sus nombres y
+  trigramas; aquí se comparan.
 - ``check_merge`` y ``check_split``: lo que se exige antes de fusionar o de
   separar menciones (D4 y D5).
 
@@ -21,9 +21,12 @@ No hace: no fusiona nada. Unir dos entidades siempre lo decide una persona;
 el sistema solo sugiere (ADR-0104).
 """
 
-from collections.abc import Collection
+import math
+from collections import Counter, defaultdict
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from itertools import combinations
 
 from app.domain.errors import EntityMergeError
 from app.domain.investigation import EntityType, ReviewStatus
@@ -119,6 +122,108 @@ def ordered_ids(first: int, second: int) -> tuple[int, int]:
     if first == second:
         raise EntityMergeError("Elige dos entidades distintas.", {"entity_id": first})
     return min(first, second), max(first, second)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolutionRoot:
+    """Una entidad raíz del caso con lo necesario para buscarle duplicados (D2).
+
+    Attributes:
+        entity_id: Entidad (no unida a otra).
+        type: Tipo: solo se comparan entidades del mismo tipo.
+        label_norm: Su nombre de comparación.
+        names: Nombres y alias de comparación de todo su grupo de fusión.
+        trigrams: Trigramas de ``label_norm`` como los arma pg_trgm
+            (``show_trgm``), para medir el parecido igual que la base.
+    """
+
+    entity_id: int
+    type: EntityType
+    label_norm: str
+    names: frozenset[str]
+    trigrams: frozenset[str]
+
+
+# Margen para comparar fracciones con flotantes: 0.9 × 10 da 9.000000000000002
+# y redondear hacia arriba daría 10, perdiendo pares justo en el umbral.
+_EPSILON = 1e-9
+
+
+def _similar_pairs(roots: Sequence[ResolutionRoot], threshold: float) -> set[tuple[int, int]]:
+    """Pares del mismo tipo con trigramas en común ≥ ``threshold`` (Jaccard).
+
+    Es la misma medida que ``similarity`` de pg_trgm (trigramas compartidos
+    entre trigramas distintos de los dos), pero sin comparar todos contra
+    todos: con el filtro por prefijo (algoritmo «AllPairs»), dos conjuntos
+    con parecido ≥ t comparten al menos uno de sus primeros ``n - ⌈t·n⌉ + 1``
+    trigramas, ordenados del más raro al más común. Solo esos se indexan y se
+    comparan. Con 3,000 entidades, la base tardaba más de 50 s comparando
+    todos contra todos (medido en la 9.5).
+    """
+    frequency = Counter(t for root in roots for t in root.trigrams)
+    index: dict[tuple[EntityType, str], list[ResolutionRoot]] = defaultdict(list)
+    found: set[tuple[int, int]] = set()
+    for root in sorted(roots, key=lambda r: (len(r.trigrams), r.entity_id)):
+        size = len(root.trigrams)
+        if size == 0:
+            continue
+        ordered = sorted(root.trigrams, key=lambda t: (frequency[t], t))
+        prefix = ordered[: size - math.ceil(threshold * size - _EPSILON) + 1]
+        seen: set[int] = set()
+        for trigram in prefix:
+            for other in index[(root.type, trigram)]:
+                if other.entity_id in seen:
+                    continue
+                seen.add(other.entity_id)
+                shared = len(root.trigrams & other.trigrams)
+                union = size + len(other.trigrams) - shared
+                if shared >= threshold * union - _EPSILON:
+                    found.add(ordered_ids(root.entity_id, other.entity_id))
+        for trigram in prefix:
+            index[(root.type, trigram)].append(root)
+    return found
+
+
+def merge_reasons(
+    roots: Sequence[ResolutionRoot],
+    dismissed: Collection[tuple[int, int]],
+    threshold: float = TRIGRAM_MERGE_THRESHOLD,
+) -> dict[tuple[int, int], frozenset[MergeReason]]:
+    """Qué pares del caso se sugiere unir y por qué (decisión D2).
+
+    Args:
+        roots: Entidades raíz visibles y no descartadas del caso.
+        dismissed: Pares que alguien marcó «No son la misma» (id menor
+            primero, ya resueltos a sus raíces).
+        threshold: Parecido mínimo de trigramas.
+
+    Returns:
+        Cada par (id menor primero) con todos los motivos que cumple. Solo
+        pares del mismo tipo; nunca uno descartado.
+
+    Example:
+        >>> julian = ResolutionRoot(1, EntityType.PERSON, "JULIAN N", frozenset({"JULIAN N"}),
+        ...                         frozenset())
+        >>> otro = ResolutionRoot(2, EntityType.PERSON, "JULIAN N", frozenset({"JULIAN N"}),
+        ...                       frozenset())
+        >>> MergeReason.SAME_NAME in merge_reasons([julian, otro], [])[(1, 2)]
+        True
+    """
+    reasons: dict[tuple[int, int], set[MergeReason]] = defaultdict(set)
+    by_label: dict[tuple[EntityType, str], list[int]] = defaultdict(list)
+    by_name: dict[tuple[EntityType, str], list[int]] = defaultdict(list)
+    for root in roots:
+        by_label[(root.type, root.label_norm)].append(root.entity_id)
+        for name in root.names:
+            by_name[(root.type, name)].append(root.entity_id)
+    for groups, reason in ((by_label, MergeReason.SAME_NAME), (by_name, MergeReason.SHARED_NAME)):
+        for ids in groups.values():
+            for first, second in combinations(sorted(set(ids)), 2):
+                reasons[(first, second)].add(reason)
+    for pair in _similar_pairs(roots, threshold):
+        reasons[pair].add(MergeReason.SIMILAR_NAME)
+    skip = set(dismissed)
+    return {pair: frozenset(found) for pair, found in reasons.items() if pair not in skip}
 
 
 @dataclass(frozen=True, slots=True)

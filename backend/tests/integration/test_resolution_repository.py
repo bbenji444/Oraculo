@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.application.audit import AuditEntry
-from app.domain.entity_resolution import MergeReason, entity_name_norm
+from app.domain.entity_resolution import TRIGRAM_MERGE_THRESHOLD, MergeReason, entity_name_norm
 from app.domain.errors import EntityMergeError
 from app.domain.investigation import InvestigationAction, LegalStatus, ReviewStatus
 from tests.integration.test_entities_repository import (
@@ -324,3 +324,48 @@ async def test_volver_a_agregar_una_nota_no_duplica_aunque_su_entidad_se_haya_un
     kept = await repo.get_entity(case_id, first.entity_id)
     assert kept is not None
     assert kept.article_count == 2
+
+
+async def test_nombre_parecido_coincide_con_similarity_de_postgresql(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # El parecido se calcula en Python con los trigramas que da la base
+    # (show_trgm): debe dar exactamente los pares que daría similarity().
+    repo = PostgresEntityRepository(test_engine)
+    case_id = new_case(sync_engine)
+    article = new_article(sync_engine, case_id)
+    labels = [
+        "Fiscalía General de Justicia de la Ciudad de México",
+        "Fiscalía General de Justicia de Ciudad de México",
+        "Fiscalía General de Justicia del Estado de México",
+        "Secretaría de Seguridad Ciudadana",
+        "Secretaría de Seguridad y Protección Ciudadana",
+        "Peña Núñez y Asociados",
+        "Pena Nunez y Asociados",
+        "Peña Núñez Asociados",
+    ]
+    for label in labels:
+        seed(sync_engine, case_id, article, label, kind="org")
+
+    found = {
+        pair
+        for pair, reasons in (await suggestions(repo, case_id)).items()
+        if MergeReason.SIMILAR_NAME in reasons
+    }
+
+    with sync_engine.connect() as conn:
+        expected = {
+            (int(a), int(b))
+            for a, b in conn.execute(
+                text(
+                    "SELECT a.id, b.id FROM case_entities ca "
+                    "JOIN entities a ON a.id = ca.entity_id "
+                    "JOIN case_entities cb ON cb.case_id = ca.case_id "
+                    "JOIN entities b ON b.id = cb.entity_id AND b.id > a.id "
+                    "WHERE ca.case_id = :c AND similarity(a.label_norm, b.label_norm) >= :t"
+                ),
+                {"c": case_id, "t": TRIGRAM_MERGE_THRESHOLD},
+            )
+        }
+    assert found == expected
+    assert len(found) >= 2  # «…de la Ciudad…» con «…de Ciudad…» y las variantes con Ñ
