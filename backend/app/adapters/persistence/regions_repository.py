@@ -35,6 +35,9 @@ _LEVEL_DEPTH = (
     "array_position(ARRAY['country', 'state', 'municipality', 'locality']::region_level[], r.level)"
 )
 _AFTER = "AND (CAST(:after_name AS text) IS NULL OR (r.name_norm, r.id) > (:after_name, :after_id))"
+# Relevancia del buscador cuando el nombre solo se parece (error de dedo): ahí
+# el orden lo decide el parecido y no el nivel (ver ``search``).
+_FUZZY_RELEVANCE = 3
 # Clave INEGI de estado: los 2 primeros dígitos de cualquier clave (ADR-0002).
 _STATE_CODE_LENGTH = 2
 
@@ -146,23 +149,33 @@ class PostgresRegionRepository:
         Orden de relevancia: nombre o alias exacto → el nombre empieza con
         el texto → alguna palabra empieza con el texto → parecido por
         trigramas. En empate, primero lo más general (estado antes que
-        localidad) y luego lo más parecido.
+        localidad) y luego lo más parecido. En lo que solo se parece (un
+        error de dedo) manda el parecido antes que el nivel: "monterey" daba
+        primero el país Montenegro (parecido 0.4) que el municipio Monterrey
+        (0.6), prueba operativa del 20/10/2026.
         """
         escaped = _escape_like(query_norm)
+        # Subconsulta: PostgreSQL no deja usar el alias ``relevance`` dentro de
+        # una expresión del ORDER BY.
         sql = f"""
-            SELECT {_COLUMNS},
-                   CASE
-                       WHEN r.name_norm = :q OR r.aliases_norm @> ARRAY[:q] THEN 0
-                       WHEN r.name_norm LIKE :prefix THEN 1
-                       WHEN r.name_norm LIKE :word_prefix THEN 2
-                       ELSE 3
-                   END AS relevance
-            FROM regions r
-            WHERE r.name_norm LIKE :contains
-               OR r.aliases_norm @> ARRAY[:q]
-               OR r.name_norm % :q
-            ORDER BY relevance, {_LEVEL_DEPTH}, similarity(r.name_norm, :q) DESC,
-                     r.name_norm, r.id
+            SELECT * FROM (
+                SELECT {_COLUMNS},
+                       CASE
+                           WHEN r.name_norm = :q OR r.aliases_norm @> ARRAY[:q] THEN 0
+                           WHEN r.name_norm LIKE :prefix THEN 1
+                           WHEN r.name_norm LIKE :word_prefix THEN 2
+                           ELSE {_FUZZY_RELEVANCE}
+                       END AS relevance,
+                       similarity(r.name_norm, :q) AS likeness,
+                       {_LEVEL_DEPTH} AS depth
+                FROM regions r
+                WHERE r.name_norm LIKE :contains
+                   OR r.aliases_norm @> ARRAY[:q]
+                   OR r.name_norm % :q
+            ) AS found
+            ORDER BY relevance,
+                     CASE WHEN relevance = {_FUZZY_RELEVANCE} THEN likeness END DESC NULLS LAST,
+                     depth, likeness DESC, name_norm, id
             LIMIT :limit
         """  # noqa: S608 — fragmentos SQL constantes del módulo; el texto del usuario va como parámetro
         return await self._fetch(
