@@ -7,9 +7,15 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from app.api.v1.concepts import client_ip, get_actor, get_concept_repository
+from app.api.v1.concepts import (
+    client_ip,
+    get_actor,
+    get_concept_repository,
+    get_preview_providers,
+)
 from app.api.v1.regions import get_region_repository
 from app.application.audit import Actor
+from app.domain.queries import Provider
 from app.main import create_app
 from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_regions import IZTAPALAPA, FakeRegionRepository
@@ -38,6 +44,7 @@ def client(concepts: FakeConceptRepository) -> Iterator[TestClient]:
     # argumento `regions` como parámetro de la petición.
     app.dependency_overrides[get_region_repository] = lambda: regions
     app.dependency_overrides[get_actor] = lambda: Actor("prueba", "127.0.0.1")
+    app.dependency_overrides[get_preview_providers] = lambda: tuple(Provider)
     # Sin `with`: no corre el lifespan, así que no se conecta a la base.
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -128,6 +135,20 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
     }
     assert (body["total_queries"], body["total_credits"]) == (4, 1)
     assert concepts.concepts == {}
+
+
+def test_probar_muestra_solo_los_proveedores_configurados(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_preview_providers] = lambda: (
+        Provider.SEARCHAPI,
+        Provider.LOCAL_INDEX,
+    )
+
+    body = client.post(f"{URL}/preview", params={"region_id": IZTAPALAPA.id}, json=BODY).json()
+
+    assert [q["provider"] for q in body["queries"]] == ["searchapi", "indice_local"]
+    assert body["total_queries"] == 2
 
 
 def test_probar_concepto_guardado(client: TestClient) -> None:

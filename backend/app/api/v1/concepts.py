@@ -34,6 +34,8 @@ from app.application.use_cases.concepts import (
     PreviewConceptQueries,
     UpdateConcept,
 )
+from app.application.use_cases.plan_search import PlanSearch
+from app.domain.queries import Provider
 
 router = APIRouter(prefix="/concepts", tags=["conceptos"], responses=ERROR_RESPONSES)
 
@@ -52,6 +54,22 @@ def get_concept_repository(request: Request) -> ConceptRepositoryPort:
     """
     repository: ConceptRepositoryPort = request.app.state.concept_repository
     return repository
+
+
+def get_preview_providers(request: Request) -> tuple[Provider, ...]:
+    """Proveedores que recibirían una búsqueda real (los configurados).
+
+    Sale de la misma planeación que usa ``POST /searches``, para que "Probar
+    concepto" muestre lo que de verdad se mandaría (las pruebas lo reemplazan).
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        Los proveedores configurados, en su orden.
+    """
+    planner: PlanSearch = request.app.state.search_planner
+    return planner.available_providers()
 
 
 def client_ip(request: Request) -> str | None:
@@ -95,6 +113,26 @@ CurrentActor = Annotated[Actor, Depends(get_actor)]
 ConceptId = Annotated[int, Path(description="Id del concepto.")]
 RegionId = Annotated[int, Query(description="Región para la que se arman las consultas.")]
 Days = Annotated[int, Query(description="Últimos N días (1 a 90).")]
+PreviewProviders = Annotated[tuple[Provider, ...], Depends(get_preview_providers)]
+
+
+def get_query_preview(
+    concepts: Concepts, regions: Regions, providers: PreviewProviders
+) -> PreviewConceptQueries:
+    """Caso de uso "Probar concepto" con sus repositorios y proveedores.
+
+    Args:
+        concepts: Repositorio de conceptos.
+        regions: Catálogo de regiones.
+        providers: Proveedores que recibirían la búsqueda.
+
+    Returns:
+        El caso de uso listo.
+    """
+    return PreviewConceptQueries(concepts, regions, providers)
+
+
+QueryPreview = Annotated[PreviewConceptQueries, Depends(get_query_preview)]
 
 
 @router.get("", response_model=ConceptPageOut, summary="Lista de conceptos")
@@ -133,15 +171,12 @@ async def create_concept(body: ConceptIn, concepts: Concepts, actor: CurrentActo
 )
 async def preview_draft(
     body: ConceptIn,
-    concepts: Concepts,
-    regions: Regions,
+    use_case: QueryPreview,
     region_id: RegionId,
     days: Days = DEFAULT_PREVIEW_DAYS,
 ) -> QueryPreviewOut:
     """Consultas que generaría el borrador, sin guardar nada ni gastar créditos."""
-    preview = await PreviewConceptQueries(concepts, regions).for_draft(
-        body.to_input(), region_id, days
-    )
+    preview = await use_case.for_draft(body.to_input(), region_id, days)
     return QueryPreviewOut.from_preview(preview)
 
 
@@ -191,12 +226,11 @@ async def delete_concept(
     responses=error_responses(404),
 )
 async def preview_saved(
-    concepts: Concepts,
-    regions: Regions,
+    use_case: QueryPreview,
     concept_id: ConceptId,
     region_id: RegionId,
     days: Days = DEFAULT_PREVIEW_DAYS,
 ) -> QueryPreviewOut:
     """Consultas que generaría el concepto, sin gastar créditos (historia H2)."""
-    preview = await PreviewConceptQueries(concepts, regions).for_saved(concept_id, region_id, days)
+    preview = await use_case.for_saved(concept_id, region_id, days)
     return QueryPreviewOut.from_preview(preview)

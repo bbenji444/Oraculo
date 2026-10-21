@@ -12,6 +12,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 
 from app.core.config import Settings
@@ -51,8 +52,15 @@ def engine(settings: Settings, tmp_path_factory: pytest.TempPathFactory) -> Iter
 
 @pytest.fixture(scope="module")
 def client(settings: Settings, engine: Engine) -> Iterator[TestClient]:
+    # Con llave de SearchApi aunque el .env no la tenga: "Probar concepto"
+    # muestra solo los proveedores configurados. La llave falsa nunca se usa:
+    # probar no manda nada.
     test_settings = settings.model_copy(
-        update={"postgres_db": settings.postgres_test_db, "dev_user": "analista-prueba"}
+        update={
+            "postgres_db": settings.postgres_test_db,
+            "dev_user": "analista-prueba",
+            "searchapi_api_key": SecretStr("clave-de-prueba"),
+        }
     )
     with TestClient(create_app(test_settings)) as test_client:
         yield test_client
@@ -149,10 +157,11 @@ def test_vista_previa_del_caso_de_la_especificacion(client: TestClient, engine: 
         '(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) '
         "Iztapalapa -curso -webinar -diplomado"
     )
+    # Una búsqueda solo consulta SearchApi y el índice local (GDELT llega por la
+    # ingesta, ADR-0014); los textos de los otros dialectos se prueban en
+    # test_query_builder.py.
     assert [q["text"] for q in body["queries"]] == [
         base,
-        f"{base} when:7d",
-        f"{base} sourcelang:spanish sourcecountry:MX",
         'contiene: ciberataque, hackeo, ransomware, "filtración de datos" o phishing'
         " · lugar: Iztapalapa · sin: curso, webinar o diplomado",
     ]

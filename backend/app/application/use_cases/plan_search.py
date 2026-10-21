@@ -120,6 +120,18 @@ class PlanSearch:
         self._credits_limit = credits_limit
         self._now = now
 
+    def available_providers(self) -> tuple[Provider, ...]:
+        """Proveedores con los que se planea de verdad, en su orden.
+
+        Los que no están configurados (sin llave, o apagados como GDELT y el RSS
+        de Google, ADR-0011 y 0012) no reciben consultas. "Probar concepto" usa
+        esta misma lista para mostrar lo que una búsqueda mandaría.
+
+        Returns:
+            Los proveedores configurados.
+        """
+        return tuple(p for p, adapter in self._providers.items() if adapter.is_configured())
+
     async def _concepts_of(self, ids: Sequence[int]) -> tuple[SearchConcept, ...]:
         if not ids:
             raise InvalidRequestError("Elige al menos un concepto.")
@@ -164,7 +176,7 @@ class PlanSearch:
         if region is None or facts is None:
             raise RegionNotFoundError("No existe esa región.", {"id": request.region_id})
         ancestors = await self._regions.ancestors(region.id)
-        available = [p for p, adapter in self._providers.items() if adapter.is_configured()]
+        available = self.available_providers()
         queries = tuple(plan_queries(concepts, place_for(facts), request.window, available))
         credits_estimated = sum(self._providers[q.provider].estimate_cost(q) for q in queries)
         used = await self._log.credits_used_since(
