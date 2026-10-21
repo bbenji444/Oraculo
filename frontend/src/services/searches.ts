@@ -170,7 +170,8 @@ const ARTICLES_PAGE_SIZE = 200;
 // Historial: una pantalla cómoda.
 const HISTORY_PAGE_SIZE = 20;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** Si el valor es un objeto (no nulo): base de las validaciones de forma. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
@@ -193,7 +194,8 @@ function isSearch(value: unknown): value is Search {
   );
 }
 
-function isArticle(value: unknown): value is Article {
+/** Si el valor tiene la forma de una nota de la API (también la usan los casos). */
+export function isArticle(value: unknown): value is Article {
   return (
     isRecord(value) &&
     typeof value.article_id === 'number' &&
@@ -203,7 +205,8 @@ function isArticle(value: unknown): value is Article {
   );
 }
 
-function isPage<T>(value: unknown, guard: (item: unknown) => item is T): value is Page<T> {
+/** Si el valor es una página `{items, next_cursor}` cuyos elementos pasan `guard`. */
+export function isPage<T>(value: unknown, guard: (item: unknown) => item is T): value is Page<T> {
   return isRecord(value) && Array.isArray(value.items) && value.items.every(guard);
 }
 
