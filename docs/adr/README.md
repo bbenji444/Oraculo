@@ -36,5 +36,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0020](0020-colonias-de-openstreetmap.md) | Colonias de OpenStreetMap y reglas nuevas del geolocalizador | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
+| [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |
 | [0104](0104-confirmacion-humana-obligatoria.md) | Confirmación humana obligatoria: todo nace sugerido y nada se fusiona solo (Fase 9) | Aceptado |
 | [0105](0105-estatus-legal-y-procedencia.md) | Estatus legal y procedencia como campos de primera clase; "culpable" no existe (Fase 9) | Aceptado |
+| [0106](0106-vinculos-y-fusiones-calculados-al-leer.md) | Vínculos y sugerencias de fusión calculados al leer; unir solo escribe `merged_into` (Fase 9.5) | Aceptado |
