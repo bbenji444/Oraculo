@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.articles import router as articles_router
 from app.api.v1.cases import router as cases_router
 from app.api.v1.concepts import router as concepts_router
+from app.api.v1.entities import router as entities_router
 from app.api.v1.health import router as health_router
 from app.api.v1.regions import router as regions_router
 from app.api.v1.reports import router as reports_router
@@ -18,6 +19,7 @@ api_router.include_router(searches_router)
 api_router.include_router(articles_router)
 api_router.include_router(reports_router)
 api_router.include_router(cases_router)
+api_router.include_router(entities_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
@@ -37,6 +39,13 @@ OPENAPI_TAGS = [
         "description": (
             "Casos de investigación (Fase 9): crear, listar, abrir y editar. Cada persona ve "
             "solo los casos de los que es miembro, y abrir un caso queda en la bitácora."
+        ),
+    },
+    {
+        "name": "entidades",
+        "description": (
+            "Entidades que la IA propone de las notas de un caso (Fase 9.4): revisarlas, "
+            "confirmarlas con su estatus legal o descartarlas. Analizar gasta tokens de la IA."
         ),
     },
     {
