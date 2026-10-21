@@ -8,6 +8,7 @@
  * No hace: no pide datos (eso es `hooks/useCases`).
  */
 import type { Case, CaseStatus, Sensitivity } from '../../services/cases';
+import type { LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
 
 /** Opciones del formulario, de menor a mayor reserva. */
@@ -44,3 +45,14 @@ export function caseSummary(item: Pick<Case, 'article_count' | 'updated_at'>): s
       : `${String(item.article_count)} ${item.article_count === 1 ? 'nota' : 'notas'}`;
   return `${notes} · actualizado ${formatDay(item.updated_at)}`;
 }
+
+/** Estatus legales que puede elegir quien confirma (los de la API, ADR-0105). */
+export const LEGAL_STATUS_OPTIONS: { value: LegalStatus; label: string }[] = [
+  { value: 'mentioned', label: 'mencionado' },
+  { value: 'alleged', label: 'señalado' },
+  { value: 'detained', label: 'detenido' },
+  { value: 'charged', label: 'vinculado a proceso' },
+  { value: 'victim', label: 'víctima' },
+  { value: 'witness', label: 'testigo' },
+  { value: 'official', label: 'funcionario' },
+];

@@ -6,7 +6,8 @@
  * o archivado es de solo lectura: no ofrece editar ni quitar notas. Un lector
  * tampoco.
  *
- * El muro sobre el globo llega en la 9.6; por ahora las notas se ven en lista.
+ * Debajo, la sección Entidades (9.4): lo que la IA propone de sus notas para
+ * confirmar o descartar. El muro sobre el globo llega en la 9.6.
  *
  * No hace: no agrega notas (eso es el botón "Agregar al caso" de Explorar).
  */
@@ -18,6 +19,7 @@ import {
 } from '../../hooks/useCases';
 import type { Case, CaseStatus } from '../../services/cases';
 import { formatDay, PRECISION_LABEL } from '../Explore/format';
+import { CaseEntities } from './CaseEntities';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
 
 interface CaseDetailProps {
@@ -200,6 +202,8 @@ export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
           })}
         </ul>
       </div>
+
+      <CaseEntities caseId={item.id} canEdit={canEdit && isOpen} />
     </section>
   );
 }
