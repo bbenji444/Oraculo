@@ -389,6 +389,11 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `entity_mentions.evidence_span`: cita de máximo 300 caracteres, que sobrevive al borrado del texto (ADR-0015).
 - `cases`, `case_members` (acceso por caso hasta la Fase 8), `case_articles` y `case_entities` con llaves foráneas reales en lugar de `case_items`, y `case_notes` con a lo más un ancla.
 
+**Extracción de entidades (Fase 9.4, migración 0020, ADR-0103)**
+- `entity_extractions`: lo que respondió la IA de cada nota (propuestas revisadas contra el texto y descartadas con su motivo), con modelo, origen del texto (`full_text` o `title_snippet`), tokens, costo y error. Única por (`article_id`, `prompt_version`): se reutiliza entre casos sin volver a pagar.
+- `case_articles.entities_status` (`pending`, `queued`, `done`, `failed`, `skipped`) y `entities_cost_usd` (lo que pagó ese caso por la nota).
+- `entity_mentions`: única por (`entity_id`, `article_id`, `evidence_span`).
+
 ---
 
 ## 7. Conceptos
