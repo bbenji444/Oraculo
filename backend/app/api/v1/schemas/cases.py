@@ -144,3 +144,16 @@ class CasePageOut(BaseModel):
             La respuesta.
         """
         return cls(items=[CaseOut.from_view(v) for v in page.items], next_cursor=page.next_cursor)
+
+
+class CaseArticleIn(BaseModel):
+    """Noticia que se agrega al caso."""
+
+    article_id: int = Field(gt=0, examples=[1234])
+
+
+class CaseArticleOut(BaseModel):
+    """Resultado de agregar una noticia (idempotente)."""
+
+    article_id: int
+    added: bool = Field(description="false si la noticia ya estaba en el caso.")

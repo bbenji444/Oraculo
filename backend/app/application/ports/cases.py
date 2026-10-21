@@ -18,6 +18,7 @@ from uuid import UUID
 
 from app.application.audit import AuditEntry
 from app.application.pagination import TimeCursor
+from app.application.ports.search_reads import ArticleItem
 from app.domain.case import Case, CaseDraft, CaseView
 from app.domain.investigation import CaseStatus
 
@@ -108,5 +109,61 @@ class CaseRepositoryPort(Protocol):
 
         Returns:
             ``True`` si se registró; ``False`` si ya había uno reciente.
+        """
+        ...
+
+    async def article_exists(self, article_id: int) -> bool:
+        """Dice si existe una noticia.
+
+        Args:
+            article_id: Noticia.
+
+        Returns:
+            ``True`` si existe.
+        """
+        ...
+
+    async def add_article(
+        self, case_id: UUID, article_id: int, added_by: str, audit: AuditEntry
+    ) -> bool:
+        """Agrega una noticia al caso (si ya estaba, no hace nada).
+
+        Args:
+            case_id: Caso.
+            article_id: Noticia.
+            added_by: Quién la agrega.
+            audit: Registro para la bitácora (solo se guarda si se agregó).
+
+        Returns:
+            ``True`` si se agregó; ``False`` si ya estaba.
+        """
+        ...
+
+    async def remove_article(self, case_id: UUID, article_id: int, audit: AuditEntry) -> bool:
+        """Quita una noticia del caso (la noticia no se borra).
+
+        Args:
+            case_id: Caso.
+            article_id: Noticia.
+            audit: Registro para la bitácora (solo se guarda si se quitó).
+
+        Returns:
+            ``True`` si se quitó; ``False`` si no estaba.
+        """
+        ...
+
+    async def list_articles(
+        self, case_id: UUID, after: TimeCursor | None, limit: int
+    ) -> list[ArticleItem]:
+        """Noticias del caso, de la más reciente a la más vieja.
+
+        Args:
+            case_id: Caso.
+            after: Posición (``published_at``, ``id``) desde la cual seguir.
+            limit: Máximo de registros.
+
+        Returns:
+            Las notas con el mismo formato de Explorar (``in_region`` vacío:
+            un caso no tiene región buscada).
         """
         ...

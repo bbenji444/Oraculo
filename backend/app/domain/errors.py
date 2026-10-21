@@ -199,9 +199,3 @@ class CaseValidationError(InvalidRequestError):
     """El caso no cumple sus reglas (``details["problemas"]`` por campo)."""
 
     code = "invalid_case"
-
-
-class ArticleNotFoundError(NotFoundError):
-    """No existe la noticia pedida."""
-
-    code = "article_not_found"

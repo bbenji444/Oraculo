@@ -152,3 +152,44 @@ def test_la_lista_filtra_por_estado_y_dice_si_tiene_la_nota(client: TestClient) 
     ]
     assert [c["name"] for c in only_archived] == ["Viejo"]
     assert client.get(URL, params={"status": "borrado"}).status_code == 422
+
+
+def test_agregar_listar_y_quitar_notas(client: TestClient, repo: FakeCaseRepository) -> None:
+    case_id = client.post(URL, json=BODY).json()["id"]
+    repo.known_article(10, "Micky Hair: qué se sabe", None)
+
+    added = client.post(f"{URL}/{case_id}/articles", json={"article_id": 10})
+    again = client.post(f"{URL}/{case_id}/articles", json={"article_id": 10})
+    listed = client.get(f"{URL}/{case_id}/articles").json()
+    removed = client.delete(f"{URL}/{case_id}/articles/10")
+
+    assert (added.status_code, added.json()) == (200, {"article_id": 10, "added": True})
+    assert again.json()["added"] is False
+    assert [a["title"] for a in listed["items"]] == ["Micky Hair: qué se sabe"]
+    assert removed.status_code == 204
+    assert client.get(f"{URL}/{case_id}/articles").json()["items"] == []
+
+
+def test_agregar_una_nota_inexistente_responde_404(client: TestClient) -> None:
+    case_id = client.post(URL, json=BODY).json()["id"]
+
+    response = client.post(f"{URL}/{case_id}/articles", json={"article_id": 999})
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "article_not_found"
+
+
+def test_las_notas_de_un_caso_ajeno_no_existen(
+    client: TestClient, repo: FakeCaseRepository, session: Session
+) -> None:
+    case_id = client.post(URL, json=BODY).json()["id"]
+    repo.known_article(10, "Nota", None)
+    session.as_user("otra-analista")
+
+    responses = [
+        client.get(f"{URL}/{case_id}/articles"),
+        client.post(f"{URL}/{case_id}/articles", json={"article_id": 10}),
+        client.delete(f"{URL}/{case_id}/articles/10"),
+    ]
+
+    assert [r.status_code for r in responses] == [404, 404, 404]

@@ -414,6 +414,29 @@ Con datos inválidos responde `422` `invalid_case`, con un problema por campo en
 
 Una petición sin cambios no escribe nada.
 
+**Noticias del caso.** Agregarlas o quitarlas exige rol `owner` o `editor` y el caso abierto. Cada cambio queda en la bitácora (`case.article_added`, `case.article_removed`) y sube el caso en la lista.
+
+- `POST /cases/{id}/articles` con `{"article_id": 67}` agrega la nota. Si ya estaba, responde `"added": false` y no repite la bitácora; así un doble clic no duplica nada. Una nota inexistente responde `404` `article_not_found`.
+- `DELETE /cases/{id}/articles/{article_id}` la quita del caso (`204`). La noticia sigue en el sistema.
+- `GET /cases/{id}/articles` lista las notas con el mismo formato de "Notas de una búsqueda", de la más reciente a la más vieja y con cursor. `in_region` va vacío: un caso no tiene región buscada.
+
+Ejemplo real: la primera nota de la historia H9.1 agregada dos veces.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/cases/2d6f9438-886a-444f-84e9-d47a146903c4/articles \
+  -H 'Content-Type: application/json' -d '{"article_id": 67}'
+```
+
+```json
+{ "article_id": 67, "added": true }
+```
+
+La segunda vez responde `{ "article_id": 67, "added": false }`. La lista del caso, recortada:
+
+```json
+{ "items": [ { "article_id": 67, "title": "Micky Hair: Qué se sabe del asesinato de estilista de Micky Hair Salon- Grupo Milenio", "published_at": "2026-10-17T20:46:00-06:00", "primary_location": { "place": "Polanco, Alcaldía Miguel Hidalgo", "precision": "locality", … }, "in_region": null, … } ], "next_cursor": null }
+```
+
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.

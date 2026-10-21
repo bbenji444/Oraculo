@@ -167,3 +167,46 @@ async def test_ver_un_caso_se_registra_una_vez_por_ventana(
 
     assert (first, again, other, later) == (True, False, True, True)
     assert audit_actions(sync_engine, case.id).count("case.viewed") == 3
+
+
+async def test_agregar_quitar_y_listar_notas_con_bitacora(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    repo = PostgresCaseRepository(test_engine)
+    case = await repo.create(CaseDraft.validated("Caso", "", "normal"), "benji", created())
+    with sync_engine.begin() as conn:
+        ids = [
+            conn.execute(
+                text(
+                    "INSERT INTO articles (url_canonical, url_hash, title, title_norm, "
+                    "published_at) VALUES (:u, md5(:u), :t, upper(:t), :p) "
+                    "ON CONFLICT (url_hash) DO UPDATE SET title = EXCLUDED.title RETURNING id"
+                ),
+                {"u": f"https://m.mx/caso-{n}", "t": f"Nota {n}", "p": f"2026-10-1{n}T12:00Z"},
+            ).scalar_one()
+            for n in range(3)
+        ]
+    added = AuditEntry(BENJI, InvestigationAction.CASE_ARTICLE_ADDED, {})
+
+    results = [await repo.add_article(case.id, i, "benji", added) for i in ids]
+    duplicate = await repo.add_article(case.id, ids[0], "benji", added)
+    first_page = await repo.list_articles(case.id, None, 2)
+    last = first_page[-1]
+    rest = await repo.list_articles(case.id, TimeCursor(last.published_at, str(last.article_id)), 2)
+    removed = await repo.remove_article(
+        case.id, ids[1], AuditEntry(BENJI, InvestigationAction.CASE_ARTICLE_REMOVED, {})
+    )
+    view = await repo.get_view(case.id, "benji")
+
+    assert (results, duplicate, removed) == ([True, True, True], False, True)
+    assert [a.title for a in first_page + rest] == ["Nota 2", "Nota 1", "Nota 0"]
+    assert first_page[0].in_region is None
+    assert view is not None and view.case.article_count == 2
+    assert view.case.updated_at > case.updated_at
+    assert await repo.article_exists(ids[0])
+    assert not await repo.article_exists(-1)
+    assert audit_actions(sync_engine, case.id) == [
+        "case.created",
+        *["case.article_added"] * 3,
+        "case.article_removed",
+    ]

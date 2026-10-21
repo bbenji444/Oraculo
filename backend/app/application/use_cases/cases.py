@@ -9,8 +9,10 @@ Cada cambio deja su registro en la bitácora en la misma transacción, y ver
 un caso también (``case.viewed``), una vez por persona cada
 ``CASE_VIEW_DEDUP_MINUTES`` (D4).
 
-No hace: no sabe de HTTP ni de SQL; no agrega noticias ni miembros (eso
-llega en los commits siguientes de la 9.3).
+Las noticias se agregan y se quitan sin duplicar (D6, D7): la noticia es de
+todo el sistema y quitarla del caso no la borra.
+
+No hace: no sabe de HTTP ni de SQL; no agrega entidades (9.4).
 """
 
 from collections.abc import Callable
@@ -26,6 +28,13 @@ from app.application.pagination import (
     encode_time_cursor,
 )
 from app.application.ports.cases import CaseRepositoryPort
+from app.application.ports.search_reads import ArticleItem
+from app.application.use_cases.search_reads import (
+    DEFAULT_ARTICLE_PAGE_SIZE,
+    MAX_ARTICLE_PAGE_SIZE,
+    ArticleNotFoundError,
+    check_limit,
+)
 from app.domain.case import (
     Case,
     CaseChanges,
@@ -359,3 +368,125 @@ def _action_for(before: CaseStatus, after: CaseStatus) -> InvestigationAction:
     if after is CaseStatus.ARCHIVED:
         return InvestigationAction.CASE_ARCHIVED
     return InvestigationAction.CASE_CLOSED
+
+
+class AddCaseArticle:
+    """Agrega una noticia a un caso (historia H9.1). Agregarla dos veces no duplica nada."""
+
+    def __init__(self, repository: CaseRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los casos.
+        """
+        self._repository = repository
+
+    async def execute(self, case_id: UUID, article_id: int, actor: Actor) -> bool:
+        """Agrega la nota y lo registra en la bitácora.
+
+        Args:
+            case_id: Caso.
+            article_id: Noticia.
+            actor: Quién la agrega.
+
+        Returns:
+            ``True`` si se agregó; ``False`` si ya estaba (D6: un doble clic no
+            deja una segunda fila en la bitácora).
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si su rol solo permite mirar.
+            CaseClosedError: Si el caso está cerrado o archivado.
+            ArticleNotFoundError: Si la noticia no existe.
+        """
+        require_edit(await case_for(self._repository, case_id, actor))
+        if not await self._repository.article_exists(article_id):
+            raise ArticleNotFoundError("No existe esa nota.", {"id": article_id})
+        audit = AuditEntry(
+            actor, InvestigationAction.CASE_ARTICLE_ADDED, {"article_id": article_id}
+        )
+        return await self._repository.add_article(case_id, article_id, actor.user_id, audit)
+
+
+class RemoveCaseArticle:
+    """Quita una noticia de un caso; la noticia sigue en el sistema (D7)."""
+
+    def __init__(self, repository: CaseRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los casos.
+        """
+        self._repository = repository
+
+    async def execute(self, case_id: UUID, article_id: int, actor: Actor) -> bool:
+        """Quita la nota y lo registra en la bitácora.
+
+        Args:
+            case_id: Caso.
+            article_id: Noticia.
+            actor: Quién la quita.
+
+        Returns:
+            ``True`` si se quitó; ``False`` si no estaba en el caso.
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si su rol solo permite mirar.
+            CaseClosedError: Si el caso está cerrado o archivado.
+        """
+        require_edit(await case_for(self._repository, case_id, actor))
+        audit = AuditEntry(
+            actor, InvestigationAction.CASE_ARTICLE_REMOVED, {"article_id": article_id}
+        )
+        return await self._repository.remove_article(case_id, article_id, audit)
+
+
+class ListCaseArticles:
+    """Noticias de un caso, por páginas; cualquier miembro las ve."""
+
+    def __init__(self, repository: CaseRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los casos.
+        """
+        self._repository = repository
+
+    async def execute(
+        self,
+        case_id: UUID,
+        actor: Actor,
+        cursor: str | None = None,
+        limit: int = DEFAULT_ARTICLE_PAGE_SIZE,
+    ) -> Page[ArticleItem]:
+        """Devuelve una página, de la nota más reciente a la más vieja.
+
+        No registra otra vista: la pantalla abre el caso con ``GetCase``, que
+        ya la registró.
+
+        Args:
+            case_id: Caso.
+            actor: Quién pregunta.
+            cursor: Cursor de la página anterior.
+            limit: Tamaño de página (1 a 200).
+
+        Returns:
+            La página con su cursor siguiente.
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            InvalidRequestError: Si el límite o el cursor no son válidos.
+        """
+        check_limit(limit, MAX_ARTICLE_PAGE_SIZE)
+        await case_for(self._repository, case_id, actor)
+        after = decode_time_cursor(cursor) if cursor else None
+        rows = await self._repository.list_articles(case_id, after, limit + 1)
+        items = rows[:limit]
+        last = items[-1] if items else None
+        next_cursor = (
+            encode_time_cursor(TimeCursor(last.published_at, str(last.article_id)))
+            if len(rows) > limit and last
+            else None
+        )
+        return Page(items=tuple(items), next_cursor=next_cursor)

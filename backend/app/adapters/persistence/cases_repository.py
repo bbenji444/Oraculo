@@ -20,8 +20,16 @@ from uuid import UUID
 from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
+from app.adapters.persistence.article_rows import (
+    ALL_JUDGEMENTS,
+    ALL_PROVIDERS,
+    ARTICLE_COLUMNS,
+    PRIMARY_COLUMNS,
+    article_item,
+)
 from app.application.audit import AuditEntry
 from app.application.pagination import TimeCursor
+from app.application.ports.search_reads import ArticleItem
 from app.domain.case import Case, CaseDraft, CaseView
 from app.domain.investigation import CaseMemberRole, CaseStatus, Sensitivity
 
@@ -253,3 +261,83 @@ class PostgresCaseRepository:
                 dict(params),
             )
         return bool(result.rowcount)
+
+    async def article_exists(self, article_id: int) -> bool:
+        """Ver ``CaseRepositoryPort.article_exists``."""
+        async with self._engine.connect() as conn:
+            found = await conn.execute(
+                text("SELECT EXISTS (SELECT 1 FROM articles WHERE id = :id)"), {"id": article_id}
+            )
+            return bool(found.scalar_one())
+
+    async def add_article(
+        self, case_id: UUID, article_id: int, added_by: str, audit: AuditEntry
+    ) -> bool:
+        """Ver ``CaseRepositoryPort.add_article``."""
+        async with self._engine.begin() as conn:
+            added = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO case_articles (case_id, article_id, added_by) "
+                        "VALUES (:case, :article, :by) ON CONFLICT DO NOTHING RETURNING article_id"
+                    ),
+                    {"case": case_id, "article": article_id, "by": added_by},
+                )
+            ).first()
+            if added is None:
+                return False
+            await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+            return True
+
+    async def remove_article(self, case_id: UUID, article_id: int, audit: AuditEntry) -> bool:
+        """Ver ``CaseRepositoryPort.remove_article``."""
+        async with self._engine.begin() as conn:
+            removed = (
+                await conn.execute(
+                    text(
+                        "DELETE FROM case_articles WHERE case_id = :case AND article_id = :article "
+                        "RETURNING article_id"
+                    ),
+                    {"case": case_id, "article": article_id},
+                )
+            ).first()
+            if removed is None:
+                return False
+            await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+            return True
+
+    async def list_articles(
+        self, case_id: UUID, after: TimeCursor | None, limit: int
+    ) -> list[ArticleItem]:
+        """Ver ``CaseRepositoryPort.list_articles``."""
+        params: dict[str, Any] = {"case": case_id, "limit": limit}
+        page = ""
+        if after is not None:
+            # Mismo orden que las notas de una búsqueda: las más recientes
+            # primero, las que no tienen fecha al final, y en empate por id.
+            if after.moment is None:
+                page = "AND a.published_at IS NULL AND a.id < :after_id"
+            else:
+                page = (
+                    "AND (a.published_at < :after_moment OR a.published_at IS NULL "
+                    "OR (a.published_at = :after_moment AND a.id < :after_id))"
+                )
+                params["after_moment"] = after.moment
+            params["after_id"] = int(after.id)
+        sql = f"""
+            SELECT {ARTICLE_COLUMNS}, NULL::boolean AS in_region,
+                {ALL_PROVIDERS} AS providers, {PRIMARY_COLUMNS},
+                {ALL_JUDGEMENTS} AS judgements
+            FROM case_articles ca
+            JOIN articles a ON a.id = ca.article_id
+            LEFT JOIN article_locations p ON p.article_id = a.id AND p.is_primary
+            LEFT JOIN regions r ON r.id = p.region_id
+            WHERE ca.case_id = :case {page}
+            ORDER BY a.published_at DESC NULLS LAST, a.id DESC
+            LIMIT :limit
+        """  # noqa: S608 — columnas y condiciones son texto fijo de article_rows y de este módulo
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(text(sql), params)).mappings().all()
+        return [article_item(row) for row in rows]
