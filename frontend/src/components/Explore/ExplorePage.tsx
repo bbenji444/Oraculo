@@ -62,13 +62,15 @@ export function ExplorePage() {
   const setPanelOpen = useExplorerStore((s) => s.setPanelOpen);
   const articleId = useExplorerStore((s) => s.articleId);
   const finishedNotice = useFinishNotice(search);
+  const earth = useExplorerStore((s) => s.earth);
 
   useEffect(() => {
     if (articleId !== null && isNarrowScreen()) setPanelOpen(false);
   }, [articleId, setPanelOpen]);
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#02030a]">
+    // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
+    <div data-earth={earth} className="relative h-full overflow-hidden bg-[#02030a]">
       <SpaceBackground />
       <ExploreGlobe articles={shown} colors={colors} />
 

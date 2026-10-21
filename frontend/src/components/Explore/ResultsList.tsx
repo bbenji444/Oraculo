@@ -122,7 +122,7 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
                   <span className="line-clamp-2 text-[13px] leading-snug text-slate-100">
                     {article.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-400">
                     {article.source_name ?? article.source_domain ?? '—'}
                     {article.published_at && ` · ${formatDay(article.published_at)}`}
                     {' · '}

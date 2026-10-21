@@ -27,6 +27,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- Modo día: sobre el mapa claro de calles, los paneles translúcidos de Explorar quedaban grises y la línea "medio · fecha · lugar" de cada noticia casi no se leía (contraste 1.6 : 1 medido en pantalla). En modo día el vidrio se oscurece y esa línea va un tono más clara: 6.1 : 1. De noche no cambia.
 - Buscador de regiones con errores de dedo: "monterey" ponía primero el país Montenegro y después el municipio Monterrey, porque en las coincidencias aproximadas mandaba el nivel (país antes que municipio) y no el parecido. Ahora, cuando el nombre solo se parece, gana lo más parecido; lo exacto y lo que empieza igual siguen ordenados por nivel.
 - "Probar concepto" decía "4 consultas" (SearchApi, Google News RSS, GDELT e índice local) aunque una búsqueda real solo manda 2: SearchApi y el índice local. Ahora muestra solo los proveedores configurados, los mismos que usa la estimación de Explorar.
 - El reporte PDF de una búsqueda en la localidad cabecera homónima ("Localidad Miguel Hidalgo", 090160001) decía "0 en Miguel Hidalgo · 0 %" y todo "fuera de la región", mientras la pantalla mostraba 8 de 11 notas dentro. El reporte ahora cuenta y dibuja el mapa sobre la alcaldía con la misma regla que el geolocalizador (`seat_area`, ADR-0020): en esa búsqueda, 8 dentro (73 %) y 3 fuera.
