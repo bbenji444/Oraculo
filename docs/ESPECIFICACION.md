@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.9 · Octubre 2026 · Responsable: Benji
+Versión 2.10 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -380,6 +380,14 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `created_by`, `created_at`
 
 **`users`** — se crea en la Fase 8; antes, un usuario fijo de desarrollo.
+
+**Tablero de investigación (Fase 9.2, migraciones 0018 y 0019)** — el detalle de columnas está en `docs/PLAN_FASES_9-10-11.md` §9.6 y en `docs/base-de-datos.md`. Cambios aprobados respecto del plan:
+- `entities`, `entity_aliases`, `entity_mentions`, `relationships` y `external_links` (reservada y vacía, ADR-0101).
+- Revisión en tres estados (`review_status`: `suggested`, `confirmed`, `discarded`, con `reviewed_by` y `reviewed_at`) en lugar de `is_confirmed` (ADR-0104).
+- Estatus legal con códigos en inglés: `mentioned`, `alleged`, `detained`, `charged` (vinculado a proceso, agregado), `victim`, `witness`, `official`; nunca "culpable" (ADR-0105).
+- Los lugares se ligan a `regions` o `places`; su punto sale del catálogo.
+- `entity_mentions.evidence_span`: cita de máximo 300 caracteres, que sobrevive al borrado del texto (ADR-0015).
+- `cases`, `case_members` (acceso por caso hasta la Fase 8), `case_articles` y `case_entities` con llaves foráneas reales en lugar de `case_items`, y `case_notes` con a lo más un ancla.
 
 ---
 
@@ -933,3 +941,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.7 | 21 de octubre de 2026 | SearchApi pide hasta 3 páginas por consulta, solo mientras vengan llenas (§8, ADR-0019). |
 | 2.8 | 21 de octubre de 2026 | Geolocalizador: colonias de OpenStreetMap (`places`, `make geo-places`), palabras genéricas, estado de la IA obligatorio y ubicación principal dentro de la región buscada (§6, §11, ADR-0020). |
 | 2.9 | 20 de octubre de 2026 | "Probar concepto" muestra solo los proveedores que recibiría la búsqueda (§9); el reporte cuenta "dentro" con la regla de la localidad cabecera homónima (§15, ADR-0020). |
+| 2.10 | 21 de octubre de 2026 | Modelo de datos del tablero de investigación (§6, Fase 9.2): entidades, menciones, vínculos, casos y `external_links` reservada (ADR-0101, 0104, 0105). |
