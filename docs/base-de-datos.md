@@ -63,7 +63,8 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `entity_extractions` | Lo que respondió la IA de cada nota al proponer entidades (Fase 9.4, ADR-0103): las propuestas que pasaron la revisión contra el texto y las descartadas con su motivo, modelo, tokens y costo. Una por nota y versión de prompt: si la nota entra a otro caso se reutiliza sin volver a pagar. |
 | `case_entities` | Entidades de cada caso, con su rol, su estado en ESE caso (en el caso, línea de investigación, descartada) y una etiqueta del analista. |
 | `case_notes` | Notas del investigador, ancladas a lo más a una entidad, noticia o vínculo. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0021`. |
+| `entity_merge_dismissals` | Pares de entidades de un caso que el analista dijo que **no** son la misma (Fase 9.5): con el id menor primero, quién y cuándo. Las sugerencias de fusión se calculan al leer; esta tabla solo evita que un par descartado vuelva a salir. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0022`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
