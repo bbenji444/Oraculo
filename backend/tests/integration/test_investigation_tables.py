@@ -20,11 +20,15 @@ from app.core.config import Settings
 from app.domain.geocoding import MentionRole
 from app.domain.investigation import (
     EVIDENCE_SPAN_MAX_CHARS,
+    CaseEntityStatus,
+    CaseMemberRole,
+    CaseStatus,
     EntityType,
     LegalStatus,
     Origin,
     RelationshipType,
     ReviewStatus,
+    Sensitivity,
 )
 from tests.integration.test_pipeline_tables import new_article, region_id
 
@@ -325,4 +329,199 @@ def test_cada_columna_de_filtro_tiene_su_indice(conn: Connection) -> None:
         "relationships_entity_b",
         "relationships_review_id",
         "external_links_entity",
+    } <= set(rows)
+
+
+# --- Casos (migración 0019) ---------------------------------------------------------
+
+
+def new_case(conn: Connection, status: str = "open", closed_at: str | None = None) -> str:
+    return str(
+        conn.execute(
+            text(
+                "INSERT INTO cases (name, name_norm, status, created_by, closed_at) "
+                "VALUES ('Homicidio estilista Polanco', 'HOMICIDIO ESTILISTA POLANCO', "
+                ":status, 'benji', :closed) RETURNING id"
+            ),
+            {"status": status, "closed": closed_at},
+        ).scalar_one()
+    )
+
+
+def add_member(conn: Connection, case: str, user: str, role: str) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO case_members (case_id, user_id, role, added_by) "
+            "VALUES (:case, :user, :role, 'benji')"
+        ),
+        {"case": case, "user": user, "role": role},
+    )
+
+
+def add_note(
+    conn: Connection,
+    case: str,
+    *,
+    entity: int | None = None,
+    article: int | None = None,
+    relationship: int | None = None,
+) -> int:
+    params = {"case": case, "entity": entity, "article": article, "relationship": relationship}
+    return int(
+        conn.execute(
+            text(
+                "INSERT INTO case_notes (case_id, body, entity_id, article_id, relationship_id, "
+                "author) VALUES (:case, 'verificar relación con caso previo', :entity, "
+                ":article, :relationship, 'benji') RETURNING id"
+            ),
+            params,
+        ).scalar_one()
+    )
+
+
+def test_un_caso_nace_abierto_y_con_sensibilidad_normal(conn: Connection) -> None:
+    case = new_case(conn)
+
+    row = conn.execute(
+        text("SELECT status, sensitivity FROM cases WHERE id = :id"), {"id": case}
+    ).one()
+
+    assert (row.status, row.sensitivity) == (CaseStatus.OPEN, Sensitivity.NORMAL)
+
+
+def test_cada_estado_y_sensibilidad_del_dominio_pasa_su_check(conn: Connection) -> None:
+    for status in CaseStatus:
+        closed = None if status is CaseStatus.OPEN else "2026-10-21T10:00Z"
+        case = new_case(conn, status, closed)
+        for sensitivity in Sensitivity:
+            conn.execute(
+                text("UPDATE cases SET sensitivity = :s WHERE id = :id"),
+                {"s": sensitivity, "id": case},
+            )
+
+
+def test_la_fecha_de_cierre_va_con_el_estado(conn: Connection) -> None:
+    with pytest.raises(IntegrityError, match="cases_closed_at_matches_status"), conn.begin_nested():
+        new_case(conn, "open", "2026-10-21T10:00Z")
+    with pytest.raises(IntegrityError, match="cases_closed_at_matches_status"):
+        new_case(conn, "closed")
+
+
+def test_roles_de_miembro_y_un_solo_dueno_por_caso(conn: Connection) -> None:
+    case = new_case(conn)
+    for number, role in enumerate(CaseMemberRole):
+        add_member(conn, case, f"analista-{number}", role)
+
+    with pytest.raises(IntegrityError, match="case_members_one_owner"), conn.begin_nested():
+        add_member(conn, case, "otra-persona", CaseMemberRole.OWNER)
+    with pytest.raises(IntegrityError, match="case_members_pkey"):
+        add_member(conn, case, "analista-1", CaseMemberRole.VIEWER)
+
+
+def test_una_nota_y_una_entidad_entran_una_vez_por_caso(conn: Connection) -> None:
+    case, article, entity = new_case(conn), new_article(conn), new_entity(conn)
+    add_article = text(
+        "INSERT INTO case_articles (case_id, article_id, added_by) VALUES (:c, :a, 'benji')"
+    )
+    add_entity = text(
+        "INSERT INTO case_entities (case_id, entity_id, case_status, added_by) "
+        "VALUES (:c, :e, :s, 'benji')"
+    )
+    conn.execute(add_article, {"c": case, "a": article})
+    conn.execute(add_entity, {"c": case, "e": entity, "s": CaseEntityStatus.ACTIVE})
+
+    with pytest.raises(IntegrityError, match="case_articles_pkey"), conn.begin_nested():
+        conn.execute(add_article, {"c": case, "a": article})
+    with pytest.raises(IntegrityError, match="case_entities_pkey"):
+        conn.execute(add_entity, {"c": case, "e": entity, "s": CaseEntityStatus.ACTIVE})
+
+
+def test_cada_estado_de_entidad_en_el_caso_pasa_su_check(conn: Connection) -> None:
+    case = new_case(conn)
+    for status in CaseEntityStatus:
+        conn.execute(
+            text(
+                "INSERT INTO case_entities (case_id, entity_id, case_status, added_by) "
+                "VALUES (:c, :e, :s, 'benji')"
+            ),
+            {"c": case, "e": new_entity(conn, label=f"Entidad {status}"), "s": status},
+        )
+
+
+def test_una_nota_del_investigador_se_ancla_a_lo_mas_a_una_cosa(conn: Connection) -> None:
+    case, entity = new_case(conn), new_entity(conn)
+    add_note(conn, case)
+    add_note(conn, case, entity=entity)
+
+    with pytest.raises(IntegrityError, match="case_notes_one_anchor"):
+        add_note(conn, case, entity=entity, article=new_article(conn))
+
+
+def test_si_se_borra_el_ancla_la_nota_se_queda_sin_ancla(conn: Connection) -> None:
+    case, entity = new_case(conn), new_entity(conn)
+    note = add_note(conn, case, entity=entity)
+
+    conn.execute(text("DELETE FROM entities WHERE id = :id"), {"id": entity})
+
+    anchor = conn.execute(
+        text("SELECT entity_id FROM case_notes WHERE id = :id"), {"id": note}
+    ).scalar_one()
+    assert anchor is None
+
+
+def test_borrar_un_caso_no_borra_las_notas_ni_las_entidades(conn: Connection) -> None:
+    case, article, entity = new_case(conn), new_article(conn), new_entity(conn)
+    add_member(conn, case, "benji", CaseMemberRole.OWNER)
+    conn.execute(
+        text("INSERT INTO case_articles (case_id, article_id, added_by) VALUES (:c, :a, 'b')"),
+        {"c": case, "a": article},
+    )
+    conn.execute(
+        text("INSERT INTO case_entities (case_id, entity_id, added_by) VALUES (:c, :e, 'b')"),
+        {"c": case, "e": entity},
+    )
+    add_note(conn, case, entity=entity)
+
+    conn.execute(text("DELETE FROM cases WHERE id = :id"), {"id": case})
+
+    left = conn.execute(
+        text(
+            "SELECT (SELECT count(*) FROM case_members WHERE case_id = :c) "
+            "+ (SELECT count(*) FROM case_articles WHERE case_id = :c) "
+            "+ (SELECT count(*) FROM case_entities WHERE case_id = :c) "
+            "+ (SELECT count(*) FROM case_notes WHERE case_id = :c)"
+        ),
+        {"c": case},
+    ).scalar_one()
+    kept = conn.execute(
+        text(
+            "SELECT (SELECT count(*) FROM articles WHERE id = :a) "
+            "+ (SELECT count(*) FROM entities WHERE id = :e)"
+        ),
+        {"a": article, "e": entity},
+    ).scalar_one()
+    assert (left, kept) == (0, 2)
+
+
+def test_los_casos_y_la_bitacora_tienen_sus_indices(conn: Connection) -> None:
+    rows = conn.execute(
+        text(
+            "SELECT indexname FROM pg_indexes WHERE tablename IN "
+            "('cases', 'case_members', 'case_articles', 'case_entities', 'case_notes', "
+            "'audit_log')"
+        )
+    ).scalars()
+
+    assert {
+        "cases_status_updated_id",
+        "cases_created_by",
+        "case_members_user_case",
+        "case_members_one_owner",
+        "case_articles_article",
+        "case_entities_entity",
+        "case_notes_case_created_id",
+        "case_notes_entity",
+        "case_notes_article",
+        "case_notes_relationship",
+        "audit_log_user_created",
     } <= set(rows)

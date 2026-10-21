@@ -38,7 +38,7 @@ Abre `psql` ya conectado. Para salir: `\q`.
 |---|---|
 | `regions` | Catálogo geográfico: 258 países, 32 estados, 2,478 municipios y 296,850 localidades. |
 | `concepts` | Conceptos de búsqueda ("Ciberseguridad", "Secuestro"...) con sus palabras clave, exclusiones y color. `deleted_at` marca los borrados lógicos. |
-| `audit_log` | Bitácora de auditoría: quién cambió qué y cuándo (por ahora, crear, editar y borrar conceptos). Solo se agregan filas. |
+| `audit_log` | Bitácora de auditoría: quién cambió qué y cuándo (conceptos, búsquedas, reportes y, desde la Fase 9, casos y entidades, incluido **ver** un caso). Solo se agregan filas. |
 | `provider_queries` | Cada petición a un proveedor de noticias (SearchApi, GDELT, Google News RSS): texto, resultado, si vino de caché y créditos gastados. |
 | `news_index` | Índice local de notas que junta la ingesta cada 15 minutos (GDELT por archivos y RSS de medios): título, fragmento, medio, fecha, link y pistas de ubicación de GDELT. Con los ngramas de GDELT (ADR-0014) también `body_terms`: frases del cuerpo normalizadas, **solo para buscar** (nunca se muestran) y borradas a los 30 días. No guarda artículos. |
 | `ingest_runs` | Cada corrida de la ingesta: qué archivo o feed se leyó, bytes descargados, notas vistas y guardadas, errores. |
@@ -57,7 +57,12 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `entity_mentions` | La evidencia: en qué nota aparece cada entidad, con su rol, su confianza y una cita corta (máximo 300 caracteres) que sobrevive al borrado del texto de la nota. |
 | `relationships` | Vínculos entre dos entidades (aparecen juntas, mismo hecho, familiar…), con su origen (coocurrencia, IA o humano), confianza y revisión. |
 | `external_links` | **Reservada y vacía** (ADR-0101): enchufe futuro hacia registros de otras bases del sistema Oráculo. Ninguna lógica de la Fase 9 la usa; una prueba lo vigila. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0018`. |
+| `cases` | Casos de investigación (Fase 9): nombre, estado (abierto, cerrado, archivado) y sensibilidad (normal, reservado, confidencial). La fecha de cierre va con el estado. |
+| `case_members` | Quién puede ver o editar cada caso (dueño, editor, lector). Un solo dueño. Hasta la Fase 8, el usuario es el de desarrollo. |
+| `case_articles` | Noticias que forman parte de cada caso. Borrar el caso no borra la noticia. |
+| `case_entities` | Entidades de cada caso, con su rol, su estado en ESE caso (en el caso, línea de investigación, descartada) y una etiqueta del analista. |
+| `case_notes` | Notas del investigador, ancladas a lo más a una entidad, noticia o vínculo. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0019`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:
