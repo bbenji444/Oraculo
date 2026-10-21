@@ -23,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.domain.errors import (
     ConflictError,
     DomainError,
+    ForbiddenError,
     InvalidRequestError,
     NotFoundError,
     ServiceUnavailableError,
@@ -46,6 +47,7 @@ class ErrorOut(BaseModel):
 
 
 _ERROR_DESCRIPTIONS = {
+    status.HTTP_403_FORBIDDEN: "Tu rol no permite esta acción",
     status.HTTP_404_NOT_FOUND: "No encontrado",
     status.HTTP_409_CONFLICT: "Choca con algo que ya existe o con un tope",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "Petición inválida",
@@ -99,6 +101,8 @@ def error_response(
 
 
 def _status_for(error: DomainError) -> int:
+    if isinstance(error, ForbiddenError):
+        return status.HTTP_403_FORBIDDEN
     if isinstance(error, NotFoundError):
         return status.HTTP_404_NOT_FOUND
     if isinstance(error, ConflictError):

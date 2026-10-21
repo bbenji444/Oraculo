@@ -165,3 +165,43 @@ class SearchNotFinishedError(ConflictError):
     """La búsqueda todavía corre: su reporte o sus datos se piden al terminar (§15)."""
 
     code = "search_not_finished"
+
+
+class ForbiddenError(DomainError):
+    """La persona no tiene permiso para esa acción (responde 403)."""
+
+    code = "forbidden"
+
+
+class CaseNotFoundError(NotFoundError):
+    """No existe el caso o la persona no es miembro.
+
+    Las dos situaciones responden igual a propósito: así no se revela que un
+    caso ajeno existe (decisión D3 de la 9.3).
+    """
+
+    code = "case_not_found"
+
+
+class CaseForbiddenError(ForbiddenError):
+    """La persona ve el caso pero su rol no le permite esa acción."""
+
+    code = "case_forbidden"
+
+
+class CaseClosedError(ConflictError):
+    """El caso está cerrado o archivado: hay que reabrirlo para cambiarlo."""
+
+    code = "case_closed"
+
+
+class CaseValidationError(InvalidRequestError):
+    """El caso no cumple sus reglas (``details["problemas"]`` por campo)."""
+
+    code = "invalid_case"
+
+
+class ArticleNotFoundError(NotFoundError):
+    """No existe la noticia pedida."""
+
+    code = "article_not_found"
