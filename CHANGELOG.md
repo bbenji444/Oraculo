@@ -15,6 +15,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- Historial: el periodo de cada búsqueda se lee como en Explorar ("13 – 20 oct 2026") y no como fechas técnicas ("2026-10-13 a 2026-10-20").
 - La lista de Explorar dice cuántas notas se ven de cuántas trajo la búsqueda ("Noticias (24 de 43)"); antes decía "Noticias (24)" mientras arriba decía "43 notas" y parecía que faltaban. La ayuda del encabezado y de los botones PDF, CSV y GeoJSON aclara que las descargas incluyen solo las notas relevantes.
 - El buscador de regiones (Explorar y "Probar concepto") dice de qué estado es cada municipio o localidad: "Municipio San Pedro — Coahuila de Zaragoza" y "San Pedro Garza García — Nuevo León". Antes solo mostraba la clave INEGI y había que sabérsela para distinguir homónimos.
 - Prompt de la IA `enrich_v2`: pide el municipio o alcaldía de cada colonia, calle o lugar (`municipality_hint`), marca al menos un lugar del hecho cuando se puede saber, fecha el hecho original en avances de casos viejos y no confunde el Día de Muertos con homicidios. Las notas leídas con v1 se vuelven a leer en la siguiente búsqueda que las encuentre.
