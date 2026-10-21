@@ -9,7 +9,7 @@ import pytest
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from app.adapters.llm.common import PROMPT_VERSION, build_prompt
+from app.adapters.llm.common import PROMPT_VERSION, EnrichmentOut, build_prompt, to_enrichment
 from app.adapters.llm.gemini import GeminiEnricher, build_gemini
 from app.application.ports.llm import EnrichmentError, EnrichmentRequest
 from app.domain.enrichment import MAX_TEXT_CHARS, ConceptBrief, LLMUsage, text_for_llm
@@ -179,3 +179,37 @@ def test_la_fabrica_crea_un_cliente_real_sin_llamar() -> None:
     enricher = build_gemini("llave-falsa", "gemini-2.5-flash", 60)
 
     assert (enricher.model, enricher.prompt_version) == ("gemini-2.5-flash", PROMPT_VERSION)
+
+
+def test_prompt_v2_pide_el_municipio_de_colonias_y_calles() -> None:
+    # Sin él, "Polanco" no se podía ubicar dentro de la CDMX (ADR-0020).
+    prompt = build_prompt(REQUEST)
+
+    assert PROMPT_VERSION == "enrich_v2"
+    assert "municipality_hint" in prompt
+    assert "Día de Muertos" in prompt
+
+
+def test_el_municipio_que_sugiere_la_ia_llega_a_la_mencion() -> None:
+    out = EnrichmentOut.model_validate(
+        {
+            "concepts": [],
+            "locations": [
+                {
+                    "mention": "Polanco",
+                    "kind_hint": "locality",
+                    "state_hint": "Ciudad de México",
+                    "municipality_hint": "Miguel Hidalgo",
+                    "country": "México",
+                    "role": "event",
+                },
+                # Respuestas grabadas con v1 no traen el campo: queda vacío.
+                {"mention": "CDMX", "kind_hint": "state", "role": "mentioned"},
+            ],
+        }
+    )
+
+    polanco, cdmx = to_enrichment(out, set()).locations
+
+    assert polanco.municipality_hint == "Miguel Hidalgo"
+    assert cdmx.municipality_hint is None

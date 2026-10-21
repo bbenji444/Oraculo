@@ -148,10 +148,10 @@ async def test_la_llave_viaja_en_el_encabezado_no_en_la_url() -> None:
     assert str(sent[0].url).startswith(SEARCHAPI_URL)
     assert "llave-de-prueba" not in str(sent[0].url)
     assert sent[0].headers["Authorization"] == "Bearer llave-de-prueba"
-    assert (
-        len(response.articles),
-        provider.estimate_cost(query(DateWindow.last_days(7, TODAY))),
-    ) == (1, 1)
+    # La página vino con menos de 10 resultados: no se pide otra.
+    assert (len(sent), len(response.articles), response.credits_used) == (1, 1, 1)
+    # La estimación es el máximo: 3 páginas llenas.
+    assert provider.estimate_cost(query(DateWindow.last_days(7, TODAY))) == 3
     await http.aclose()
 
 
@@ -172,3 +172,93 @@ def test_respuesta_real_de_searchapi() -> None:
     assert first.source_domain == "milenio.com"
     assert first.published_at == datetime(2026, 10, 12, 20, 3, tzinfo=UTC)
     assert all(a.published_at is not None for a in articles)
+
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "providers"
+
+
+def real_page(number: int) -> str:
+    # Homicidio · Miguel Hidalgo, 13–20/10/2026: 3 páginas reales (21/10/2026,
+    # 3 créditos aprobados por Benji; la cuenta pasó de 94 a 91 restantes).
+    return (FIXTURES / f"searchapi_homicidio_pagina_{number}.json").read_text(encoding="utf-8")
+
+
+def paged_client(pages: dict[int, httpx2.Response]) -> tuple[ProviderHttpClient, list[str]]:
+    asked: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        page = int(request.url.params.get("page", "1"))
+        asked.append(str(page))
+        return pages[page]
+
+    http = ProviderHttpClient(
+        Provider.SEARCHAPI,
+        timeout_seconds=5,
+        max_attempts=1,
+        max_concurrency=1,
+        transport=httpx2.MockTransport(handler),
+    )
+    return http, asked
+
+
+@pytest.mark.anyio
+async def test_tres_paginas_reales_traen_30_notas_distintas_y_cuestan_3() -> None:
+    http, asked = paged_client({n: httpx2.Response(200, text=real_page(n)) for n in (1, 2, 3)})
+
+    response = await SearchApiProvider(http, max_pages=3).search(
+        query(DateWindow.last_days(7, TODAY))
+    )
+
+    assert asked == ["1", "2", "3"]
+    assert (len(response.articles), response.credits_used, response.pages) == (30, 3, 3)
+    assert [a.provider_rank for a in response.articles] == list(range(1, 31))
+    assert len({a.url for a in response.articles}) == 30
+    assert response.params["pages"] == "3"
+    await http.aclose()
+
+
+@pytest.mark.anyio
+async def test_si_una_pagina_viene_incompleta_no_pide_la_siguiente() -> None:
+    short = json.loads(real_page(2))
+    short["organic_results"] = short["organic_results"][:4]
+    http, asked = paged_client(
+        {
+            1: httpx2.Response(200, text=real_page(1)),
+            2: httpx2.Response(200, text=json.dumps(short)),
+        }
+    )
+
+    response = await SearchApiProvider(http, max_pages=3).search(
+        query(DateWindow.last_days(7, TODAY))
+    )
+
+    assert asked == ["1", "2"]
+    assert (len(response.articles), response.credits_used) == (14, 2)
+    await http.aclose()
+
+
+@pytest.mark.anyio
+async def test_una_pagina_extra_que_falla_conserva_las_anteriores_y_no_se_cobra() -> None:
+    http, asked = paged_client(
+        {1: httpx2.Response(200, text=real_page(1)), 2: httpx2.Response(500, text="error")}
+    )
+
+    response = await SearchApiProvider(http, max_pages=3).search(
+        query(DateWindow.last_days(7, TODAY))
+    )
+
+    assert asked == ["1", "2"]
+    assert (len(response.articles), response.credits_used) == (10, 1)
+    await http.aclose()
+
+
+@pytest.mark.anyio
+async def test_una_sola_pagina_si_asi_se_configura() -> None:
+    http, asked = paged_client({1: httpx2.Response(200, text=real_page(1))})
+    provider = SearchApiProvider(http, max_pages=1)
+
+    response = await provider.search(query(DateWindow.last_days(7, TODAY)))
+
+    assert (asked, response.credits_used) == (["1"], 1)
+    assert provider.estimate_cost(query(DateWindow.last_days(7, TODAY))) == 1
+    await http.aclose()

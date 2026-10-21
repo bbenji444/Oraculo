@@ -37,9 +37,16 @@ export interface ExplorerState {
   range: DateRange;
   searchId: string | null;
   articleId: number | null;
+  /**
+   * Cuántas veces se ha pedido ver una nota. Volver a elegir la misma nota no
+   * cambia `articleId`, pero sí esto: así el globo vuelve a volar hacia ella.
+   */
+  articleRequest: number;
   listFilter: ListFilter;
   /** Interruptor "No relevantes": vale para la lista y el globo a la vez. */
   showIrrelevant: boolean;
+  /** Panel izquierdo visible; se oculta para ver el globo completo. */
+  panelOpen: boolean;
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
@@ -58,6 +65,7 @@ export interface ExplorerState {
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
   setShowIrrelevant: (showIrrelevant: boolean) => void;
+  setPanelOpen: (panelOpen: boolean) => void;
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
@@ -119,8 +127,10 @@ export const useExplorerStore = create<ExplorerState>()(
       range: { kind: '7' },
       searchId: null,
       articleId: null,
+      articleRequest: 0,
       listFilter: 'all',
       showIrrelevant: false,
+      panelOpen: true,
       earth: 'night',
       // "Menos movimiento" del sistema manda sobre la preferencia guardada.
       motion: prefersReducedMotion() ? 'off' : 'normal',
@@ -156,13 +166,20 @@ export const useExplorerStore = create<ExplorerState>()(
         });
       },
       selectArticle: (articleId) => {
-        set(articleId === null ? { articleId } : { articleId, spinning: false });
+        set((state) =>
+          articleId === null
+            ? { articleId }
+            : { articleId, articleRequest: state.articleRequest + 1, spinning: false },
+        );
       },
       setListFilter: (listFilter) => {
         set({ listFilter });
       },
       setShowIrrelevant: (showIrrelevant) => {
         set({ showIrrelevant });
+      },
+      setPanelOpen: (panelOpen) => {
+        set({ panelOpen });
       },
       setEarth: (earth) => {
         set({ earth });

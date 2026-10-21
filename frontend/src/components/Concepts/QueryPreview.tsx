@@ -144,7 +144,7 @@ export function QueryPreview({ draft }: QueryPreviewProps) {
           <p className="mb-2 text-xs text-slate-400">
             <span className="text-slate-200">{result.region.breadcrumb}</span> ·{' '}
             {result.window.description} · {result.total_queries} consultas · ~{result.total_credits}{' '}
-            crédito{result.total_credits === 1 ? '' : 's'} de SearchApi
+            crédito{result.total_credits === 1 ? '' : 's'} de SearchApi por página (hasta 3 páginas)
           </p>
           <ul className="space-y-2">
             {result.queries.map((query, index) => (

@@ -19,8 +19,6 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   type FeatureIdentifier,
   type GeoJSONSource,
-  LngLat,
-  type LngLatBoundsLike,
   Map as MapLibreMap,
   NavigationControl,
 } from 'maplibre-gl';
@@ -46,6 +44,7 @@ import {
   DASHED_RING_IMAGE,
   dashedRingPixels,
   isOnVisibleSide,
+  keepNewsLayers,
   NEWS_SOURCE,
   newsFeatures,
   newsLayers,
@@ -54,12 +53,23 @@ import {
   CLUSTER_MAX_ZOOM,
   CLUSTER_RADIUS_PX,
   calloutPlacement,
+  STACK_LIMIT,
+  stackedIds,
 } from '../../map/newsLayers';
+import { collapseAttributionOnStart } from '../../map/attribution';
+import { smoothFlights } from '../../map/flight';
+import {
+  articleOffset,
+  articleZoom,
+  calloutWidth,
+  flyPadding,
+  globeCamera,
+  type ScreenSize,
+} from '../../map/framing';
 import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
   buildMapStyle,
-  EARTH_LAYER,
   featureLabel,
   FLY_MAX_ZOOM,
   INTERACTIVE_LAYERS,
@@ -71,6 +81,7 @@ import type { Article } from '../../services/searches';
 import { useCameraStore } from '../../store/camera';
 import { useExplorerStore } from '../../store/explorer';
 import { NewsCard } from './NewsCard';
+import { NewsStack } from './NewsStack';
 import { GLASS } from './ui';
 
 interface ExploreGlobeProps {
@@ -85,6 +96,20 @@ interface Tooltip {
   detail: string;
 }
 
+/** Lista abierta de las notas de un mismo lugar (grupo o puntos encimados). */
+interface Stack {
+  lng: number;
+  lat: number;
+  x: number;
+  y: number;
+  ids: number[];
+  total: number;
+  /** Zoom que separa el grupo; `null` si son notas en el mismo punto. */
+  expandZoom: number | null;
+  /** `articleRequest` al abrirla: elegir otra nota (desde donde sea) la cierra. */
+  request: number;
+}
+
 interface Callout {
   // Nota a la que pertenece: si cambia la nota elegida, esta ficha ya no se muestra.
   articleId: number;
@@ -96,19 +121,15 @@ interface Callout {
 // Vista inicial: México con el eje inclinado (map/spin.ts).
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
 const INITIAL_ZOOM = 1.8;
-// Márgenes al volar: libres el panel de la izquierda y las gráficas de la derecha.
-const FLY_PADDING = { top: 90, bottom: 90, left: 430, right: 330 };
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
-// Al volar a una nota: el punto queda a la izquierda y abajo del centro para
-// que su ficha quepa a la derecha.
-const ARTICLE_OFFSET: [number, number] = [-120, 70];
-// Zoom al volar a una nota: municipio o más cerca si es precisa; estado si no.
-const ARTICLE_ZOOM_PRECISE = 7.5;
-const ARTICLE_ZOOM_COARSE = 5;
-// Ancho de la ficha; su lugar lo decide calloutPlacement (nunca se sale del mapa).
-const CALLOUT_WIDTH = 330;
+// Lista de un grupo: 20 rem de ancho; alto según cuántas notas (encabezado +
+// renglones de dos líneas), con tope y desplazamiento dentro.
+const STACK_WIDTH = 320;
+const STACK_BASE_HEIGHT = 56;
+const STACK_ROW_HEIGHT = 56;
+const STACK_MAX_HEIGHT = 380;
 // Alto supuesto de la ficha mientras se mide la real.
 const CALLOUT_INITIAL_HEIGHT = 280;
 // Revisión de inactividad para reanudar el giro.
@@ -122,18 +143,22 @@ const USER_EVENTS = ['mousedown', 'touchstart', 'wheel', 'dragstart'] as const;
 const NEWS_LAYERS = ['news-point', 'news-coarse', 'news-cluster'];
 const LEVEL_ORDER: RegionLevel[] = ['country', 'state', 'municipality', 'locality'];
 
+type FlyFn = ReturnType<typeof smoothFlights>;
+
 export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
+  const [stack, setStack] = useState<Stack | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [cardHeight, setCardHeight] = useState(CALLOUT_INITIAL_HEIGHT);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const regionId = useExplorerStore((s) => s.regionId);
   const articleId = useExplorerStore((s) => s.articleId);
+  const articleRequest = useExplorerStore((s) => s.articleRequest);
   const spinning = useExplorerStore((s) => s.spinning);
   const earth = useExplorerStore((s) => s.earth);
   const motion = useExplorerStore((s) => s.motion);
@@ -151,6 +176,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const selectedRef = useRef<Article | null>(selected);
   // Notas por id para el tooltip (el evento del mapa lee la versión vigente).
   const articlesByIdRef = useRef(new Map<number, Article>());
+  // Vuela con menos resolución y la recupera al aterrizar (map/flight.ts).
+  const flyRef = useRef<FlyFn>((_duration, start) => {
+    start();
+  });
 
   useEffect(() => {
     motionRef.current = motion;
@@ -175,6 +204,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
+    // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
+    const stopAttribution = collapseAttributionOnStart(map.getContainer());
+    const fly = smoothFlights(map, () => window.devicePixelRatio);
+    flyRef.current = fly;
 
     let introDone = !intro;
     const spinStep = () => {
@@ -197,6 +230,13 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         useExplorerStore.getState().setSpinning(false);
       });
     }
+    // Arrastrar o girar la rueda cierra la lista de un grupo: ya no apunta a nada.
+    map.on('dragstart', () => {
+      setStack(null);
+    });
+    map.on('wheel', () => {
+      setStack(null);
+    });
 
     map.on('load', () => {
       const size = 44;
@@ -217,11 +257,13 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
           spinStartRef.current = performance.now();
           spinStep();
         });
-        map.easeTo({
-          center: INITIAL_CENTER,
-          zoom: INITIAL_ZOOM,
-          duration: INTRO_DURATION_MS,
-          easing: easeOutQuint,
+        fly(INTRO_DURATION_MS, () => {
+          map.easeTo({
+            center: INITIAL_CENTER,
+            zoom: INITIAL_ZOOM,
+            duration: INTRO_DURATION_MS,
+            easing: easeOutQuint,
+          });
         });
       }
     });
@@ -239,6 +281,11 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       });
       cancelAnimationFrame(calloutFrame);
       calloutFrame = requestAnimationFrame(() => {
+        setStack((current) => {
+          if (!current) return current;
+          const point = map.project([current.lng, current.lat]);
+          return { ...current, x: point.x, y: point.y };
+        });
         const loc = selectedRef.current?.primary_location;
         const lng = loc?.lon ?? null;
         const lat = loc?.lat ?? null;
@@ -314,32 +361,52 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       clearHover();
       setTooltip(null);
     });
+    const openStack = (
+      coordinates: [number, number],
+      ids: number[],
+      total: number,
+      expandZoom: number | null,
+    ) => {
+      const [lng, lat] = coordinates;
+      const point = map.project(coordinates);
+      const request = useExplorerStore.getState().articleRequest;
+      setStack({ lng, lat, x: point.x, y: point.y, ids, total, expandZoom, request });
+    };
     map.on('click', (event) => {
       const news = firstAt(event.point, NEWS_LAYERS);
       const store = useExplorerStore.getState();
       if (news?.properties.cluster) {
-        // Grupo: acercarse hasta que se separen sus notas.
+        // Grupo: la lista dice qué notas son; "Acercar" las separa en el mapa.
         const source = map.getSource<GeoJSONSource>(NEWS_SOURCE);
         const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
-        void source?.getClusterExpansionZoom(Number(news.properties.cluster_id)).then((zoom) => {
-          map.easeTo({
-            center: coordinates,
-            zoom,
-            duration: flyDurationMs(
-              cameraOf(map),
-              { lng: coordinates[0], lat: coordinates[1], zoom },
-              'region',
-              motionRef.current,
-            ),
-            easing: easeInOutCubic,
-          });
+        const clusterId = Number(news.properties.cluster_id);
+        const total = Number(news.properties.point_count);
+        if (!source) return;
+        void Promise.all([
+          source.getClusterLeaves(clusterId, STACK_LIMIT, 0),
+          source.getClusterExpansionZoom(clusterId),
+        ]).then(([leaves, zoom]) => {
+          openStack(coordinates, stackedIds(leaves), total, zoom);
         });
         return;
       }
+      // Notas encimadas en el mismo punto (p. ej. varias "solo por estado").
+      const stacked = stackedIds(
+        map.queryRenderedFeatures([event.point.x, event.point.y], {
+          layers: NEWS_LAYERS.filter((id) => map.getLayer(id)),
+        }),
+      );
+      if (news && stacked.length > 1) {
+        const coordinates = (news.geometry as { coordinates: [number, number] }).coordinates;
+        openStack(coordinates, stacked, stacked.length, null);
+        return;
+      }
       if (news?.id !== undefined) {
+        setStack(null);
         store.selectArticle(Number(news.id));
         return;
       }
+      setStack(null);
       const region = firstAt(event.point, INTERACTIVE_LAYERS);
       if (region?.id !== undefined) store.selectRegion(Number(region.id));
     });
@@ -357,6 +424,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     mapRef.current = map;
     return () => {
       observer.disconnect();
+      stopAttribution();
       cancelAnimationFrame(calloutFrame);
       map.remove();
       mapRef.current = null;
@@ -370,13 +438,18 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articles]);
 
   // --- Día / noche ---------------------------------------------------------
+  // Cambia la textura de la Tierra y también los colores del mapa de calles
+  // (claro de día, oscuro de noche). MapLibre aplica solo las diferencias y
+  // keepNewsLayers conserva los puntos de noticias, que no vienen en el estilo.
   useEffect(() => {
+    const previous = earthRef.current;
     earthRef.current = earth;
     const map = mapRef.current;
-    if (!map || !ready) return;
-    for (const mode of ['night', 'day'] as const) {
-      map.setLayoutProperty(EARTH_LAYER[mode], 'visibility', mode === earth ? 'visible' : 'none');
-    }
+    if (!map || !ready || previous === earth) return;
+    map.setStyle(buildMapStyle(window.location.origin, earth), {
+      diff: true,
+      transformStyle: keepNewsLayers,
+    });
   }, [earth, ready]);
 
   // --- Giro ----------------------------------------------------------------
@@ -387,18 +460,21 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     spinStartRef.current = performance.now();
     if (spinDegrees(map.getZoom()) === 0) {
       // De cerca no se gira: primero se aleja a la vista de globo.
-      map.easeTo({
-        center: [map.getCenter().lng, INITIAL_CENTER[1]],
-        zoom: INITIAL_ZOOM,
-        pitch: 0,
-        bearing: GLOBE_BEARING,
-        duration: flyDurationMs(
-          cameraOf(map),
-          { lng: map.getCenter().lng, lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM },
-          'up',
-          motionRef.current,
-        ),
-        easing: easeInOutCubic,
+      const duration = flyDurationMs(
+        cameraOf(map),
+        { lng: map.getCenter().lng, lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM },
+        'up',
+        motionRef.current,
+      );
+      flyRef.current(duration, () => {
+        map.easeTo({
+          center: [map.getCenter().lng, INITIAL_CENTER[1]],
+          zoom: INITIAL_ZOOM,
+          pitch: 0,
+          bearing: GLOBE_BEARING,
+          duration,
+          easing: easeInOutCubic,
+        });
       });
     } else if (!map.isMoving()) {
       spinStepRef.current();
@@ -431,38 +507,28 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
         ? 'up'
         : 'region';
     levelRef.current = region.level;
-    const [west, south, east, north] = region.bbox;
-    const isPoint = west === east && south === north;
-    const camera = isPoint
-      ? { center: { lng: west, lat: south }, zoom: FLY_MAX_ZOOM.locality }
-      : map.cameraForBounds(
-          [
-            [west, south],
-            [east, north],
-          ] as LngLatBoundsLike,
-          {
-            padding: FLY_PADDING,
-            maxZoom: FLY_MAX_ZOOM[region.level],
-          },
-        );
-    if (camera?.center !== undefined && camera.zoom !== undefined) {
-      const { lng, lat } = LngLat.convert(camera.center);
-      const center = { lng, lat };
+    // Encuadre de la parte principal (sin territorios lejanos), medido sobre
+    // la esfera y no en el mapa plano (map/framing.ts).
+    const box = region.focus_bbox;
+    const padding = flyPadding(screenOf(map), useExplorerStore.getState().panelOpen);
+    // Una localidad sin polígono es un punto: se acerca al zoom de localidad.
+    const isPoint = box[0] === box[2] && box[1] === box[3];
+    const maxZoom = FLY_MAX_ZOOM[isPoint ? 'locality' : region.level];
+    const camera = globeCamera(box, screenOf(map), padding, maxZoom);
+    const [lng, lat] = camera.center;
+    const { zoom } = camera;
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, kind, motionRef.current);
+    flyRef.current(duration, () => {
       map.flyTo({
-        center: [center.lng, center.lat],
-        zoom: camera.zoom,
+        center: camera.center,
+        zoom,
         bearing: REGION_BEARING,
         pitch: flyPitch(region.level),
         curve: FLY_CURVE,
-        duration: flyDurationMs(
-          cameraOf(map),
-          { ...center, zoom: camera.zoom },
-          kind,
-          motionRef.current,
-        ),
+        duration,
         essential: false,
       });
-    }
+    });
     return () => {
       if (mapRef.current === map) map.setFeatureState(key, { selected: false });
     };
@@ -488,35 +554,49 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articles, colors, ready]);
 
   // --- Nota elegida: latido, vuelo y ficha -----------------------------------
+  // Se vuelve a volar cada vez que se elige una nota, aunque sea la misma
+  // (`articleRequest`), y no cuando solo se recarga la lista.
+  const selectedId = selected?.article_id ?? null;
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    map.setFilter('news-pulse', selectedFilter(selected?.article_id ?? null));
-    const loc = selected?.primary_location;
+    map.setFilter('news-pulse', selectedFilter(selectedId));
+    const article = selectedRef.current;
+    const loc = article?.primary_location;
     const lng = loc?.lon ?? null;
     const lat = loc?.lat ?? null;
-    if (selected === null || lng === null || lat === null) return;
-    const coarse = loc?.precision === 'state' || loc?.precision === 'country';
-    const zoom = Math.max(map.getZoom(), coarse ? ARTICLE_ZOOM_COARSE : ARTICLE_ZOOM_PRECISE);
-    const target = { lng, lat, zoom };
+    if (article === null || !loc || lng === null || lat === null) return;
+    const zoom = articleZoom(loc.precision, lng, lat);
     // La ficha aparece cuando la cámara llega (no persigue al punto en vuelo).
-    map.once('moveend', () => {
-      const point = map.project([target.lng, target.lat]);
-      setCallout({ articleId: selected.article_id, x: point.x, y: point.y, visible: true });
+    setCallout(null);
+    const onArrive = () => {
+      const point = map.project([lng, lat]);
+      setCallout({ articleId: article.article_id, x: point.x, y: point.y, visible: true });
+    };
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
+    flyRef.current(duration, () => {
+      map.flyTo({
+        center: [lng, lat],
+        zoom,
+        offset: articleOffset(screenOf(map)),
+        pitch: flyPitch('article'),
+        bearing: REGION_BEARING,
+        curve: FLY_CURVE,
+        duration,
+        essential: false,
+      });
     });
-    map.flyTo({
-      center: [target.lng, target.lat],
-      zoom,
-      offset: ARTICLE_OFFSET,
-      pitch: flyPitch('article'),
-      bearing: REGION_BEARING,
-      curve: FLY_CURVE,
-      duration: flyDurationMs(cameraOf(map), target, 'region', motionRef.current),
-      essential: false,
-    });
+    // Se escucha el aterrizaje hasta que el vuelo arrancó: si interrumpió otro
+    // vuelo, ese "terminó" no es el de esta nota. Sin animación, ya llegó.
+    if (map.isMoving()) map.once('moveend', onArrive);
+    else onArrive();
 
     // Latido a 30 fps (sin animación: anillo fijo).
-    if (motionRef.current === 'off') return;
+    if (motionRef.current === 'off') {
+      return () => {
+        map.off('moveend', onArrive);
+      };
+    }
     let frame = 0;
     let last = 0;
     const tick = (now: number) => {
@@ -529,9 +609,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     };
     frame = requestAnimationFrame(tick);
     return () => {
+      map.off('moveend', onArrive);
       cancelAnimationFrame(frame);
     };
-  }, [selected, ready]);
+  }, [selectedId, articleRequest, ready]);
 
   // Alto real de la ficha (cambia con el largo del resumen) para acomodarla.
   const calloutShown = callout?.visible === true && callout.articleId === articleId;
@@ -560,8 +641,37 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   }, [articleId]);
 
   // Lugar de la ficha: nunca se sale del mapa (map/newsLayers.ts).
+  const cardWidth = calloutWidth(viewport);
   const placement = (point: { x: number; y: number }) =>
-    calloutPlacement(point, { width: CALLOUT_WIDTH, height: cardHeight }, viewport);
+    calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
+
+  // Lista de un grupo: las notas más recientes primero, junto al punto.
+  const stackArticles = articles
+    .filter((article) => stack?.ids.includes(article.article_id))
+    .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''));
+  const stackPlacement =
+    stack &&
+    calloutPlacement(
+      stack,
+      {
+        width: STACK_WIDTH,
+        height: Math.min(
+          STACK_MAX_HEIGHT,
+          STACK_BASE_HEIGHT + stackArticles.length * STACK_ROW_HEIGHT,
+        ),
+      },
+      viewport,
+    );
+  const zoomIntoStack = () => {
+    const map = mapRef.current;
+    if (!map || stack?.expandZoom == null) return;
+    const { lng, lat, expandZoom: zoom } = stack;
+    setStack(null);
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
+    flyRef.current(duration, () => {
+      map.easeTo({ center: [lng, lat], zoom, duration, easing: easeInOutCubic });
+    });
+  };
 
   return (
     <div className="absolute inset-0">
@@ -599,7 +709,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
             style={{
               left: placement(callout).left,
               top: placement(callout).top,
-              width: CALLOUT_WIDTH,
+              width: cardWidth,
             }}
           >
             <div className={`${GLASS} animate-[fadeIn_200ms_ease-out] p-4`}>
@@ -614,8 +724,34 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
           </div>
         </>
       )}
+      {stack?.request === articleRequest && stackPlacement && (
+        <div
+          className="absolute z-30 animate-[fadeIn_150ms_ease-out]"
+          style={{ left: stackPlacement.left, top: stackPlacement.top }}
+        >
+          <NewsStack
+            articles={stackArticles}
+            colors={colors}
+            total={stack.total}
+            onSelect={(articleId) => {
+              setStack(null);
+              useExplorerStore.getState().selectArticle(articleId);
+            }}
+            onZoom={stack.expandZoom === null ? undefined : zoomIntoStack}
+            onClose={() => {
+              setStack(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+/** Tamaño del mapa en pantalla (para encuadrar sin taparlo con los paneles). */
+function screenOf(map: MapLibreMap): ScreenSize {
+  const container = map.getContainer();
+  return { width: container.clientWidth, height: container.clientHeight };
 }
 
 /** Dónde está la cámara (para calcular la duración de un vuelo). */

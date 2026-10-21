@@ -22,7 +22,7 @@ from app.application.ports.search_store import (
     SearchStorePort,
     StoredText,
 )
-from app.application.use_cases.geocoding import GeocodeMentions
+from app.application.use_cases.geocoding import GeocodeMentions, search_area
 from app.application.use_cases.run_search import NO_USAGE, PipelineLimits, SearchNotFoundError
 from app.domain.enrichment import ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import NotFoundError, ProviderError
@@ -94,6 +94,7 @@ class RelocateSearch:
         if search is None:
             raise SearchNotFoundError(f"No existe la búsqueda {search_id}.")
         searched = await self._gazetteer.by_code(search.region_code)
+        searched = searched and await search_area(self._gazetteer, searched)
         if searched is None:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
         relocations = []
@@ -187,6 +188,7 @@ class ReprocessSearch:
         if search is None:
             raise SearchNotFoundError(f"No existe la búsqueda {search_id}.")
         searched = await self._gazetteer.by_code(search.region_code)
+        searched = searched and await search_area(self._gazetteer, searched)
         if searched is None:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
         briefs = [

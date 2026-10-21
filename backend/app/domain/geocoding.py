@@ -14,6 +14,14 @@ confianza:
   y luego por la región buscada.
 - Si sigue ambigua **no se asigna ese nivel**: se sube al estado si todas
   caen en uno; si no, queda sin ubicar. Nunca se finge precisión.
+- El estado que da la IA manda: un homónimo de otro estado nunca gana
+  ("Polanco, CDMX" caía en una localidad de Jalisco; 20/10/2026). Si no se
+  encuentra el lugar dentro de ese estado, la nota se ubica en el estado.
+- Palabras genéricas al inicio ("alcaldía", "colonia", "calle") se quitan
+  antes de buscar: INEGI guarda "Miguel Hidalgo", no "alcaldía Miguel Hidalgo".
+- Lo que INEGI no tiene (colonias, barrios) se busca en las colonias de
+  OpenStreetMap, siempre dentro del estado de la nota (ADR-0020). Si todas las
+  coincidencias caen en un solo municipio, la nota se pinta en la colonia.
 
 La población (tercer desempate de §11) no se usa: el catálogo no la trae
 (0 de 2,478 municipios con población, medido el 16/10/2026).
@@ -43,6 +51,46 @@ FUZZY_MIN_SIMILARITY = 0.85
 FUZZY_CONFIDENCE_FACTOR = 0.7
 # Umbral para ser la ubicación principal (GEO_MIN_CONFIDENCE, §11).
 DEFAULT_MIN_CONFIDENCE = 0.6
+# Colonias de OpenStreetMap (ADR-0020): un poco menos que INEGI porque los
+# nombres son de voluntarios; exacta ("Roma Norte") o como familia ("Polanco"
+# junta "Polanco 1ª Sección", "Polanco III Sección"...).
+NEIGHBORHOOD_EXACT_CONFIDENCE = 0.85
+NEIGHBORHOOD_FAMILY_CONFIDENCE = 0.75
+# Preferencia entre tipos de lugar de OpenStreetMap con el mismo nombre.
+_NEIGHBORHOOD_KIND_ORDER = ("neighbourhood", "macrohood", "locality")
+# "Solo sabemos el estado que dice la IA": alcanza justo el umbral para ser la
+# ubicación principal si no hay nada más preciso (se pinta con anillo punteado).
+STATE_HINT_CONFIDENCE = DEFAULT_MIN_CONFIDENCE
+# Palabras genéricas que la IA deja al inicio de una mención (medido en el
+# historial del 20/10/2026: 51 de 140 menciones sin resolver las traían). Ya
+# normalizadas; de la más larga a la más corta para quitar la más específica.
+# "ESTADO DE" no está: "Estado de México" es un alias del estado 15.
+GENERIC_PREFIXES = (
+    "UNIDAD HABITACIONAL ",
+    "FRACCIONAMIENTO ",
+    "MUNICIPIO DE ",
+    "DELEGACION ",
+    "BARRIO DE ",
+    "CARRETERA ",
+    "BOULEVARD ",
+    "MUNICIPIO ",
+    "ALCALDIA ",
+    "COLONIA ",
+    "AVENIDA ",
+    "BULEVAR ",
+    "CALZADA ",
+    "BARRIO ",
+    "FRACC. ",
+    "PUEBLO ",
+    "CALLE ",
+    "BLVD. ",
+    "FRACC ",
+    "BLVD ",
+    "COL. ",
+    "AV. ",
+    "COL ",
+    "AV ",
+)
 UNKNOWN_CONFIDENCE = 0.0
 
 
@@ -70,6 +118,50 @@ _GENERALITY = (
     RegionLevel.MUNICIPALITY,
     RegionLevel.LOCALITY,
 )
+
+
+def strip_generic_prefix(name_norm: str) -> str:
+    """Quita una palabra genérica del inicio de un nombre ya normalizado.
+
+    Args:
+        name_norm: Nombre normalizado (``normalize_name``).
+
+    Returns:
+        El nombre sin la palabra; el mismo si no la tenía.
+
+    Example:
+        >>> strip_generic_prefix("ALCALDIA MIGUEL HIDALGO")
+        'MIGUEL HIDALGO'
+    """
+    for prefix in GENERIC_PREFIXES:
+        if name_norm.startswith(prefix):
+            return name_norm[len(prefix) :].strip()
+    return name_norm
+
+
+# Artículos con que los medios nombran municipios que INEGI registra sin
+# ellos ("El Rosario" → "Rosario", "La Concordia" → "Concordia"; Sinaloa,
+# búsqueda real del 19/10/2026). Solo se prueban si el nombre completo no está.
+LEADING_ARTICLES = ("LOS ", "LAS ", "EL ", "LA ")
+
+
+def strip_leading_article(name_norm: str) -> str:
+    """Quita un artículo del inicio de un nombre normalizado.
+
+    Args:
+        name_norm: Nombre normalizado.
+
+    Returns:
+        El nombre sin el artículo; el mismo si no lo tenía.
+
+    Example:
+        >>> strip_leading_article("EL ROSARIO")
+        'ROSARIO'
+    """
+    for article in LEADING_ARTICLES:
+        if name_norm.startswith(article):
+            return name_norm[len(article) :].strip()
+    return name_norm
 
 
 def is_mexico_name(name: str) -> bool:
@@ -100,6 +192,8 @@ class Place:
         country_code: País (``MEX``).
         lon: Longitud del punto del catálogo (localidad o centroide).
         lat: Latitud del punto del catálogo.
+        detail: Lugar más fino dentro de la región, si se usó uno ("Colonia
+            Polanco"): entonces el punto es el de ese lugar, no el centroide.
     """
 
     region_id: int
@@ -110,6 +204,7 @@ class Place:
     country_code: str
     lon: float
     lat: float
+    detail: str | None = None
 
     @property
     def state_code(self) -> str | None:
@@ -151,6 +246,8 @@ class Mention:
         kind_hint: Nivel que sugiere la IA, si lo sugiere.
         state_hint: Estado que sugiere la IA ("Ciudad de México").
         country: País que sugiere la IA ("España").
+        municipality_hint: Municipio o alcaldía que sugiere la IA para una
+            colonia o calle ("Miguel Hidalgo"; prompt ``enrich_v2``).
     """
 
     text: str
@@ -158,6 +255,7 @@ class Mention:
     kind_hint: RegionLevel | None = None
     state_hint: str | None = None
     country: str | None = None
+    municipality_hint: str | None = None
 
     @property
     def is_abroad(self) -> bool:
@@ -201,6 +299,99 @@ class Choice:
     place: Place | None
     state_code: str | None
     confidence: float
+
+
+@dataclass(frozen=True, slots=True)
+class Neighborhood:
+    """Una colonia, barrio o zona de OpenStreetMap (tabla ``places``).
+
+    Attributes:
+        name: Nombre original ("Colonia Polanco 1ª Sección").
+        name_core: Nombre normalizado sin la palabra genérica ("POLANCO 1ª SECCION").
+        kind: ``neighbourhood``, ``macrohood`` o ``locality``.
+        municipality: Municipio de INEGI que la contiene.
+        lon: Longitud de su punto.
+        lat: Latitud de su punto.
+    """
+
+    name: str
+    name_core: str
+    kind: str
+    municipality: Place
+    lon: float
+    lat: float
+
+
+def choose_neighborhood(
+    name_core: str, matches: Sequence[Neighborhood], municipality_code: str | None = None
+) -> tuple[Place, float] | None:
+    """Elige la colonia de OpenStreetMap de una mención (ADR-0020).
+
+    Se prefieren las de nombre exacto; si no hay, las de la misma familia
+    ("Polanco" → "Polanco 1ª Sección"...). Con municipio sugerido por la IA,
+    solo cuentan las de ese municipio: "Ajusco, Tlalpan" no es la Colonia
+    Ajusco de Coyoacán (historial del 20/10/2026). Solo se acepta si todas las
+    que quedan caen en **un** municipio: "Colonia Centro" existe en cientos y
+    no dice nada.
+
+    Args:
+        name_core: Mención normalizada, sin palabra genérica.
+        matches: Colonias del estado de la nota con ese nombre o familia.
+        municipality_code: Clave INEGI del municipio que sugiere la IA, si hay.
+
+    Returns:
+        El municipio con el punto y el nombre de la colonia, y la confianza; o
+        ``None`` si no hay o es ambigua.
+
+    Example:
+        >>> choose_neighborhood("ROMA NORTE", [roma_norte])
+        (Place(..., detail="Colonia Roma Norte"), 0.85)
+    """
+    pool = list(matches)
+    if municipality_code is not None:
+        pool = [m for m in pool if m.municipality.code == municipality_code]
+    exact = [m for m in pool if m.name_core == name_core]
+    chosen = exact or pool
+    if not chosen or len({m.municipality.region_id for m in chosen}) != 1:
+        return None
+    best = min(
+        chosen,
+        key=lambda m: (
+            _NEIGHBORHOOD_KIND_ORDER.index(m.kind) if m.kind in _NEIGHBORHOOD_KIND_ORDER else 9,
+            len(m.name_core),
+        ),
+    )
+    place = replace(best.municipality, lon=best.lon, lat=best.lat, detail=best.name)
+    confidence = NEIGHBORHOOD_EXACT_CONFIDENCE if exact else NEIGHBORHOOD_FAMILY_CONFIDENCE
+    return place, confidence
+
+
+def seat_area(searched: Place, municipality: Place | None) -> Place:
+    """Zona real de una búsqueda: la localidad cabecera homónima vale por su municipio.
+
+    En la CDMX cada alcaldía tiene una localidad urbana con su mismo nombre que
+    cubre casi toda la alcaldía (090160001 "Miguel Hidalgo" dentro de 09016).
+    Ni las notas ni las personas las distinguen: una búsqueda en esa localidad
+    marcaba "fuera de la región" todo lo ubicado en la alcaldía o sus colonias
+    (búsqueda real del 20/10/2026: 0 notas dentro).
+
+    Args:
+        searched: Región elegida para la búsqueda.
+        municipality: Su municipio, si es una localidad.
+
+    Returns:
+        El municipio si la búsqueda es su localidad cabecera con el mismo nombre;
+        si no, la misma región.
+    """
+    if (
+        searched.level is RegionLevel.LOCALITY
+        and municipality is not None
+        and municipality.level is RegionLevel.MUNICIPALITY
+        and searched.code.startswith(municipality.code)
+        and normalize_name(searched.name) == normalize_name(municipality.name)
+    ):
+        return municipality
+    return searched
 
 
 def most_general(candidates: Sequence[Place]) -> list[Place]:
@@ -281,25 +472,47 @@ _SPECIFICITY = {
 }
 
 
-def mark_primary(resolutions: Sequence[Resolution], min_confidence: float) -> list[Resolution]:
-    """Marca la ubicación principal: el lugar del hecho más específico y confiable (paso 6).
+def _inside(resolution: Resolution, searched: Place | None) -> bool:
+    place = resolution.place
+    if searched is None or place is None:
+        return False
+    return place.region_id == searched.region_id or searched.contains(place)
+
+
+def mark_primary(
+    resolutions: Sequence[Resolution], min_confidence: float, searched: Place | None = None
+) -> list[Resolution]:
+    """Marca la ubicación principal de una nota (paso 6 de §11).
+
+    1. Entre los lugares del hecho con confianza suficiente, se prefieren los
+       que caen dentro de la región buscada; de ellos, el más específico.
+    2. Si la IA no marcó ningún lugar del hecho utilizable, se usa el lugar
+       *mencionado* más específico dentro de la región buscada (13 de las 24
+       notas sin ubicación del historial del 20/10/2026 eran así). Conserva su
+       papel "mencionado" para que la ficha lo diga.
 
     Args:
         resolutions: Menciones resueltas de una nota.
         min_confidence: Umbral (``GEO_MIN_CONFIDENCE``).
+        searched: Región de la búsqueda, si la hay.
 
     Returns:
-        Las mismas resoluciones, con a lo más una ``is_primary``. Si ningún
-        lugar del hecho pasa el umbral, ninguna lo es: la nota queda "sin
-        ubicación" y no se pinta en el mapa.
+        Las mismas resoluciones, con a lo más una ``is_primary``. Si ninguna
+        califica, la nota queda "sin ubicación" y no se pinta en el mapa.
     """
-    eligible = [
+    confident = [
         (index, r)
         for index, r in enumerate(resolutions)
-        if r.mention.role is MentionRole.EVENT
-        and r.place is not None
-        and r.confidence >= min_confidence
+        if r.place is not None and r.confidence >= min_confidence
     ]
+    events = [(i, r) for i, r in confident if r.mention.role is MentionRole.EVENT]
+    events_inside = [(i, r) for i, r in events if _inside(r, searched)]
+    mentioned_inside = [
+        (i, r)
+        for i, r in confident
+        if r.mention.role is MentionRole.MENTIONED and _inside(r, searched)
+    ]
+    eligible = events_inside or events or mentioned_inside
     if not eligible:
         return list(resolutions)
     best_index, _ = max(

@@ -168,7 +168,7 @@ class ArticleDetailOut(ArticleOut):
     locations: list[LocationOut]
     first_seen_at: datetime
     llm_model: str | None = Field(examples=["gpt-6-luna"])
-    prompt_version: str | None = Field(examples=["enrich_v1"])
+    prompt_version: str | None = Field(examples=["enrich_v2"])
 
     @classmethod
     def from_detail(cls, detail: ArticleDetail) -> "ArticleDetailOut":

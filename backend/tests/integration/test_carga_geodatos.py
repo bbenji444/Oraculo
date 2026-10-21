@@ -60,7 +60,7 @@ def row(engine: Engine, code: str) -> dict[str, Any]:
                 """
                 SELECT r.level::text, r.name, r.name_norm, r.display_prefix, r.country_code,
                        r.aliases, r.aliases_norm, p.code AS parent_code, r.source,
-                       r.geom IS NULL AS sin_poligono, r.bbox,
+                       r.geom IS NULL AS sin_poligono, r.bbox, r.focus_bbox,
                        ST_IsValid(r.geom) AS valida,
                        ST_GeometryType(r.geom) AS tipo,
                        r.geom IS NULL OR ST_Intersects(r.geom, r.centroid) AS punto_dentro
@@ -96,6 +96,17 @@ def test_pais_con_iso_menos_99_usa_adm0(engine: Engine) -> None:
         "País",
         "country",
     )
+
+
+def test_encuadre_de_la_parte_principal_sin_territorios_lejanos(engine: Engine) -> None:
+    francia = row(engine, "FRA")
+
+    # El bbox incluye Guayana (-54.5); el encuadre, solo Francia y Córcega,
+    # que está a menos de 2° (FOCUS_CLUSTER_DEGREES).
+    assert francia["bbox"][0] == pytest.approx(-54.5)
+    assert francia["focus_bbox"] == pytest.approx([-5, 41.4, 9.5, 51])
+    # Colombia es de una sola parte: no necesita encuadre propio.
+    assert row(engine, "COL")["focus_bbox"] is None
 
 
 def test_jerarquia_y_prefijos(engine: Engine) -> None:

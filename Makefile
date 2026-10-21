@@ -27,7 +27,7 @@ COVERAGE_MIN := 85
 .PHONY: help bootstrap up down status logs migrate \
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
-        geo-terms geo-basemap db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
+        geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth
 
 help: ## Muestra esta ayuda
@@ -111,6 +111,9 @@ geo-basemap: ## Descarga el mapa base de Protomaps (mundo z6 + México z14, ~1.3
 
 geo-earth: ## Texturas NASA de la Tierra (día y noche) y estrellas (ARGS=--muestra para solo 5 recortes)
 	$(UV_RUN) python -m app.geodata.tierra $(ARGS)
+
+geo-places: ## Colonias y barrios de OpenStreetMap desde el mapa base (ARGS=--muestra: solo ejemplos)
+	$(UV_RUN) python -m app.geodata.lugares_osm $(ARGS)
 
 # --- Base de datos (docs/base-de-datos.md) ---------------------------------------
 

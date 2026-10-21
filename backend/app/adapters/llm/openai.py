@@ -85,7 +85,14 @@ ENRICHMENT_SCHEMA: dict[str, Any] = {
             "items": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["mention", "kind_hint", "state_hint", "country", "role"],
+                "required": [
+                    "mention",
+                    "kind_hint",
+                    "state_hint",
+                    "municipality_hint",
+                    "country",
+                    "role",
+                ],
                 "properties": {
                     "mention": {"type": "string"},
                     "kind_hint": {
@@ -93,6 +100,7 @@ ENRICHMENT_SCHEMA: dict[str, Any] = {
                         "enum": ["country", "state", "municipality", "locality", None],
                     },
                     "state_hint": _NULLABLE_TEXT,
+                    "municipality_hint": _NULLABLE_TEXT,
                     "country": _NULLABLE_TEXT,
                     "role": {"type": "string", "enum": ["event", "mentioned"]},
                 },

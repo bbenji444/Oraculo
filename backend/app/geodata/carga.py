@@ -14,7 +14,9 @@ Cómo funciona (especificación §12, ADR-0008):
    (``ST_MakeValid``), se queda solo con polígonos, calcula el punto
    representativo (``ST_PointOnSurface``) y el ``bbox``, enlaza al padre
    por prefijo de clave INEGI y hace ``upsert`` por ``code``: correrlo dos
-   veces no duplica nada.
+. Para las regiones de varias partes (islas, territorios de ultramar) se
+   calcula ``focus_bbox``: el rectángulo de su parte principal, que es el que
+   usa el globo para encuadrar (sin Guayana ni Reunión en Francia).
 
 Orden: países → México (unión de los estados INEGI) → estados → municipios
 → localidades (primero las puntuales y luego las de polígono, para que si
@@ -86,6 +88,45 @@ _VALID_POLYGON = (
     "CASE WHEN ST_IsValid(s.geom) THEN s.geom ELSE ST_MakeValid(s.geom) END, 3))"
 )
 _BBOX = "ARRAY[ST_XMin(g.geom), ST_YMin(g.geom), ST_XMax(g.geom), ST_YMax(g.geom)]"
+
+# Encuadre de la parte principal (focus_bbox). Las partes a menos de 2° entre sí
+# forman un grupo (Francia con Córcega, Indonesia con sus islas); se queda el
+# grupo de la parte más grande y cualquier otro con al menos 25 % del área
+# (la península de Malasia). Medido sobre 30 países el 20/10/2026: Francia,
+# Estados Unidos (contiguo), Rusia, Noruega y Nueva Zelanda quedan bien.
+FOCUS_CLUSTER_DEGREES = 2.0
+FOCUS_MIN_AREA_SHARE = 0.25
+# Simplificar antes de agrupar: con el contorno completo (68 mil vértices en
+# Canadá) el agrupamiento tardaba más de 100 s; simplificado, menos de 1 s.
+FOCUS_SIMPLIFY_DEGREES = 0.1
+FILL_FOCUS_BBOX_SQL = """
+WITH parts AS (
+    SELECT r.id, d.geom AS g
+    FROM regions r, LATERAL ST_Dump(r.geom) AS d
+    WHERE r.geom IS NOT NULL AND ST_NumGeometries(r.geom) > 1
+), clustered AS (
+    SELECT id, g, ST_Area(g::geography) AS area,
+           ST_ClusterDBSCAN(ST_Simplify(g, :simplify), eps := :eps, minpoints := 1)
+               OVER (PARTITION BY id) AS cid
+    FROM parts
+), clusters AS (
+    SELECT id, cid, sum(area) AS area, max(area) AS biggest_part, ST_Extent(g)::geometry AS box
+    FROM clustered GROUP BY id, cid
+), ranked AS (
+    SELECT *, sum(area) OVER (PARTITION BY id) AS total,
+           max(biggest_part) OVER (PARTITION BY id) AS region_biggest
+    FROM clusters
+), kept AS (
+    SELECT id, ST_Extent(box)::geometry AS box
+    FROM ranked
+    WHERE biggest_part = region_biggest OR area >= :share * total
+    GROUP BY id
+)
+UPDATE regions r
+SET focus_bbox = ARRAY[ST_XMin(k.box), ST_YMin(k.box), ST_XMax(k.box), ST_YMax(k.box)]
+FROM kept k
+WHERE k.id = r.id
+"""
 _UPSERT = """
     ON CONFLICT (code) DO UPDATE SET
         level = EXCLUDED.level,
@@ -577,6 +618,29 @@ def apply_aliases(engine: Engine, aliases: dict[str, list[str]]) -> int:
     return sum(len(names) for names in aliases.values())
 
 
+def fill_focus_bbox(engine: Engine) -> int:
+    """Calcula ``focus_bbox`` de las regiones de varias partes.
+
+    Las de una sola parte lo dejan en ``NULL``: su encuadre es el ``bbox``.
+    Se puede repetir: recalcula a partir de la geometría guardada.
+
+    Args:
+        engine: Conexión síncrona a la base destino.
+
+    Returns:
+        Cuántas regiones recibieron un encuadre propio.
+    """
+    params = {
+        "eps": FOCUS_CLUSTER_DEGREES,
+        "share": FOCUS_MIN_AREA_SHARE,
+        "simplify": FOCUS_SIMPLIFY_DEGREES,
+    }
+    with engine.begin() as conn:
+        filled = conn.execute(text(FILL_FOCUS_BBOX_SQL), params).rowcount
+    logger.info(f"Encuadre de la parte principal en {filled} regiones de varias partes")
+    return int(filled)
+
+
 def run_load(
     engine: Engine, target: PostgresTarget, inputs: LoadInputs, work_dir: Path
 ) -> LoadSummary:
@@ -630,6 +694,7 @@ def run_load(
         inputs.inegi_source,
         f"left(s.cvegeo, {MUNICIPALITY_CODE_LENGTH})",
     )
+    fill_focus_bbox(engine)
     alias_count = apply_aliases(engine, read_aliases(inputs.aliases_csv))
     terms_count = apply_search_terms(engine, read_search_terms(inputs.search_terms_csv))
     codes_count = apply_country_codes(

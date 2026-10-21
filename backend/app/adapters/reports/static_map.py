@@ -179,7 +179,8 @@ class _Frame:
 
     @classmethod
     def of(cls, region: Region) -> "_Frame":
-        box = region.bbox
+        # Parte principal: Francia sin Guayana ni Reunión (ver Region.focus).
+        box = region.focus
         size = max(box.east - box.west, box.north - box.south, MIN_SIZE_DEGREES)
         margin = size * MARGIN_SHARE
         kx = math.cos(math.radians((box.north + box.south) / 2))

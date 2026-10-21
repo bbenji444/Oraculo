@@ -11,7 +11,7 @@
  *
  * Funciones puras (sin mapa ni DOM): datos GeoJSON y estilos de las capas.
  */
-import type { ExpressionSpecification, LayerSpecification } from 'maplibre-gl';
+import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
 
 import type { Article } from '../services/searches';
 
@@ -288,7 +288,8 @@ export interface CalloutPlacement {
  * Dónde dibujar la ficha para que nunca se salga del mapa.
  *
  * Prefiere arriba a la derecha del punto; si no cabe arriba, la baja; si no
- * cabe a la derecha, la pasa a la izquierda.
+ * cabe a la derecha, la pasa a la izquierda. Si no cabe a ningún lado (celular),
+ * va encima del punto, centrada, y la línea baja recta hasta él.
  *
  * @param point Punto de la nota en pantalla.
  * @param card Ancho y alto de la ficha.
@@ -299,14 +300,77 @@ export function calloutPlacement(
   card: { width: number; height: number },
   viewport: { width: number; height: number },
 ): CalloutPlacement {
-  const fitsRight = point.x + CALLOUT_GAP_X + card.width <= viewport.width - CALLOUT_MARGIN;
-  const left = fitsRight ? point.x + CALLOUT_GAP_X : point.x - CALLOUT_GAP_X - card.width;
   const preferredTop = point.y - CALLOUT_RISE_Y - card.height;
   const maxTop = Math.max(CALLOUT_MARGIN, viewport.height - card.height - CALLOUT_MARGIN);
   const top = Math.min(maxTop, Math.max(CALLOUT_MARGIN, preferredTop));
+  const fitsRight = point.x + CALLOUT_GAP_X + card.width <= viewport.width - CALLOUT_MARGIN;
+  const fitsLeft = point.x - CALLOUT_GAP_X - card.width >= CALLOUT_MARGIN;
+  if (!fitsRight && !fitsLeft) {
+    const maxLeft = Math.max(CALLOUT_MARGIN, viewport.width - card.width - CALLOUT_MARGIN);
+    const left = Math.min(maxLeft, Math.max(CALLOUT_MARGIN, point.x - card.width / 2));
+    const lineX = Math.min(
+      left + card.width - CALLOUT_LINE_INSET,
+      Math.max(left + CALLOUT_LINE_INSET, point.x),
+    );
+    return { left, top, lineX, lineY: top + card.height };
+  }
+  const left = fitsRight ? point.x + CALLOUT_GAP_X : point.x - CALLOUT_GAP_X - card.width;
   const lineY = Math.min(
     top + card.height - CALLOUT_LINE_INSET,
     Math.max(top + CALLOUT_LINE_INSET, point.y - CALLOUT_RISE_Y),
   );
   return { left, top, lineX: fitsRight ? left : left + card.width, lineY };
+}
+
+/**
+ * Pasa los puntos de noticias del estilo anterior al nuevo al cambiar de día a
+ * noche (`map.setStyle(..., { diff: true, transformStyle })`).
+ *
+ * El estilo nuevo trae el mapa de calles con otra variante de colores, pero no
+ * sabe de las noticias: el globo las agrega después de cargar. Sin esto, el
+ * cambio las borraría junto con el filtro del punto elegido.
+ *
+ * @param previous Estilo actual (serializado por MapLibre), si hay.
+ * @param next Estilo nuevo de `buildMapStyle`.
+ * @returns El estilo nuevo con la fuente y las capas de noticias al final.
+ */
+export function keepNewsLayers(
+  previous: StyleSpecification | undefined,
+  next: StyleSpecification,
+): StyleSpecification {
+  const news = previous?.sources[NEWS_SOURCE];
+  if (!previous || !news) return next;
+  return {
+    ...next,
+    sources: { ...next.sources, [NEWS_SOURCE]: news },
+    layers: [
+      ...next.layers,
+      ...previous.layers.filter((layer) => 'source' in layer && layer.source === NEWS_SOURCE),
+    ],
+  };
+}
+
+// Máximo de notas en la lista de un grupo: más ya no se leen; se pide acercar.
+export const STACK_LIMIT = 50;
+
+/**
+ * Notas distintas entre las figuras bajo un clic (sin contar grupos).
+ *
+ * Cuando varias notas comparten el mismo punto (todas las ubicadas solo por
+ * estado caen en su centro), se dibujan encimadas y el clic las alcanza todas.
+ *
+ * @param features Figuras de `queryRenderedFeatures` o de `getClusterLeaves`.
+ * @returns Ids de nota en el orden recibido, sin repetir.
+ */
+export function stackedIds(
+  features: readonly { properties?: Record<string, unknown> | null }[],
+): number[] {
+  const ids: number[] = [];
+  for (const feature of features) {
+    const props = feature.properties ?? {};
+    if (props.cluster) continue;
+    const id = Number(props.id);
+    if (Number.isFinite(id) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }

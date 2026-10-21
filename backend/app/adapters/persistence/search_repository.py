@@ -640,7 +640,7 @@ class PostgresArticleStore:
                         text(
                             """
                             SELECT a.id, a.title, al.mention_text, al.role, al.kind_hint,
-                                al.state_hint,
+                                al.state_hint, al.municipality_hint,
                                 -- Filas anteriores a 0014: si se resolvió a otro país,
                                 -- ese país es la pista.
                                 COALESCE(al.country_hint, CASE WHEN r.level = 'country'
@@ -674,6 +674,7 @@ class PostgresArticleStore:
                     RegionLevel(row["kind_hint"]) if row["kind_hint"] else None,
                     row["state_hint"],
                     row["country"],
+                    row["municipality_hint"],
                 )
                 current = replace(current, mentions=(*current.mentions, mention))
             grouped[row["id"]] = current
@@ -912,8 +913,9 @@ class PostgresArticleStore:
                             SELECT a.title, a.source_name, a.url_canonical, a.published_at,
                                 a.summary, a.extraction_status, sr.in_region, sr.best_rank,
                                 al.precision, al.confidence,
-                                CASE WHEN r.level IN ('municipality', 'locality')
-                                    THEN r.display_prefix || ' ' || r.name ELSE r.name END
+                                concat_ws(', ', al.place_name,
+                                    CASE WHEN r.level IN ('municipality', 'locality')
+                                    THEN r.display_prefix || ' ' || r.name ELSE r.name END)
                                     AS place,
                                 COALESCE((SELECT array_agg(sc.concept_name ORDER BY sc.concept_name)
                                     FROM article_concepts ac JOIN search_concepts sc
@@ -971,12 +973,13 @@ async def _write_locations(
             text(
                 """
                 INSERT INTO article_locations (article_id, mention_text, role, kind_hint,
-                    state_hint, country_hint, region_id, precision, confidence, is_primary,
-                    point)
-                VALUES (:a, :mention, :role, :kind, :state, :country, :region, :precision,
-                    :confidence, :primary,
+                    state_hint, country_hint, municipality_hint, region_id, precision,
+                    confidence, is_primary, point, place_name)
+                VALUES (:a, :mention, :role, :kind, :state, :country, :municipality, :region,
+                    :precision, :confidence, :primary,
                     CASE WHEN CAST(:lon AS double precision) IS NULL THEN NULL
-                        ELSE ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) END)
+                        ELSE ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) END,
+                    :place_name)
                 """
             ),
             {
@@ -986,12 +989,14 @@ async def _write_locations(
                 "kind": mention.kind_hint.value if mention.kind_hint else None,
                 "state": mention.state_hint,
                 "country": mention.country,
+                "municipality": mention.municipality_hint,
                 "region": r.place.region_id if r.place else None,
                 "precision": r.precision.value,
                 "confidence": r.confidence,
                 "primary": r.is_primary,
                 "lon": r.place.lon if r.place else None,
                 "lat": r.place.lat if r.place else None,
+                "place_name": r.place.detail if r.place else None,
             },
         )
 
@@ -1003,7 +1008,7 @@ _ARTICLE_COLUMNS = """
 _LOCATION_COLUMNS = """
     p.mention_text, p.role, p.precision, p.confidence, p.is_primary, r.id AS region_id,
     r.code AS region_code, r.level::text AS region_level, r.name AS region_name,
-    r.display_prefix, ST_X(p.point) AS lon, ST_Y(p.point) AS lat
+    r.display_prefix, p.place_name, ST_X(p.point) AS lon, ST_Y(p.point) AS lat
 """
 # La ubicación principal, con el prefijo "p_" para no chocar con las de la nota.
 _PRIMARY_COLUMNS = """
@@ -1011,7 +1016,7 @@ _PRIMARY_COLUMNS = """
     p.precision AS p_precision, p.confidence AS p_confidence, p.is_primary AS p_is_primary,
     r.id AS p_region_id, r.code AS p_region_code, r.level::text AS p_region_level,
     r.name AS p_region_name, r.display_prefix AS p_display_prefix,
-    ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat
+    p.place_name AS p_place_name, ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat
 """
 # Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces.
 _JUDGEMENTS_IN_SEARCH = """
@@ -1055,13 +1060,15 @@ def _article_filters(filters: ArticleFilters) -> tuple[list[str], dict[str, obje
     return where, params
 
 
-def _place_name(level: str | None, prefix: str | None, name: str | None) -> str | None:
+def _place_name(
+    level: str | None, prefix: str | None, name: str | None, detail: str | None = None
+) -> str | None:
     # Igual que Region.display_name: municipios y localidades con su prefijo.
+    # Con una colonia de OpenStreetMap, va primero: "Polanco, Alcaldía Miguel Hidalgo".
     if name is None:
         return None
-    if level in ("municipality", "locality") and prefix:
-        return f"{prefix} {name}"
-    return name
+    region = f"{prefix} {name}" if level in ("municipality", "locality") and prefix else name
+    return f"{detail}, {region}" if detail else region
 
 
 def _location(row: RowMapping, prefix: str = "") -> LocationView:
@@ -1077,6 +1084,7 @@ def _location(row: RowMapping, prefix: str = "") -> LocationView:
             row[f"{prefix}region_level"],
             row[f"{prefix}display_prefix"],
             row[f"{prefix}region_name"],
+            row[f"{prefix}place_name"],
         ),
         lon=row[f"{prefix}lon"],
         lat=row[f"{prefix}lat"],

@@ -8,7 +8,7 @@ No hace: no decide nada (las reglas están en ``app.domain.geocoding``).
 
 from typing import Protocol
 
-from app.domain.geocoding import Place
+from app.domain.geocoding import Neighborhood, Place
 
 
 class GazetteerPort(Protocol):
@@ -45,6 +45,19 @@ class GazetteerPort(Protocol):
 
         Returns:
             El país, o ``None``.
+        """
+        ...
+
+    async def neighborhoods(self, name_core: str, state_code: str) -> list[Neighborhood]:
+        """Colonias de OpenStreetMap de un estado con ese nombre o de su familia.
+
+        Args:
+            name_core: Nombre normalizado sin palabra genérica ("POLANCO").
+            state_code: Clave INEGI del estado ("09").
+
+        Returns:
+            Las de nombre exacto y las que empiezan con ese nombre seguido de
+            otra palabra ("POLANCO 1ª SECCION"), con su municipio.
         """
         ...
 

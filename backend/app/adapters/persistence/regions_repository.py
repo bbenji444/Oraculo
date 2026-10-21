@@ -28,7 +28,7 @@ from app.domain.region import BoundingBox, GeoPoint, Region, RegionLevel, Region
 _COLUMNS = """
     r.id, r.level::text AS level, r.code, r.name, r.name_norm, r.display_prefix,
     r.country_code, r.parent_id, ST_X(r.centroid) AS lon, ST_Y(r.centroid) AS lat,
-    r.bbox, r.geom IS NOT NULL AS has_polygon, r.aliases, r.population
+    r.bbox, r.focus_bbox, r.geom IS NOT NULL AS has_polygon, r.aliases, r.population
 """
 # Profundidad del nivel (país 1 … localidad 4) para ordenar en SQL.
 _LEVEL_DEPTH = (
@@ -60,6 +60,7 @@ def _to_region(row: RowMapping) -> Region:
         has_polygon=row["has_polygon"],
         aliases=tuple(row["aliases"]),
         population=row["population"],
+        focus_bbox=BoundingBox(*row["focus_bbox"]) if row["focus_bbox"] else None,
     )
 
 

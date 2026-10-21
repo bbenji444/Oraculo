@@ -56,6 +56,10 @@ _DEFAULT_QUERY_CACHE_TTL_HOURS = 6.0
 # - Tope mensual de créditos de SearchApi: las 100 búsquedas de la prueba
 #   gratuita. Red de seguridad contra gastos por error.
 _DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
+# Páginas de Google News por consulta (10 notas cada una, 1 crédito cada una;
+# se piden solo mientras vengan llenas). Medido el 21/10/2026 (ADR-0019).
+_DEFAULT_SEARCHAPI_MAX_PAGES = 3
+_MAX_SEARCHAPI_PAGES = 10
 
 # Ingesta al índice local (ADR-0013):
 # - 90 días de notas, igual que la ventana que cubre la API de GDELT.
@@ -152,6 +156,9 @@ class Settings(BaseSettings):
     max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
     query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
     searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
+    searchapi_max_pages: int = Field(
+        default=_DEFAULT_SEARCHAPI_MAX_PAGES, ge=1, le=_MAX_SEARCHAPI_PAGES
+    )
     # Google News RSS: desactivado por defecto por sus términos de uso
     # (ADR-0011). Solo se activa a propósito en desarrollo; nunca en producción.
     news_rss_enabled: bool = False

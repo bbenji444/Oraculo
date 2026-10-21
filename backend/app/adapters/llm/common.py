@@ -1,6 +1,6 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v1.md`` para
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v2.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte) y su respuesta se valida con el mismo modelo de Pydantic
 (``EnrichmentOut``, ``SummaryOut``). Así, cambiar de proveedor no cambia lo
@@ -22,7 +22,9 @@ from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.region import RegionLevel
 
-PROMPT_VERSION = "enrich_v1"
+# v2 (21/10/2026): pide el municipio de cada colonia o calle, marca al menos
+# un lugar del hecho y fecha el hecho original en avances de casos (ADR-0020).
+PROMPT_VERSION = "enrich_v2"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 # Respuestas consistentes: se extraen datos, no se escribe creativo.
 TEMPERATURE = 0.2
@@ -58,6 +60,7 @@ class LocationOut(BaseModel):
     mention: str = Field(min_length=1)
     kind_hint: LocationKind | None = None
     state_hint: str | None = None
+    municipality_hint: str | None = None
     country: str | None = None
     role: Literal["event", "mentioned"]
 
@@ -90,7 +93,7 @@ def _concepts_text(concepts: Sequence[ConceptBrief]) -> str:
 
 
 def build_prompt(request: EnrichmentRequest) -> str:
-    """Llena la plantilla ``enrich_v1.md`` con la nota.
+    """Llena la plantilla del prompt vigente (``PROMPT_VERSION``) con la nota.
 
     Args:
         request: Nota y conceptos.
@@ -134,6 +137,7 @@ def to_enrichment(out: EnrichmentOut, concept_ids: set[int]) -> Enrichment:
                 kind_hint=RegionLevel(loc.kind_hint) if loc.kind_hint else None,
                 state_hint=loc.state_hint,
                 country=loc.country,
+                municipality_hint=loc.municipality_hint,
             )
             for loc in out.locations
         ),

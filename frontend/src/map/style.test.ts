@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BASEMAP_SWITCH_ZOOM,
+  basemapFlavor,
   buildMapStyle,
   EARTH_FADE_END_ZOOM,
   EARTH_LAYER,
@@ -112,6 +113,22 @@ describe('buildMapStyle', () => {
     expect(day.layers.find((l) => l.id === EARTH_LAYER.day)?.layout).toEqual({
       visibility: 'visible',
     });
+  });
+
+  it('de día el mapa de calles es claro; de noche, oscuro', () => {
+    const day = buildMapStyle(ORIGIN, 'day');
+    const backgroundOf = (s: typeof style) =>
+      s.layers.find((l) => l.type === 'background')?.paint as Record<string, unknown>;
+
+    expect(style.sprite).toBe(`${ORIGIN}/tiles/basemap-assets/sprites/v4/dark`);
+    expect(day.sprite).toBe(`${ORIGIN}/tiles/basemap-assets/sprites/v4/light`);
+    expect(basemapFlavor('day')).toBe('light');
+    expect(basemapFlavor('night')).toBe('dark');
+    // Mismas capas en los dos modos: solo cambian los colores.
+    expect(day.layers.map((l) => l.id)).toEqual(style.layers.map((l) => l.id));
+    expect(backgroundOf(day)['background-color']).not.toEqual(
+      backgroundOf(style)['background-color'],
+    );
   });
 
   it('las etiquetas del mundo no ensucian la vista de globo', () => {

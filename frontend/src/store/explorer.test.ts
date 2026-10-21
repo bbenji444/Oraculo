@@ -44,6 +44,17 @@ describe('cuerpo de la búsqueda', () => {
 });
 
 describe('store de Explorar', () => {
+  it('volver a elegir la misma nota vuelve a pedir el vuelo', () => {
+    const store = useExplorerStore.getState();
+    store.selectArticle(11);
+    const first = useExplorerStore.getState().articleRequest;
+    store.selectArticle(11);
+
+    expect(useExplorerStore.getState()).toMatchObject({ articleId: 11, articleRequest: first + 1 });
+    store.selectArticle(null);
+    expect(useExplorerStore.getState().articleRequest).toBe(first + 1);
+  });
+
   it('elegir región o nota detiene el giro', () => {
     const store = useExplorerStore.getState();
     store.setSpinning(true);
@@ -78,6 +89,19 @@ describe('store de Explorar', () => {
       listFilter: 'all',
       showIrrelevant: false,
     });
+  });
+
+  it('el panel se oculta y se muestra, y no se recuerda entre visitas', () => {
+    useExplorerStore.getState().setPanelOpen(false);
+
+    expect(useExplorerStore.getState().panelOpen).toBe(false);
+    expect(useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState())).toEqual(
+      {
+        earth: useExplorerStore.getState().earth,
+        motion: useExplorerStore.getState().motion,
+      },
+    );
+    useExplorerStore.getState().setPanelOpen(true);
   });
 
   it('"sin animación" también detiene el giro', () => {

@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.4 · Octubre 2026 · Responsable: Benji
+Versión 2.8 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -267,9 +267,12 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `display_prefix` (`Alcaldía`, `Municipio`, `Estado`...)
 - `geom` geometry(MultiPolygon, 4326), nulo en localidades sin polígono
 - `centroid` geometry(Point, 4326)
-- `bbox` (para volar la cámara)
+- `bbox`: rectángulo que contiene toda la región
+- `focus_bbox`: rectángulo de su parte principal, sin islas ni territorios lejanos (Francia sin Guayana, Estados Unidos contiguo); `NULL` si es de una sola parte. Con él vuela la cámara y se encuadra el mapa del reporte
 - `population` (si la fuente la trae)
 - Índices: GIST(`geom`), GIST(`centroid`), GIN(`name_norm gin_trgm_ops`), GIN(`aliases_norm`), BTREE(`level`, `parent_id`), BTREE(`code text_pattern_ops`)
+
+**Tabla `places`** (ADR-0020): colonias, zonas y parajes de OpenStreetMap que trae el mapa base, cada uno con `name`, `name_core` (normalizado sin palabra genérica, índice `text_pattern_ops`), `kind`, `point` y `municipality_id` (municipio de INEGI que lo contiene, con índice). Se llena con `make geo-places`. `article_locations` guarda además `place_name` (la colonia usada) y `municipality_hint` (el municipio que sugiere la IA).
 
 **Truco clave:** la jerarquía INEGI está en el prefijo del código. "¿La noticia ubicada en `09007` está dentro de `09`?" se resuelve con `code LIKE '09%'`, sin geometría.
 
@@ -430,7 +433,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 
 | Proveedor | Rol | Costo | Notas |
 |---|---|---|---|
-| **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Contar créditos por consulta. |
+| **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Hasta `SEARCHAPI_MAX_PAGES` páginas de 10 notas por consulta (3 por defecto); la siguiente solo si la anterior vino llena, 1 crédito por página (ADR-0019). |
 | **Índice local** (`indice_local`, ADR-0013 y ADR-0014) | Notas que la ingesta periódica junta cada 15 minutos: **ngramas de GDELT** (texto completo, español + México; ADR-0014), archivos GKG de GDELT (solo título; apagados por defecto cuando los ngramas funcionan) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~1 GB de descarga al día) | Busca en título, fragmento y frases del cuerpo (`body_terms`, solo para buscar; nunca se muestran). Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
 | **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
 | **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
@@ -492,7 +495,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ## 10. Enriquecimiento con LLM
 
 - **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
-- **Prompts:** se guardan versionados en `adapters/llm/prompts/enrich_v1.md`. Cambiar el prompt implica subir la versión.
+- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigente: `enrich_v2.md`, que agrega `municipality_hint` para colonias y calles; ADR-0020). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
 - **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; se registran tokens y costo estimado por búsqueda.
@@ -517,6 +520,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
       "mention": "Iztapalapa",
       "kind_hint": "municipality",
       "state_hint": "Ciudad de México",
+      "municipality_hint": "Iztapalapa",
       "country": "México",
       "role": "event"
     }
@@ -537,8 +541,8 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ### Algoritmo para cada mención
 
 1. **País distinto de México:** resolver a la región `country`. Fin.
-2. **Normalizar** la mención: mayúsculas, sin acentos, conservando Ñ. Aplicar alias (`CDMX` → `CIUDAD DE MEXICO`; `EDOMEX` → `MEXICO`, estado 15; `LA CAPITAL DEL PAIS` → estado 09).
-3. **Coincidencia exacta** de `name_norm`, en el nivel sugerido y, si hay `state_hint`, dentro de ese estado.
+2. **Normalizar** la mención: mayúsculas, sin acentos, conservando Ñ, y sin la palabra genérica del inicio ("alcaldía", "colonia", "calle"…; ADR-0020). Aplicar alias (`CDMX` → `CIUDAD DE MEXICO`; `EDOMEX` → `MEXICO`, estado 15; `LA CAPITAL DEL PAIS` → estado 09).
+3. **Coincidencia exacta** de `name_norm`, en el nivel sugerido y, si hay `state_hint`, **solo** dentro de ese estado: un homónimo de otro estado nunca gana.
 4. **Varias coincidencias.** Desempatar en este orden:
    1. otras menciones del mismo artículo con estado;
    2. la región buscada;
@@ -546,7 +550,9 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 
    Si sigue ambigua, **no asignar ese nivel**: subir al nivel común (estado si todas coinciden en uno) o marcar `unknown`.
 5. **Sin coincidencia exacta:** similitud trigram ≥ 0.85 con confianza reducida.
-6. **Ubicación principal:** la mención `role=event` más específica con confianza ≥ umbral (`GEO_MIN_CONFIDENCE`, por defecto 0.6).
+   - Si tampoco: **colonias de OpenStreetMap** (`places`, ADR-0020) del estado conocido, por nombre exacto o familia, solo si todas caen en un municipio (o en el que sugiere la IA). Precisión `locality`, punto de la colonia.
+   - Si tampoco y la IA dio el estado: el estado, con confianza 0.6 (aproximada).
+6. **Ubicación principal:** la mención `role=event` más específica con confianza ≥ umbral (`GEO_MIN_CONFIDENCE`, por defecto 0.6), prefiriendo las que caen dentro de la región buscada. Si no hay ninguna, la mención `role=mentioned` más específica dentro de la región buscada (la ficha dice "lugar mencionado").
 7. **Punto para el mapa:** coordenadas de la localidad o centroide de la región. **Nunca coordenadas inventadas por el LLM.**
 
 ### Casos de prueba obligatorios
@@ -564,6 +570,11 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | "Nezahualcóyotl" / "Neza" | — | Municipio en el Estado de México (alias "Neza") |
 | "Madrid" | Ataque en España | País España, `in_region = false` si se buscó en México |
 | "Peñón de los Baños" | — | Comparación correcta con Ñ, sin convertirla en N |
+| "Polanco" (estado CDMX) | La nota también nombra Jalisco | Colonia Polanco, Alcaldía Miguel Hidalgo; nunca la localidad Polanco de Jalisco |
+| "alcaldía Iztapalapa" | — | Municipio Iztapalapa |
+| "calle Molière" (estado CDMX) | — | Estado 09, aproximada |
+| "El Rosario" (estado Sinaloa) | — | Municipio Rosario (INEGI lo registra sin artículo) |
+| (búsqueda en la localidad "Miguel Hidalgo") | Nota en Polanco | Dentro de la región: la localidad cabecera homónima vale por su alcaldía |
 | (sin lugar) | — | Precisión `unknown`; no se pinta en el mapa y aparece en la lista "Sin ubicación" |
 
 ---
@@ -645,7 +656,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 **Apariencia (ADR-0017)**
 - El globo ocupa la pantalla, sobre un fondo de universo (Vía Láctea y estrellas que titilan) que gira con la cámara.
 - Tierra con textura satelital de la NASA. Por defecto de noche, con las ciudades iluminadas; un botón cambia a la de día. Al acercarse se funde con el mapa de calles y los límites de INEGI.
-- Paneles translúcidos a los lados (búsqueda, lista, gráficas y descargas) que no tapan el centro.
+- Paneles translúcidos a la izquierda (búsqueda, lista y descargas) que no tapan el centro; la derecha queda libre para el globo.
 
 **Vista inicial**
 - La cámara entra desde lejos y llega a México con frenado suave (~3.5 s).
@@ -659,7 +670,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 **Interacción**
 - **Hover:** resalta la región bajo el cursor y muestra un tooltip con nombre y tipo ("Alcaldía Iztapalapa").
 - **Click en país:** selecciona el país. Si es México, la cámara vuela y se muestran los estados.
-- **Click en estado:** vuela al `bbox`, resalta y muestra los municipios.
+- **Click en estado:** vuela al `focus_bbox` (encuadre medido sobre la esfera, no en el mapa plano), resalta y muestra los municipios.
 - **Click en municipio:** lo selecciona; con más zoom aparecen las localidades.
 - **Click en localidad:** la selecciona.
 
@@ -917,3 +928,7 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.2 | 17 de octubre de 2026 | F5: parámetros finales de `/searches/{id}/articles` (`relevant`, `concept_id`, `in_region=none`) y de `/aggregates` (`level`, `coarser`); errores 500 y 503 uniformes; `docs/api.md`. |
 | 2.3 | 17 de octubre de 2026 | F6: Tierra realista con texturas de la NASA, fondo de universo con three.js y reglas de movimiento del globo (ADR-0017). |
 | 2.4 | 17 de octubre de 2026 | F7: reportes con mapa SVG dibujado en el servidor, resumen ejecutivo guardado en `reports`, fuente incluida y datos en CSV y GeoJSON (`/export`) (ADR-0018). |
+| 2.5 | 19 de octubre de 2026 | Explorar sin las gráficas "Top 5 estados" y "Tipos de noticias" (decisión de Benji): la derecha queda libre para el globo. |
+| 2.6 | 20 de octubre de 2026 | `regions.focus_bbox` (§6): la cámara encuadra la parte principal de cada región; al elegir Estados Unidos, Rusia o Francia el globo ya no se aleja (§14.2). |
+| 2.7 | 21 de octubre de 2026 | SearchApi pide hasta 3 páginas por consulta, solo mientras vengan llenas (§8, ADR-0019). |
+| 2.8 | 21 de octubre de 2026 | Geolocalizador: colonias de OpenStreetMap (`places`, `make geo-places`), palabras genéricas, estado de la IA obligatorio y ubicación principal dentro de la región buscada (§6, §11, ADR-0020). |

@@ -2,7 +2,7 @@
 
 from difflib import SequenceMatcher
 
-from app.domain.geocoding import Place
+from app.domain.geocoding import Neighborhood, Place
 from app.domain.names import normalize_name
 from app.domain.region import RegionLevel
 
@@ -51,6 +51,45 @@ JUCHITAN_OAX = place(
 )
 # Una "colonia La Gloria" de Juchitán coincidía con este pueblo de Guanajuato.
 LA_GLORIA_GTO = place(36, "110350261", RegionLevel.LOCALITY, "Colonia la Gloria")
+# Búsqueda real del 20/10/2026 (Homicidio · Miguel Hidalgo): "Polanco" es una
+# colonia de la CDMX que INEGI no tiene; sí hay una localidad "Polanco" en
+# Jalisco, y la nota también nombraba Jalisco.
+JALISCO = place(37, "14", RegionLevel.STATE, "Jalisco")
+POLANCO_JAL = place(38, "140970123", RegionLevel.LOCALITY, "Polanco")
+MIGUEL_HIDALGO = place(
+    39, "09016", RegionLevel.MUNICIPALITY, "Miguel Hidalgo", display="Alcaldía Miguel Hidalgo"
+)
+# "Dos Bocas" (Paraíso, Tabasco) caía en una localidad de Veracruz.
+TABASCO = place(40, "27", RegionLevel.STATE, "Tabasco")
+VERACRUZ = place(41, "30", RegionLevel.STATE, "Veracruz de Ignacio de la Llave")
+DOS_BOCAS_VER = place(42, "301310045", RegionLevel.LOCALITY, "Dos Bocas")
+
+# "El Rosario" en las notas; INEGI lo registra como "Rosario" (Sinaloa).
+SINALOA = place(46, "25", RegionLevel.STATE, "Sinaloa")
+ROSARIO_SIN = place(47, "25014", RegionLevel.MUNICIPALITY, "Rosario")
+SAN_LUIS_POTOSI = place(43, "24", RegionLevel.STATE, "San Luis Potosí")
+SLP_CAPITAL = place(44, "24028", RegionLevel.MUNICIPALITY, "San Luis Potosí")
+
+
+def colonia(name: str, core: str, municipality: Place, kind: str = "neighbourhood") -> Neighborhood:
+    return Neighborhood(name, core, kind, municipality, -99.19, 19.43)
+
+
+# Colonias de OpenStreetMap (tabla places, ADR-0020): Polanco y su familia en
+# Miguel Hidalgo, un homónimo en San Luis Potosí, y "Centro" en dos alcaldías.
+NEIGHBORHOODS = (
+    colonia("Polanco", "POLANCO", MIGUEL_HIDALGO),
+    colonia("Colonia Polanco 1ª Sección", "POLANCO 1ª SECCION", MIGUEL_HIDALGO),
+    colonia("Nuevo Polanco", "NUEVO POLANCO", MIGUEL_HIDALGO, "macrohood"),
+    colonia("Colonia Polanco", "POLANCO", SLP_CAPITAL),
+    colonia(
+        "Colonia Roma Norte",
+        "ROMA NORTE",
+        place(45, "09015", RegionLevel.MUNICIPALITY, "Cuauhtémoc"),
+    ),
+    colonia("Colonia Centro", "CENTRO", IZTAPALAPA),
+    colonia("Colonia Centro", "CENTRO", MIGUEL_HIDALGO),
+)
 
 ALIASES: dict[int, tuple[str, ...]] = {
     CDMX.region_id: ("CDMX", "la capital del país", "DF"),
@@ -84,6 +123,16 @@ ALL = (
     JUCHITAN_GRO,
     JUCHITAN_OAX,
     LA_GLORIA_GTO,
+    JALISCO,
+    POLANCO_JAL,
+    MIGUEL_HIDALGO,
+    TABASCO,
+    VERACRUZ,
+    DOS_BOCAS_VER,
+    SAN_LUIS_POTOSI,
+    SLP_CAPITAL,
+    SINALOA,
+    ROSARIO_SIN,
 )
 
 
@@ -113,6 +162,14 @@ class FakeGazetteer:
         return next(
             (p for p in ALL if p.level is RegionLevel.COUNTRY and name_norm in _names(p)), None
         )
+
+    async def neighborhoods(self, name_core: str, state_code: str) -> list[Neighborhood]:
+        return [
+            n
+            for n in NEIGHBORHOODS
+            if n.municipality.code.startswith(state_code)
+            and (n.name_core == name_core or n.name_core.startswith(f"{name_core} "))
+        ]
 
     async def by_code(self, code: str) -> Place | None:
         return next((p for p in ALL if p.code == code), None)

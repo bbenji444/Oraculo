@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
-  conceptSlices,
+  eventDateNote,
+  finishNotice,
   formatDay,
   formatMexicoCity,
+  formatRange,
   formatUsd,
   isCoarse,
-  NO_CONCEPT_COLOR,
   stageProgress,
   visibleArticles,
 } from './format';
@@ -78,28 +79,6 @@ describe('textos', () => {
   });
 });
 
-describe('notas por concepto', () => {
-  it('cuenta las relevantes por concepto y aparte las que no lo son', () => {
-    const slices = conceptSlices(
-      [
-        article([[3, 'Extorsión', true]]),
-        article([
-          [3, 'Extorsión', true],
-          [5, 'Secuestro', true],
-        ]),
-        article([[3, 'Extorsión', false]]),
-      ],
-      new Map([[3, '#AA0000']]),
-    );
-
-    expect(slices).toEqual([
-      { conceptId: 3, name: 'Extorsión', color: '#AA0000', count: 2 },
-      { conceptId: 5, name: 'Secuestro', color: NO_CONCEPT_COLOR, count: 1 },
-      { conceptId: null, name: 'No relevantes', color: NO_CONCEPT_COLOR, count: 1 },
-    ]);
-  });
-});
-
 describe('notas visibles (lista y globo)', () => {
   const kept = article([[3, 'Extorsión', true]]);
   const discarded = article([[3, 'Extorsión', false]]);
@@ -110,5 +89,47 @@ describe('notas visibles (lista y globo)', () => {
 
   it('con "No relevantes" se ven todas', () => {
     expect(visibleArticles([kept, discarded], true)).toEqual([kept, discarded]);
+  });
+});
+
+describe('periodo corto', () => {
+  it('mismo mes, otro mes y otro año', () => {
+    expect(formatRange('2026-10-10', '2026-10-17')).toBe('10 – 17 oct 2026');
+    expect(formatRange('2026-09-28', '2026-10-05')).toBe('28 sep – 5 oct 2026');
+    expect(formatRange('2025-12-28', '2026-01-04')).toBe('28 dic 2025 – 4 ene 2026');
+  });
+});
+
+describe('aviso al terminar', () => {
+  it('dice cuántas notas hay y si hubo avisos o falla', () => {
+    expect(finishNotice({ status: 'completed', results_count: 18 })).toEqual({
+      tone: 'ok',
+      text: 'Búsqueda lista: 18 notas',
+    });
+    expect(finishNotice({ status: 'completed', results_count: 1 }).text).toBe(
+      'Búsqueda lista: 1 nota',
+    );
+    expect(finishNotice({ status: 'partial', results_count: 4 }).tone).toBe('warn');
+    expect(finishNotice({ status: 'failed', results_count: 0 })).toEqual({
+      tone: 'error',
+      text: 'La búsqueda falló',
+    });
+  });
+});
+
+describe('fecha del hecho', () => {
+  it('se avisa cuando la nota es un avance de un hecho de otro momento', () => {
+    expect(eventDateNote('2025-09-29', '2026-10-16T14:00:00Z')).toBe(
+      'Fecha del hecho: 29 sep 2025',
+    );
+    expect(eventDateNote('2026-10-30', '2026-10-15T14:00:00Z')).toBe(
+      'Fecha del hecho: 30 oct 2026',
+    );
+  });
+
+  it('no se repite si es del mismo día o casi', () => {
+    expect(eventDateNote('2026-10-15', '2026-10-16T05:00:00Z')).toBeNull();
+    expect(eventDateNote(null, '2026-10-16T05:00:00Z')).toBeNull();
+    expect(eventDateNote('2026-10-15', null)).toBeNull();
   });
 });

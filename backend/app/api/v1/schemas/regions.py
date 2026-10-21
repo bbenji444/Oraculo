@@ -34,7 +34,13 @@ class RegionOut(BaseModel):
     parent_id: int | None
     point: PointOut
     bbox: tuple[float, float, float, float] = Field(
-        description="[oeste, sur, este, norte] en grados, listo para fitBounds."
+        description="[oeste, sur, este, norte] en grados: contiene toda la región."
+    )
+    focus_bbox: tuple[float, float, float, float] = Field(
+        description=(
+            "[oeste, sur, este, norte] de la parte principal, para encuadrar el mapa "
+            "(sin islas ni territorios lejanos; igual a bbox si es de una sola parte)."
+        )
     )
     has_polygon: bool = Field(description="false en localidades que solo tienen punto.")
     aliases: list[str]
@@ -49,6 +55,7 @@ class RegionOut(BaseModel):
         Returns:
             El esquema listo para serializar.
         """
+        focus = region.focus
         return cls(
             id=region.id,
             level=region.level.value,
@@ -60,6 +67,7 @@ class RegionOut(BaseModel):
             parent_id=region.parent_id,
             point=PointOut(lon=region.point.lon, lat=region.point.lat),
             bbox=(region.bbox.west, region.bbox.south, region.bbox.east, region.bbox.north),
+            focus_bbox=(focus.west, focus.south, focus.east, focus.north),
             has_polygon=region.has_polygon,
             aliases=list(region.aliases),
         )

@@ -107,51 +107,6 @@ export function formatUsd(value: number): string {
   return `${value.toFixed(4)} USD`;
 }
 
-/** Rebanada de la gráfica "Tipos de noticias" (por concepto). */
-export interface ConceptSlice {
-  conceptId: number | null;
-  name: string;
-  color: string;
-  count: number;
-}
-
-// Color de las notas que no fueron relevantes para ningún concepto.
-export const NO_CONCEPT_COLOR = '#64748B';
-
-/**
- * Notas por concepto (una nota relevante para dos conceptos cuenta en ambos).
- *
- * @param articles Notas de la búsqueda.
- * @param colors Color de cada concepto (de su ficha).
- */
-export function conceptSlices(
-  articles: readonly Article[],
-  colors: ReadonlyMap<number, string>,
-): ConceptSlice[] {
-  const counts = new Map<number, { name: string; count: number }>();
-  let none = 0;
-  for (const article of articles) {
-    const relevant = article.concepts.filter((c) => c.is_relevant);
-    if (relevant.length === 0) none += 1;
-    for (const judgement of relevant) {
-      const current = counts.get(judgement.concept_id) ?? { name: judgement.name, count: 0 };
-      counts.set(judgement.concept_id, { ...current, count: current.count + 1 });
-    }
-  }
-  const slices: ConceptSlice[] = [...counts.entries()]
-    .map(([conceptId, { name, count }]) => ({
-      conceptId,
-      name,
-      color: colors.get(conceptId) ?? NO_CONCEPT_COLOR,
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
-  if (none > 0) {
-    slices.push({ conceptId: null, name: 'No relevantes', color: NO_CONCEPT_COLOR, count: none });
-  }
-  return slices;
-}
-
 /**
  * Notas que se ven en la lista y en el globo: por defecto solo las relevantes
  * para algún concepto. Las dos vistas usan esta misma función para que nunca
@@ -165,4 +120,72 @@ export function conceptSlices(
 export function visibleArticles(articles: readonly Article[], showIrrelevant: boolean): Article[] {
   if (showIrrelevant) return [...articles];
   return articles.filter((article) => article.concepts.some((c) => c.is_relevant));
+}
+
+// Meses cortos en español para formatRange (sin depender del idioma del equipo).
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/**
+ * Periodo de una búsqueda en corto, para el renglón compacto del panel.
+ *
+ * @param from Primer día (AAAA-MM-DD).
+ * @param to Último día (AAAA-MM-DD).
+ * @returns "10 – 17 oct 2026", o "28 sep – 5 oct 2026" si cambia el mes.
+ * @example formatRange('2026-10-10', '2026-10-17') // '10 – 17 oct 2026'
+ */
+export function formatRange(from: string, to: string): string {
+  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
+  const [toYear, toMonth, toDay] = to.split('-').map(Number);
+  const month = (m: number | undefined) => MONTHS[(m ?? 1) - 1] ?? '';
+  const start =
+    fromMonth === toMonth && fromYear === toYear
+      ? String(fromDay)
+      : `${String(fromDay)} ${month(fromMonth)}${fromYear === toYear ? '' : ` ${String(fromYear)}`}`;
+  return `${start} – ${String(toDay)} ${month(toMonth)} ${String(toYear)}`;
+}
+
+export interface FinishNotice {
+  tone: 'ok' | 'warn' | 'error';
+  text: string;
+}
+
+/**
+ * Aviso de que una búsqueda terminó, para quien se fue a otra pestaña o dejó
+ * de mirar la barra de avance. `partial` es que algún proveedor falló pero hay
+ * notas (§9 paso 8).
+ *
+ * @example finishNotice({ status: 'completed', results_count: 18 }) // 'Búsqueda lista: 18 notas'
+ */
+export function finishNotice(search: Pick<Search, 'status' | 'results_count'>): FinishNotice {
+  const notes = `${String(search.results_count)} ${search.results_count === 1 ? 'nota' : 'notas'}`;
+  if (search.status === 'failed') return { tone: 'error', text: 'La búsqueda falló' };
+  if (search.status === 'partial')
+    return { tone: 'warn', text: `Búsqueda lista con avisos: ${notes}` };
+  return { tone: 'ok', text: `Búsqueda lista: ${notes}` };
+}
+
+// Diferencia mínima entre el hecho y la publicación para avisarlo: con menos,
+// es la misma noticia del día ("ayer", "el lunes").
+const OLD_EVENT_DAYS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Fecha del hecho para la ficha, solo si es distinta de la publicación.
+ *
+ * Muchas notas son avances de casos viejos (una orden de captura por un
+ * homicidio de hace un año, historial del 20/10/2026): sin esto parecía un
+ * hecho reciente.
+ *
+ * @param eventDate Fecha del hecho según la IA (AAAA-MM-DD), si hay.
+ * @param publishedAt Publicación (ISO, UTC), si hay.
+ * @returns "Fecha del hecho: 29 sep 2025", o `null` si no aplica.
+ * @example eventDateNote('2025-09-29', '2026-10-16T14:00:00Z') // 'Fecha del hecho: 29 sep 2025'
+ */
+export function eventDateNote(eventDate: string | null, publishedAt: string | null): string | null {
+  if (!eventDate || !publishedAt) return null;
+  const [year, month, day] = eventDate.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  const gap = Math.abs(Date.parse(publishedAt) - Date.UTC(year, month - 1, day));
+  if (!Number.isFinite(gap) || gap < OLD_EVENT_DAYS * DAY_MS) return null;
+  return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
 }

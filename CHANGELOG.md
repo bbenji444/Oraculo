@@ -6,6 +6,34 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- SearchApi trae hasta 3 páginas por consulta (30 notas de Google en lugar de 10). Pide la siguiente solo si la anterior vino llena; cada página cuesta 1 crédito (medido con la cuenta) y la bitácora registra lo gastado de verdad. La estimación dice "hasta N créditos". Configurable con `SEARCHAPI_MAX_PAGES` (ADR-0019).
+- Al hacer clic en un grupo de notas, o en notas encimadas en el mismo punto, aparece la lista de cuáles son; elegir una vuela a ella y "Acercar" separa el grupo.
+- La ficha de una nota dice la fecha del hecho cuando es de otro momento ("Fecha del hecho: 29 sep 2025" en un avance de un caso viejo) y "lugar mencionado" cuando la ubicación no es la del hecho.
+- Aviso al terminar una búsqueda: "✓ Búsqueda lista: 18 notas" abajo al centro de Explorar durante 8 s y, si la pestaña estaba oculta, también en su título hasta que la persona regresa. Reabrir una búsqueda del Historial no avisa.
+
+### Cambiado
+
+- Prompt de la IA `enrich_v2`: pide el municipio o alcaldía de cada colonia, calle o lugar (`municipality_hint`), marca al menos un lugar del hecho cuando se puede saber, fecha el hecho original en avances de casos viejos y no confunde el Día de Muertos con homicidios. Las notas leídas con v1 se vuelven a leer en la siguiente búsqueda que las encuentre.
+- Vuelos del globo más fluidos: mientras vuela a una región, a una nota o a un grupo, el mapa se dibuja al 80 % de la resolución de la pantalla y recupera la nitidez al aterrizar (`map/flight.ts`). Medido a 1920×1080 con escala 125 %: de ~37 a ~46 cuadros por segundo y de 30 % a 12 % de cuadros lentos. El giro lento del globo no cambia.
+- Explorar en pantallas bajas: al terminar, la búsqueda se reduce a un renglón ("Extorsión · Jalisco · 10 – 17 oct 2026 · 18 notas…") con "Editar" y una fila de descargas (PDF, CSV, GeoJSON, Imprimir), y la lista de noticias se queda con el resto. A 1366×650 pasan de 2 a 3–4 noticias visibles. "Ocultar ‹" esconde el panel para ver el globo completo; en celular se oculta solo al elegir una noticia.
+- Celular: las pestañas de arriba bajan a su propio renglón y caben en 375 px (antes la página se desbordaba a 451 px).
+- Modo día: al acercarse, el mapa de calles ahora es claro (antes siempre usaba la variante oscura de Protomaps y parecía de noche). `make geo-basemap` baja también los íconos claros.
+- Explorar ya no muestra las gráficas "Top 5 estados con más noticias" ni "Tipos de noticias" (decisión de Benji: no aportaban y estorbaban). La derecha queda libre para el globo; el reporte en PDF conserva su página de análisis.
+- Los créditos del mapa (INEGI, Natural Earth, NASA, OpenStreetMap) empiezan plegados en Explorar: solo se ve el botón "i" y aparecen al hacer clic. Antes MapLibre los dejaba abiertos porque el giro del globo no cuenta como arrastre.
+
+### Corregido
+
+- Los créditos del mapa (OpenStreetMap, Protomaps) abrían en la misma pestaña; ahora en otra, igual que "Ver nota original".
+- Ubicaciones equivocadas o vacías por colonias y palabras genéricas (ADR-0020). "Polanco, CDMX" terminaba en una localidad de Jalisco y "Dos Bocas" (Tabasco) en Veracruz: el estado que da la IA ya no se descarta. "alcaldía Miguel Hidalgo" o "colonia Roma Norte" no se encontraban: se quita la palabra genérica antes de buscar. Lo que INEGI no tiene se busca en ~107 mil colonias y zonas de OpenStreetMap (tabla nueva `places`, `make geo-places`, sacadas del mapa base ya descargado) y se pinta en la colonia ("Polanco, Alcaldía Miguel Hidalgo"). Si solo se sabe el estado, la nota se ubica ahí como aproximada. Con el municipio que sugiere la IA, una colonia homónima de otra alcaldía ya no gana ("Ajusco, Tlalpan" no es la Colonia Ajusco de Coyoacán) y, si no hay colonia, la nota queda en ese municipio. "El Rosario" encuentra el municipio "Rosario". Buscar la localidad cabecera homónima ("Miguel Hidalgo", 090160001) cuenta como buscar su alcaldía: antes todo lo de Polanco salía "fuera de la región". La ubicación principal prefiere el lugar del hecho dentro de la región buscada y, si la IA no marcó ninguno, el lugar mencionado dentro de ella.
+- Al saltar entre notas la animación del globo empezaba a fallar: los vuelos fluidos bajaban la resolución con el mapa quieto, y MapLibre en ese caso detiene lo que se mueve y avisa "terminó de moverse", así que se cortaban vuelos y la ficha salía antes de tiempo. Ahora la resolución baja con el vuelo ya en marcha.
+- Elegir una nota siempre vuela con el mismo zoom según la precisión de su lugar (localidad 11, municipio 9, estado 5, país 4); antes era "el mayor entre el actual y ese" y, ya de cerca, otra nota no acercaba nada. Volver a elegir la misma nota vuelve a volar y la ficha aparece al llegar. Fuera de México el zoom se queda en 6.5: más cerca no hay mapa de calles (solo se descargó el de México; el del mundo pesaría 559 MB hasta zoom 8, 1.6 GB hasta 9 y 3.8 GB hasta 10).
+- Al elegir un país grande o con territorios lejanos (Estados Unidos, Rusia, Canadá, Francia, Noruega…) el globo se alejaba o se iba al Atlántico. Dos causas: el rectángulo del país incluía todo su territorio (Francia de Guadalupe a Reunión; Estados Unidos y Rusia cruzan el meridiano 180, así que cubrían el mundo) y MapLibre encuadraba como si el mapa fuera plano, donde el Ártico se estira sin fin. Ahora cada región tiene `focus_bbox` con su parte principal (columna nueva, migración 0016; también lo usa el mapa del reporte) y el globo mide el encuadre sobre la esfera. Colima ya no incluye las islas Revillagigedo al encuadrar.
+- Los países ahora se acercan hasta zoom 6 (antes 4): Países Bajos o El Salvador quedaban lejos.
+- El globo no volaba a la región ni a la nota en celular: los márgenes del encuadre eran fijos para escritorio (760 px de ancho) y MapLibre se negaba ("Map cannot fit within canvas"). Ahora se calculan según la pantalla y el panel (`map/framing.ts`); en celular la ficha de la nota va encima del punto y cabe completa.
+- En escritorio las regiones quedaban corridas a la izquierda porque el margen derecho seguía reservando el lugar de las gráficas que se quitaron.
+
 ## [0.7.0] - 2026-10-19
 
 ### Agregado

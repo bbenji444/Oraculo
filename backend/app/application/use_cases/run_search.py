@@ -53,7 +53,7 @@ from app.application.ports.search_store import (
 )
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionResult
 from app.application.use_cases.extraction import ArticleText, ExtractTexts
-from app.application.use_cases.geocoding import GeocodeMentions
+from app.application.use_cases.geocoding import GeocodeMentions, search_area
 from app.domain.dedupe import DedupedArticle, TitleSimilarity, dedupe
 from app.domain.enrichment import ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import DomainError, NotFoundError, ProviderError
@@ -297,6 +297,7 @@ class RunSearch:
         searched = await self._gazetteer.by_code(search.region_code)
         if facts is None or searched is None:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
+        searched = await search_area(self._gazetteer, searched)
         window = DateWindow.between(search.date_from, search.date_to)
         queries = plan_queries(
             search.concepts, place_for(facts), window, self.available_providers()
