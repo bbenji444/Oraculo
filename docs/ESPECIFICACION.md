@@ -1,6 +1,6 @@
 # Especificación — Monitor de Noticias Geolocalizadas
 
-Versión 2.8 · Octubre 2026 · Responsable: Benji
+Versión 2.9 · Octubre 2026 · Responsable: Benji
 
 Este documento define **qué** se construye. Las reglas de **cómo** se trabaja están en `CLAUDE.md`.
 Cuando algo no esté claro aquí, pregunta antes de suponer.
@@ -425,7 +425,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - **País seleccionado:** no se agrega lugar a la consulta; se usan los filtros de país e idioma del proveedor.
 - **Presupuesto:** máximo de consultas por búsqueda configurable (`MAX_QUERIES_PER_SEARCH`, por defecto 10). La UI muestra la estimación antes de ejecutar.
 - **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos.
-- **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor.
+- **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor, y solo con los proveedores que recibiría una búsqueda real (los configurados): hoy SearchApi y el índice local.
 
 ---
 
@@ -932,3 +932,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.6 | 20 de octubre de 2026 | `regions.focus_bbox` (§6): la cámara encuadra la parte principal de cada región; al elegir Estados Unidos, Rusia o Francia el globo ya no se aleja (§14.2). |
 | 2.7 | 21 de octubre de 2026 | SearchApi pide hasta 3 páginas por consulta, solo mientras vengan llenas (§8, ADR-0019). |
 | 2.8 | 21 de octubre de 2026 | Geolocalizador: colonias de OpenStreetMap (`places`, `make geo-places`), palabras genéricas, estado de la IA obligatorio y ubicación principal dentro de la región buscada (§6, §11, ADR-0020). |
+| 2.9 | 20 de octubre de 2026 | "Probar concepto" muestra solo los proveedores que recibiría la búsqueda (§9); el reporte cuenta "dentro" con la regla de la localidad cabecera homónima (§15, ADR-0020). |

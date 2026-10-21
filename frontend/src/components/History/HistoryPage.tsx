@@ -7,7 +7,7 @@
 import { useSearchHistory } from '../../hooks/useSearches';
 import type { Search } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
-import { formatMexicoCity, formatUsd } from '../Explore/format';
+import { formatMexicoCity, formatRange, formatUsd } from '../Explore/format';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; className: string }> = {
   pending: { text: 'En cola', className: 'bg-slate-700 text-slate-200' },
@@ -57,7 +57,7 @@ export function HistoryPage() {
                     {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
                   </p>
                   <p className="mt-0.5 text-xs text-slate-400">
-                    {search.date_from} a {search.date_to} · pedida el{' '}
+                    {formatRange(search.date_from, search.date_to)} · pedida el{' '}
                     {formatMexicoCity(search.created_at)}
                   </p>
                 </div>

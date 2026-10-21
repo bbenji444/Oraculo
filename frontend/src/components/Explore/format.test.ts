@@ -9,6 +9,7 @@ import {
   formatRange,
   formatUsd,
   isCoarse,
+  newsCount,
   stageProgress,
   visibleArticles,
 } from './format';
@@ -131,5 +132,23 @@ describe('fecha del hecho', () => {
     expect(eventDateNote('2026-10-15', '2026-10-16T05:00:00Z')).toBeNull();
     expect(eventDateNote(null, '2026-10-16T05:00:00Z')).toBeNull();
     expect(eventDateNote('2026-10-15', null)).toBeNull();
+  });
+});
+
+describe('cuenta de noticias de la lista', () => {
+  it('dice cuántas se ocultaron por no relevantes', () => {
+    // Prueba operativa del 20/10/2026: arriba "43 notas", en la lista "Noticias (24)".
+    expect(newsCount(24, 43)).toEqual({
+      label: 'Noticias (24 de 43)',
+      hint: '19 no relevantes ocultas: actívalas con «No relevantes». Las descargas incluyen solo las relevantes.',
+    });
+  });
+
+  it('sin ocultas, solo el total', () => {
+    expect(newsCount(43, 43)).toEqual({
+      label: 'Noticias (43)',
+      hint: 'Las descargas incluyen solo las notas relevantes.',
+    });
+    expect(newsCount(1, 2).hint).toMatch(/^1 no relevante oculta:/);
   });
 });

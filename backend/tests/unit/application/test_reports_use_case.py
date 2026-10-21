@@ -40,9 +40,9 @@ from app.domain.aggregates import AggregateLevel, NoteLocation
 from app.domain.enrichment import LLMUsage
 from app.domain.errors import ProviderUnavailableError, RegionNotFoundError, SearchNotFinishedError
 from app.domain.geocoding import Precision
-from app.domain.region import Region
+from app.domain.region import Region, RegionLevel
 from app.domain.search import SearchStatus
-from tests.unit.fake_regions import CDMX, MEXICO, FakeRegionRepository
+from tests.unit.fake_regions import ALL, CDMX, MEXICO, FakeRegionRepository, make_region
 
 pytestmark = pytest.mark.anyio
 
@@ -394,3 +394,25 @@ async def test_reporte_de_todo_mexico_cuenta_por_estado_y_deja_fuera_lo_de_otro_
     # La CDMX junta sus 4 notas (alcaldías y "solo CDMX"); París queda fuera.
     assert [(c.code, c.count) for c in data.counts] == [("09", 4), ("14", 1), ("16", 1)]
     assert (data.outside, data.coarser, data.unlocated) == (1, 0, 1)
+
+
+async def test_la_localidad_cabecera_homonima_cuenta_como_su_alcaldia() -> None:
+    # Búsqueda real del 20/10/2026 en "Localidad Miguel Hidalgo" (090160001): la
+    # pantalla decía 8 notas dentro y el PDF "0 en Miguel Hidalgo · 11 fuera",
+    # porque el reporte no usaba la regla de ``seat_area`` (ADR-0020).
+    seat = make_region(
+        6, "Iztapalapa", RegionLevel.LOCALITY, parent_id=3, code="090070001", prefix="Localidad"
+    )
+    row = replace(search(), region_id=seat.id, region_code=seat.code, region_name=seat.name)
+    static_map = Map()
+
+    data = await build(
+        row, regions=FakeRegionRepository((*ALL, seat)), static_map=static_map
+    ).execute(row.search_id, ReportFormat.PDF, ACTOR)
+
+    # Las 2 notas de la alcaldía Iztapalapa (09007) quedan dentro; fuera, el resto.
+    assert (data.outside, data.unlocated) == (5, 1)
+    assert data.level is AggregateLevel.LOCALITY
+    # La portada y el mapa hablan de la búsqueda, pero cuentan sobre la alcaldía.
+    assert data.region.code == "090070001"
+    assert static_map.calls[0][0].code == "09007"

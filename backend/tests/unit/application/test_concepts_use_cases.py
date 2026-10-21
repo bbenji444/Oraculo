@@ -295,3 +295,21 @@ async def test_probar_concepto_inexistente(repo: FakeConceptRepository) -> None:
 async def test_probar_con_rango_invalido(repo: FakeConceptRepository) -> None:
     with pytest.raises(InvalidRequestError, match="1 a 90"):
         await preview_use_case(repo).for_draft(concept_input(), IZTAPALAPA.id, 120)
+
+
+@pytest.mark.anyio
+async def test_probar_solo_muestra_los_proveedores_que_se_usarian(
+    repo: FakeConceptRepository,
+) -> None:
+    # Con GDELT y el RSS de Google apagados (ADR-0011 y 0012) la búsqueda real
+    # manda 2 consultas; "Probar concepto" decía 4.
+    use = PreviewConceptQueries(
+        repo,
+        FakeRegionRepository(),
+        providers=(Provider.SEARCHAPI, Provider.LOCAL_INDEX),
+        today=lambda: TODAY,
+    )
+
+    preview = await use.for_draft(concept_input(), IZTAPALAPA.id, 7)
+
+    assert [q.provider for q in preview.queries] == [Provider.SEARCHAPI, Provider.LOCAL_INDEX]

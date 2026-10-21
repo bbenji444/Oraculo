@@ -122,6 +122,41 @@ export function visibleArticles(articles: readonly Article[], showIrrelevant: bo
   return articles.filter((article) => article.concepts.some((c) => c.is_relevant));
 }
 
+/** Encabezado de la lista de noticias y su ayuda (ver `newsCount`). */
+export interface NewsCount {
+  label: string;
+  hint: string;
+}
+
+// Las descargas (PDF, CSV, GeoJSON) solo llevan notas relevantes (ADR-0018).
+const DOWNLOADS_NOTE = 'Las descargas incluyen solo las relevantes.';
+
+/**
+ * Encabezado de la lista: cuántas notas se ven y cuántas tiene la búsqueda.
+ *
+ * Arriba dice "43 notas" (todas las que trajo la búsqueda) y la lista muestra
+ * solo las relevantes; sin este "24 de 43" parecía que faltaban notas.
+ *
+ * @param shown Notas en la lista (las relevantes, o todas con "No relevantes").
+ * @param total Notas de la búsqueda.
+ * @returns El texto del encabezado y la ayuda que explica las ocultas.
+ * @example newsCount(24, 43).label // "Noticias (24 de 43)"
+ */
+export function newsCount(shown: number, total: number): NewsCount {
+  const hidden = total - shown;
+  if (hidden <= 0) {
+    return {
+      label: `Noticias (${String(total)})`,
+      hint: 'Las descargas incluyen solo las notas relevantes.',
+    };
+  }
+  const noun = hidden === 1 ? 'no relevante oculta' : 'no relevantes ocultas';
+  return {
+    label: `Noticias (${String(shown)} de ${String(total)})`,
+    hint: `${String(hidden)} ${noun}: actívalas con «No relevantes». ${DOWNLOADS_NOTE}`,
+  };
+}
+
 // Meses cortos en español para formatRange (sin depender del idioma del equipo).
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 

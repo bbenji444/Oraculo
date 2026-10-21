@@ -13,6 +13,7 @@ Reglas que viven aquí (las del concepto en sí están en ``app.domain.concept``
 No hace: no sabe de HTTP ni de SQL.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.application.audit import (
@@ -34,7 +35,7 @@ from app.domain.errors import (
     InvalidRequestError,
     RegionNotFoundError,
 )
-from app.domain.queries import DateWindow, PlannedQuery, place_for
+from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
 from app.domain.query_builder import ConceptTerms, build_queries
 from app.domain.region import RegionDetail
 
@@ -318,17 +319,22 @@ class PreviewConceptQueries:
         self,
         concepts: ConceptRepositoryPort,
         regions: RegionRepositoryPort,
+        providers: Sequence[Provider] = tuple(Provider),
         today: Today = mexico_city_today,
     ) -> None:
-        """Recibe los repositorios y el reloj.
+        """Recibe los repositorios, los proveedores y el reloj.
 
         Args:
             concepts: Acceso a los conceptos.
             regions: Acceso al catálogo de regiones.
+            providers: Proveedores que de verdad recibirían la búsqueda
+                (``PlanSearch.available_providers``), para no mostrar consultas
+                que nunca se mandan.
             today: Fecha de hoy en la Ciudad de México (las pruebas la fijan).
         """
         self._concepts = concepts
         self._regions = regions
+        self._providers = tuple(providers)
         self._today = today
 
     async def for_saved(self, concept_id: int, region_id: int, days: int) -> QueryPreview:
@@ -380,5 +386,5 @@ class PreviewConceptQueries:
         if facts is None or region is None:
             raise RegionNotFoundError("No existe esa región.", {"id": region_id})
         ancestors = await self._regions.ancestors(region_id)
-        queries = build_queries(concept, place_for(facts), window)
+        queries = build_queries(concept, place_for(facts), window, self._providers)
         return QueryPreview(name, RegionDetail(region, tuple(ancestors)), window, tuple(queries))
