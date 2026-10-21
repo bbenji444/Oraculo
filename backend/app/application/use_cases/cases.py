@@ -14,12 +14,16 @@ todo el sistema y quitarla del caso no la borra.
 
 Los miembros los administra solo el dueño, y el caso nunca se queda sin él.
 
-No hace: no sabe de HTTP ni de SQL; no agrega entidades (9.4).
+Desde la 9.4, agregar una nota avisa a ``on_added``, que la manda a la cola
+para que la IA proponga sus entidades (``use_cases/entities.py``).
+
+No hace: no sabe de HTTP ni de SQL; no propone ni revisa entidades.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 from uuid import UUID
 
 from app.application.audit import Actor, AuditEntry
@@ -377,16 +381,38 @@ def _action_for(before: CaseStatus, after: CaseStatus) -> InvestigationAction:
     return InvestigationAction.CASE_CLOSED
 
 
+class ArticlesAdded(Protocol):
+    """Lo que pasa después de agregar notas a un caso (9.4: encolar su lectura por la IA)."""
+
+    async def run(self, case_id: UUID, article_ids: Sequence[int], actor: Actor) -> int:
+        """Reacciona a las notas nuevas del caso.
+
+        Args:
+            case_id: Caso.
+            article_ids: Notas que se acaban de agregar.
+            actor: Quién las agregó.
+
+        Returns:
+            Cuántas notas se atendieron.
+        """
+        ...
+
+
 class AddCaseArticle:
     """Agrega una noticia a un caso (historia H9.1). Agregarla dos veces no duplica nada."""
 
-    def __init__(self, repository: CaseRepositoryPort) -> None:
-        """Recibe el repositorio.
+    def __init__(
+        self, repository: CaseRepositoryPort, on_added: ArticlesAdded | None = None
+    ) -> None:
+        """Recibe el repositorio y lo que se hace con cada nota nueva.
 
         Args:
             repository: Acceso a los casos.
+            on_added: Si viene, recibe cada nota recién agregada (la 9.4 la
+                manda a que la IA proponga sus entidades, historia H9.2).
         """
         self._repository = repository
+        self._on_added = on_added
 
     async def execute(self, case_id: UUID, article_id: int, actor: Actor) -> bool:
         """Agrega la nota y lo registra en la bitácora.
@@ -412,7 +438,10 @@ class AddCaseArticle:
         audit = AuditEntry(
             actor, InvestigationAction.CASE_ARTICLE_ADDED, {"article_id": article_id}
         )
-        return await self._repository.add_article(case_id, article_id, actor.user_id, audit)
+        added = await self._repository.add_article(case_id, article_id, actor.user_id, audit)
+        if added and self._on_added is not None:
+            await self._on_added.run(case_id, [article_id], actor)
+        return added
 
 
 class RemoveCaseArticle:
