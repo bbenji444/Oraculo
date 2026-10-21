@@ -34,3 +34,4 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0018](0018-reportes-pdf-y-datos.md) | Reportes en PDF con mapa dibujado en el servidor y datos en CSV y GeoJSON | Aceptado |
 | [0019](0019-paginas-de-searchapi.md) | Hasta 3 páginas de SearchApi por consulta, solo mientras vengan llenas | Aceptado |
 | [0020](0020-colonias-de-openstreetmap.md) | Colonias de OpenStreetMap y reglas nuevas del geolocalizador | Aceptado |
+| [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
