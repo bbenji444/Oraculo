@@ -23,6 +23,9 @@ from app.api.v1.schemas.cases import (
     CaseArticleIn,
     CaseArticleOut,
     CaseIn,
+    CaseMemberIn,
+    CaseMemberOut,
+    CaseMemberSavedOut,
     CaseOut,
     CasePageOut,
     CasePatch,
@@ -32,11 +35,14 @@ from app.application.ports.cases import CaseRepositoryPort
 from app.application.use_cases.cases import (
     DEFAULT_PAGE_SIZE,
     AddCaseArticle,
+    AddCaseMember,
     CreateCase,
     GetCase,
     ListCaseArticles,
+    ListCaseMembers,
     ListCases,
     RemoveCaseArticle,
+    RemoveCaseMember,
     UpdateCase,
 )
 from app.application.use_cases.search_reads import DEFAULT_ARTICLE_PAGE_SIZE
@@ -166,4 +172,49 @@ async def remove_case_article(
 ) -> Response:
     """Quita la nota del caso; la noticia sigue en el sistema."""
     await RemoveCaseArticle(cases).execute(case_id, article_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{case_id}/members",
+    response_model=list[CaseMemberOut],
+    summary="Quién tiene acceso a un caso",
+    responses=error_responses(404),
+)
+async def list_case_members(
+    cases: Cases, actor: CurrentActor, case_id: CaseId
+) -> list[CaseMemberOut]:
+    """Miembros del caso, el dueño primero. Cualquier miembro los puede ver."""
+    members = await ListCaseMembers(cases).execute(case_id, actor)
+    return [CaseMemberOut.from_member(m) for m in members]
+
+
+@router.post(
+    "/{case_id}/members",
+    response_model=CaseMemberSavedOut,
+    summary="Dar acceso a un caso o cambiar el rol",
+    responses=error_responses(403, 404, 409),
+)
+async def add_case_member(
+    body: CaseMemberIn, cases: Cases, actor: CurrentActor, case_id: CaseId
+) -> CaseMemberSavedOut:
+    """Solo el dueño. Roles: ``editor`` o ``viewer`` (el caso tiene un solo dueño)."""
+    changed = await AddCaseMember(cases).execute(case_id, body.user_id, body.role, actor)
+    return CaseMemberSavedOut(user_id=body.user_id.strip(), role=body.role, changed=changed)
+
+
+@router.delete(
+    "/{case_id}/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Quitar el acceso a un caso",
+    responses=error_responses(403, 404, 409),
+)
+async def remove_case_member(
+    cases: Cases,
+    actor: CurrentActor,
+    case_id: CaseId,
+    user_id: Annotated[str, Path(description="Usuario al que se le quita el acceso.")],
+) -> Response:
+    """Solo el dueño; al dueño no se le quita el acceso."""
+    await RemoveCaseMember(cases).execute(case_id, user_id, actor)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -17,8 +17,12 @@ from pydantic import BaseModel, Field
 
 from app.application.pagination import Page
 from app.application.use_cases.cases import CaseInput
-from app.domain.case import Case, CaseChanges, CaseView
-from app.domain.investigation import CASE_STATUS_LABEL, SENSITIVITY_LABEL
+from app.domain.case import Case, CaseChanges, CaseMember, CaseView
+from app.domain.investigation import (
+    CASE_MEMBER_ROLE_LABEL,
+    CASE_STATUS_LABEL,
+    SENSITIVITY_LABEL,
+)
 
 # Topes de transporte, muy por encima de las reglas del dominio (120 y 2,000
 # caracteres): solo evitan cuerpos gigantes.
@@ -157,3 +161,46 @@ class CaseArticleOut(BaseModel):
 
     article_id: int
     added: bool = Field(description="false si la noticia ya estaba en el caso.")
+
+
+class CaseMemberIn(BaseModel):
+    """Persona a la que se da acceso (hasta la Fase 8, su usuario de texto)."""
+
+    user_id: str = Field(max_length=_MAX_TEXT, examples=["analista-2"])
+    role: str = Field(max_length=_MAX_TEXT, examples=["editor", "viewer"])
+
+
+class CaseMemberOut(BaseModel):
+    """Una persona con acceso al caso."""
+
+    user_id: str
+    role: str
+    role_label: str
+    added_by: str
+    created_at: datetime
+
+    @classmethod
+    def from_member(cls, member: CaseMember) -> "CaseMemberOut":
+        """Arma la respuesta.
+
+        Args:
+            member: El miembro.
+
+        Returns:
+            La respuesta con la etiqueta del rol en español.
+        """
+        return cls(
+            user_id=member.user_id,
+            role=member.role.value,
+            role_label=CASE_MEMBER_ROLE_LABEL[member.role],
+            added_by=member.added_by,
+            created_at=member.created_at,
+        )
+
+
+class CaseMemberSavedOut(BaseModel):
+    """Resultado de dar acceso (idempotente)."""
+
+    user_id: str
+    role: str
+    changed: bool = Field(description="false si ya tenía ese rol.")

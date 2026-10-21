@@ -193,3 +193,27 @@ def test_las_notas_de_un_caso_ajeno_no_existen(
     ]
 
     assert [r.status_code for r in responses] == [404, 404, 404]
+
+
+def test_miembros_por_api_solo_con_el_dueno(client: TestClient, session: Session) -> None:
+    case_id = client.post(URL, json=BODY).json()["id"]
+
+    saved = client.post(f"{URL}/{case_id}/members", json={"user_id": "lectora", "role": "viewer"})
+    second_owner = client.post(
+        f"{URL}/{case_id}/members", json={"user_id": "otra", "role": "owner"}
+    )
+    listed = client.get(f"{URL}/{case_id}/members").json()
+    session.as_user("lectora")
+    forbidden = client.delete(f"{URL}/{case_id}/members/benji")
+    session.as_user("benji")
+    removed = client.delete(f"{URL}/{case_id}/members/lectora")
+
+    assert saved.json() == {"user_id": "lectora", "role": "viewer", "changed": True}
+    assert second_owner.status_code == 409
+    assert second_owner.json()["error"]["code"] == "case_owner_required"
+    assert [(m["user_id"], m["role_label"]) for m in listed] == [
+        ("benji", "dueño"),
+        ("lectora", "lector"),
+    ]
+    assert forbidden.status_code == 403
+    assert removed.status_code == 204

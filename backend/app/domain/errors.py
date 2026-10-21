@@ -199,3 +199,9 @@ class CaseValidationError(InvalidRequestError):
     """El caso no cumple sus reglas (``details["problemas"]`` por campo)."""
 
     code = "invalid_case"
+
+
+class CaseOwnerRequiredError(ConflictError):
+    """La acción dejaría al caso sin su único dueño (o le daría un segundo)."""
+
+    code = "case_owner_required"

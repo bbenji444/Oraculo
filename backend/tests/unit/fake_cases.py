@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from app.application.audit import AuditEntry
 from app.application.pagination import TimeCursor
 from app.application.ports.search_reads import ArticleItem
-from app.domain.case import Case, CaseDraft, CaseView
+from app.domain.case import Case, CaseDraft, CaseMember, CaseView
 from app.domain.investigation import CaseMemberRole, CaseStatus
 
 START = datetime(2026, 10, 21, 18, tzinfo=UTC)
@@ -181,3 +181,27 @@ class FakeCaseRepository:
             key = (after.moment, int(after.id))
             notes = [a for a in notes if (a.published_at or START, a.article_id) < key]
         return notes[:limit]
+
+    async def list_members(self, case_id: UUID) -> list[CaseMember]:
+        members = self.members.get(case_id, {})
+        return [
+            CaseMember(user, role, "benji", self.now)
+            for user, role in sorted(
+                members.items(), key=lambda m: (m[1] is not CaseMemberRole.OWNER, m[0])
+            )
+        ]
+
+    async def save_member(self, case_id: UUID, member: CaseMember, audit: AuditEntry) -> bool:
+        current = self.members[case_id].get(member.user_id)
+        if current in (member.role, CaseMemberRole.OWNER):
+            return False
+        self.members[case_id][member.user_id] = member.role
+        self.audit.append((case_id, audit, self.now))
+        return True
+
+    async def remove_member(self, case_id: UUID, user_id: str, audit: AuditEntry) -> bool:
+        if self.members[case_id].get(user_id) in (None, CaseMemberRole.OWNER):
+            return False
+        del self.members[case_id][user_id]
+        self.audit.append((case_id, audit, self.now))
+        return True

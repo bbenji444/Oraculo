@@ -221,3 +221,24 @@ def closed_at_for(status: CaseStatus, current: datetime | None, now: datetime) -
     if status is CaseStatus.OPEN:
         return None
     return current or now
+
+
+# Un identificador de usuario de texto (hasta la Fase 8, como ``created_by``).
+USER_ID_MAX_LENGTH = 100
+
+
+@dataclass(frozen=True, slots=True)
+class CaseMember:
+    """Una persona con acceso a un caso.
+
+    Attributes:
+        user_id: Usuario.
+        role: Dueño, editor o lector.
+        added_by: Quién le dio acceso.
+        created_at: Desde cuándo.
+    """
+
+    user_id: str
+    role: CaseMemberRole
+    added_by: str
+    created_at: datetime

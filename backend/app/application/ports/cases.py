@@ -19,7 +19,7 @@ from uuid import UUID
 from app.application.audit import AuditEntry
 from app.application.pagination import TimeCursor
 from app.application.ports.search_reads import ArticleItem
-from app.domain.case import Case, CaseDraft, CaseView
+from app.domain.case import Case, CaseDraft, CaseMember, CaseView
 from app.domain.investigation import CaseStatus
 
 
@@ -165,5 +165,42 @@ class CaseRepositoryPort(Protocol):
         Returns:
             Las notas con el mismo formato de Explorar (``in_region`` vacío:
             un caso no tiene región buscada).
+        """
+        ...
+
+    async def list_members(self, case_id: UUID) -> list[CaseMember]:
+        """Personas con acceso al caso, el dueño primero.
+
+        Args:
+            case_id: Caso.
+
+        Returns:
+            Los miembros.
+        """
+        ...
+
+    async def save_member(self, case_id: UUID, member: CaseMember, audit: AuditEntry) -> bool:
+        """Da acceso a una persona o le cambia el rol, y lo registra.
+
+        Args:
+            case_id: Caso.
+            member: Persona, rol y quién le da acceso.
+            audit: Registro para la bitácora (solo si algo cambió).
+
+        Returns:
+            ``True`` si se agregó o cambió; ``False`` si ya tenía ese rol.
+        """
+        ...
+
+    async def remove_member(self, case_id: UUID, user_id: str, audit: AuditEntry) -> bool:
+        """Quita el acceso de una persona y lo registra.
+
+        Args:
+            case_id: Caso.
+            user_id: Persona.
+            audit: Registro para la bitácora (solo si se quitó).
+
+        Returns:
+            ``True`` si se quitó; ``False`` si no era miembro.
         """
         ...

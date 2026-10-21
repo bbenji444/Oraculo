@@ -437,6 +437,13 @@ La segunda vez responde `{ "article_id": 67, "added": false }`. La lista del cas
 { "items": [ { "article_id": 67, "title": "Micky Hair: Qué se sabe del asesinato de estilista de Micky Hair Salon- Grupo Milenio", "published_at": "2026-10-17T20:46:00-06:00", "primary_location": { "place": "Polanco, Alcaldía Miguel Hidalgo", "precision": "locality", … }, "in_region": null, … } ], "next_cursor": null }
 ```
 
+**Miembros.** Hasta la Fase 8 no hay usuarios reales: el usuario es un texto, como `created_by`, y no hay pantalla para esto.
+- `GET /cases/{id}/members` lista quién tiene acceso, el dueño primero. Cualquier miembro lo puede ver.
+- `POST /cases/{id}/members` con `{"user_id": "analista-2", "role": "viewer"}` da acceso o cambia el rol. Solo lo hace el dueño (`403` si no), y responde `"changed": false` si ya tenía ese rol.
+- `DELETE /cases/{id}/members/{user_id}` quita el acceso: el caso deja de existir para esa persona.
+
+El caso tiene **un solo dueño**: pedir un segundo dueño, cambiarle el rol o quitarlo responde `409` `case_owner_required`. En la bitácora queda `case.member_added` o `case.member_removed`.
+
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.

@@ -9,12 +9,15 @@ from app.application.audit import Actor
 from app.application.use_cases.cases import (
     CASE_VIEW_DEDUP_MINUTES,
     AddCaseArticle,
+    AddCaseMember,
     CaseInput,
     CreateCase,
     GetCase,
     ListCaseArticles,
+    ListCaseMembers,
     ListCases,
     RemoveCaseArticle,
+    RemoveCaseMember,
     UpdateCase,
 )
 from app.application.use_cases.search_reads import ArticleNotFoundError
@@ -23,6 +26,7 @@ from app.domain.errors import (
     CaseClosedError,
     CaseForbiddenError,
     CaseNotFoundError,
+    CaseOwnerRequiredError,
     CaseValidationError,
     InvalidRequestError,
 )
@@ -252,3 +256,61 @@ async def test_las_notas_del_caso_por_paginas_y_solo_para_miembros(
     assert rest.next_cursor is None
     with pytest.raises(CaseNotFoundError):
         await use.execute(case.id, OTRA)
+
+
+# --- Miembros -------------------------------------------------------------------------
+
+
+async def test_el_dueno_da_acceso_y_la_otra_persona_ya_ve_el_caso(
+    repo: FakeCaseRepository,
+) -> None:
+    case = (await CreateCase(repo).execute(POLANCO, BENJI)).case
+
+    added = await AddCaseMember(repo).execute(case.id, " otra-analista ", "viewer", BENJI)
+    again = await AddCaseMember(repo).execute(case.id, "otra-analista", "viewer", BENJI)
+    view = await GetCase(repo).execute(case.id, OTRA)
+    members = await ListCaseMembers(repo).execute(case.id, OTRA)
+
+    assert (added, again) == (True, False)
+    assert view.role is CaseMemberRole.VIEWER
+    assert [(m.user_id, m.role) for m in members] == [
+        ("benji", CaseMemberRole.OWNER),
+        ("otra-analista", CaseMemberRole.VIEWER),
+    ]
+    added_entries = [
+        e for _, e, _ in repo.audit if e.action == InvestigationAction.CASE_MEMBER_ADDED
+    ]
+    assert [e.payload for e in added_entries] == [{"user_id": "otra-analista", "role": "viewer"}]
+
+
+async def test_solo_el_dueno_administra_y_nunca_queda_sin_dueno(
+    repo: FakeCaseRepository,
+) -> None:
+    case = (await CreateCase(repo).execute(POLANCO, BENJI)).case
+    await AddCaseMember(repo).execute(case.id, "otra-analista", "editor", BENJI)
+
+    with pytest.raises(CaseForbiddenError):
+        await AddCaseMember(repo).execute(case.id, "tercera", "viewer", OTRA)
+    with pytest.raises(CaseOwnerRequiredError):
+        await AddCaseMember(repo).execute(case.id, "tercera", "owner", BENJI)
+    with pytest.raises(CaseOwnerRequiredError):
+        await AddCaseMember(repo).execute(case.id, "benji", "viewer", BENJI)
+    with pytest.raises(CaseOwnerRequiredError):
+        await RemoveCaseMember(repo).execute(case.id, "benji", BENJI)
+    with pytest.raises(InvalidRequestError):
+        await AddCaseMember(repo).execute(case.id, "tercera", "jefe", BENJI)
+    with pytest.raises(InvalidRequestError):
+        await AddCaseMember(repo).execute(case.id, "   ", "viewer", BENJI)
+
+
+async def test_quitar_el_acceso_y_el_caso_desaparece_para_esa_persona(
+    repo: FakeCaseRepository,
+) -> None:
+    case = (await CreateCase(repo).execute(POLANCO, BENJI)).case
+    await AddCaseMember(repo).execute(case.id, "otra-analista", "viewer", BENJI)
+
+    removed = await RemoveCaseMember(repo).execute(case.id, "otra-analista", BENJI)
+
+    assert removed is True
+    with pytest.raises(CaseNotFoundError):
+        await GetCase(repo).execute(case.id, OTRA)

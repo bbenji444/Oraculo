@@ -12,6 +12,8 @@ un caso también (``case.viewed``), una vez por persona cada
 Las noticias se agregan y se quitan sin duplicar (D6, D7): la noticia es de
 todo el sistema y quitarla del caso no la borra.
 
+Los miembros los administra solo el dueño, y el caso nunca se queda sin él.
+
 No hace: no sabe de HTTP ni de SQL; no agrega entidades (9.4).
 """
 
@@ -36,18 +38,23 @@ from app.application.use_cases.search_reads import (
     check_limit,
 )
 from app.domain.case import (
+    USER_ID_MAX_LENGTH,
     Case,
     CaseChanges,
     CaseDraft,
+    CaseMember,
     CaseView,
     can_edit,
+    can_manage_members,
     closed_at_for,
     is_read_only,
 )
+from app.domain.concept import clean_text
 from app.domain.errors import (
     CaseClosedError,
     CaseForbiddenError,
     CaseNotFoundError,
+    CaseOwnerRequiredError,
     CaseValidationError,
     InvalidRequestError,
 )
@@ -490,3 +497,136 @@ class ListCaseArticles:
             else None
         )
         return Page(items=tuple(items), next_cursor=next_cursor)
+
+
+def _require_owner(view: CaseView) -> None:
+    if not can_manage_members(view.role):
+        raise CaseForbiddenError(
+            "Solo el dueño del caso decide quién tiene acceso.", {"role": view.role.value}
+        )
+
+
+class ListCaseMembers:
+    """Quién tiene acceso a un caso; cualquier miembro lo puede ver."""
+
+    def __init__(self, repository: CaseRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los casos.
+        """
+        self._repository = repository
+
+    async def execute(self, case_id: UUID, actor: Actor) -> list[CaseMember]:
+        """Devuelve los miembros, el dueño primero.
+
+        Args:
+            case_id: Caso.
+            actor: Quién pregunta.
+
+        Returns:
+            Los miembros.
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+        """
+        await case_for(self._repository, case_id, actor)
+        return await self._repository.list_members(case_id)
+
+
+class AddCaseMember:
+    """Da acceso a una persona (editor o lector) o le cambia el rol (solo el dueño).
+
+    Hasta la Fase 8 no hay usuarios reales: el identificador es texto, como
+    ``created_by``. Esta acción no tiene pantalla todavía (decisión D3).
+    """
+
+    def __init__(self, repository: CaseRepositoryPort, clock: Clock = _utc_now) -> None:
+        """Recibe el repositorio y el reloj.
+
+        Args:
+            repository: Acceso a los casos.
+            clock: Hora actual (las pruebas la fijan).
+        """
+        self._repository = repository
+        self._clock = clock
+
+    async def execute(self, case_id: UUID, user_id: str, role: str, actor: Actor) -> bool:
+        """Agrega a la persona o le cambia el rol.
+
+        Args:
+            case_id: Caso.
+            user_id: Persona.
+            role: ``editor`` o ``viewer`` (el dueño es uno solo).
+            actor: Quién da el acceso (debe ser el dueño).
+
+        Returns:
+            ``True`` si se agregó o cambió; ``False`` si ya tenía ese rol.
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si quien lo pide no es el dueño.
+            CaseOwnerRequiredError: Si se pide un segundo dueño o cambiar el rol del dueño.
+            InvalidRequestError: Si el usuario o el rol no son válidos.
+        """
+        _require_owner(await case_for(self._repository, case_id, actor))
+        member = clean_text(user_id)
+        if not 1 <= len(member) <= USER_ID_MAX_LENGTH:
+            raise InvalidRequestError(
+                f"El usuario debe tener entre 1 y {USER_ID_MAX_LENGTH} caracteres.",
+                {"user_id": user_id},
+            )
+        try:
+            new_role = CaseMemberRole(role)
+        except ValueError as error:
+            raise InvalidRequestError("El rol debe ser editor o viewer.", {"role": role}) from error
+        if new_role is CaseMemberRole.OWNER or member == actor.user_id:
+            raise CaseOwnerRequiredError(
+                "El caso tiene un solo dueño; aquí solo se agregan editores o lectores.",
+                {"user_id": member, "role": role},
+            )
+        audit = AuditEntry(
+            actor,
+            InvestigationAction.CASE_MEMBER_ADDED,
+            {"user_id": member, "role": new_role.value},
+        )
+        return await self._repository.save_member(
+            case_id, CaseMember(member, new_role, actor.user_id, self._clock()), audit
+        )
+
+
+class RemoveCaseMember:
+    """Quita el acceso de una persona (solo el dueño; al dueño no se le quita)."""
+
+    def __init__(self, repository: CaseRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los casos.
+        """
+        self._repository = repository
+
+    async def execute(self, case_id: UUID, user_id: str, actor: Actor) -> bool:
+        """Quita el acceso y lo registra.
+
+        Args:
+            case_id: Caso.
+            user_id: Persona.
+            actor: Quién lo quita (debe ser el dueño).
+
+        Returns:
+            ``True`` si se quitó; ``False`` si no era miembro.
+
+        Raises:
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si quien lo pide no es el dueño.
+            CaseOwnerRequiredError: Si se intenta quitar al dueño.
+        """
+        _require_owner(await case_for(self._repository, case_id, actor))
+        if user_id == actor.user_id:
+            raise CaseOwnerRequiredError(
+                "El dueño no se puede quitar del caso: se quedaría sin dueño.",
+                {"user_id": user_id},
+            )
+        audit = AuditEntry(actor, InvestigationAction.CASE_MEMBER_REMOVED, {"user_id": user_id})
+        return await self._repository.remove_member(case_id, user_id, audit)

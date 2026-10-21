@@ -7,6 +7,7 @@ import pytest
 from app.domain.errors import InvalidRequestError
 from app.domain.investigation import (
     CASE_ENTITY_STATUS_LABEL,
+    CASE_MEMBER_ROLE_LABEL,
     CASE_STATUS_LABEL,
     ENTITY_TYPE_LABEL,
     EVIDENCE_SPAN_MAX_CHARS,
@@ -17,6 +18,7 @@ from app.domain.investigation import (
     SENSITIVITY_LABEL,
     SYMMETRIC_RELATIONSHIPS,
     CaseEntityStatus,
+    CaseMemberRole,
     CaseStatus,
     EntityType,
     InvestigationAction,
@@ -38,6 +40,7 @@ from app.domain.investigation import (
         (Sensitivity, SENSITIVITY_LABEL),
         (CaseEntityStatus, CASE_ENTITY_STATUS_LABEL),
         (CaseStatus, CASE_STATUS_LABEL),
+        (CaseMemberRole, CASE_MEMBER_ROLE_LABEL),
     ],
 )
 def test_cada_valor_tiene_su_etiqueta_en_espanol(

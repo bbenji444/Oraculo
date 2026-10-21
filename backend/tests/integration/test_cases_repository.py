@@ -19,7 +19,7 @@ from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.application.audit import Actor, AuditEntry
 from app.application.pagination import TimeCursor
 from app.core.config import Settings
-from app.domain.case import CaseDraft
+from app.domain.case import CaseDraft, CaseMember
 from app.domain.investigation import CaseMemberRole, CaseStatus, InvestigationAction
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -210,3 +210,45 @@ async def test_agregar_quitar_y_listar_notas_con_bitacora(
         *["case.article_added"] * 3,
         "case.article_removed",
     ]
+
+
+async def test_miembros_sin_tocar_nunca_al_dueno(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    repo = PostgresCaseRepository(test_engine)
+    case = await repo.create(CaseDraft.validated("Caso", "", "normal"), "benji", created())
+    added = AuditEntry(BENJI, InvestigationAction.CASE_MEMBER_ADDED, {})
+    removed = AuditEntry(BENJI, InvestigationAction.CASE_MEMBER_REMOVED, {})
+
+    new = await repo.save_member(
+        case.id, CaseMember("lectora", CaseMemberRole.VIEWER, "benji", case.created_at), added
+    )
+    same = await repo.save_member(
+        case.id, CaseMember("lectora", CaseMemberRole.VIEWER, "benji", case.created_at), added
+    )
+    promoted = await repo.save_member(
+        case.id, CaseMember("lectora", CaseMemberRole.EDITOR, "benji", case.created_at), added
+    )
+    # El dueño no cambia de rol ni se borra, aunque se pida.
+    owner_demoted = await repo.save_member(
+        case.id, CaseMember("benji", CaseMemberRole.VIEWER, "benji", case.created_at), added
+    )
+    owner_removed = await repo.remove_member(case.id, "benji", removed)
+    members = await repo.list_members(case.id)
+    shared = await repo.get_view(case.id, "lectora")
+
+    assert (new, same, promoted, owner_demoted, owner_removed) == (
+        True,
+        False,
+        True,
+        False,
+        False,
+    )
+    assert [(m.user_id, m.role) for m in members] == [
+        ("benji", CaseMemberRole.OWNER),
+        ("lectora", CaseMemberRole.EDITOR),
+    ]
+    assert shared is not None and shared.role is CaseMemberRole.EDITOR
+    assert await repo.remove_member(case.id, "lectora", removed) is True
+    assert await repo.get_view(case.id, "lectora") is None
+    assert audit_actions(sync_engine, case.id).count("case.member_added") == 2

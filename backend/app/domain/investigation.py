@@ -221,6 +221,13 @@ class CaseMemberRole(StrEnum):
     VIEWER = "viewer"
 
 
+CASE_MEMBER_ROLE_LABEL: dict[CaseMemberRole, str] = {
+    CaseMemberRole.OWNER: "dueño",
+    CaseMemberRole.EDITOR: "editor",
+    CaseMemberRole.VIEWER: "lector",
+}
+
+
 class CaseEntityStatus(StrEnum):
     """Columna ``case_entities.case_status``: cómo ve el analista a la entidad en ESTE caso."""
 

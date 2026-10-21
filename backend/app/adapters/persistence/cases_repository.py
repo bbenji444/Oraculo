@@ -30,7 +30,7 @@ from app.adapters.persistence.article_rows import (
 from app.application.audit import AuditEntry
 from app.application.pagination import TimeCursor
 from app.application.ports.search_reads import ArticleItem
-from app.domain.case import Case, CaseDraft, CaseView
+from app.domain.case import Case, CaseDraft, CaseMember, CaseView
 from app.domain.investigation import CaseMemberRole, CaseStatus, Sensitivity
 
 # ``audit_log.entity_type`` de todo lo que pasa en un caso.
@@ -341,3 +341,69 @@ class PostgresCaseRepository:
         async with self._engine.connect() as conn:
             rows = (await conn.execute(text(sql), params)).mappings().all()
         return [article_item(row) for row in rows]
+
+    async def list_members(self, case_id: UUID) -> list[CaseMember]:
+        """Ver ``CaseRepositoryPort.list_members``."""
+        async with self._engine.connect() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT user_id, role, added_by, created_at FROM case_members "
+                            "WHERE case_id = :case ORDER BY role = 'owner' DESC, user_id"
+                        ),
+                        {"case": case_id},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            CaseMember(r["user_id"], CaseMemberRole(r["role"]), r["added_by"], r["created_at"])
+            for r in rows
+        ]
+
+    async def save_member(self, case_id: UUID, member: CaseMember, audit: AuditEntry) -> bool:
+        """Ver ``CaseRepositoryPort.save_member``.
+
+        Nunca cambia el rol del dueño: el ``DO UPDATE`` lo excluye.
+        """
+        async with self._engine.begin() as conn:
+            changed = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO case_members AS m (case_id, user_id, role, added_by) "
+                        "VALUES (:case, :user, :role, :by) "
+                        "ON CONFLICT (case_id, user_id) DO UPDATE SET role = EXCLUDED.role "
+                        "WHERE m.role <> EXCLUDED.role AND m.role <> 'owner' "
+                        "RETURNING user_id"
+                    ),
+                    {
+                        "case": case_id,
+                        "user": member.user_id,
+                        "role": member.role.value,
+                        "by": member.added_by,
+                    },
+                )
+            ).first()
+            if changed is None:
+                return False
+            await write_audit(conn, case_id, audit)
+            return True
+
+    async def remove_member(self, case_id: UUID, user_id: str, audit: AuditEntry) -> bool:
+        """Ver ``CaseRepositoryPort.remove_member``. El dueño nunca se borra."""
+        async with self._engine.begin() as conn:
+            removed = (
+                await conn.execute(
+                    text(
+                        "DELETE FROM case_members WHERE case_id = :case AND user_id = :user "
+                        "AND role <> 'owner' RETURNING user_id"
+                    ),
+                    {"case": case_id, "user": user_id},
+                )
+            ).first()
+            if removed is None:
+                return False
+            await write_audit(conn, case_id, audit)
+            return True
