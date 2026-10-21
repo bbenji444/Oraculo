@@ -26,15 +26,17 @@ import { useCameraStore } from '../store/camera';
 import { type FrameStats, FRAME_BUDGET_MS, summarizeRuns } from './fpsMeter';
 import { DEMO_CASE, type LabCase, syntheticCase } from './labCase';
 import { PHASE_LABEL, PHASES, type Phase, runPhase } from './labScript';
+import { addDeckMuro } from './muroDeck';
 import type { MuroEngine } from './muroLabels';
 import { addMapLibreMuro } from './muroMapLibre';
 
-type EngineKey = 'control' | 'maplibre';
+type EngineKey = 'control' | 'maplibre' | 'deck';
 type CaseKey = 'demo' | '25' | '150' | '500';
 
 const ENGINES: { key: EngineKey; label: string }[] = [
   { key: 'control', label: 'Sin muro (control)' },
   { key: 'maplibre', label: 'A · MapLibre propio' },
+  { key: 'deck', label: 'B · deck.gl 9.4' },
 ];
 const CASES: { key: CaseKey; label: string }[] = [
   { key: 'demo', label: 'Caso de prueba (9 nodos)' },
@@ -59,6 +61,7 @@ function caseFor(key: CaseKey): LabCase {
 
 function addEngine(map: MapLibreMap, key: EngineKey, labCase: LabCase): MuroEngine | null {
   if (key === 'maplibre') return addMapLibreMuro(map, labCase);
+  if (key === 'deck') return addDeckMuro(map, labCase);
   return null;
 }
 
