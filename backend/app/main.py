@@ -27,6 +27,7 @@ from app.adapters.llm.factory import (
     build_summarizer,
     llm_info,
 )
+from app.adapters.persistence.case_graph_repository import PostgresCaseGraphRepository
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
@@ -117,6 +118,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         # Vínculos de los casos (Fase 9.5): la coocurrencia se calcula al leer.
         app.state.relationship_repository = PostgresRelationshipRepository(engine)
+        # Muro de los casos sobre el globo (Fase 9.6).
+        app.state.case_graph_repository = PostgresCaseGraphRepository(engine)
+        app.state.case_max_visible_nodes = settings.case_max_visible_nodes
         info = llm_info(settings)
         app.state.llm_prices = LLMPrices(
             info.provider, info.price_input_per_million, info.price_output_per_million
