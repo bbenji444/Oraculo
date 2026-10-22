@@ -53,9 +53,9 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `reports` | El resumen ejecutivo de cada búsqueda, escrito una vez por la IA y guardado para no volver a pagarlo (F7, ADR-0018). |
 | `places` | ~107 mil colonias y zonas de OpenStreetMap, sacadas del mapa base, para ubicar lo que INEGI no tiene (ADR-0020). |
 | `entities` | Tablero de investigación (Fase 9): personas, organizaciones, lugares y vehículos como objetos propios. Las personas llevan estatus legal (lo que dice la nota, nunca "culpable"); todo nace `suggested` y solo una persona lo confirma o descarta, con su nombre y la hora (ADR-0101, 0104, 0105). Los lugares se ligan a `regions` o `places`. |
-| `entity_aliases` | Otros nombres de cada entidad ("Eduardo N", "Micky Hair"). |
+| `entity_aliases` | Otros nombres de cada entidad ("Eduardo N", "Micky Hair"). Igual que `entities.label_norm`, `alias_norm` es el nombre de comparación: la regla de `name_norm` más quitar las comillas, para que "Eduardo “N”" y "Eduardo N" sean el mismo nombre (`entity_name_norm`, migración 0021). |
 | `entity_mentions` | La evidencia: en qué nota aparece cada entidad, con su rol, su confianza y una cita corta (máximo 300 caracteres) que sobrevive al borrado del texto de la nota. |
-| `relationships` | Vínculos entre dos entidades (aparecen juntas, mismo hecho, familiar…), con su origen (coocurrencia, IA o humano), confianza y revisión. |
+| `relationships` | Vínculos entre dos entidades (aparecen juntas, mismo hecho, familiar…), con su origen (coocurrencia, IA o humano), confianza y revisión. Desde la 9.5, «aparecen juntas» entre entidades confirmadas se calcula al leer; aquí solo se guarda cuando alguien lo confirma o descarta, y los que dibuja el analista (nacen confirmados). |
 | `external_links` | **Reservada y vacía** (ADR-0101): enchufe futuro hacia registros de otras bases del sistema Oráculo. Ninguna lógica de la Fase 9 la usa; una prueba lo vigila. |
 | `cases` | Casos de investigación (Fase 9): nombre, estado (abierto, cerrado, archivado) y sensibilidad (normal, reservado, confidencial). La fecha de cierre va con el estado. |
 | `case_members` | Quién puede ver o editar cada caso (dueño, editor, lector). Un solo dueño. Hasta la Fase 8, el usuario es el de desarrollo. |
@@ -63,7 +63,8 @@ Abre `psql` ya conectado. Para salir: `\q`.
 | `entity_extractions` | Lo que respondió la IA de cada nota al proponer entidades (Fase 9.4, ADR-0103): las propuestas que pasaron la revisión contra el texto y las descartadas con su motivo, modelo, tokens y costo. Una por nota y versión de prompt: si la nota entra a otro caso se reutiliza sin volver a pagar. |
 | `case_entities` | Entidades de cada caso, con su rol, su estado en ESE caso (en el caso, línea de investigación, descartada) y una etiqueta del analista. |
 | `case_notes` | Notas del investigador, ancladas a lo más a una entidad, noticia o vínculo. |
-| `alembic_version` | Versión del esquema (migraciones). Hoy: `0020`. |
+| `entity_merge_dismissals` | Pares de entidades de un caso que el analista dijo que **no** son la misma (Fase 9.5): con el id menor primero, quién y cuándo. Las sugerencias de fusión se calculan al leer; esta tabla solo evita que un par descartado vuelva a salir. |
+| `alembic_version` | Versión del esquema (migraciones). Hoy: `0022`. |
 | `spatial_ref_sys` | Tabla interna de PostGIS (sistemas de coordenadas). No se toca. |
 
 Columnas principales de `regions`:

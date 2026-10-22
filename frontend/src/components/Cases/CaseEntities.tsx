@@ -7,14 +7,20 @@
  *   estaban antes de la 9.4 o fallaron.
  * - Pestañas Sugeridas, Confirmadas y Descartadas; solo lo confirmado llegará
  *   al muro (9.6).
+ * - Desde la 9.5: «Posibles duplicados» para revisar lado a lado, y en cada
+ *   tarjeta «Es la misma que…», «separar» y «Separar menciones».
  *
- * No hace: no fusiona ni vincula entidades (9.5).
+ * No hace: no dibuja vínculos (`CaseRelationships`).
  */
-import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 
+import { invalidateCaseEntities } from '../../hooks/caseKeys';
 import { useAnalyzePending, useCaseEntities, useReviewEntity } from '../../hooks/useEntities';
-import type { ReviewStatus } from '../../services/entities';
+import { useMergeSuggestions, useResolution } from '../../hooks/useResolution';
+import type { Entity, ReviewStatus } from '../../services/entities';
 import { EntityCard } from './EntityCard';
+import { MergeSuggestions } from './MergeSuggestions';
 
 const TABS: { value: ReviewStatus; label: string }[] = [
   { value: 'suggested', label: 'Sugeridas' },
@@ -40,7 +46,21 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
   const data = entities.data;
   const analysis = data?.analysis;
   const pending = analysis ? analysis.pending + analysis.failed : 0;
-  const error = entities.error ?? analyze.error ?? review.error;
+  const suggestions = useMergeSuggestions(caseId);
+  const resolution = useResolution(caseId);
+  // Destinos de «Es la misma que…»: sugeridas y confirmadas (lo más común es
+  // unir una sugerida nueva a una persona ya confirmada).
+  const suggested = useCaseEntities(caseId, 'suggested').data?.items ?? [];
+  const confirmed = useCaseEntities(caseId, 'confirmed').data?.items ?? [];
+  const busy = review.isPending || resolution.isPending;
+  const error = entities.error ?? analyze.error ?? review.error ?? resolution.error;
+  useRefreshWhenAnalysisEnds(caseId, analysis?.queued ?? 0);
+
+  function targetsFor(entity: Entity): Entity[] {
+    return [...confirmed, ...suggested].filter(
+      (other) => other.id !== entity.id && other.type === entity.type,
+    );
+  }
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/40">
@@ -75,6 +95,14 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
           </button>
         </div>
       )}
+      <MergeSuggestions
+        suggestions={suggestions.data ?? []}
+        canEdit={canEdit}
+        busy={busy}
+        onDecide={(action) => {
+          resolution.mutate(action);
+        }}
+      />
       <div role="tablist" aria-label="Estado de las entidades" className="flex gap-1 px-3 pt-2">
         {TABS.map((t) => (
           <button
@@ -112,7 +140,11 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
             key={entity.id}
             entity={entity}
             canEdit={canEdit}
-            busy={review.isPending}
+            busy={busy}
+            mergeTargets={targetsFor(entity)}
+            onResolve={(action) => {
+              resolution.mutate(action);
+            }}
             onConfirm={(legal) => {
               review.mutate({ entityId: entity.id, action: 'confirm', legal });
             }}
@@ -124,4 +156,17 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
       </ul>
     </div>
   );
+}
+
+/**
+ * Cuando la IA termina de leer las notas en cola, vuelve a pedir duplicados y
+ * vínculos: las sugerencias nuevas pueden traer pares nuevos.
+ */
+function useRefreshWhenAnalysisEnds(caseId: string, queued: number): void {
+  const client = useQueryClient();
+  const before = useRef(queued);
+  useEffect(() => {
+    if (before.current > 0 && queued === 0) void invalidateCaseEntities(client, caseId);
+    before.current = queued;
+  }, [client, caseId, queued]);
 }

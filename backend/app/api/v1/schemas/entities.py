@@ -1,4 +1,4 @@
-"""Esquemas de las entidades de un caso (Fase 9.4, historia H9.2).
+"""Esquemas de las entidades de un caso (Fases 9.4 y 9.5, historias H9.2 y §9.8).
 
 La salida trae cada valor con su etiqueta en español ("persona", "señalado")
 para que la interfaz no traduzca, y el estatus legal siempre visible (§9.10).
@@ -43,6 +43,9 @@ class ConfirmIn(ReviewIn):
 class MentionOut(BaseModel):
     """Una mención: la cita y la nota de donde salió."""
 
+    id: int
+    # Entidad dueña: la misma, o una que se le unió (9.5). Solo las propias se separan.
+    entity_id: int
     article_id: int
     article_title: str
     article_url: str
@@ -59,6 +62,8 @@ class MentionOut(BaseModel):
     def from_view(cls, m: MentionView) -> "MentionOut":
         """Convierte la mención del caso de uso."""
         return cls(
+            id=m.mention_id,
+            entity_id=m.entity_id,
             article_id=m.article_id,
             article_title=m.article_title,
             article_url=m.article_url,
@@ -71,6 +76,14 @@ class MentionOut(BaseModel):
             confidence=m.confidence,
             evidence_span=m.evidence_span,
         )
+
+
+class MergedOut(BaseModel):
+    """Una entidad que se unió a esta (9.5): se puede separar."""
+
+    id: int
+    label: str
+    merged_into: int
 
 
 class EntityOut(BaseModel):
@@ -94,6 +107,7 @@ class EntityOut(BaseModel):
     mention_count: int
     article_count: int
     mentions: list[MentionOut]
+    merged: list[MergedOut]
 
     @classmethod
     def from_entity(cls, e: CaseEntity) -> "EntityOut":
@@ -118,6 +132,10 @@ class EntityOut(BaseModel):
             mention_count=len(e.mentions),
             article_count=e.article_count,
             mentions=[MentionOut.from_view(m) for m in e.mentions],
+            merged=[
+                MergedOut(id=m.entity_id, label=m.label, merged_into=m.merged_into)
+                for m in e.merged
+            ],
         )
 
 

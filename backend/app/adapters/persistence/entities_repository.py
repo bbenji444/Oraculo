@@ -1,19 +1,29 @@
-"""``EntityRepositoryPort`` sobre PostgreSQL (Fase 9.4; migraciones 0018 a 0020).
+"""``EntityRepositoryPort`` sobre PostgreSQL (Fases 9.4 y 9.5; migraciones 0018 a 0022).
 
 Guarda lo que la IA leyó de cada nota (``entity_extractions``) y lo convierte
 en sugerencias de un caso (``entities``, ``entity_aliases``,
-``entity_mentions`` y ``case_entities``).
+``entity_mentions`` y ``case_entities``). Desde la 9.5 también sugiere, une y
+separa entidades del caso.
 
-- **Agrupar dentro del caso (decisión D6):** una propuesta se suma a la
-  sugerencia del MISMO caso con el mismo tipo y nombre normalizado. Nunca se
-  junta con una de otro caso ni con una ya confirmada o descartada (ADR-0104):
-  si la que existe ya se revisó, nace otra sugerencia que la 9.5 propondrá
-  unir.
-- **Una nota por caso a la vez:** ``materialize`` toma un candado de la base
-  por caso (``pg_advisory_xact_lock``), para que dos notas con la misma
-  persona leídas al mismo tiempo no creen dos sugerencias.
+- **Agrupar dentro del caso (decisión D6 de la 9.4):** una propuesta se suma a
+  la sugerencia del MISMO caso con el mismo tipo y nombre de comparación
+  (``entity_name_norm``). Nunca se junta con una de otro caso ni con una ya
+  confirmada o descartada (ADR-0104): si la que existe ya se revisó, nace otra
+  sugerencia, que se ofrece para unir.
+- **Una nota por caso a la vez:** ``materialize``, unir y separar toman un
+  candado de la base por caso (``pg_advisory_xact_lock``), para que dos notas
+  con la misma persona leídas al mismo tiempo no creen dos sugerencias ni se
+  una algo mientras el worker le suma menciones.
 - **Sin duplicar evidencia:** si la nota se quitó y se volvió a agregar, sus
-  menciones ya están (índice ``entity_mentions_once``) y no se repiten.
+  menciones ya están en el caso y no se repiten, aunque su entidad se haya
+  unido a otra o separado desde entonces.
+- **Grupos de fusión (9.5, D4):** unir solo escribe ``merged_into``. Las
+  lecturas resuelven cada entidad raíz con las que se le unieron
+  (``GROUPS_CTE``) y muestran sus menciones y alias juntos; separar es
+  borrar ese ``merged_into``.
+- **Sugerencias de fusión (9.5, D2 y D3):** se calculan al leer
+  (las consultas traen las entidades; ``merge_reasons`` del dominio las compara);
+  solo se guarda el «No son la misma».
 - **Lo que se ve:** una sugerencia cuyas menciones son todas de notas que ya
   no están en el caso no aparece (vuelve si la nota regresa); lo ya revisado
   siempre aparece, porque lo decidió una persona.
@@ -26,6 +36,7 @@ uso); nunca toca la tabla reservada de enlaces externos (ADR-0101).
 """
 
 import json
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
@@ -43,6 +54,8 @@ from app.application.ports.entities import (
     FailedExtraction,
     Materialized,
     MentionView,
+    MergedEntity,
+    MergeSuggestion,
     StoredExtraction,
 )
 from app.domain.enrichment import LLMUsage
@@ -55,11 +68,16 @@ from app.domain.entity_extraction import (
     TextSource,
     match_region,
 )
-from app.domain.errors import EntityNotFoundError
+from app.domain.entity_resolution import (
+    MergeCandidate,
+    ResolutionRoot,
+    entity_name_norm,
+    merge_reasons,
+)
+from app.domain.errors import EntityMergeError, EntityNotFoundError
 from app.domain.extraction import ExtractionStatus
 from app.domain.geocoding import MentionRole
 from app.domain.investigation import EntityType, LegalStatus, ReviewStatus
-from app.domain.names import normalize_name
 
 # Primer número del candado de la base (pg_advisory_xact_lock(int, int)):
 # separa estos candados de cualquier otro que use el sistema. 904 = fase 9.4.
@@ -70,17 +88,32 @@ _ENTITY_COLUMNS = """
     e.reviewed_at, e.region_id, r.level::text AS region_level, r.display_prefix,
     r.name AS region_name
 """
-# Una sugerencia se ve solo si tiene al menos una mención en una nota que
-# sigue en el caso; lo revisado siempre se ve.
-_VISIBLE = """
-    (e.review_status <> 'suggested' OR EXISTS (
-        SELECT 1 FROM entity_mentions m
-        JOIN case_articles ca ON ca.case_id = ce.case_id AND ca.article_id = m.article_id
-        WHERE m.entity_id = e.id))
+# Grupos de fusión del caso (9.5, decisión D4): cada entidad raíz (no unida a
+# otra) con las que se le unieron, directo o en cadena. Las filas unidas no
+# cambian al fusionar: las lecturas las resuelven aquí, y separar es solo
+# borrar su ``merged_into``. Va acotado al caso: solo se une dentro de uno.
+GROUPS_CTE = """
+    WITH RECURSIVE grp(root, id) AS (
+        SELECT e.id, e.id FROM case_entities ce JOIN entities e ON e.id = ce.entity_id
+        WHERE ce.case_id = :case AND e.merged_into IS NULL
+        UNION ALL
+        SELECT grp.root, c.id FROM grp JOIN entities c ON c.merged_into = grp.id
+    ),
+    -- Grupos con al menos una mención en una nota que sigue en el caso. Se
+    -- calcula una vez: como subconsulta por entidad costaba 330 ms con 3,000.
+    visible AS (
+        SELECT DISTINCT grp.root FROM grp
+        JOIN entity_mentions m ON m.entity_id = grp.id
+        JOIN case_articles ca ON ca.case_id = :case AND ca.article_id = m.article_id
+    )
 """
+# Una sugerencia se ve solo si su grupo tiene al menos una mención en una nota
+# que sigue en el caso; lo revisado siempre se ve.
+_VISIBLE = "(e.review_status <> 'suggested' OR e.id IN (SELECT root FROM visible))"
 
 
 _ENTITIES_OF_CASE = f"""
+    {GROUPS_CTE}
     SELECT {_ENTITY_COLUMNS}
     FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
@@ -94,12 +127,41 @@ _ONE_SQL = f"""
     {_ENTITIES_OF_CASE} AND e.id = :entity
 """
 _COUNTS_SQL = f"""
+    {GROUPS_CTE}
     SELECT e.review_status, count(*)
     FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
     WHERE ce.case_id = :case AND e.merged_into IS NULL AND {_VISIBLE}
     GROUP BY e.review_status
 """  # noqa: S608 — condiciones fijas de este módulo; los datos van por parámetro
+# Sugerencias de fusión (D2): la base trae las raíces visibles y no
+# descartadas con sus trigramas (los mismos de pg_trgm), los nombres y alias de
+# cada grupo y los pares descartados; ``merge_reasons`` (dominio) los compara.
+# Compararlos en SQL todos contra todos tardaba más de 50 s con 3,000
+# entidades: con una tabla así de chica PostgreSQL no usa el índice GIN.
+_MERGE_ROOTS_SQL = f"""
+    {GROUPS_CTE}
+    SELECT e.id, e.type, e.label_norm, show_trgm(e.label_norm) AS trigrams
+    FROM case_entities ce JOIN entities e ON e.id = ce.entity_id
+    WHERE ce.case_id = :case AND e.merged_into IS NULL
+      AND e.review_status <> 'discarded' AND {_VISIBLE}
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
+_GROUP_NAMES_SQL = f"""
+    {GROUPS_CTE}
+    SELECT grp.root, e.label_norm AS name FROM grp JOIN entities e ON e.id = grp.id
+    UNION
+    SELECT grp.root, a.alias_norm FROM grp JOIN entity_aliases a ON a.entity_id = grp.id
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
+# Un «No son la misma» cuenta para los grupos enteros, aunque se haya dicho
+# sobre una entidad que después se unió a otra.
+_DISMISSED_SQL = f"""
+    {GROUPS_CTE}
+    SELECT DISTINCT least(g1.root, g2.root) AS first, greatest(g1.root, g2.root) AS second
+    FROM entity_merge_dismissals d
+    JOIN grp g1 ON g1.id = d.entity_low
+    JOIN grp g2 ON g2.id = d.entity_high
+    WHERE d.case_id = :case
+"""  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
 
 
 def _lock_key(case_id: UUID) -> int:
@@ -145,7 +207,8 @@ def _reviewed_from(data: Mapping[str, Any]) -> ReviewedProposals:
             Proposal(
                 type=EntityType(p["type"]),
                 label=p["label"],
-                label_norm=p["label_norm"],
+                # Se recalcula: las lecturas de la 9.4 lo guardaron con comillas.
+                label_norm=entity_name_norm(p["label"]),
                 aliases=tuple(p["aliases"]),
                 role=MentionRole(p["role"]),
                 legal_status_hint=(
@@ -168,6 +231,7 @@ def _reviewed_from(data: Mapping[str, Any]) -> ReviewedProposals:
 def _mention(row: RowMapping) -> MentionView:
     return MentionView(
         mention_id=row["id"],
+        entity_id=row["entity_id"],
         article_id=row["article_id"],
         article_title=row["title"],
         article_url=row["url_canonical"],
@@ -344,10 +408,7 @@ class PostgresEntityRepository:
         """Ver ``EntityRepositoryPort.materialize``."""
         article_id = extraction.article_id
         async with self._engine.begin() as conn:
-            await conn.execute(
-                text("SELECT pg_advisory_xact_lock(:namespace, :key)"),
-                {"namespace": _LOCK_NAMESPACE, "key": _lock_key(case_id)},
-            )
+            await self._lock(conn, case_id)
             in_case = (
                 await conn.execute(
                     text(
@@ -405,34 +466,48 @@ class PostgresEntityRepository:
     ) -> str:
         """Suma una propuesta al caso. Devuelve ``created``, ``attached`` o ``skipped``."""
         article_id = extraction.article_id
+        # La mención ya está en el caso (la nota se quitó y se volvió a agregar)
+        # aunque desde entonces su entidad se haya unido a otra o se haya
+        # separado con otro nombre (9.5): se busca por la mención, no por el
+        # nombre de la entidad.
+        already = (
+            await conn.execute(
+                text(
+                    "SELECT 1 FROM entity_mentions m "
+                    "JOIN case_entities ce ON ce.entity_id = m.entity_id AND ce.case_id = :case "
+                    "JOIN entities e ON e.id = m.entity_id AND e.type = :type "
+                    "WHERE m.article_id = :article AND m.evidence_span = :evidence "
+                    "AND m.mention_text = :mention LIMIT 1"
+                ),
+                {
+                    "case": case_id,
+                    "type": proposal.type.value,
+                    "article": article_id,
+                    "evidence": proposal.evidence_span,
+                    "mention": proposal.label,
+                },
+            )
+        ).first()
+        if already is not None:
+            return "skipped"
         same_name = (
             (
                 await conn.execute(
                     text(
-                        "SELECT e.id, e.review_status, EXISTS (SELECT 1 FROM entity_mentions m "
-                        "WHERE m.entity_id = e.id AND m.article_id = :article "
-                        "AND m.evidence_span = :evidence) AS has_mention "
+                        "SELECT e.id, e.review_status "
                         "FROM case_entities ce JOIN entities e ON e.id = ce.entity_id "
                         "WHERE ce.case_id = :case AND e.type = :type AND e.label_norm = :norm "
                         "AND e.merged_into IS NULL ORDER BY e.id"
                     ),
-                    {
-                        "article": article_id,
-                        "evidence": proposal.evidence_span,
-                        "case": case_id,
-                        "type": proposal.type.value,
-                        "norm": proposal.label_norm,
-                    },
+                    {"case": case_id, "type": proposal.type.value, "norm": proposal.label_norm},
                 )
             )
             .mappings()
             .all()
         )
-        if any(row["has_mention"] for row in same_name):
-            return "skipped"
         region_id = (
             match_region(
-                [proposal.label_norm, *(normalize_name(a) for a in proposal.aliases)], locations
+                [proposal.label_norm, *(entity_name_norm(a) for a in proposal.aliases)], locations
             )
             if proposal.type is EntityType.PLACE
             else None
@@ -476,7 +551,7 @@ class PostgresEntityRepository:
                     "INSERT INTO entity_aliases (entity_id, alias, alias_norm) "
                     "VALUES (:entity, :alias, :norm) ON CONFLICT (entity_id, alias_norm) DO NOTHING"
                 ),
-                {"entity": target, "alias": alias, "norm": normalize_name(alias)},
+                {"entity": target, "alias": alias, "norm": entity_name_norm(alias)},
             )
         await conn.execute(
             text(
@@ -631,6 +706,234 @@ class PostgresEntityRepository:
             raise EntityNotFoundError("No existe esa entidad en el caso.", {"entity_id": entity_id})
         return entity
 
+    async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
+        """Ver ``EntityRepositoryPort.merge_suggestions``."""
+        params = {"case": case_id}
+        async with self._engine.connect() as conn:
+            names: dict[int, set[str]] = defaultdict(set)
+            for root, name in await conn.execute(text(_GROUP_NAMES_SQL), params):
+                names[int(root)].add(name)
+            roots = [
+                ResolutionRoot(
+                    entity_id=row["id"],
+                    type=EntityType(row["type"]),
+                    label_norm=row["label_norm"],
+                    names=frozenset(names[row["id"]]),
+                    trigrams=frozenset(row["trigrams"]),
+                )
+                for row in (await conn.execute(text(_MERGE_ROOTS_SQL), params)).mappings()
+            ]
+            dismissed = [
+                (int(first), int(second))
+                for first, second in await conn.execute(text(_DISMISSED_SQL), params)
+            ]
+            pairs = merge_reasons(roots, dismissed)
+            if not pairs:
+                return []
+            ids = sorted({entity for pair in pairs for entity in pair})
+            rows = (
+                (
+                    await conn.execute(
+                        text(f"{_ENTITIES_OF_CASE} AND e.id = ANY(:ids)"),
+                        {"case": case_id, "ids": ids},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            by_id = {e.entity_id: e for e in await self._with_details(conn, case_id, rows)}
+        return [
+            MergeSuggestion(by_id[first], by_id[second], reasons)
+            for (first, second), reasons in pairs.items()
+        ]
+
+    async def merge_candidate(self, case_id: UUID, entity_id: int) -> MergeCandidate | None:
+        """Ver ``EntityRepositoryPort.merge_candidate``."""
+        async with self._engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT e.id, e.type, e.review_status, e.merged_into "
+                            "FROM case_entities ce JOIN entities e ON e.id = ce.entity_id "
+                            "WHERE ce.case_id = :case AND e.id = :entity"
+                        ),
+                        {"case": case_id, "entity": entity_id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        return MergeCandidate(
+            row["id"],
+            EntityType(row["type"]),
+            ReviewStatus(row["review_status"]),
+            row["merged_into"],
+        )
+
+    async def merge(
+        self, case_id: UUID, keep_id: int, merge_id: int, audit: AuditEntry
+    ) -> CaseEntity:
+        """Ver ``EntityRepositoryPort.merge``."""
+        async with self._engine.begin() as conn:
+            await self._lock(conn, case_id)
+            # Se vuelve a exigir lo que validó el caso de uso, por si otra
+            # persona unió o descartó alguna en el inter.
+            changed = (
+                await conn.execute(
+                    text(
+                        "UPDATE entities SET merged_into = :keep, updated_at = now() "
+                        "WHERE id = :merge AND merged_into IS NULL "
+                        "AND review_status <> 'discarded' AND id IN ("
+                        "SELECT entity_id FROM case_entities WHERE case_id = :case) "
+                        "AND EXISTS (SELECT 1 FROM entities k "
+                        "JOIN case_entities ck ON ck.entity_id = k.id AND ck.case_id = :case "
+                        "WHERE k.id = :keep AND k.merged_into IS NULL "
+                        "AND k.review_status <> 'discarded') RETURNING id"
+                    ),
+                    {"keep": keep_id, "merge": merge_id, "case": case_id},
+                )
+            ).first()
+            if changed is None:
+                raise EntityMergeError(
+                    "Una de las dos entidades cambió mientras tanto; vuelve a cargar el caso.",
+                    {"keep_id": keep_id, "merge_id": merge_id},
+                )
+            await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+            kept = await self._entity(conn, case_id, keep_id)
+        if kept is None:
+            raise EntityNotFoundError("No existe esa entidad en el caso.", {"entity_id": keep_id})
+        return kept
+
+    async def unmerge(self, case_id: UUID, entity_id: int, audit: AuditEntry) -> CaseEntity:
+        """Ver ``EntityRepositoryPort.unmerge``."""
+        async with self._engine.begin() as conn:
+            await self._lock(conn, case_id)
+            changed = (
+                await conn.execute(
+                    text(
+                        "UPDATE entities SET merged_into = NULL, updated_at = now() "
+                        "WHERE id = :entity AND merged_into IS NOT NULL AND id IN ("
+                        "SELECT entity_id FROM case_entities WHERE case_id = :case) RETURNING id"
+                    ),
+                    {"entity": entity_id, "case": case_id},
+                )
+            ).first()
+            if changed is None:
+                raise EntityMergeError(
+                    "Esa entidad no está unida a otra.", {"entity_id": entity_id}
+                )
+            await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+            separated = await self._entity(conn, case_id, entity_id)
+        if separated is None:
+            raise EntityNotFoundError("No existe esa entidad en el caso.", {"entity_id": entity_id})
+        return separated
+
+    async def split(
+        self, case_id: UUID, entity_id: int, mention_ids: Sequence[int], audit: AuditEntry
+    ) -> CaseEntity:
+        """Ver ``EntityRepositoryPort.split``."""
+        ids = sorted(set(mention_ids))
+        async with self._engine.begin() as conn:
+            await self._lock(conn, case_id)
+            source = (
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT e.type, m.mention_text FROM entity_mentions m "
+                            "JOIN entities e ON e.id = m.entity_id "
+                            "JOIN case_entities ce ON ce.entity_id = e.id AND ce.case_id = :case "
+                            "WHERE m.entity_id = :entity AND m.id = ANY(:ids) ORDER BY m.id LIMIT 1"
+                        ),
+                        {"case": case_id, "entity": entity_id, "ids": ids},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            if source is None:
+                raise EntityMergeError(
+                    "Esas menciones no son de esa entidad.", {"entity_id": entity_id}
+                )
+            label = source["mention_text"]
+            new_id = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO entities (type, canonical_label, label_norm) "
+                        "VALUES (:type, :label, :norm) RETURNING id"
+                    ),
+                    {"type": source["type"], "label": label, "norm": entity_name_norm(label)},
+                )
+            ).scalar_one()
+            await conn.execute(
+                text(
+                    "INSERT INTO case_entities (case_id, entity_id, added_by) "
+                    "VALUES (:case, :entity, :by)"
+                ),
+                {"case": case_id, "entity": new_id, "by": audit.actor.user_id},
+            )
+            moved = await conn.execute(
+                text(
+                    "UPDATE entity_mentions SET entity_id = :new "
+                    "WHERE entity_id = :entity AND id = ANY(:ids)"
+                ),
+                {"new": new_id, "entity": entity_id, "ids": ids},
+            )
+            if moved.rowcount != len(ids):
+                # Alguna ya no era de la entidad: se deshace todo (la transacción).
+                raise EntityMergeError(
+                    "Alguna de esas menciones ya no es de esa entidad; vuelve a cargar el caso.",
+                    {"entity_id": entity_id},
+                )
+            await write_audit(
+                conn,
+                case_id,
+                AuditEntry(audit.actor, audit.action, {**audit.payload, "new_entity_id": new_id}),
+            )
+            await touch(conn, case_id)
+            created = await self._entity(conn, case_id, new_id)
+        if created is None:
+            raise EntityNotFoundError("No existe esa entidad en el caso.", {"entity_id": new_id})
+        return created
+
+    async def dismiss_merge(
+        self, case_id: UUID, first_id: int, second_id: int, audit: AuditEntry
+    ) -> bool:
+        """Ver ``EntityRepositoryPort.dismiss_merge``."""
+        async with self._engine.begin() as conn:
+            saved = (
+                await conn.execute(
+                    text(
+                        "INSERT INTO entity_merge_dismissals "
+                        "(case_id, entity_low, entity_high, dismissed_by) "
+                        "VALUES (:case, :low, :high, :by) ON CONFLICT DO NOTHING "
+                        "RETURNING entity_low"
+                    ),
+                    {
+                        "case": case_id,
+                        "low": first_id,
+                        "high": second_id,
+                        "by": audit.actor.user_id,
+                    },
+                )
+            ).first()
+            if saved is None:
+                return False
+            await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+        return True
+
+    async def _lock(self, conn: AsyncConnection, case_id: UUID) -> None:
+        """Candado del caso hasta que termine la transacción (el mismo de ``materialize``)."""
+        await conn.execute(
+            text("SELECT pg_advisory_xact_lock(:namespace, :key)"),
+            {"namespace": _LOCK_NAMESPACE, "key": _lock_key(case_id)},
+        )
+
     async def _entity(
         self, conn: AsyncConnection, case_id: UUID, entity_id: int
     ) -> CaseEntity | None:
@@ -645,19 +948,42 @@ class PostgresEntityRepository:
     async def _with_details(
         self, conn: AsyncConnection, case_id: UUID, rows: Sequence[RowMapping]
     ) -> list[CaseEntity]:
-        """Agrega a cada entidad sus alias y sus menciones en notas del caso."""
+        """Agrega a cada entidad sus alias, sus menciones en notas del caso y su grupo.
+
+        Lo de las entidades que se le unieron (9.5) se ve en ella: sus alias y
+        sus menciones, que conservan el id de su dueña para poder separarlas.
+        """
         ids = [row["id"] for row in rows]
         if not ids:
             return []
+        root_of: dict[int, int] = {}
+        merged: dict[int, list[MergedEntity]] = {}
+        for root, member, label, merged_into in await conn.execute(
+            text(
+                "WITH RECURSIVE grp(root, id) AS ("
+                "SELECT r, r FROM unnest(CAST(:ids AS bigint[])) AS r "
+                "UNION ALL SELECT grp.root, c.id FROM grp "
+                "JOIN entities c ON c.merged_into = grp.id) "
+                "SELECT grp.root, e.id, e.canonical_label, e.merged_into FROM grp "
+                "JOIN entities e ON e.id = grp.id ORDER BY e.id"
+            ),
+            {"ids": ids},
+        ):
+            root_of[member] = root
+            if member != root:
+                merged.setdefault(root, []).append(MergedEntity(member, label, merged_into))
+        members = list(root_of)
         aliases: dict[int, list[str]] = {}
         for entity_id, alias in await conn.execute(
             text(
                 "SELECT entity_id, alias FROM entity_aliases WHERE entity_id = ANY(:ids) "
                 "ORDER BY id"
             ),
-            {"ids": ids},
+            {"ids": members},
         ):
-            aliases.setdefault(entity_id, []).append(alias)
+            group_aliases = aliases.setdefault(root_of[entity_id], [])
+            if alias not in group_aliases:
+                group_aliases.append(alias)
         mentions: dict[int, list[MentionView]] = {}
         mention_rows = await conn.execute(
             text(
@@ -668,10 +994,10 @@ class PostgresEntityRepository:
                 "JOIN articles a ON a.id = m.article_id WHERE m.entity_id = ANY(:ids) "
                 "ORDER BY a.published_at DESC NULLS LAST, m.id DESC"
             ),
-            {"case": case_id, "ids": ids},
+            {"case": case_id, "ids": members},
         )
         for row in mention_rows.mappings():
-            mentions.setdefault(row["entity_id"], []).append(_mention(row))
+            mentions.setdefault(root_of[row["entity_id"]], []).append(_mention(row))
         return [
             CaseEntity(
                 entity_id=row["id"],
@@ -687,6 +1013,7 @@ class PostgresEntityRepository:
                     row["region_level"], row["display_prefix"], row["region_name"]
                 ),
                 mentions=tuple(mentions.get(row["id"], [])),
+                merged=tuple(merged.get(row["id"], [])),
             )
             for row in rows
         ]

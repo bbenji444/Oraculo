@@ -21,7 +21,8 @@ Reglas que se cumplen aquí:
 - Cada lectura (correcta o fallida) va a la bitácora con su costo, y cada
   revisión con quién y qué cambió (CLAUDE.md §8).
 
-No hace: no sabe de HTTP, SQL ni Celery; no fusiona entidades (9.5).
+No hace: no sabe de HTTP, SQL ni Celery; no une ni separa entidades
+(``use_cases/resolution.py``, 9.5).
 """
 
 from collections.abc import Sequence

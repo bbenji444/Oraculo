@@ -106,6 +106,36 @@ def test_una_propuesta_con_su_cita_queda_como_sugerencia() -> None:
     assert BODY[item.char_start : item.char_end] == item.evidence_span
 
 
+def test_el_mismo_nombre_con_otras_comillas_se_agrupa_igual() -> None:
+    # Bug de la 9.4: "Julián “N”" y "Julián 'N'" quedaban como sugerencias
+    # distintas de "Julián N" porque las comillas sobrevivían a la normalización.
+    body = "Detienen a Julián “N”. Otro medio lo llama Julián 'N' y uno más, Julián N."
+    text_ = AnalyzedText("Detienen a Julián N", body, TextSource.FULL_TEXT)
+    raw = [
+        proposal("Julián “N”", "Detienen a Julián “N”"),
+        proposal("Julián 'N'", "lo llama Julián 'N'"),
+        proposal("Julián N", "uno más, Julián N"),
+    ]
+
+    reviewed = review_proposals(raw, text_)
+
+    assert reviewed.rejected == ()
+    assert {item.label_norm for item in reviewed.proposals} == {"JULIAN N"}
+    # Lo que se muestra sigue siendo lo que dice la nota.
+    assert [item.label for item in reviewed.proposals] == ["Julián “N”", "Julián 'N'", "Julián N"]
+
+
+def test_un_alias_igual_al_nombre_salvo_comillas_no_se_repite() -> None:
+    body = "Detienen a Julián “N”, también llamado Julián N."
+    text_ = AnalyzedText("Detienen", body, TextSource.FULL_TEXT)
+
+    (item,) = review_proposals(
+        [proposal("Julián “N”", "Detienen a Julián “N”", aliases=("Julián N",))], text_
+    ).proposals
+
+    assert item.aliases == ()
+
+
 def test_una_cita_inventada_se_descarta() -> None:
     reviewed = review_proposals([proposal(evidence="fue detenido por la policía")], TEXT)
 

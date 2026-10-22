@@ -457,6 +457,34 @@ La IA propone las entidades de cada nota que entra a un caso (ADR-0103). Todo na
 
 Agregar una nota con `POST /cases/{id}/articles` la encola sola. Cada lectura queda en la bitácora como `case.entities_extracted`, con modelo, tokens y costo.
 
+Desde la 9.5, cada mención trae su `id` y su `entity_id` (la entidad dueña), y cada entidad trae `merged`: las que se le unieron, con `{id, label, merged_into}`.
+
+## Duplicados de un caso (Fase 9.5)
+
+El sistema **sugiere** qué entidades del caso podrían ser la misma; solo una persona las une (ADR-0104). Unir no mueve nada: se puede separar después.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/cases/{id}/merge-suggestions` | Pares del mismo tipo con `reason` (`same_name`, `shared_name` o `similar_name`, con `reason_label`), las dos entidades completas para verlas lado a lado y `keep_id`: cuál se propone que quede (la confirmada; si no, la de más menciones). Cualquier miembro. Mirar nunca fusiona. |
+| POST | `/entities/merge` | Cuerpo `{case_id, keep_id, merge_id}`. Responde la que queda con las menciones de las dos. 422 `invalid_entity_merge` si son de tipos distintos, alguna está descartada o ya unida, o quedaría la sugerida en lugar de la confirmada. Bitácora `entity.merged`. |
+| POST | `/entities/merge/dismiss` | Cuerpo `{case_id, first_id, second_id}`: «No son la misma». Responde `{dismissed}` (`false` si ya estaba). Bitácora `entity.merge_dismissed`. |
+| POST | `/entities/{id}/unmerge` | Cuerpo `{case_id}`. Separa la entidad de aquella a la que se unió (lo que se le había unido a ella se va con ella). Bitácora `entity.unmerged`. |
+| POST | `/entities/{id}/split` | Cuerpo `{case_id, mention_ids}`. Pasa esas menciones propias a una sugerencia nueva (para dos homónimos que quedaron juntos); debe quedar al menos una. Responde la nueva. Bitácora `entity.split`. |
+
+Las cuatro escrituras piden editor o dueño con el caso abierto.
+
+## Vínculos de un caso (Fase 9.5)
+
+Solo entre entidades **confirmadas** del caso. «Aparecen juntas» se calcula de las notas que comparten; los demás los dibuja el analista.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/cases/{id}/relationships?status=suggested` | Vínculos en ese estado, los de más confianza primero, con `counts`. Cada uno trae sus dos entidades (con estatus legal), `type` y `type_label`, `symmetric`, `origin` y `origin_label`, `confidence` y `shared_articles` (la evidencia). Un sugerido por coocurrencia tiene `id` nulo. Cualquier miembro. |
+| POST | `/relationships` | Cuerpo `{case_id, entity_a, entity_b, type, custom_label?, notes?}`. `type`: `appears_with`, `same_event`, `family`, `associate`, `employer`, `located_in`, `owns` o `custom` (este con `custom_label`, hasta 80 caracteres). Nace confirmado, origen `human`, confianza 1. En los dirigidos (`employer`, `located_in`, `owns`) `entity_a` es quien «es dueño de»… Si ya existía, se confirma ese. 422 `invalid_relationship` si alguna entidad no está confirmada. Bitácora `relationship.created`. |
+| POST | `/relationships/confirm` · `/discard` | Cuerpo `{case_id, entity_a, entity_b, type}` (la llave que trae la lista). 404 `relationship_not_found` si no existe. Bitácora `relationship.confirmed` o `relationship.discarded`. |
+
+Las escrituras piden editor o dueño con el caso abierto.
+
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.

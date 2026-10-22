@@ -7,7 +7,8 @@
  * tampoco.
  *
  * Debajo, la sección Entidades (9.4): lo que la IA propone de sus notas para
- * confirmar o descartar. El muro sobre el globo llega en la 9.6.
+ * confirmar o descartar, con sus posibles duplicados, y la sección Vínculos
+ * (9.5). El muro sobre el globo llega en la 9.6.
  *
  * No hace: no agrega notas (eso es el botón "Agregar al caso" de Explorar).
  */
@@ -20,6 +21,7 @@ import {
 import type { Case, CaseStatus } from '../../services/cases';
 import { formatDay, PRECISION_LABEL } from '../Explore/format';
 import { CaseEntities } from './CaseEntities';
+import { CaseRelationships } from './CaseRelationships';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
 
 interface CaseDetailProps {
@@ -204,6 +206,7 @@ export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
       </div>
 
       <CaseEntities caseId={item.id} canEdit={canEdit && isOpen} />
+      <CaseRelationships caseId={item.id} canEdit={canEdit && isOpen} />
     </section>
   );
 }

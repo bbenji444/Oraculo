@@ -111,6 +111,13 @@ class Origin(StrEnum):
     HUMAN = "human"
 
 
+ORIGIN_LABEL: dict[Origin, str] = {
+    Origin.COOCCURRENCE: "aparecen en la misma nota",
+    Origin.LLM: "propuesto por la IA",
+    Origin.HUMAN: "dibujado por una persona",
+}
+
+
 class RelationshipType(StrEnum):
     """Columna ``relationships.type``."""
 
@@ -267,6 +274,11 @@ class InvestigationAction(StrEnum):
     ENTITY_CONFIRMED = "entity.confirmed"
     ENTITY_DISCARDED = "entity.discarded"
     ENTITY_MERGED = "entity.merged"
+    # Fase 9.5: deshacer una fusión, separar menciones de una sugerencia y
+    # decir que dos entidades no son la misma también llevan firma.
+    ENTITY_UNMERGED = "entity.unmerged"
+    ENTITY_SPLIT = "entity.split"
+    ENTITY_MERGE_DISMISSED = "entity.merge_dismissed"
     RELATIONSHIP_CREATED = "relationship.created"
     RELATIONSHIP_CONFIRMED = "relationship.confirmed"
     RELATIONSHIP_DISCARDED = "relationship.discarded"

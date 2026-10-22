@@ -8,6 +8,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Duplicados y vínculos de un caso** (Fase 9.5, §9.8, ADR-0106):
+  - **Posibles duplicados:** el sistema sugiere qué entidades del caso podrían ser la misma (mismo nombre, un nombre o alias en común, o nombres muy parecidos) y las muestra lado a lado con sus citas. Solo una persona decide «Son la misma» o «No son la misma»; nada se une solo. Al unir queda la confirmada.
+  - **Deshacer:** «separar» deshace una fusión, y «Separar menciones» saca a un homónimo que quedó junto.
+  - **Vínculos:** «aparecen juntas» se sugiere entre entidades confirmadas que comparten notas del caso, con confianza de 0.5 a 0.9 según cuántas compartan. El analista también dibuja vínculos («familiar», «es dueño de», una etiqueta propia…), que nacen confirmados con su firma.
+  - **Bitácora:** cada decisión queda registrada.
+  - **Base:** la migración 0022 guarda los «No son la misma».
 - **Entidades de un caso** (Fase 9.4, historia H9.2, ADR-0103): al agregar una noticia a un caso, la IA la lee en el worker y propone personas, organizaciones, lugares y vehículos, cada uno con su estatus legal según la nota (nunca "culpable") y una cita literal comprobada contra el texto. Lo que no está escrito en la nota se descarta. En el caso, la sección Entidades muestra sugeridas, confirmadas y descartadas con sus citas, el avance y el costo de la IA, y «Analizar con IA» para las notas pendientes. Confirmar a una persona exige elegir su estatus legal; todo queda firmado en la bitácora. Nuevo prompt `entities_v1`, migración 0020 y `make extraer-entidades` para ver ejemplos reales antes de gastar.
 - **Agregar al caso** en la ficha de cada noticia (Fase 9.3, historia H9.1): lista mis casos abiertos con ✓ en los que ya la tienen, crea un caso nuevo en el mismo paso y deja el último caso usado a un clic («+ Agregar a «Homicidio estilista Polanco»»), así 8 notas seguidas son 8 clics. La ficha dice en qué caso está la nota.
 - **Pestaña Casos** (Fase 9.3): lista de mis casos (activos o archivados) con estado, sensibilidad y número de notas; crear y editar un caso; cerrarlo, archivarlo o reabrirlo; y ver sus noticias con «Ver nota original» y «Quitar». Un caso cerrado es de solo lectura.
@@ -34,6 +40,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- Entidades de un caso: "Eduardo “N”", "Eduardo 'N'" y "Eduardo N" quedaban como tres sugerencias distintas de la misma persona, porque las comillas del medio contaban al comparar nombres (en el caso de prueba, 8 pares así). Ahora se comparan sin comillas (`entity_name_norm`) y la migración 0021 corrige los nombres ya guardados; las sugerencias que ya estaban separadas se ofrecen para unir en la 9.5, nunca se juntan solas.
 - Modo día: sobre el mapa claro de calles, los paneles translúcidos de Explorar quedaban grises y la línea "medio · fecha · lugar" de cada noticia casi no se leía (contraste 1.6 : 1 medido en pantalla). En modo día el vidrio se oscurece y esa línea va un tono más clara: 6.1 : 1. De noche no cambia.
 - Buscador de regiones con errores de dedo: "monterey" ponía primero el país Montenegro y después el municipio Monterrey, porque en las coincidencias aproximadas mandaba el nivel (país antes que municipio) y no el parecido. Ahora, cuando el nombre solo se parece, gana lo más parecido; lo exacto y lo que empieza igual siguen ordenados por nivel.
 - "Probar concepto" decía "4 consultas" (SearchApi, Google News RSS, GDELT e índice local) aunque una búsqueda real solo manda 2: SearchApi y el índice local. Ahora muestra solo los proveedores configurados, los mismos que usa la estimación de Explorar.
