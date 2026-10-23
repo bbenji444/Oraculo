@@ -20,6 +20,7 @@ import {
 } from '../../hooks/useCases';
 import type { Case, CaseStatus } from '../../services/cases';
 import { formatDay, PRECISION_LABEL } from '../Explore/format';
+import { wallHash } from '../../map/muro/orbit';
 import { CaseEntities } from './CaseEntities';
 import { CaseRelationships } from './CaseRelationships';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
@@ -72,6 +73,13 @@ export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
               </span>
             </p>
           </div>
+          {/* Cualquier miembro puede ver el muro (9.6); abrirlo queda en la bitácora. */}
+          <a
+            href={wallHash(item.id)}
+            className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white shadow-lg shadow-sky-900/40 hover:bg-sky-500 focus-visible:outline-2 focus-visible:outline-sky-300"
+          >
+            🌐 Ver en el globo
+          </a>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               {isOpen && (

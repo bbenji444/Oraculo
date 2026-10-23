@@ -88,6 +88,8 @@ import { GLASS } from './ui';
 interface ExploreGlobeProps {
   articles: readonly Article[];
   colors: ReadonlyMap<number, string>;
+  /** Avisa cuando el mapa está listo (o se quita), para el muro y «Mis casos» (9.6). */
+  onMap?: (map: MapLibreMap | null) => void;
 }
 
 interface Tooltip {
@@ -146,10 +148,13 @@ const LEVEL_ORDER: RegionLevel[] = ['country', 'state', 'municipality', 'localit
 
 type FlyFn = ReturnType<typeof smoothFlights>;
 
-export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
+export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
+  // La entrada desde el espacio terminó: hasta entonces nadie más mueve la cámara
+  // (el muro de la 9.6 volaría y la entrada lo pisaría).
+  const [introFinished, setIntroFinished] = useState(false);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
   const [stack, setStack] = useState<Stack | null>(null);
@@ -163,6 +168,8 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
   const spinning = useExplorerStore((s) => s.spinning);
   const earth = useExplorerStore((s) => s.earth);
   const motion = useExplorerStore((s) => s.motion);
+  const wallCaseId = useExplorerStore((s) => s.wallCaseId);
+  const homeRequest = useExplorerStore((s) => s.homeRequest);
   const region = useRegionDetail(regionId).data;
   const selected = articles.find((a) => a.article_id === articleId) ?? null;
 
@@ -255,6 +262,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       if (intro) {
         map.once('moveend', () => {
           introDone = true;
+          setIntroFinished(true);
           spinStartRef.current = performance.now();
           spinStep();
         });
@@ -266,6 +274,8 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
             easing: easeOutQuint,
           });
         });
+      } else {
+        setIntroFinished(true);
       }
     });
 
@@ -374,8 +384,10 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       setStack({ lng, lat, x: point.x, y: point.y, ids, total, expandZoom, request });
     };
     map.on('click', (event) => {
-      const news = firstAt(event.point, NEWS_LAYERS);
       const store = useExplorerStore.getState();
+      // Con el muro abierto, los clics son del muro (CaseWall), no de las regiones.
+      if (store.wallCaseId !== null) return;
+      const news = firstAt(event.point, NEWS_LAYERS);
       if (news?.properties.cluster) {
         // Grupo: la lista dice qué notas son; "Acercar" las separa en el mapa.
         const source = map.getSource<GeoJSONSource>(NEWS_SOURCE);
@@ -434,6 +446,7 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
       map.remove();
       mapRef.current = null;
       setReady(false);
+      setIntroFinished(false);
     };
     // El mapa se crea una sola vez; lo demás llega por refs y efectos.
   }, []);
@@ -488,7 +501,15 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
 
   // Reanudar el giro tras un rato sin uso, si no hay nada elegido.
   useEffect(() => {
-    if (spinning || regionId !== null || articleId !== null || motion === 'off') return;
+    if (
+      spinning ||
+      regionId !== null ||
+      articleId !== null ||
+      wallCaseId !== null ||
+      motion === 'off'
+    ) {
+      return;
+    }
     const timer = window.setInterval(() => {
       if (performance.now() - lastInteractionRef.current > IDLE_RESUME_MS) {
         useExplorerStore.getState().setSpinning(true);
@@ -497,7 +518,31 @@ export function ExploreGlobe({ articles, colors }: ExploreGlobeProps) {
     return () => {
       window.clearInterval(timer);
     };
-  }, [spinning, regionId, articleId, motion]);
+  }, [spinning, regionId, articleId, wallCaseId, motion]);
+
+  // El muro y «Mis casos» dibujan sobre este mismo mapa (9.6).
+  useEffect(() => {
+    onMap?.(ready && introFinished ? mapRef.current : null);
+  }, [onMap, ready, introFinished]);
+
+  // «Limpiar globo»: de regreso a la vista de México.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || homeRequest === 0) return;
+    const target = { lng: INITIAL_CENTER[0], lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM };
+    const duration = flyDurationMs(cameraOf(map), target, 'up', motionRef.current);
+    flyRef.current(duration, () => {
+      map.flyTo({
+        center: INITIAL_CENTER,
+        zoom: INITIAL_ZOOM,
+        pitch: 0,
+        bearing: GLOBE_BEARING,
+        curve: FLY_CURVE,
+        duration,
+        essential: false,
+      });
+    });
+  }, [homeRequest, ready]);
 
   // --- Región elegida: resaltar y volar -------------------------------------
   useEffect(() => {

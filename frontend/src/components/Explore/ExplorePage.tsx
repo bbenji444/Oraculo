@@ -11,17 +11,22 @@
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
  * - Abajo: giro, día/noche, velocidad y leyenda de precisión.
  * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
+ * - Modo caso (9.6): con `#/explorar?caso=<id>` el globo muestra el muro del
+ *   caso (`CaseWall`) en lugar de las noticias de la búsqueda.
  *
  * Lee el store y pide los datos con los hooks; el globo y los paneles se
  * sincronizan a través del store.
  */
-import { useEffect, useMemo } from 'react';
+import type { Map as MapLibreMap } from 'maplibre-gl';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
+import { wallCaseFromHash } from '../../map/muro/orbit';
 import { SpaceBackground } from '../Space/SpaceBackground';
+import { CaseWall } from './CaseWall';
 import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
 import { visibleArticles } from './format';
@@ -63,6 +68,24 @@ export function ExplorePage() {
   const articleId = useExplorerStore((s) => s.articleId);
   const finishedNotice = useFinishNotice(search);
   const earth = useExplorerStore((s) => s.earth);
+  const wallCaseId = useExplorerStore((s) => s.wallCaseId);
+  const inWall = wallCaseId !== null;
+  const [map, setMap] = useState<MapLibreMap | null>(null);
+
+  // La URL manda: `#/explorar?caso=<id>` abre el muro (se puede compartir y recargar).
+  useEffect(() => {
+    const sync = () => {
+      const caseId = wallCaseFromHash(window.location.hash);
+      const store = useExplorerStore.getState();
+      if (caseId !== null && caseId !== store.wallCaseId) store.openWall(caseId);
+      if (caseId === null && store.wallCaseId !== null) store.closeWall();
+    };
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => {
+      window.removeEventListener('hashchange', sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (articleId !== null && isNarrowScreen()) setPanelOpen(false);
@@ -72,12 +95,13 @@ export function ExplorePage() {
     // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
     <div data-earth={earth} className="relative h-full overflow-hidden bg-[#02030a]">
       <SpaceBackground />
-      <ExploreGlobe articles={shown} colors={colors} />
+      <ExploreGlobe articles={inWall ? NO_ARTICLES : shown} colors={colors} onMap={setMap} />
+      <CaseWall map={map} />
 
       <aside
         aria-label="Búsqueda y noticias"
         className={`pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 transition-[transform,visibility] duration-300 sm:w-[24rem] ${
-          panelOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
+          panelOpen && !inWall ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
       >
         <div className="pointer-events-auto shrink-0">
@@ -91,7 +115,7 @@ export function ExplorePage() {
         )}
       </aside>
 
-      {!panelOpen && (
+      {!panelOpen && !inWall && (
         <button
           type="button"
           onClick={() => {

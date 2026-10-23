@@ -52,6 +52,19 @@ export interface ExplorerState {
   spinning: boolean;
   /** Último caso al que se agregó una nota: va primero en «Agregar al caso» (9.3). */
   lastCaseId: string | null;
+  /** Caso cuyo muro se ve en el globo (9.6); `null` = Explorar normal. */
+  wallCaseId: string | null;
+  /** Entidad elegida en el muro: la cámara la orbita y el panel la muestra. */
+  wallNodeId: number | null;
+  /** Vista alterna del muro: las notas como constelación (9.6, D7). */
+  constellation: boolean;
+  /** Interruptor «Mis casos»: mis casos como marcadores en el globo (9.6, D9). */
+  showCases: boolean;
+  /**
+   * Cuántas veces se pidió volver a la vista de México («Limpiar globo»): el
+   * globo vuela cada vez que cambia.
+   */
+  homeRequest: number;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
   setRange: (range: DateRange) => void;
@@ -72,6 +85,17 @@ export interface ExplorerState {
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
   setLastCaseId: (caseId: string) => void;
+  openWall: (caseId: string) => void;
+  closeWall: () => void;
+  selectWallNode: (nodeId: number | null) => void;
+  setConstellation: (constellation: boolean) => void;
+  setShowCases: (showCases: boolean) => void;
+  /**
+   * «Limpiar globo» (9.6, D10): quita resultados, nota elegida y muro, y vuelve a
+   * la vista de México. Región, conceptos y fechas se quedan en el formulario
+   * para buscar otra cosa con un clic; la búsqueda sigue en Historial.
+   */
+  clearGlobe: () => void;
 }
 
 // Días de cada rango rápido; "hoy" es el último día (la API cuenta hasta hoy).
@@ -139,6 +163,11 @@ export const useExplorerStore = create<ExplorerState>()(
       motion: prefersReducedMotion() ? 'off' : 'normal',
       spinning: !prefersReducedMotion(),
       lastCaseId: null,
+      wallCaseId: null,
+      wallNodeId: null,
+      constellation: false,
+      showCases: false,
+      homeRequest: 0,
       selectRegion: (regionId) => {
         // Elegir una región detiene el giro: la cámara vuela hacia ella.
         set(regionId === null ? { regionId } : { regionId, spinning: false });
@@ -196,6 +225,41 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       setLastCaseId: (lastCaseId) => {
         set({ lastCaseId });
+      },
+      openWall: (wallCaseId) => {
+        // El muro ocupa el globo: se quita la nota elegida y se detiene el giro.
+        set({
+          wallCaseId,
+          wallNodeId: null,
+          constellation: false,
+          articleId: null,
+          spinning: false,
+        });
+      },
+      closeWall: () => {
+        set({ wallCaseId: null, wallNodeId: null, constellation: false });
+      },
+      selectWallNode: (wallNodeId) => {
+        set({ wallNodeId });
+      },
+      setConstellation: (constellation) => {
+        set({ constellation, wallNodeId: null });
+      },
+      setShowCases: (showCases) => {
+        set({ showCases });
+      },
+      clearGlobe: () => {
+        set((state) => ({
+          searchId: null,
+          articleId: null,
+          listFilter: 'all',
+          showIrrelevant: false,
+          wallCaseId: null,
+          wallNodeId: null,
+          constellation: false,
+          panelOpen: true,
+          homeRequest: state.homeRequest + 1,
+        }));
       },
     }),
     {

@@ -13,7 +13,10 @@ const EARTH_RADIUS_M = 6_371_008.8;
 // Altura del arco: una fracción de su largo, con piso (que un arco dentro de
 // Polanco se vea levantado) y techo (que CDMX–Cancún no salga del cuadro).
 export const ARC_HEIGHT_SHARE = 0.22;
-export const ARC_MIN_HEIGHT_M = 1_500;
+// El piso bajó de 1,500 a 120 m en la 9.6: en un caso real los nodos quedan a
+// unos 500 m (todo cae en una alcaldía) y con 1,500 m los arcos salían como
+// agujas tres veces más altas que largas.
+export const ARC_MIN_HEIGHT_M = 120;
 export const ARC_MAX_HEIGHT_M = 700_000;
 
 type Vec3 = [number, number, number];
