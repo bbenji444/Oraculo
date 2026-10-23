@@ -176,6 +176,16 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
         <div className="flex gap-1.5">
           <button
             type="button"
+            onClick={() => {
+              useExplorerStore.getState().clearGlobe();
+            }}
+            title="Quitar los resultados del globo y empezar otra búsqueda (esta queda en Historial)"
+            className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
+          >
+            Nueva búsqueda
+          </button>
+          <button
+            type="button"
             onClick={onEdit}
             title="Cambiar región, conceptos o fechas"
             className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}

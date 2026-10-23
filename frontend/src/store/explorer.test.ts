@@ -146,3 +146,36 @@ describe('reabrir una búsqueda', () => {
     });
   });
 });
+
+describe('muro y limpiar globo (9.6)', () => {
+  it('abrir el muro quita la nota elegida y detiene el giro', () => {
+    const store = useExplorerStore.getState();
+    store.selectArticle(7);
+    store.openWall('caso-1');
+
+    const state = useExplorerStore.getState();
+    expect([state.wallCaseId, state.articleId, state.spinning]).toEqual(['caso-1', null, false]);
+    state.selectWallNode(33);
+    state.setConstellation(true);
+    // Cambiar a constelación suelta la entidad elegida.
+    expect(useExplorerStore.getState().wallNodeId).toBeNull();
+  });
+
+  it('limpiar el globo deja el formulario listo y vuela a México', () => {
+    const store = useExplorerStore.getState();
+    store.selectRegion(272);
+    store.toggleConcept(3);
+    store.openSearch('busqueda-1');
+    store.selectArticle(7);
+    store.openWall('caso-1');
+    store.setPanelOpen(false);
+    const before = useExplorerStore.getState().homeRequest;
+
+    store.clearGlobe();
+
+    const state = useExplorerStore.getState();
+    expect([state.searchId, state.articleId, state.wallCaseId]).toEqual([null, null, null]);
+    expect([state.regionId, state.conceptIds, state.panelOpen]).toEqual([272, [3], true]);
+    expect(state.homeRequest).toBe(before + 1);
+  });
+});

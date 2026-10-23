@@ -83,6 +83,7 @@ import { useCameraStore } from '../../store/camera';
 import { useExplorerStore } from '../../store/explorer';
 import { NewsCard } from './NewsCard';
 import { NewsStack } from './NewsStack';
+import { CASES_DOT_LAYER } from './CasesOnGlobe';
 import { GLASS } from './ui';
 
 interface ExploreGlobeProps {
@@ -387,6 +388,13 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
       const store = useExplorerStore.getState();
       // Con el muro abierto, los clics son del muro (CaseWall), no de las regiones.
       if (store.wallCaseId !== null) return;
+      // Un clic en «Mis casos» abre el muro (CasesOnGlobe), no elige la región de abajo.
+      if (
+        map.getLayer(CASES_DOT_LAYER) &&
+        map.queryRenderedFeatures(event.point, { layers: [CASES_DOT_LAYER] }).length > 0
+      ) {
+        return;
+      }
       const news = firstAt(event.point, NEWS_LAYERS);
       if (news?.properties.cluster) {
         // Grupo: la lista dice qué notas son; "Acercar" las separa en el mapa.
