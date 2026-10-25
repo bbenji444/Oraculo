@@ -5,9 +5,11 @@
    búsqueda ya pedida).
 2. **Consultar:** ``ExecuteQueries`` (presupuesto, caché, tope mensual y
    registro en ``provider_queries``).
-3. **Deduplicar:** ``dedupe`` y guardar las notas en ``articles``. Si una
-   nota ya se enriqueció con la misma versión del prompt y los mismos
-   conceptos, se reutiliza (caché de §10): no se vuelve a bajar ni a pagar.
+3. **Deduplicar:** ``dedupe`` y guardar las notas en ``articles``. La misma
+   nota ya guardada con otro link (``match_known``, ADR-0025) se reutiliza
+   en lugar de crear otra. Si una nota ya se enriqueció con la misma versión
+   del prompt y los mismos conceptos, se reutiliza (caché de §10): no se
+   vuelve a bajar ni a pagar.
 4. **Extraer texto:** ``ExtractTexts``; si falla, título + fragmento
    (``fallback``).
 5. **Enriquecer:** la IA (``LLMPort``), hasta ``LLM_MAX_ARTICLES_PER_SEARCH``
@@ -54,7 +56,7 @@ from app.application.ports.search_store import (
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionResult
 from app.application.use_cases.extraction import ArticleText, ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions, search_area
-from app.domain.dedupe import DedupedArticle, TitleSimilarity, dedupe
+from app.domain.dedupe import DedupedArticle, TitleSimilarity, dedupe, match_known
 from app.domain.enrichment import ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import DomainError, NotFoundError, ProviderError
 from app.domain.extraction import ExtractionStatus
@@ -309,8 +311,15 @@ class RunSearch:
     ) -> list[_Work]:
         await self._progress(search.search_id, tally, Stage.DEDUPE)
         unique = dedupe(execution.articles, self._similarity)
+        # Nivel 2 de duplicados (ADR-0025): la misma nota que ya se guardó en
+        # otra búsqueda con otro link se reutiliza, con su IA ya pagada.
+        candidates = await self._articles.known_like(unique)
+        for item, known in zip(unique, candidates, strict=True):
+            match = match_known(item, known, self._similarity)
+            item.known_id = match.article_id if match else None
         stored = await self._articles.upsert(unique)
         tally.extra["articles"] = len(unique)
+        tally.extra["known"] = sum(1 for item in unique if item.known_id is not None)
         return [_Work(item, s) for item, s in zip(unique, stored, strict=True)]
 
     async def _extract(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> list[_Work]:

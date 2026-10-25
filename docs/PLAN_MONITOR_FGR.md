@@ -239,6 +239,8 @@ Niveles:
 
 Va después del Mojibake (F12.1) porque los títulos corruptos impiden reconocer que dos notas son la misma.
 
+**Avance (24/10/2026, ADR-0025):** los niveles 1 y 2 quedaron en F12.1b. Medición completa del índice: sobran 2,769 notas (1,333 por la misma URL con otra forma, 1,363 por el mismo medio con el mismo texto y cuerpo, 73 sin letras). Exigir el mismo cuerpo evita borrar artículos distintos a los que GDELT les puso el título de la portada. El nivel 3 (historias) pasa a F12.1c.
+
 ### 9.3 Sub-fases ajustadas
 
 | Sub-fase | Entregable |

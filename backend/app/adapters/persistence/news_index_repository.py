@@ -1,10 +1,12 @@
 """Índice local de notas y registro de ingesta sobre PostgreSQL (ADR-0013).
 
-Implementa ``NewsIndexPort`` (``news_index``) e ``IngestRunLogPort``
-(``ingest_runs``) con SQL explícito.
+Implementa ``NewsIndexPort`` (``news_index``), ``IngestRunLogPort``
+(``ingest_runs``) e ``IndexCleanupPort`` (``make limpiar-duplicados``) con
+SQL explícito.
 
-Una nota se identifica por el SHA-256 de su URL: si llega dos veces (de
-GDELT y de un RSS, o en dos corridas), se guarda una sola vez. Cada corrida
+Una nota se identifica por el SHA-256 de su URL canónica: si llega dos veces
+(de GDELT y de un RSS, o en dos corridas), se guarda una sola vez. Tampoco
+entra dos veces el mismo texto del mismo medio a ±3 días (ADR-0025). Cada corrida
 trae ~100 notas, así que se insertan una por una dentro de una transacción;
 el historial grande usa la misma vía en lotes por archivo.
 
@@ -21,7 +23,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.ports.ingest import IngestRun
-from app.domain.news_index import NewsItem
+from app.domain.dedupe import canonical_url
+from app.domain.index_cleanup import IndexKey
+from app.domain.news_index import SAME_OUTLET_WINDOW, NewsItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,14 +49,26 @@ class SourceStats:
     newest: datetime | None
 
 
+# Dos reglas de duplicados (ADR-0025): la misma URL canónica no entra dos
+# veces (``ON CONFLICT``), y el mismo medio con el mismo texto y el mismo
+# cuerpo a ±SAME_OUTLET_WINDOW tampoco (``NOT EXISTS``, con el índice
+# news_index_domain_published de la migración 0023). La misma nota en otro
+# medio (sindicada) sí entra: es otra fuente.
 _INSERT = text(
     """
     INSERT INTO news_index (source, url, url_hash, title, snippet, source_name, source_domain,
         published_at, language, text_norm, gdelt_states, gdelt_locations, gdelt_themes,
         body_terms)
-    VALUES (:source, :url, :url_hash, :title, :snippet, :source_name, :source_domain,
+    SELECT :source, :url, :url_hash, :title, :snippet, :source_name, :source_domain,
         :published_at, :language, :text_norm, :gdelt_states, CAST(:gdelt_locations AS jsonb),
-        :gdelt_themes, :body_terms)
+        :gdelt_themes, :body_terms
+    WHERE NOT EXISTS (
+        SELECT 1 FROM news_index n
+        WHERE n.source_domain = :source_domain
+          AND n.published_at BETWEEN :window_from AND :window_to
+          AND n.text_norm = :text_norm
+          AND n.body_terms IS NOT DISTINCT FROM CAST(:body_terms AS text)
+    )
     ON CONFLICT (url_hash) DO NOTHING
     RETURNING id
     """
@@ -62,13 +78,17 @@ _INSERT = text(
 def url_hash(url: str) -> str:
     """Huella de una URL para la llave única del índice.
 
+    Se calcula sobre la URL canónica (sin ``www.``, puerto por defecto ni
+    parámetros de rastreo): ``https://razon.com.mx:443/a`` y
+    ``https://www.razon.com.mx/a`` son la misma nota (F12.1b).
+
     Args:
-        url: URL de la nota.
+        url: URL de la nota, tal como llegó.
 
     Returns:
         SHA-256 en hexadecimal.
     """
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical_url(url).encode("utf-8")).hexdigest()
 
 
 def _values(item: NewsItem) -> dict[str, object]:
@@ -91,6 +111,8 @@ def _values(item: NewsItem) -> dict[str, object]:
         ),
         "gdelt_themes": list(item.gdelt_themes),
         "body_terms": item.body_terms,
+        "window_from": item.published_at - SAME_OUTLET_WINDOW,
+        "window_to": item.published_at + SAME_OUTLET_WINDOW,
     }
 
 
@@ -213,3 +235,64 @@ class PostgresIngestRunLog:
                 )
             ).scalar_one_or_none()
             return row_id or 0
+
+
+class PostgresIndexCleanup:
+    """``IndexCleanupPort`` sobre ``news_index`` (``make limpiar-duplicados``).
+
+    Args:
+        engine: Engine asíncrono de SQLAlchemy.
+    """
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        self._engine = engine
+
+    async def fetch_keys(self, after_id: int, limit: int) -> Sequence[IndexKey]:
+        """Ver ``IndexCleanupPort.fetch_keys`` (cursor por id, nunca OFFSET)."""
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text(
+                    """
+                    SELECT id, url, url_hash, title, source_domain, text_norm, published_at,
+                        body_terms IS NOT NULL AS has_body, md5(body_terms) AS body_fingerprint
+                    FROM news_index WHERE id > :after ORDER BY id LIMIT :limit
+                    """
+                ),
+                {"after": after_id, "limit": limit},
+            )
+            return [
+                IndexKey(
+                    note_id=r.id,
+                    url=r.url,
+                    url_hash=r.url_hash,
+                    title=r.title,
+                    source_domain=r.source_domain,
+                    text_norm=r.text_norm,
+                    published_at=r.published_at,
+                    has_body=r.has_body,
+                    body_fingerprint=r.body_fingerprint,
+                )
+                for r in rows
+            ]
+
+    async def delete(self, note_ids: Sequence[int]) -> int:
+        """Ver ``IndexCleanupPort.delete``."""
+        async with self._engine.begin() as conn:
+            result = await conn.execute(
+                text("DELETE FROM news_index WHERE id = ANY(:ids)"), {"ids": list(note_ids)}
+            )
+            return result.rowcount
+
+    async def rehash(self, pairs: Sequence[tuple[int, str]]) -> None:
+        """Ver ``IndexCleanupPort.rehash``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    """
+                    UPDATE news_index n SET url_hash = v.hash
+                    FROM unnest(CAST(:ids AS bigint[]), CAST(:hashes AS text[])) AS v(id, hash)
+                    WHERE n.id = v.id
+                    """
+                ),
+                {"ids": [p[0] for p in pairs], "hashes": [p[1] for p in pairs]},
+            )

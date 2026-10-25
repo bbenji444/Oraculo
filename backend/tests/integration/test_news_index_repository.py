@@ -12,12 +12,14 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.news_index_repository import (
+    PostgresIndexCleanup,
     PostgresIngestRunLog,
     PostgresNewsIndex,
     index_stats,
     url_hash,
 )
 from app.application.ports.ingest import IngestRun
+from app.application.use_cases.clean_duplicates import CleanIndexDuplicates
 from app.application.use_cases.ingest import IngestGdeltGkg
 from app.core.config import Settings
 from app.domain.news_index import GdeltLocation, NewsItem
@@ -47,11 +49,13 @@ def sync_engine(settings: Settings) -> Iterator[Engine]:
     engine.dispose()
 
 
-def note(url: str, published_at: datetime = NOW) -> NewsItem:
+def note(url: str, published_at: datetime = NOW, title: str | None = None) -> NewsItem:
+    # Cada URL lleva su propio título: el mismo medio con el mismo texto es
+    # la misma nota (ADR-0025), así que notas distintas necesitan títulos distintos.
     return NewsItem.create(
         source="gdelt_gkg",
         url=url,
-        title="Cayó extorsionador tras cateo en Iztapalapa",
+        title=title or f"Cayó extorsionador tras cateo en Iztapalapa {url.rsplit('/', 1)[-1]}",
         snippet="Detienen a un hombre en la alcaldía.",
         published_at=published_at,
         language="es",
@@ -220,3 +224,101 @@ async def test_estadisticas_por_fuente(sync_engine: Engine, test_engine: AsyncEn
     assert (by_source["gdelt_ngrams"].with_body, by_source["gdelt_ngrams"].newest) == (1, NOW)
     assert by_source["gdelt_ngrams"].body_bytes > 0
     assert total > 0
+
+
+async def test_no_guarda_la_misma_url_con_otro_puerto_ni_con_www(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Par real (24/10/2026): razon.com.mx con y sin :443 (F12.1b, ADR-0025).
+    index = PostgresNewsIndex(test_engine)
+
+    new = await index.add(
+        [
+            note("https://www.razon.com.mx/mexico/trudy", title="Huracán Trudy"),
+            note("https://razon.com.mx:443/mexico/trudy", title="Huracán Trudy, versión 443"),
+        ]
+    )
+
+    assert new == 1
+
+
+async def test_el_mismo_medio_con_el_mismo_texto_es_la_misma_nota(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    index = PostgresNewsIndex(test_engine)
+    title = "Perdió el control y chocó contra puente en el viaducto Díaz Ordaz"
+    await index.add([note("https://puentelibre.mx/local/choque", title=title)])
+
+    again = await index.add(
+        [
+            # Variante real con %20 en la ruta: otra URL, mismo medio y texto.
+            note("https://puentelibre.mx/local%20/choque", NOW + timedelta(hours=6), title),
+            # La misma nota sindicada en otro medio sí entra: es otra fuente.
+            note("https://tiempo.com.mx/local/choque", title=title),
+            # Mismo medio y texto pero una semana después: otra nota.
+            note("https://puentelibre.mx/local/choque-2", NOW + timedelta(days=7), title),
+        ]
+    )
+
+    assert again == 2
+    with sync_engine.connect() as conn:
+        urls = conn.execute(text("SELECT url FROM news_index ORDER BY id")).scalars().all()
+    assert urls == [
+        "https://puentelibre.mx/local/choque",
+        "https://tiempo.com.mx/local/choque",
+        "https://puentelibre.mx/local/choque-2",
+    ]
+
+
+async def test_mismo_titulo_de_portada_con_cuerpo_distinto_si_entra(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Real: ciudadccs.info pone el título de la portada a artículos distintos.
+    def portada(url: str, body: str) -> NewsItem:
+        return NewsItem.create(
+            source="gdelt_ngrams",
+            url=url,
+            title="Inicio | Periódico CiudadCCS",
+            published_at=NOW,
+            body_phrases=[body],
+        )
+
+    new = await PostgresNewsIndex(test_engine).add(
+        [
+            portada("https://ciudadccs.info/publicacion/52005", "criollos suman derrotas"),
+            portada("https://ciudadccs.info/publicacion/3452", "de paseo por caracas"),
+        ]
+    )
+
+    assert new == 2
+
+
+async def test_limpieza_borra_repetidas_y_actualiza_huellas(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Notas viejas: entraron con la huella de la URL cruda, antes de F12.1b.
+    with sync_engine.begin() as conn:
+        for url, title in (
+            ("https://www.razon.com.mx/trudy", "Huracán Trudy"),
+            ("https://razon.com.mx:443/trudy", "Huracán Trudy"),
+            ("https://tiempo.com.mx/local/x", "🎦"),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO news_index (source, url, url_hash, title, published_at, "
+                    "text_norm, source_domain) VALUES ('gdelt_gkg', :url, md5(:url), :title, "
+                    ":published, upper(:title), :domain)"
+                ),
+                {"url": url, "title": title, "published": NOW, "domain": url.split("/")[2]},
+            )
+
+    report = await CleanIndexDuplicates(PostgresIndexCleanup(test_engine)).run(apply=True)
+
+    assert report.removed == 2
+    with sync_engine.connect() as conn:
+        rows = conn.execute(text("SELECT url, url_hash FROM news_index")).all()
+    assert [(r.url, r.url_hash) for r in rows] == [
+        ("https://www.razon.com.mx/trudy", url_hash("https://razon.com.mx/trudy"))
+    ]
+    # Ya con la huella canónica, la variante :443 no vuelve a entrar.
+    assert await PostgresNewsIndex(test_engine).add([note("https://razon.com.mx:443/trudy")]) == 0

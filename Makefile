@@ -28,7 +28,8 @@ COVERAGE_MIN := 85
         test test-backend test-frontend lint lint-backend lint-frontend \
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
-        ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto
+        ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
+        limpiar-duplicados
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -131,6 +132,9 @@ reubicar: ## Vuelve a ubicar las notas de una búsqueda sin pagar a la IA (ARGS=
 
 reparar-texto: ## Repara el Mojibake de las notas guardadas: sin ARGS solo muestra 5 ejemplos; ARGS=--aplicar guarda (pide "si")
 	$(UV_RUN) python -m app.cli.reparar_texto $(ARGS)
+
+limpiar-duplicados: ## Quita notas repetidas del índice local: sin ARGS solo muestra 5 ejemplos; ARGS=--aplicar borra (pide "si"; antes make db-dump)
+	$(UV_RUN) python -m app.cli.limpiar_duplicados $(ARGS)
 
 extraer-entidades: ## La IA lee notas de un caso y muestra las entidades que propone; pide "si" (ARGS="--caso <id> --muestra 5")
 	$(UV_RUN) python -m app.cli.extraer_entidades $(ARGS)

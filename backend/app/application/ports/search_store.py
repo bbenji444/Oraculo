@@ -22,7 +22,7 @@ from uuid import UUID
 
 from app.application.audit import Actor
 from app.application.ports.llm import EnrichmentResult
-from app.domain.dedupe import DedupedArticle
+from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import Mention, Resolution
@@ -257,8 +257,26 @@ class SearchResultRow:
 class ArticleStorePort(Protocol):
     """Notas, su texto, su enriquecimiento y sus ubicaciones."""
 
+    async def known_like(self, articles: Sequence[DedupedArticle]) -> list[list[KnownArticle]]:
+        """Notas guardadas con título parecido y fecha cercana a cada una.
+
+        Son solo candidatas (por trigramas): la regla que decide si es la
+        misma nota es ``match_known`` del dominio.
+
+        Args:
+            articles: Notas nuevas de una búsqueda.
+
+        Returns:
+            Una lista de candidatas por nota, en el mismo orden.
+        """
+        ...
+
     async def upsert(self, articles: Sequence[DedupedArticle]) -> list[StoredArticle]:
         """Guarda las notas nuevas y devuelve todas con lo que ya se sabía de ellas.
+
+        Una nota con ``known_id`` no se inserta: se usa la ya guardada (si su
+        link era de Google News y la nueva trae el del medio, se cambia al del
+        medio). Una nota cuya URL ya existe tampoco se inserta.
 
         Args:
             articles: Notas sin duplicados.
