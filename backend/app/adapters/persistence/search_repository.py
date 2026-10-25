@@ -66,6 +66,7 @@ from app.domain.dedupe import (
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
+from app.domain.queries import Provider
 from app.domain.region import RegionLevel
 from app.domain.search import SearchStatus
 
@@ -123,10 +124,12 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO searches (user_id, region_id, date_from, date_to, "
-                        "queries_planned, credits_estimated) VALUES (:user_id, :region_id, "
-                        ":date_from, :date_to, :queries, :credits) RETURNING id"
+                        "queries_planned, credits_estimated, providers) VALUES (:user_id, "
+                        ":region_id, :date_from, :date_to, :queries, :credits, :providers) "
+                        "RETURNING id"
                     ),
                     {
+                        "providers": [p.value for p in search.providers],
                         "user_id": search.user_id,
                         "region_id": search.region_id,
                         "date_from": search.date_from,
@@ -160,7 +163,7 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT s.id, s.user_id, s.region_id, r.code, s.date_from, "
-                            "s.date_to, s.status FROM searches s "
+                            "s.date_to, s.status, s.providers FROM searches s "
                             "JOIN regions r ON r.id = s.region_id WHERE s.id = :id"
                         ),
                         {"id": search_id},
@@ -204,6 +207,7 @@ class PostgresSearchStore:
                 )
                 for c in concepts
             ),
+            providers=tuple(Provider(p) for p in row["providers"]),
         )
 
     async def start(self, search_id: UUID) -> None:
@@ -259,7 +263,7 @@ class PostgresSearchStore:
                             "llm_tokens_out = :tout, llm_cost_usd = :cost, "
                             "results_count = :results, error_summary = :summary, "
                             "finished_at = now(), updated_at = now() WHERE id = :id "
-                            "RETURNING region_id, date_from, date_to"
+                            "RETURNING region_id, date_from, date_to, providers"
                         ),
                         {
                             "id": search_id,
@@ -359,6 +363,7 @@ class PostgresSearchStore:
                 created_at=row["created_at"],
                 started_at=row["started_at"],
                 finished_at=row["finished_at"],
+                providers=tuple(row["providers"]),
             )
             for row in rows
         ]
@@ -424,6 +429,7 @@ async def _audit(
         "region_id": params["region_id"],
         "desde": params["date_from"],
         "hasta": params["date_to"],
+        "fuentes": params["providers"],
         "estado": closing.status.value,
         "consultas": list(closing.queries_executed),
         "creditos": closing.credits_used,

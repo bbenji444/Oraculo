@@ -29,7 +29,7 @@ COVERAGE_MIN := 85
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
-        limpiar-duplicados agrupar-historias
+        limpiar-duplicados agrupar-historias comparar-fuentes
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -138,6 +138,9 @@ limpiar-duplicados: ## Quita notas repetidas del índice local: sin ARGS solo mu
 
 agrupar-historias: ## Junta en historias las notas guardadas: sin ARGS solo muestra 5 historias; ARGS=--aplicar guarda (pide "si")
 	$(UV_RUN) python -m app.cli.agrupar_historias $(ARGS)
+
+comparar-fuentes: ## Mide cuánto aporta SearchApi sobre Google News RSS: muestra costo y pide "si" (ARGS="--concepto X --dias 2")
+	$(UV_RUN) python -m app.cli.comparar_fuentes $(ARGS)
 
 extraer-entidades: ## La IA lee notas de un caso y muestra las entidades que propone; pide "si" (ARGS="--caso <id> --muestra 5")
 	$(UV_RUN) python -m app.cli.extraer_entidades $(ARGS)

@@ -118,3 +118,61 @@ async def test_conceptos_y_region_invalidos() -> None:
         await use.estimate(SearchRequest("benji", (999,), IZTAPALAPA.id, WEEK))
     with pytest.raises(RegionNotFoundError):
         await use.estimate(SearchRequest("benji", (extorsion.id,), 999, WEEK))
+
+
+async def test_las_fuentes_elegidas_mandan_y_se_guardan() -> None:
+    # Switches (F12.2, ADR-0027): con solo el índice local la búsqueda es gratis.
+    repo = FakeConceptRepository()
+    extorsion = repo.add(concept("Extorsión"))
+    request = SearchRequest(
+        "benji", (extorsion.id,), IZTAPALAPA.id, WEEK, providers=(Provider.LOCAL_INDEX,)
+    )
+
+    estimate = await planner(repo).estimate(request)
+
+    assert [q.provider for q in estimate.queries] == [Provider.LOCAL_INDEX]
+    assert estimate.credits == 0
+    assert estimate.search.providers == (Provider.LOCAL_INDEX,)
+
+
+async def test_sin_elegir_se_usan_las_de_por_defecto() -> None:
+    repo = FakeConceptRepository()
+    extorsion = repo.add(concept("Extorsión"))
+    plan = PlanSearch(
+        concepts=repo,
+        regions=FakeRegionRepository(),
+        providers={
+            p: Source(p, [], cost=1 if p is Provider.SEARCHAPI else 0)
+            for p in (Provider.SEARCHAPI, Provider.LOCAL_INDEX)
+        },
+        log=FakeLog(used=0),
+        llm=OPENAI,
+        llm_max_articles=150,
+        credits_limit=100,
+        default_sources=(Provider.LOCAL_INDEX, Provider.GOOGLE_NEWS_RSS),
+        now=lambda: NOW,
+    )
+
+    estimate = await plan.estimate(SearchRequest("benji", (extorsion.id,), IZTAPALAPA.id, WEEK))
+
+    # El RSS está en la lista por defecto pero no configurado aquí: se omite.
+    assert estimate.search.providers == (Provider.LOCAL_INDEX,)
+
+
+@pytest.mark.parametrize(
+    ("providers", "message"),
+    [
+        ((), "Elige al menos una fuente"),
+        ((Provider.SEARCHAPI,), r"SearchApi \(Google News\): no está configurada"),
+        ((Provider.GDELT,), "no se puede elegir"),
+    ],
+)
+async def test_fuentes_invalidas_no_se_planean(
+    providers: tuple[Provider, ...], message: str
+) -> None:
+    repo = FakeConceptRepository()
+    extorsion = repo.add(concept("Extorsión"))
+    request = SearchRequest("benji", (extorsion.id,), IZTAPALAPA.id, WEEK, providers=providers)
+
+    with pytest.raises(InvalidRequestError, match=message):
+        await planner(repo, searchapi=False).estimate(request)

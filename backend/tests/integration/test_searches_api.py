@@ -95,6 +95,9 @@ def make_client(settings: Settings, queue: FakeQueue, **changes: Any) -> TestCli
             "dev_user": "analista-prueba",
             # Con llave, SearchApi se planea (1 crédito); la cola falsa nunca lo consulta.
             "searchapi_api_key": SecretStr("llave-de-prueba"),
+            # Encendido aquí para probar créditos y topes; por defecto va
+            # apagado (ADR-0027, ver la prueba de valores por defecto).
+            "manual_default_sources": "google_news_rss,indice_local,searchapi",
             "openai_api_key": SecretStr("llave-de-prueba"),
             "llm_provider": "openai",
             **changes,
@@ -129,7 +132,11 @@ def test_estimar_no_crea_nada_y_dice_cuanto_costaria(
     data = response.json()
     assert [c["name"] for c in data["concepts"]] == [CONCEPT_NAME]
     assert data["region"] == "México › Ciudad de México"
-    assert [q["provider"] for q in data["queries"]] == ["searchapi", "indice_local"]
+    assert [q["provider"] for q in data["queries"]] == [
+        "searchapi",
+        "google_news_rss",
+        "indice_local",
+    ]
     # Hasta 3 páginas de SearchApi por consulta (ADR-0019): la estimación es el máximo.
     assert data["credits"] == 3
     assert data["over_limit"] is False
@@ -174,7 +181,8 @@ def test_lanzar_crea_la_busqueda_pendiente_y_la_encola(
         "status": "pending",
         "date_from": "2026-10-01",
         "date_to": "2026-10-07",
-        "queries_planned": 2,
+        # SearchApi, Google News RSS e índice local; solo SearchApi cuesta.
+        "queries_planned": 3,
         "credits_estimated": 3,
         "concept_name": CONCEPT_NAME,
         "exclude_terms": ["simulacro"],
@@ -464,3 +472,66 @@ def test_mapa_de_calor_errores(client: TestClient, filled: tuple[str, dict[str, 
 
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "search_not_found")
     assert (bad.status_code, bad.json()["error"]["code"]) == (422, "invalid_request")
+
+
+def test_las_fuentes_para_los_switches(client: TestClient) -> None:
+    # F12.2 (ADR-0027): orden de pantalla, costo y si están configuradas.
+    response = client.get("/api/v1/sources")
+
+    assert response.status_code == 200
+    items = {i["id"]: i for i in response.json()["items"]}
+    assert list(items) == ["google_news_rss", "indice_local", "searchapi"]
+    assert items["searchapi"]["paid"] is True
+    assert items["indice_local"] == {
+        "id": "indice_local",
+        "label": "Índice local (GDELT + medios)",
+        "paid": False,
+        "configured": True,
+        "default_on": True,
+    }
+
+
+def test_estimar_solo_con_las_fuentes_elegidas(client: TestClient, ids: dict[str, int]) -> None:
+    response = client.post(f"{URL}/estimate", json=body(ids, providers=["indice_local"]))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [q["provider"] for q in data["queries"]] == ["indice_local"]
+    assert data["credits"] == 0
+    assert data["providers"] == ["indice_local"]
+
+
+@pytest.mark.parametrize("providers", [[], ["bing"]])
+def test_fuentes_invalidas_no_se_estiman(
+    client: TestClient, ids: dict[str, int], providers: list[str]
+) -> None:
+    response = client.post(f"{URL}/estimate", json=body(ids, providers=providers))
+
+    assert response.status_code == 422
+
+
+def test_la_busqueda_lanzada_dice_con_que_fuentes_se_hizo(
+    client: TestClient, ids: dict[str, int]
+) -> None:
+    started = client.post(URL, json=body(ids, providers=["indice_local"]))
+    search_id = started.json()["search_id"]
+
+    detail = client.get(f"{URL}/{search_id}")
+
+    assert started.status_code == 202
+    assert detail.json()["providers"] == ["indice_local"]
+
+
+def test_por_defecto_searchapi_va_apagado_y_no_gasta(
+    settings: Settings, engine: Engine, queue: FakeQueue, ids: dict[str, int]
+) -> None:
+    # Decisión del 25/10/2026 (ADR-0027): 27 de 30 notas de SearchApi ya venían en el RSS.
+    with make_client(
+        settings, queue, manual_default_sources=Settings().manual_default_sources
+    ) as c:
+        sources = {i["id"]: i["default_on"] for i in c.get("/api/v1/sources").json()["items"]}
+        estimate = c.post(f"{URL}/estimate", json=body(ids)).json()
+
+    assert sources == {"google_news_rss": True, "indice_local": True, "searchapi": False}
+    assert estimate["providers"] == ["google_news_rss", "indice_local"]
+    assert estimate["credits"] == 0

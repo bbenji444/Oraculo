@@ -41,8 +41,10 @@ from app.domain.queries import Provider
 
 logger = logging.getLogger(__name__)
 
-# Proveedores de una búsqueda, en orden (plan de F4).
-SEARCH_PROVIDERS = (Provider.SEARCHAPI, Provider.LOCAL_INDEX)
+# Proveedores de una búsqueda, en orden (plan de F4). Google News RSS entra
+# desde el ADR-0021; si NEWS_RSS_ENABLED=false se arma igual pero dice que no
+# está configurado y no recibe consultas.
+SEARCH_PROVIDERS = (Provider.SEARCHAPI, Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX)
 
 
 def build_providers(settings: Settings, engine: AsyncEngine) -> dict[Provider, NewsProviderPort]:

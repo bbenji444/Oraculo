@@ -46,6 +46,7 @@ from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
+from app.domain.sources import parse_sources
 from app.worker.celery_app import create_celery_app
 from app.worker.search_jobs import build_providers
 
@@ -131,6 +132,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             llm=llm_info(settings),
             llm_max_articles=settings.llm_max_articles_per_search,
             credits_limit=settings.searchapi_monthly_credit_limit,
+            default_sources=parse_sources(settings.manual_default_sources),
         )
         app.state.search_store = PostgresSearchStore(engine)
         app.state.article_store = PostgresArticleStore(engine)

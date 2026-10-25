@@ -29,12 +29,27 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 ## Flujo de una búsqueda
 
+0. `GET /sources`: las fuentes para los switches (cuáles hay, cuáles cuestan, cuáles van encendidas).
 1. `POST /searches/estimate`: muestra cuánto costaría. **No gasta.**
 2. `POST /searches`: la lanza (`202`). **Gasta** créditos de SearchApi y tokens de la IA.
 3. `GET /searches/{id}`: su avance (consúltala cada 2 s hasta que `status` sea `completed`, `partial` o `failed`).
 4. `GET /searches/{id}/articles`: las notas, y `GET /searches/{id}/aggregates`: el mapa de calor.
 5. `GET /articles/{id}`: el detalle de una nota.
 6. `POST /searches/{id}/report` y `GET /searches/{id}/export`: el reporte en PDF o HTML y las notas en CSV o GeoJSON.
+
+## Fuentes de la búsqueda (switches)
+
+`GET /sources`. Una por fuente, en el orden de pantalla. Las que no están configuradas (`configured: false`) se muestran apagadas y no se pueden encender.
+
+```json
+{
+  "items": [
+    { "id": "google_news_rss", "label": "Google News RSS", "paid": false, "configured": true, "default_on": true },
+    { "id": "indice_local", "label": "Índice local (GDELT + medios)", "paid": false, "configured": true, "default_on": true },
+    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "configured": true, "default_on": false }
+  ]
+}
+```
 
 ## Estimar una búsqueda (no gasta)
 
@@ -46,6 +61,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 | `region_id` | Región (de `/regions`) |
 | `days` | Últimos N días (1 a 90; por defecto 7) |
 | `date_from` y `date_to` | Rango fijo, en lugar de `days`; deben ir los dos |
+| `providers` | Fuentes encendidas (`id` de `/sources`). Sin mandar, las de por defecto (`MANUAL_DEFAULT_SOURCES`). Una lista vacía o una fuente sin configurar responde `422` (F12.2, ADR-0027) |
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/searches/estimate -H 'Content-Type: application/json' -d '{"concept_ids":[3],"region_id":272,"days":7}'
@@ -73,9 +89,12 @@ curl -s -X POST http://localhost:8080/api/v1/searches/estimate -H 'Content-Type:
   "credits_month": 2,
   "credits_limit": 100,
   "over_limit": false,
-  "llm": { "provider": "openai", "model": "gpt-6-luna", "configured": true, "max_articles": 150, "max_cost_usd": 0.0525 }
+  "llm": { "provider": "openai", "model": "gpt-6-luna", "configured": true, "max_articles": 150, "max_cost_usd": 0.0525 },
+  "providers": ["searchapi", "indice_local"]
 }
 ```
+
+`providers` dice con qué fuentes se buscaría; `GET /searches/{id}` y el historial devuelven el mismo campo con las fuentes con que se hizo (vacío en las búsquedas de antes de F12.2, que usaron todas).
 
 `max_cost_usd` es el máximo: las notas ya procesadas en búsquedas anteriores no se vuelven a pagar.
 

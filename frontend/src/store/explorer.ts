@@ -52,6 +52,11 @@ export interface ExplorerState {
   spinning: boolean;
   /** Último caso al que se agregó una nota: va primero en «Agregar al caso» (9.3). */
   lastCaseId: string | null;
+  /**
+   * Fuentes que encendió el analista (switches, F12.2), o `null` si no ha
+   * tocado ninguna: entonces valen las de por defecto del servidor.
+   */
+  sources: string[] | null;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
   setRange: (range: DateRange) => void;
@@ -63,6 +68,8 @@ export interface ExplorerState {
     conceptIds: number[];
     dateFrom: string;
     dateTo: string;
+    /** Fuentes con las que se hizo; vacía en búsquedas de antes de F12.2. */
+    providers?: string[];
   }) => void;
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
@@ -72,6 +79,8 @@ export interface ExplorerState {
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
   setLastCaseId: (caseId: string) => void;
+  /** Elige las fuentes encendidas (la lista completa ya calculada). */
+  setSources: (sources: string[]) => void;
 }
 
 // Días de cada rango rápido; "hoy" es el último día (la API cuenta hasta hoy).
@@ -85,11 +94,15 @@ const RANGE_DAYS: Record<Exclude<RangeKind, 'custom'>, number> = { today: 1, '7'
  */
 export function searchInput(
   state: Pick<ExplorerState, 'regionId' | 'conceptIds' | 'range'>,
+  providers?: string[],
 ): SearchInput | null {
   if (state.regionId === null || state.conceptIds.length === 0) return null;
+  // Sin ninguna fuente encendida no hay nada que estimar (F12.2).
+  if (providers?.length === 0) return null;
   const base = {
     region_id: state.regionId,
     concept_ids: [...state.conceptIds].sort((a, b) => a - b),
+    ...(providers ? { providers } : {}),
   };
   if (state.range.kind !== 'custom') return { ...base, days: RANGE_DAYS[state.range.kind] };
   if (!state.range.from || !state.range.to) return null;
@@ -139,6 +152,7 @@ export const useExplorerStore = create<ExplorerState>()(
       motion: prefersReducedMotion() ? 'off' : 'normal',
       spinning: !prefersReducedMotion(),
       lastCaseId: null,
+      sources: null,
       selectRegion: (regionId) => {
         // Elegir una región detiene el giro: la cámara vuela hacia ella.
         set(regionId === null ? { regionId } : { regionId, spinning: false });
@@ -157,12 +171,14 @@ export const useExplorerStore = create<ExplorerState>()(
         // Otra búsqueda: se olvidan la nota elegida y los filtros de la lista.
         set({ searchId, articleId: null, listFilter: 'all', showIrrelevant: false });
       },
-      restoreSearch: ({ searchId, regionId, conceptIds, dateFrom, dateTo }) => {
+      restoreSearch: ({ searchId, regionId, conceptIds, dateFrom, dateTo, providers }) => {
         set({
           searchId,
           regionId,
           conceptIds,
           range: { kind: 'custom', from: dateFrom, to: dateTo },
+          // Editar una búsqueda reabierta parte de sus fuentes (si las guardó).
+          ...(providers && providers.length > 0 ? { sources: providers } : {}),
           articleId: null,
           listFilter: 'all',
           showIrrelevant: false,
@@ -197,6 +213,9 @@ export const useExplorerStore = create<ExplorerState>()(
       setLastCaseId: (lastCaseId) => {
         set({ lastCaseId });
       },
+      setSources: (sources) => {
+        set({ sources });
+      },
     }),
     {
       name: 'monitor-noticias:explorar',
@@ -207,6 +226,8 @@ export const useExplorerStore = create<ExplorerState>()(
         earth: state.earth,
         motion: state.motion,
         lastCaseId: state.lastCaseId,
+        // Las fuentes que prefiere el analista se recuerdan entre visitas.
+        sources: state.sources,
       }),
     },
   ),

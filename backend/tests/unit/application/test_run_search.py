@@ -596,3 +596,27 @@ async def test_si_agrupar_falla_la_busqueda_no_se_cae() -> None:
     assert [(e.stage, e.message) for e in searches.errors] == [
         (Stage.CLOSE, "Historias: base caída")
     ]
+
+
+@pytest.mark.parametrize(
+    ("providers", "queried"),
+    [
+        # Switches (F12.2): solo las fuentes que eligió el analista.
+        ((Provider.LOCAL_INDEX,), {Provider.LOCAL_INDEX}),
+        # Búsqueda de antes de F12.2 (sin fuentes guardadas): todas, como entonces.
+        ((), {Provider.SEARCHAPI, Provider.LOCAL_INDEX}),
+    ],
+)
+async def test_corre_con_las_fuentes_de_la_busqueda(
+    providers: tuple[Provider, ...], queried: set[Provider]
+) -> None:
+    sources = [
+        Source(Provider.SEARCHAPI, [IZTA_SEARCHAPI, MADRID], cost=1),
+        Source(Provider.LOCAL_INDEX, [IZTA_LOCAL]),
+    ]
+    search = replace(stored_search(), providers=providers)
+    use_case, _s, _a, _l, _e = pipeline(sources=sources, search=search)
+
+    await use_case.run(search.search_id)
+
+    assert {s.provider for s in sources if s.queries} == queried
