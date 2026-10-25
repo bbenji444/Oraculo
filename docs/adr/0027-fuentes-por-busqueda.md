@@ -42,4 +42,18 @@ El ADR-0023 ya fijó dos perfiles: el **automático**, fijo (Google News RSS e �
 - Buscar solo con fuentes gratis cuesta 0 créditos, y la estimación lo muestra antes de buscar.
 - El historial y la bitácora dicen con qué fuentes se hizo cada búsqueda.
 - **Las corridas automáticas (F12.8)** usarán el mismo campo con su perfil fijo; no hace falta otro mecanismo.
-- **Pendiente:** la medición RSS contra SearchApi (≤ 3 créditos, con aprobación) y, con ella, el valor por defecto de SearchApi.
+- **Pendiente:** con la medición de abajo, Benji decide si SearchApi sigue encendido por defecto (`MANUAL_DEFAULT_SOURCES`).
+
+## Medición RSS contra SearchApi (25/10/2026)
+
+`make comparar-fuentes`, concepto «Fiscalia General de la Republica», México, últimos 2 días, la misma consulta en las dos fuentes. Costó 3 créditos (45 de 100 en el mes).
+
+| | SearchApi | Google News RSS |
+|---|---|---|
+| Notas que trajo | 30 (3 páginas, 3 créditos) | 100 (tope del feed, 0 créditos) |
+| Notas distintas que trajo **solo** esa fuente | 3 | 69 |
+| Notas que trajeron las dos | 27 | 27 |
+
+- **27 de las 30 notas de SearchApi (90 %) ya venían en el RSS.** Las 3 que solo trajo SearchApi fueron: un agente de la FGR muerto en un accidente (ECOdiario), un proceso por pederastia (La Prensa) y un video de Facebook (BI Noticias Aguascalientes).
+- **El RSS trajo 69 notas que SearchApi no**, gratis.
+- **Lo que solo da SearchApi:** el link directo al medio y, a veces, un fragmento. El RSS da el link de Google News, que también abre la nota. Cuando las dos traen la misma nota, el sistema ya se queda con el link del medio (ADR-0025).
