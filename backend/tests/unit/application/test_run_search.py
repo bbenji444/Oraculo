@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -37,7 +38,7 @@ from app.domain.extraction import ExtractionStatus, ProcessingText
 from app.domain.geocoding import Mention, MentionRole, Resolution
 from app.domain.names import normalize_name
 from app.domain.queries import PlannedQuery, Provider, QueryPlace
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, Stage
 from tests.unit import fake_gazetteer as cat
 from tests.unit.application.test_execute_queries import MEXICO as MEXICO_FILTER
 from tests.unit.application.test_execute_queries import WEEK, FakeCache, FakeLog
@@ -275,6 +276,7 @@ def pipeline(
     replies: Mapping[str, Enrichment | Exception] | None = None,
     max_llm_articles: int = 150,
     region_missing: bool = False,
+    stories: Any = None,
 ) -> tuple[RunSearch, Searches, Articles, LLM, Extractor]:
     sources = (
         sources
@@ -308,6 +310,7 @@ def pipeline(
         geocoder=GeocodeMentions(cat.FakeGazetteer()),
         similarity=lambda a, b: 1.0 if a == b else 0.0,
         limits=PipelineLimits(max_llm_articles, 2, 0.10, 0.50),
+        stories=stories,
     )
     return use_case, searches, articles, llm, extractor
 
@@ -558,3 +561,38 @@ def test_plan_de_varios_conceptos() -> None:
     )
 
     assert [q.keywords for q in queries] == [("extorsión", "cobro de piso"), ("secuestro",)]
+
+
+class Stories:
+    """``GroupStories`` falso: anota qué notas recibió o falla."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.received: list[list[int]] = []
+
+    async def run(self, article_ids: Sequence[int]) -> int:
+        self.received.append(list(article_ids))
+        if self.error:
+            raise self.error
+        return len(article_ids)
+
+
+async def test_al_cerrar_agrupa_en_historias_las_notas_encontradas() -> None:
+    stories = Stories()
+    use_case, _s, articles, _l, _e = pipeline(stories=stories)
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.COMPLETED
+    assert sorted(stories.received[0]) == sorted({r.article_id for r in articles.rows})
+
+
+async def test_si_agrupar_falla_la_busqueda_no_se_cae() -> None:
+    use_case, searches, _a, _l, _e = pipeline(stories=Stories(RuntimeError("base caída")))
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.COMPLETED
+    assert [(e.stage, e.message) for e in searches.errors] == [
+        (Stage.CLOSE, "Historias: base caída")
+    ]

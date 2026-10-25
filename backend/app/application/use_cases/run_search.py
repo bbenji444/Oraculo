@@ -18,7 +18,8 @@
    desempatar.
 7. **Filtrar por región:** ``in_region`` por la clave INEGI o el país. Las
    de fuera **no se borran**.
-8. **Cerrar:** estado final (``final_status``), créditos, tokens y costo, y
+8. **Cerrar:** junta en historias las notas del mismo hecho (ADR-0026),
+   estado final (``final_status``), créditos, tokens y costo, y
    la bitácora.
 
 Un error en una nota va a ``processing_errors`` y la búsqueda sigue. Cada
@@ -56,6 +57,7 @@ from app.application.ports.search_store import (
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionResult
 from app.application.use_cases.extraction import ArticleText, ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions, search_area
+from app.application.use_cases.stories import GroupStories
 from app.domain.dedupe import DedupedArticle, TitleSimilarity, dedupe, match_known
 from app.domain.enrichment import ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import DomainError, NotFoundError, ProviderError
@@ -209,6 +211,7 @@ class RunSearch:
         geocoder: GeocodeMentions,
         similarity: TitleSimilarity,
         limits: PipelineLimits,
+        stories: GroupStories | None = None,
         log_progress: Callable[[UUID, Mapping[str, object]], None] = lambda _id, _p: None,
     ) -> None:
         """Recibe una pieza por etapa.
@@ -225,6 +228,8 @@ class RunSearch:
             geocoder: Resuelve las menciones de lugar.
             similarity: Similitud de títulos (rapidfuzz en producción).
             limits: Topes y precios.
+            stories: Agrupa en historias las notas encontradas (F12.1c); sin
+                él, no se agrupa.
             log_progress: Aviso de avance (el comando lo muestra en pantalla).
         """
         self._searches = searches
@@ -238,6 +243,7 @@ class RunSearch:
         self._geocoder = geocoder
         self._similarity = similarity
         self._limits = limits
+        self._stories = stories
         self._log_progress = log_progress
 
     def available_providers(self) -> list[Provider]:
@@ -419,6 +425,25 @@ class RunSearch:
                 w.primary = await self._gazetteer.by_code(w.stored.primary_code)
         tally.stages[Stage.GEOCODE] = StageCount(Stage.GEOCODE, geocoded, 0)
 
+    async def _group_stories(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> None:
+        """Junta en historias las notas encontradas (F12.1c, ADR-0026).
+
+        Agrupar es un extra para el analista: si falla, la búsqueda sigue con
+        su estado y el error queda en ``processing_errors``.
+        """
+        if self._stories is None or not work:
+            return
+        try:
+            tally.extra["stories_changed"] = await self._stories.run(
+                [w.stored.article_id for w in work]
+            )
+        except Exception as error:
+            await self._searches.record_error(
+                ProcessingErrorRecord(
+                    search.search_id, Stage.CLOSE, type(error).__name__, f"Historias: {error}"
+                )
+            )
+
     async def _close(
         self,
         search: StoredSearch,
@@ -439,6 +464,7 @@ class RunSearch:
             )
         if rows:
             await self._articles.link_results(search.search_id, rows)
+        await self._group_stories(search, tally, work)
         tally.extra.update(
             {
                 "in_region": located[True],
