@@ -124,3 +124,13 @@ def test_reconoce_si_una_nota_menciona_mexico(
     text: str, domain: str | None, expected: bool
 ) -> None:
     assert MENTIONS.found_in(text, domain) is expected
+
+
+def test_repara_el_mojibake_de_gdelt_al_entrar() -> None:
+    # Título real de tiempo.com.mx tal como lo trae GDELT (F12.1).
+    note = item(title="Maru seÃ±alÃ³ corrupciÃ³n ðŸŽ¦", snippet="JÃ¡uregui", source_name="Ã‰xito")
+
+    assert note.title == "Maru señaló corrupción 🎦"
+    assert note.snippet == "Jáuregui"
+    assert note.source_name == "Éxito"
+    assert note.text_norm == "MARU SEÑALO CORRUPCION 🎦 JAUREGUI"

@@ -6,7 +6,8 @@ para que el resto del sistema no dependa de ningún formato (especificación
 §8). Reglas que garantiza este módulo:
 
 - La URL es absoluta, ``http`` o ``https``.
-- El título no está vacío; los espacios se limpian.
+- El título no está vacío; los espacios se limpian y el Mojibake se repara
+  (text_repair, F12.1).
 - Las fechas van en UTC. Si el proveedor no da fecha, queda ``None``: nunca
   se inventa.
 
@@ -19,6 +20,7 @@ from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from app.domain.queries import Provider
+from app.domain.text_repair import clean_text
 
 _WEB_SCHEMES = frozenset({"http", "https"})
 _WWW = "www."
@@ -49,13 +51,6 @@ def domain_of(url: str) -> str | None:
     if host.startswith(_WWW):
         host = host[len(_WWW) :]
     return host or None
-
-
-def _clean(text: str | None) -> str | None:
-    if text is None:
-        return None
-    cleaned = " ".join(text.split())
-    return cleaned or None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +124,7 @@ class RawArticle:
         parts = urlsplit(clean_url)
         if parts.scheme not in _WEB_SCHEMES or not parts.netloc:
             raise InvalidArticleError(f"URL no válida: {url!r}")
-        clean_title = _clean(title)
+        clean_title = clean_text(title)
         if clean_title is None:
             raise InvalidArticleError(f"Resultado sin título: {url!r}")
         if provider_rank < 1:
@@ -143,10 +138,10 @@ class RawArticle:
             provider_rank=provider_rank,
             url=clean_url,
             title=clean_title,
-            source_name=_clean(source_name),
+            source_name=clean_text(source_name),
             source_domain=(source_domain or domain_of(clean_url) or "").lower() or None,
             published_at=published_at.astimezone(UTC) if published_at else None,
-            snippet=_clean(snippet),
-            language=_clean(language),
+            snippet=clean_text(snippet),
+            language=clean_text(language),
             raw=dict(raw or {}),
         )

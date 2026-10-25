@@ -79,3 +79,11 @@ def test_errores_de_proveedor_dicen_si_conviene_reintentar() -> None:
     assert ProviderRateLimitError("x", provider="gdelt").retryable is True
     assert ProviderUnavailableError("x", provider="gdelt").retryable is True
     assert ProviderResponseError("x", provider="gdelt").retryable is False
+
+
+def test_repara_el_mojibake_de_cualquier_proveedor() -> None:
+    raw = article(title="Â¿QuÃ© pasÃ³?ðŸŽ¦", snippet="  cÃ³mo  ", source_name="Ã‰xito")
+
+    assert raw.title == "¿Qué pasó?🎦"
+    assert raw.snippet == "cómo"
+    assert raw.source_name == "Éxito"

@@ -25,6 +25,7 @@ from urllib.parse import urlsplit
 
 from app.domain.articles import domain_of
 from app.domain.names import normalize_name
+from app.domain.text_repair import clean_text
 
 # Código de idioma de GDELT para el español (campo TranslationInfo, srclc:spa).
 SPANISH = "spa"
@@ -43,6 +44,22 @@ MAX_BODY_PHRASES = 2000
 # Palabras que nombran al país; se suman a los estados del catálogo.
 MEXICO_WORDS = ("México", "mexicano", "mexicana", "mexicanos", "mexicanas")
 _MEXICAN_TLD = ".mx"
+
+
+def index_text_norm(title: str, snippet: str | None) -> str:
+    """Texto en el que busca ``indice_local``: título y fragmento normalizados.
+
+    Es la única fórmula de ``news_index.text_norm``: la usan la ingesta y la
+    reparación de Mojibake (``make reparar-texto``) para que coincidan.
+
+    Args:
+        title: Título de la nota.
+        snippet: Fragmento, si hay.
+
+    Returns:
+        El texto normalizado (mayúsculas, sin acentos, con Ñ).
+    """
+    return normalize_name(f"{title} {snippet or ''}")
 
 
 class InvalidNewsError(ValueError):
@@ -106,7 +123,7 @@ class NewsItem:
     @property
     def text_norm(self) -> str:
         """Título y fragmento normalizados: sobre esto busca ``indice_local``."""
-        return normalize_name(f"{self.title} {self.snippet or ''}")
+        return index_text_norm(self.title, self.snippet)
 
     @classmethod
     def create(  # noqa: PLR0913 — un argumento por campo de la nota, todos por nombre (*)
@@ -152,18 +169,19 @@ class NewsItem:
         parts = urlsplit(clean_url)
         if parts.scheme not in _WEB_SCHEMES or not parts.netloc:
             raise InvalidNewsError(f"URL no válida: {url!r}")
-        clean_title = " ".join((title or "").split())
+        # clean_text también repara el Mojibake: GDELT trae títulos de algunos
+        # medios (tiempo.com.mx, puentelibre.mx) ya rotos (F12.1).
+        clean_title = clean_text(title)
         if not clean_title:
             raise InvalidNewsError(f"Nota sin título: {url!r}")
         if published_at is None or published_at.tzinfo is None:
             raise InvalidNewsError(f"Nota sin fecha con zona: {url!r}")
-        clean_snippet = " ".join((snippet or "").split()) or None
         return cls(
             source=source,
             url=clean_url,
             title=clean_title,
-            snippet=clean_snippet,
-            source_name=" ".join((source_name or "").split()) or None,
+            snippet=clean_text(snippet),
+            source_name=clean_text(source_name),
             source_domain=(source_domain or domain_of(clean_url) or "").lower() or None,
             published_at=published_at.astimezone(UTC),
             language=language,
