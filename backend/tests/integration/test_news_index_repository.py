@@ -12,12 +12,14 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.news_index_repository import (
+    PostgresIndexCleanup,
     PostgresIngestRunLog,
     PostgresNewsIndex,
     index_stats,
     url_hash,
 )
 from app.application.ports.ingest import IngestRun
+from app.application.use_cases.clean_duplicates import CleanIndexDuplicates
 from app.application.use_cases.ingest import IngestGdeltGkg
 from app.core.config import Settings
 from app.domain.news_index import GdeltLocation, NewsItem
@@ -289,3 +291,34 @@ async def test_mismo_titulo_de_portada_con_cuerpo_distinto_si_entra(
     )
 
     assert new == 2
+
+
+async def test_limpieza_borra_repetidas_y_actualiza_huellas(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Notas viejas: entraron con la huella de la URL cruda, antes de F12.1b.
+    with sync_engine.begin() as conn:
+        for url, title in (
+            ("https://www.razon.com.mx/trudy", "Huracán Trudy"),
+            ("https://razon.com.mx:443/trudy", "Huracán Trudy"),
+            ("https://tiempo.com.mx/local/x", "🎦"),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO news_index (source, url, url_hash, title, published_at, "
+                    "text_norm, source_domain) VALUES ('gdelt_gkg', :url, md5(:url), :title, "
+                    ":published, upper(:title), :domain)"
+                ),
+                {"url": url, "title": title, "published": NOW, "domain": url.split("/")[2]},
+            )
+
+    report = await CleanIndexDuplicates(PostgresIndexCleanup(test_engine)).run(apply=True)
+
+    assert report.removed == 2
+    with sync_engine.connect() as conn:
+        rows = conn.execute(text("SELECT url, url_hash FROM news_index")).all()
+    assert [(r.url, r.url_hash) for r in rows] == [
+        ("https://www.razon.com.mx/trudy", url_hash("https://razon.com.mx/trudy"))
+    ]
+    # Ya con la huella canónica, la variante :443 no vuelve a entrar.
+    assert await PostgresNewsIndex(test_engine).add([note("https://razon.com.mx:443/trudy")]) == 0

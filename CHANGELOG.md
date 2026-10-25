@@ -16,6 +16,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
   El reloj de Celery que ya existe dispara las corridas (ADR-0022). Los perfiles de fuentes y la conexión con BrowserWork quedan en el ADR-0023.
 - **`make reparar-texto`** (F12.1, ADR-0024): repara el Mojibake de las notas ya guardadas en el índice local, en las notas y en sus textos, y recalcula sus columnas de búsqueda. Sin opciones solo muestra cuántas cambiarían y 5 ejemplos reales; con `ARGS=--aplicar` pide «si» y guarda por lotes.
+- **`make limpiar-duplicados`** (F12.1b, ADR-0025): quita del índice local las notas repetidas que entraron antes: la misma URL con otra forma (`:443`, `www.`), el mismo medio con el mismo texto y cuerpo, y títulos sin letras. Sin opciones solo muestra conteos y 5 ejemplos reales; con `ARGS=--aplicar` pide «si» y borra por lotes. No toca notas de búsquedas, casos ni reportes.
 - **Duplicados y vínculos de un caso** (Fase 9.5, §9.8, ADR-0106):
   - **Posibles duplicados:** el sistema sugiere qué entidades del caso podrían ser la misma (mismo nombre, un nombre o alias en común, o nombres muy parecidos) y las muestra lado a lado con sus citas. Solo una persona decide «Son la misma» o «No son la misma»; nada se une solo. Al unir queda la confirmada.
   - **Deshacer:** «separar» deshace una fusión, y «Separar menciones» saca a un homónimo que quedó junto.
@@ -49,6 +50,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Notas repetidas** (F12.1b, ADR-0025): la misma nota que llega en otra búsqueda con otro link (Google News y el del medio) ya no se guarda dos veces: se reutiliza la guardada, con su resumen de IA, y se prefiere el link del medio. El índice local tampoco guarda dos veces la misma URL (`:443`, `www.`) ni el mismo texto y cuerpo del mismo medio a ±3 días, ni «notas» cuyo título es solo un emoji. La misma nota en otro medio sí se guarda: es otra fuente.
 - **Títulos con «letras raras»** (F12.1, ADR-0024): `seÃ±alÃ³`, `JÃ¡uregui` o `ChihuahuaðŸŽ¦` ahora entran como `señaló`, `Jáuregui` y `Chihuahua🎦`, vengan de GDELT, de un RSS o de cualquier proveedor. Venían de GDELT en cinco medios (396 notas del índice al 24/10/2026). El texto correcto no se toca.
 - Entidades de un caso: "Eduardo “N”", "Eduardo 'N'" y "Eduardo N" quedaban como tres sugerencias distintas de la misma persona, porque las comillas del medio contaban al comparar nombres (en el caso de prueba, 8 pares así). Ahora se comparan sin comillas (`entity_name_norm`) y la migración 0021 corrige los nombres ya guardados; las sugerencias que ya estaban separadas se ofrecen para unir en la 9.5, nunca se juntan solas.
 - Modo día: sobre el mapa claro de calles, los paneles translúcidos de Explorar quedaban grises y la línea "medio · fecha · lugar" de cada noticia casi no se leía (contraste 1.6 : 1 medido en pantalla). En modo día el vidrio se oscurece y esa línea va un tono más clara: 6.1 : 1. De noche no cambia.

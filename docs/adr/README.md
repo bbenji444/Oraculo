@@ -38,6 +38,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0022](0022-programador-de-corridas-automaticas.md) | Las corridas automáticas FGR se programan en el reloj de Celery que ya existe | Aceptado |
 | [0023](0023-perfiles-de-fuentes-y-browserwork.md) | Perfiles de fuentes (automático fijo y manual con switches) y conexión con BrowserWork | Aceptado |
 | [0024](0024-reparacion-de-mojibake.md) | Reparación propia y conservadora del Mojibake, al entrar y en lo ya guardado | Aceptado |
+| [0025](0025-duplicados-en-tres-niveles.md) | Duplicados en tres niveles: misma URL, misma nota con otro link y mismo hecho | Aceptado (niveles 1 y 2) |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |
