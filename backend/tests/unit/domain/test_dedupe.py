@@ -6,7 +6,16 @@ import pytest
 
 from app.adapters.text.similarity import title_similarity
 from app.domain.articles import RawArticle
-from app.domain.dedupe import Sighting, canonical_url, dedupe, url_hash
+from app.domain.dedupe import (
+    KnownArticle,
+    Sighting,
+    canonical_url,
+    dedupe,
+    is_google_news,
+    match_known,
+    url_hash,
+)
+from app.domain.names import normalize_name
 from app.domain.queries import Provider
 
 NOON = datetime(2026, 10, 15, 18, 0, tzinfo=UTC)
@@ -119,3 +128,66 @@ def test_un_proveedor_no_se_repite_en_la_misma_nota() -> None:
     [kept] = dedupe([same, same], title_similarity)
 
     assert kept.sightings == [Sighting("searchapi", 1)]
+
+
+# Par real de la base (24/10/2026): la misma nota de infobae guardada con el
+# link de Google News (RSS) y con el del medio.
+MICKY = "Reportan orden de aprehensión contra empresario por el asesinato de Micky Hernández"
+GOOGLE_URL = "https://news.google.com/rss/articles/CBMiXkFVX3lxTE1"
+
+
+def known(article_id: int, url: str, title: str, published: datetime | None = NOON) -> KnownArticle:
+    return KnownArticle(article_id, canonical_url(url), normalize_name(title), published)
+
+
+def test_reconoce_links_de_google_news() -> None:
+    assert is_google_news(GOOGLE_URL)
+    assert not is_google_news("https://www.infobae.com/mexico/2026/10/22/micky")
+
+
+def test_en_el_grupo_gana_el_link_del_medio() -> None:
+    google = article(GOOGLE_URL, MICKY, Provider.GOOGLE_NEWS_RSS, 1)
+    medio = article("https://www.infobae.com/mexico/micky", MICKY, Provider.SEARCHAPI, 4)
+
+    [kept] = dedupe([google, medio], title_similarity)
+
+    assert kept.url_canonical == "https://infobae.com/mexico/micky"
+    assert kept.article is medio
+    assert [s.provider for s in kept.sightings] == ["google_news_rss", "searchapi"]
+
+
+def test_misma_nota_guardada_con_otro_link() -> None:
+    [new] = dedupe([article("https://www.infobae.com/mexico/micky", MICKY)], title_similarity)
+    candidates = [
+        known(1, "https://otro.mx/nota", "Detienen a empresario en Polanco"),
+        known(2, GOOGLE_URL, MICKY),
+    ]
+
+    match = match_known(new, candidates, title_similarity)
+
+    assert match is not None
+    assert match.article_id == 2
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        # Mismo título pero tres días después: otra nota (§9, ±1 día).
+        known(2, GOOGLE_URL, MICKY, NOON + timedelta(days=3)),
+        # Título distinto.
+        known(2, GOOGLE_URL, "Vinculan a proceso a El Cromos, ligado al CJNG"),
+        # La misma URL ya la resuelve el nivel 1; no es «otro link».
+        known(2, "https://infobae.com/mexico/micky", MICKY),
+    ],
+)
+def test_no_es_la_misma_nota_guardada(candidate: KnownArticle) -> None:
+    [new] = dedupe([article("https://www.infobae.com/mexico/micky", MICKY)], title_similarity)
+
+    assert match_known(new, [candidate], title_similarity) is None
+
+
+def test_guardada_sin_fecha_solo_cuenta_el_titulo_identico() -> None:
+    [new] = dedupe([article("https://infobae.com/m", MICKY, published=None)], title_similarity)
+
+    assert match_known(new, [known(2, GOOGLE_URL, MICKY, None)], title_similarity) is not None
+    assert match_known(new, [known(2, GOOGLE_URL, MICKY + ".", None)], title_similarity) is None

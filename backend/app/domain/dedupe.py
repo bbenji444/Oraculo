@@ -11,16 +11,21 @@ de GDELT y del RSS del medio, a veces con la URL decorada (``utm_*``,
   librerías externas (CLAUDE.md §6.1).
 
 Se conserva una nota por grupo y se anotan **todos** los proveedores que la
-encontraron, con su posición.
+encontraron, con su posición. Si el grupo trae el link de Google News y el
+del medio, se conserva el del medio (F12.1b): es el que el analista puede
+abrir y el que identifica al medio.
 
-No hace: no consulta la base (reutilizar notas de búsquedas anteriores es
-del pipeline).
+``match_known`` aplica la misma regla contra notas ya guardadas (nivel 2 de
+duplicados, ADR-0025): la misma nota que llega en otra búsqueda con otro
+link se reutiliza en lugar de guardarse otra vez.
+
+No hace: no consulta la base (los candidatos los trae el pipeline).
 """
 
 import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.articles import RawArticle
@@ -52,6 +57,8 @@ _TRACKING_PARAMS = frozenset(
     }
 )
 _TRACKING_PREFIXES = ("utm_",)
+# Host de los links de Google News RSS: no llevan directo al medio (ADR-0021).
+GOOGLE_NEWS_HOST = "news.google.com"
 _WWW = "www."
 _AMP_SUFFIXES = ("/amp", "/amp/")
 
@@ -123,25 +130,56 @@ class DedupedArticle:
     """Una nota después de quitar duplicados.
 
     Attributes:
-        article: La nota que se conserva (la primera que llegó).
+        article: La nota que se conserva (la primera que llegó, o la que trae
+            el link del medio si la primera era de Google News).
         url_canonical: Su URL canónica.
         title_norm: Su título normalizado.
         sightings: Todos los proveedores que la encontraron.
+        known_id: Id de la misma nota ya guardada con otro link, si la hay
+            (lo pone el pipeline con ``match_known``).
     """
 
     article: RawArticle
     url_canonical: str
     title_norm: str
     sightings: list[Sighting] = field(default_factory=list)
+    known_id: int | None = None
+
+
+def _close(
+    title_a: str,
+    published_a: datetime | None,
+    title_b: str,
+    published_b: datetime | None,
+    similarity: TitleSimilarity,
+) -> bool:
+    """Regla de «casi iguales» (§9): título ≥ 0.9 de parecido y fechas a ±1 día."""
+    if published_a is None or published_b is None:
+        # Sin fechas no se puede comprobar la ventana: solo cuenta el título idéntico.
+        return title_a == title_b
+    if abs(published_a - published_b) > NEAR_DUPLICATE_WINDOW:
+        return False
+    return similarity(title_a, title_b) >= NEAR_DUPLICATE_SIMILARITY
 
 
 def _near(a: DedupedArticle, b: RawArticle, title_b: str, similarity: TitleSimilarity) -> bool:
-    if a.article.published_at is None or b.published_at is None:
-        # Sin fechas no se puede comprobar la ventana: solo cuenta el título idéntico.
-        return a.title_norm == title_b
-    if abs(a.article.published_at - b.published_at) > NEAR_DUPLICATE_WINDOW:
-        return False
-    return similarity(a.title_norm, title_b) >= NEAR_DUPLICATE_SIMILARITY
+    return _close(a.title_norm, a.article.published_at, title_b, b.published_at, similarity)
+
+
+def is_google_news(url: str) -> bool:
+    """Dice si el link es de Google News (no lleva directo al medio).
+
+    Args:
+        url: URL de la nota.
+
+    Returns:
+        ``True`` si el host es ``news.google.com``.
+
+    Example:
+        >>> is_google_news("https://news.google.com/rss/articles/CBMi...")
+        True
+    """
+    return (urlsplit(url).hostname or "").lower() == GOOGLE_NEWS_HOST
 
 
 def dedupe(articles: Sequence[RawArticle], similarity: TitleSimilarity) -> list[DedupedArticle]:
@@ -170,7 +208,57 @@ def dedupe(articles: Sequence[RawArticle], similarity: TitleSimilarity) -> list[
         if match is None:
             match = DedupedArticle(article, url, title)
             kept.append(match)
-            by_url[url] = match
+        elif is_google_news(match.url_canonical) and not is_google_news(url):
+            # Misma nota: nos quedamos con el link del medio, no con el de Google.
+            match.article, match.url_canonical, match.title_norm = article, url, title
+        by_url[url] = match
         if sighting not in match.sightings:
             match.sightings.append(sighting)
     return kept
+
+
+@dataclass(frozen=True, slots=True)
+class KnownArticle:
+    """Una nota ya guardada, candidata a ser la misma que una nueva.
+
+    Attributes:
+        article_id: Id en ``articles``.
+        url_canonical: Su URL canónica.
+        title_norm: Su título normalizado.
+        published_at: Su fecha (UTC), si la tiene.
+    """
+
+    article_id: int
+    url_canonical: str
+    title_norm: str
+    published_at: datetime | None
+
+
+def match_known(
+    item: DedupedArticle, known: Sequence[KnownArticle], similarity: TitleSimilarity
+) -> KnownArticle | None:
+    """Busca, entre notas ya guardadas, la misma nota que ``item`` con otro link.
+
+    Usa la misma regla que ``dedupe`` (título ≥ 0.9 de parecido y ±1 día).
+    Si varias cumplen, gana la de título más parecido.
+
+    Args:
+        item: Nota nueva, ya sin duplicados dentro de su búsqueda.
+        known: Candidatas que trajo la base (pueden no cumplir la regla).
+        similarity: Similitud de dos títulos normalizados, de 0 a 1.
+
+    Returns:
+        La nota guardada que es la misma, o ``None``.
+
+    Example:
+        >>> match_known(nota_de_google_news, [misma_nota_del_medio], rapidfuzz).article_id
+        1504
+    """
+    published = item.article.published_at
+    matches = [
+        k
+        for k in known
+        if k.url_canonical != item.url_canonical
+        and _close(k.title_norm, k.published_at, item.title_norm, published, similarity)
+    ]
+    return max(matches, key=lambda k: similarity(k.title_norm, item.title_norm), default=None)

@@ -30,11 +30,12 @@ from app.application.use_cases.run_search import (
     plan_queries,
 )
 from app.domain.articles import RawArticle
-from app.domain.dedupe import DedupedArticle
+from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import ConceptJudgement, Enrichment, LLMUsage
 from app.domain.errors import ProviderUnavailableError
 from app.domain.extraction import ExtractionStatus, ProcessingText
 from app.domain.geocoding import Mention, MentionRole, Resolution
+from app.domain.names import normalize_name
 from app.domain.queries import PlannedQuery, Provider, QueryPlace
 from app.domain.search import SearchStatus
 from tests.unit import fake_gazetteer as cat
@@ -148,17 +149,31 @@ class Searches:
 class Articles:
     """``ArticleStorePort`` en memoria."""
 
-    def __init__(self, known: Mapping[str, StoredArticle] | None = None) -> None:
+    def __init__(
+        self,
+        known: Mapping[str, StoredArticle] | None = None,
+        *,
+        stored_titles: Sequence[KnownArticle] = (),
+        by_id: Mapping[int, StoredArticle] | None = None,
+    ) -> None:
         self.known = dict(known or {})
+        self.stored_titles = list(stored_titles)
+        self.by_id = dict(by_id or {})
         self.ids: dict[str, int] = {}
         self.texts: dict[int, ProcessingText] = {}
         self.enriched: dict[int, tuple[EnrichmentResult, list[Resolution]]] = {}
         self.failed: list[int] = []
         self.rows: list[SearchResultRow] = []
 
+    async def known_like(self, articles: Sequence[DedupedArticle]) -> list[list[KnownArticle]]:
+        return [list(self.stored_titles) for _ in articles]
+
     async def upsert(self, articles: Sequence[DedupedArticle]) -> list[StoredArticle]:
         out = []
         for a in articles:
+            if a.known_id is not None:
+                out.append(self.by_id.get(a.known_id, StoredArticle(a.known_id)))
+                continue
             if a.url_canonical in self.known:
                 out.append(self.known[a.url_canonical])
                 continue
@@ -354,6 +369,25 @@ async def test_nota_ya_enriquecida_se_reutiliza_sin_bajarla_ni_pagarla() -> None
     assert [r.title for r in llm.requests] == [MADRID_TITLE]
     assert IZTA_SEARCHAPI.url not in extractor.urls
     assert {r.article_id: r.in_region for r in articles.rows}[7] is True
+
+
+async def test_misma_nota_guardada_con_otro_link_se_reutiliza() -> None:
+    # Nivel 2 de duplicados (ADR-0025): la nota ya estaba guardada con el link
+    # de Google News; llega con el del medio y se usa la misma, con su IA.
+    google = KnownArticle(
+        7, "https://news.google.com/rss/articles/CBMi", normalize_name(IZTA_TITLE), PUBLISHED
+    )
+    articles = Articles(
+        stored_titles=[google],
+        by_id={7: StoredArticle(7, "enrich_v1", frozenset({3}), "09007")},
+    )
+    use_case, _s, _a, llm, _e = pipeline(articles=articles)
+
+    report = await use_case.run(uuid4())
+
+    assert report.reused == 1
+    assert [r.title for r in llm.requests] == [MADRID_TITLE]
+    assert 7 in {r.article_id for r in articles.rows}
 
 
 @pytest.mark.parametrize(

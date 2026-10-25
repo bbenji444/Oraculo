@@ -55,7 +55,14 @@ from app.application.ports.search_store import (
     StoredText,
 )
 from app.domain.aggregates import NoteLocation
-from app.domain.dedupe import DedupedArticle, url_hash
+from app.domain.dedupe import (
+    GOOGLE_NEWS_HOST,
+    NEAR_DUPLICATE_WINDOW,
+    DedupedArticle,
+    KnownArticle,
+    is_google_news,
+    url_hash,
+)
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
@@ -469,6 +476,97 @@ class ResultPreview:
     extraction_status: str
 
 
+# Candidatas para el nivel 2 de duplicados (ADR-0025). El operador ``%`` de
+# pg_trgm usa el índice ``articles_title_trgm`` con su umbral por defecto
+# (0.3), mucho más bajo que la regla del dominio (0.9 con rapidfuzz): aquí
+# solo se junta a las posibles; ``match_known`` decide. Sin fecha, solo
+# cuenta el título idéntico, igual que en ``dedupe``.
+_KNOWN_LIKE = text(
+    """
+    SELECT id, url_canonical, title_norm, published_at
+    FROM articles
+    WHERE url_hash <> :hash
+      AND CASE WHEN CAST(:published AS timestamptz) IS NULL OR published_at IS NULL
+               THEN title_norm = :title
+               ELSE title_norm % :title
+                    AND published_at BETWEEN CAST(:date_from AS timestamptz)
+                                         AND CAST(:date_to AS timestamptz)
+          END
+    ORDER BY similarity(title_norm, :title) DESC
+    LIMIT :limit
+    """
+)
+# Bastan unas pocas: la misma nota casi siempre queda primera por parecido.
+_KNOWN_LIKE_LIMIT = 10
+
+
+async def _store_article(conn: AsyncConnection, item: DedupedArticle) -> int:
+    """Guarda una nota (o reutiliza la que ya está) y devuelve su id.
+
+    Orden: misma URL → esa nota; ``known_id`` → la misma nota con otro link
+    (si era de Google News y la nueva trae el del medio, se cambia); si no,
+    una nota nueva.
+    """
+    a = item.article
+    hash_ = url_hash(item.url_canonical)
+    same_url = (
+        await conn.execute(
+            text("UPDATE articles SET updated_at = now() WHERE url_hash = :hash RETURNING id"),
+            {"hash": hash_},
+        )
+    ).scalar_one_or_none()
+    if same_url is not None:
+        return int(same_url)
+    if item.known_id is not None:
+        if not is_google_news(item.url_canonical):
+            await conn.execute(
+                text(
+                    """
+                    UPDATE articles SET url_canonical = :url, url_hash = :hash,
+                        source_domain = COALESCE(:source_domain, source_domain),
+                        source_name = COALESCE(:source_name, source_name), updated_at = now()
+                    WHERE id = :id AND url_canonical LIKE :google
+                    """
+                ),
+                {
+                    "id": item.known_id,
+                    "url": item.url_canonical,
+                    "hash": hash_,
+                    "source_domain": a.source_domain,
+                    "source_name": a.source_name,
+                    "google": f"https://{GOOGLE_NEWS_HOST}/%",
+                },
+            )
+        return item.known_id
+    return int(
+        (
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO articles (url_canonical, url_hash, title, title_norm,
+                        source_name, source_domain, published_at, snippet, language)
+                    VALUES (:url, :hash, :title, :title_norm, :source_name,
+                        :source_domain, :published_at, :snippet, :language)
+                    ON CONFLICT (url_hash) DO UPDATE SET updated_at = now()
+                    RETURNING id
+                    """
+                ),
+                {
+                    "url": item.url_canonical,
+                    "hash": hash_,
+                    "title": a.title,
+                    "title_norm": item.title_norm,
+                    "source_name": a.source_name,
+                    "source_domain": a.source_domain,
+                    "published_at": a.published_at,
+                    "snippet": a.snippet,
+                    "language": a.language,
+                },
+            )
+        ).scalar_one()
+    )
+
+
 class PostgresArticleStore:
     """Notas, su texto, su enriquecimiento y sus ubicaciones."""
 
@@ -480,6 +578,31 @@ class PostgresArticleStore:
         """
         self._engine = engine
 
+    async def known_like(self, articles: Sequence[DedupedArticle]) -> list[list[KnownArticle]]:
+        """Ver ``ArticleStorePort.known_like``."""
+        found: list[list[KnownArticle]] = []
+        async with self._engine.connect() as conn:
+            for item in articles:
+                published = item.article.published_at
+                rows = await conn.execute(
+                    _KNOWN_LIKE,
+                    {
+                        "title": item.title_norm,
+                        "hash": url_hash(item.url_canonical),
+                        "published": published,
+                        "date_from": published - NEAR_DUPLICATE_WINDOW if published else None,
+                        "date_to": published + NEAR_DUPLICATE_WINDOW if published else None,
+                        "limit": _KNOWN_LIKE_LIMIT,
+                    },
+                )
+                found.append(
+                    [
+                        KnownArticle(r.id, r.url_canonical, r.title_norm, r.published_at)
+                        for r in rows
+                    ]
+                )
+        return found
+
     async def upsert(self, articles: Sequence[DedupedArticle]) -> list[StoredArticle]:
         """Ver ``ArticleStorePort.upsert``."""
         if not articles:
@@ -487,34 +610,7 @@ class PostgresArticleStore:
         ids: list[int] = []
         async with self._engine.begin() as conn:
             for item in articles:
-                a = item.article
-                ids.append(
-                    (
-                        await conn.execute(
-                            text(
-                                """
-                                INSERT INTO articles (url_canonical, url_hash, title, title_norm,
-                                    source_name, source_domain, published_at, snippet, language)
-                                VALUES (:url, :hash, :title, :title_norm, :source_name,
-                                    :source_domain, :published_at, :snippet, :language)
-                                ON CONFLICT (url_hash) DO UPDATE SET updated_at = now()
-                                RETURNING id
-                                """
-                            ),
-                            {
-                                "url": item.url_canonical,
-                                "hash": url_hash(item.url_canonical),
-                                "title": a.title,
-                                "title_norm": item.title_norm,
-                                "source_name": a.source_name,
-                                "source_domain": a.source_domain,
-                                "published_at": a.published_at,
-                                "snippet": a.snippet,
-                                "language": a.language,
-                            },
-                        )
-                    ).scalar_one()
-                )
+                ids.append(await _store_article(conn, item))
             known = (
                 (
                     await conn.execute(
