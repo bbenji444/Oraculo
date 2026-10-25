@@ -159,7 +159,8 @@ describe('nombre de las fuentes (F12.2)', () => {
     expect(providersLabel(['google_news_rss', 'indice_local'])).toBe(
       'Google News RSS · Índice local',
     );
-    expect(providersLabel(['searchapi', 'browserwork_bing'])).toBe('SearchApi · browserwork_bing');
+    expect(providersLabel(['searchapi', 'browserwork_bing'])).toBe('SearchApi · Bing');
+    expect(providersLabel(['otra_fuente'])).toBe('otra_fuente');
     expect(providersLabel([])).toBe('');
   });
 });

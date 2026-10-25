@@ -48,6 +48,22 @@ describe('switches de fuentes', () => {
     expect(onChange).toHaveBeenCalledWith(['google_news_rss']);
   });
 
+  it('BrowserWork avisa que tarda más', () => {
+    const bing: SourceOption = {
+      id: 'browserwork_bing',
+      label: 'Bing (BrowserWork)',
+      paid: false,
+      slow: true,
+      configured: true,
+      default_on: false,
+    };
+    render(<SourceSwitches options={[bing]} chosen={[]} onChange={vi.fn()} />);
+
+    const sw = screen.getByRole('switch', { name: /Bing/ });
+    expect(sw.getAttribute('aria-checked')).toBe('false');
+    expect(sw.textContent).toContain('Gratis · tarda más');
+  });
+
   it('una fuente sin configurar se ve apagada y no se puede encender', () => {
     render(<SourceSwitches options={OPTIONS} chosen={['google_news_rss']} onChange={vi.fn()} />);
 
