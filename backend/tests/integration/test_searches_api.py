@@ -129,7 +129,11 @@ def test_estimar_no_crea_nada_y_dice_cuanto_costaria(
     data = response.json()
     assert [c["name"] for c in data["concepts"]] == [CONCEPT_NAME]
     assert data["region"] == "México › Ciudad de México"
-    assert [q["provider"] for q in data["queries"]] == ["searchapi", "indice_local"]
+    assert [q["provider"] for q in data["queries"]] == [
+        "searchapi",
+        "google_news_rss",
+        "indice_local",
+    ]
     # Hasta 3 páginas de SearchApi por consulta (ADR-0019): la estimación es el máximo.
     assert data["credits"] == 3
     assert data["over_limit"] is False
@@ -174,7 +178,8 @@ def test_lanzar_crea_la_busqueda_pendiente_y_la_encola(
         "status": "pending",
         "date_from": "2026-10-01",
         "date_to": "2026-10-07",
-        "queries_planned": 2,
+        # SearchApi, Google News RSS e índice local; solo SearchApi cuesta.
+        "queries_planned": 3,
         "credits_estimated": 3,
         "concept_name": CONCEPT_NAME,
         "exclude_terms": ["simulacro"],

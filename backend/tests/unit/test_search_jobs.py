@@ -32,6 +32,15 @@ async def test_arma_el_pipeline_y_cierra_todo_al_salir() -> None:
         assert Provider.LOCAL_INDEX in use_case.available_providers()
 
 
+async def test_las_busquedas_usan_google_news_rss_si_esta_encendido() -> None:
+    # Bug (F12.2): desde el ADR-0021 el RSS está encendido por defecto, pero la
+    # lista de proveedores de las búsquedas nunca lo incluyó y no se consultaba.
+    async with search_jobs.search_pipeline(settings(news_rss_enabled=True)) as (use_case, _l, _e):
+        assert Provider.GOOGLE_NEWS_RSS in use_case.available_providers()
+    async with search_jobs.search_pipeline(settings(news_rss_enabled=False)) as (use_case, _l, _e):
+        assert Provider.GOOGLE_NEWS_RSS not in use_case.available_providers()
+
+
 async def test_sin_llave_de_la_ia_no_arma_nada() -> None:
     with pytest.raises(MissingLLMKeyError):
         async with search_jobs.search_pipeline(settings(openai_api_key=None)):
