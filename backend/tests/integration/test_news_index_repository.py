@@ -266,3 +266,26 @@ async def test_el_mismo_medio_con_el_mismo_texto_es_la_misma_nota(
         "https://tiempo.com.mx/local/choque",
         "https://puentelibre.mx/local/choque-2",
     ]
+
+
+async def test_mismo_titulo_de_portada_con_cuerpo_distinto_si_entra(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Real: ciudadccs.info pone el título de la portada a artículos distintos.
+    def portada(url: str, body: str) -> NewsItem:
+        return NewsItem.create(
+            source="gdelt_ngrams",
+            url=url,
+            title="Inicio | Periódico CiudadCCS",
+            published_at=NOW,
+            body_phrases=[body],
+        )
+
+    new = await PostgresNewsIndex(test_engine).add(
+        [
+            portada("https://ciudadccs.info/publicacion/52005", "criollos suman derrotas"),
+            portada("https://ciudadccs.info/publicacion/3452", "de paseo por caracas"),
+        ]
+    )
+
+    assert new == 2

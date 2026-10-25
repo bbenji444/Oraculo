@@ -45,13 +45,25 @@ MAX_BODY_PHRASES = 2000
 MEXICO_WORDS = ("México", "mexicano", "mexicana", "mexicanos", "mexicanas")
 _MEXICAN_TLD = ".mx"
 # Nivel 2 de duplicados en el índice (ADR-0025): el mismo medio con el mismo
-# texto en esta ventana es la misma nota con otro link (variantes ``%20``,
+# texto y el mismo cuerpo en esta ventana es la misma nota con otro link (variantes ``%20``,
 # títulos de portada como «INICIO | PERIODICO CIUDADCCS» ×151). Medido el
 # 24/10/2026: 2,899 notas sobrantes así. Tres días cubre las republicaciones
 # sin juntar columnas que repiten título cada semana.
 SAME_OUTLET_WINDOW = timedelta(days=3)
 # Un título necesita letras: «🎦» solo (73 notas al 24/10/2026) no es una nota.
 MIN_TITLE_LETTERS = 2
+
+
+def has_title_letters(title: str) -> bool:
+    """Dice si un título tiene letras suficientes para ser el de una nota.
+
+    Args:
+        title: Título ya limpio.
+
+    Returns:
+        ``True`` si tiene al menos ``MIN_TITLE_LETTERS`` letras («🎦» no).
+    """
+    return sum(char.isalpha() for char in title) >= MIN_TITLE_LETTERS
 
 
 def index_text_norm(title: str, snippet: str | None) -> str:
@@ -181,7 +193,7 @@ class NewsItem:
         # clean_text también repara el Mojibake: GDELT trae títulos de algunos
         # medios (tiempo.com.mx, puentelibre.mx) ya rotos (F12.1).
         clean_title = clean_text(title)
-        if not clean_title or sum(c.isalpha() for c in clean_title) < MIN_TITLE_LETTERS:
+        if not clean_title or not has_title_letters(clean_title):
             raise InvalidNewsError(f"Nota sin título: {url!r}")
         if published_at is None or published_at.tzinfo is None:
             raise InvalidNewsError(f"Nota sin fecha con zona: {url!r}")

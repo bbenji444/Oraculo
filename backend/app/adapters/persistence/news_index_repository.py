@@ -47,8 +47,8 @@ class SourceStats:
 
 
 # Dos reglas de duplicados (ADR-0025): la misma URL canónica no entra dos
-# veces (``ON CONFLICT``), y el mismo medio con el mismo texto a
-# ±SAME_OUTLET_WINDOW tampoco (``NOT EXISTS``, con el índice
+# veces (``ON CONFLICT``), y el mismo medio con el mismo texto y el mismo
+# cuerpo a ±SAME_OUTLET_WINDOW tampoco (``NOT EXISTS``, con el índice
 # news_index_domain_published de la migración 0023). La misma nota en otro
 # medio (sindicada) sí entra: es otra fuente.
 _INSERT = text(
@@ -64,6 +64,7 @@ _INSERT = text(
         WHERE n.source_domain = :source_domain
           AND n.published_at BETWEEN :window_from AND :window_to
           AND n.text_norm = :text_norm
+          AND n.body_terms IS NOT DISTINCT FROM CAST(:body_terms AS text)
     )
     ON CONFLICT (url_hash) DO NOTHING
     RETURNING id
