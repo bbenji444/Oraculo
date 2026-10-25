@@ -1,12 +1,11 @@
 """Adaptador de Google News RSS (especificación §8).
 
-⚠️ ADVERTENCIA — FUERA DE PRODUCCIÓN (ADR-0011). El propio feed declara en
-su elemento <copyright> que se ofrece "solely for the purpose of rendering
-Google News results within a personal feed reader for personal,
-non-commercial use" y que cualquier otro uso está prohibido. Por eso está
-**desactivado por defecto** (``NEWS_RSS_ENABLED=false``): solo se habilita a
-propósito en desarrollo y nunca en producción mientras la revisión legal no
-diga lo contrario. Las pruebas usan solo las respuestas grabadas.
+**Activado** (``NEWS_RSS_ENABLED=true`` por defecto) desde el dictamen de la
+Dirección del 24/10/2026 (ADR-0021, que sustituye al ADR-0011). El propio feed
+declara en su <copyright> que se ofrece para un lector personal y no comercial;
+la Dirección aprobó su uso institucional y quedó registrado como riesgo
+aceptado en el ADR-0021. ``NEWS_RSS_ENABLED=false`` lo apaga sin tocar código.
+Las pruebas usan solo las respuestas grabadas.
 
 No es un servicio oficial ni documentado: puede cambiar o bloquear sin
 aviso, y por eso es el proveedor de respaldo. El texto de la consulta ya trae
@@ -40,8 +39,8 @@ from app.domain.queries import CountryFilter, DateWindow, PlannedQuery, Provider
 
 RSS_URL = "https://news.google.com/rss/search"
 DISABLED_MESSAGE = (
-    "Google News RSS está desactivado: sus términos solo permiten uso personal y no "
-    "comercial (ADR-0011). Solo para desarrollo: NEWS_RSS_ENABLED=true en .env."
+    "Google News RSS está apagado en esta instalación (NEWS_RSS_ENABLED=false en .env). "
+    "Está aprobado para producción (ADR-0021): quita esa línea o ponla en true."
 )
 # Español latinoamericano: la edición de Google News que cubre a México.
 LANGUAGE = "es-419"
@@ -154,7 +153,7 @@ def parse_items(body: str, window: DateWindow | None = None) -> tuple[list[RawAr
 
 
 class GoogleNewsRssProvider:
-    """``NewsProviderPort`` para Google News RSS (fuera de producción, ADR-0011)."""
+    """``NewsProviderPort`` para Google News RSS (aprobado para producción, ADR-0021)."""
 
     def __init__(self, http: ProviderHttpClient, *, enabled: bool) -> None:
         """Recibe el cliente HTTP y si está habilitado.
@@ -172,7 +171,7 @@ class GoogleNewsRssProvider:
         return Provider.GOOGLE_NEWS_RSS
 
     def is_configured(self) -> bool:
-        """Solo con ``NEWS_RSS_ENABLED=true`` (por defecto está desactivado)."""
+        """Con ``NEWS_RSS_ENABLED=true`` (el valor por defecto, ADR-0021)."""
         return self._enabled
 
     def request_params(self, query: PlannedQuery) -> dict[str, str]:

@@ -90,8 +90,9 @@ def test_la_llave_de_searchapi_no_aparece_al_imprimir(env: pytest.MonkeyPatch) -
     assert settings.searchapi_api_key.get_secret_value() == "llave-super-secreta"
 
 
-def test_google_news_rss_desactivado_por_defecto(env: pytest.MonkeyPatch) -> None:
-    assert build_settings().news_rss_enabled is False
-
-    env.setenv("NEWS_RSS_ENABLED", "true")
+def test_google_news_rss_activado_por_defecto_y_se_puede_apagar(env: pytest.MonkeyPatch) -> None:
+    # ADR-0021: aprobado por la Dirección el 24/10/2026; sigue pudiendo apagarse.
     assert build_settings().news_rss_enabled is True
+
+    env.setenv("NEWS_RSS_ENABLED", "false")
+    assert build_settings().news_rss_enabled is False

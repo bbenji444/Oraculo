@@ -6,8 +6,6 @@ tiempos, reintentos y llaves vive en un solo lugar.
 No hace: no decide qué proveedores usar en una búsqueda.
 """
 
-import logging
-
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.providers.gdelt import GdeltProvider
@@ -18,8 +16,6 @@ from app.adapters.providers.searchapi import SearchApiProvider
 from app.application.ports.providers import NewsProviderPort
 from app.core.config import Settings
 from app.domain.queries import Provider
-
-logger = logging.getLogger(__name__)
 
 
 def build_gdelt(settings: Settings, *, enabled: bool) -> GdeltProvider:
@@ -70,12 +66,6 @@ def build_provider(
     if provider is Provider.GDELT:
         return build_gdelt(settings, enabled=settings.gdelt_enabled)
     if provider is Provider.GOOGLE_NEWS_RSS:
-        if settings.news_rss_enabled:
-            # Que quede en el registro cada vez: no debe pasar en producción.
-            logger.warning(
-                "Google News RSS habilitado (NEWS_RSS_ENABLED=true): solo para desarrollo; "
-                "sus términos solo permiten uso personal y no comercial (ADR-0011)."
-            )
         return GoogleNewsRssProvider(
             ProviderHttpClient(
                 provider,

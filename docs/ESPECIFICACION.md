@@ -438,7 +438,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - **País seleccionado:** no se agrega lugar a la consulta; se usan los filtros de país e idioma del proveedor.
 - **Presupuesto:** máximo de consultas por búsqueda configurable (`MAX_QUERIES_PER_SEARCH`, por defecto 10). La UI muestra la estimación antes de ejecutar.
 - **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos.
-- **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor, y solo con los proveedores que recibiría una búsqueda real (los configurados): hoy SearchApi y el índice local.
+- **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor, y solo con los proveedores que recibiría una búsqueda real (los configurados): hoy SearchApi, el índice local y Google News RSS (ADR-0021).
 
 ---
 
@@ -449,7 +449,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 | **SearchApi** (`engine=google_news`) | Principal: resultados reales de Google News | De pago por búsqueda exitosa; 100 solicitudes gratis de prueba | Llave en `SEARCHAPI_API_KEY`. Hasta `SEARCHAPI_MAX_PAGES` páginas de 10 notas por consulta (3 por defecto); la siguiente solo si la anterior vino llena, 1 crédito por página (ADR-0019). |
 | **Índice local** (`indice_local`, ADR-0013 y ADR-0014) | Notas que la ingesta periódica junta cada 15 minutos: **ngramas de GDELT** (texto completo, español + México; ADR-0014), archivos GKG de GDELT (solo título; apagados por defecto cuando los ngramas funcionan) y RSS de medios mexicanos activos en `fuentes/medios_rss.csv` | Gratis (consume ~1 GB de descarga al día) | Busca en título, fragmento y frases del cuerpo (`body_terms`, solo para buscar; nunca se muestran). Devuelve candidatos que F4 confirma y geolocaliza con INEGI. Citar "GDELT Project" con link cuando se muestren sus datos. |
 | **GDELT DOC 2.0** | Volumen y cobertura amplia de medios en español. ⚠️ **Desactivado por defecto** (`GDELT_ENABLED=false`, ADR-0012): respondió 429 de forma persistente y `{}` después de los rechazos. Se propone reactivarlo cuando `make gdelt-diagnostico` registre notas reales en 2 días distintos; Benji decide. | Gratis | Ventana móvil de los últimos 3 meses, según su documentación. Un `{}` recibido después de un 429 se registra como falla, nunca como "sin resultados". |
-| **Google News RSS** | ⚠️ **Fuera de producción** (ADR-0011): sus términos solo permiten uso personal y no comercial. Desactivado por defecto (`NEWS_RSS_ENABLED=false`); solo para desarrollo. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
+| **Google News RSS** | Respaldo gratuito de Google News, **activo también en producción** por dictamen de la Dirección del 24/10/2026 (ADR-0021, sustituye al ADR-0011, que lo había apagado por los términos del feed: uso personal y no comercial). `NEWS_RSS_ENABLED=false` lo apaga. | Gratis | Sin garantía de servicio. Ver la nota de abajo sobre sus links. `after:`/`before:` no se respetan: el adaptador descarta notas fuera del rango. |
 
 **Nota sobre los links de Google News RSS:** los links del feed apuntan a `news.google.com` con un identificador codificado. No son redirecciones HTTP simples, así que obtener la URL real del medio no es trivial y puede romperse sin aviso. `# VERIFICAR:` en F3 si existe una forma estable de resolverlos. Si no la hay, las notas de RSS se deduplican solo por título normalizado y fecha (regla de casi duplicado de la sección 9) y la tarjeta muestra el link de Google News.
 
@@ -976,3 +976,4 @@ Ideas registradas para evaluarlas después. **No están en el alcance de ninguna
 | 2.8 | 21 de octubre de 2026 | Geolocalizador: colonias de OpenStreetMap (`places`, `make geo-places`), palabras genéricas, estado de la IA obligatorio y ubicación principal dentro de la región buscada (§6, §11, ADR-0020). |
 | 2.9 | 20 de octubre de 2026 | "Probar concepto" muestra solo los proveedores que recibiría la búsqueda (§9); el reporte cuenta "dentro" con la regla de la localidad cabecera homónima (§15, ADR-0020). |
 | 2.10 | 21 de octubre de 2026 | Modelo de datos del tablero de investigación (§6, Fase 9.2): entidades, menciones, vínculos, casos y `external_links` reservada (ADR-0101, 0104, 0105). |
+| 2.11 | 24 de octubre de 2026 | Google News RSS activo también en producción por dictamen de la Dirección (§8, ADR-0021, sustituye al ADR-0011). |

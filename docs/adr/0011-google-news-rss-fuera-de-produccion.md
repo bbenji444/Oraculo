@@ -1,6 +1,6 @@
 # ADR-0011 — Google News RSS fuera de producción por sus términos de uso
 
-- **Estado:** aceptado (pendiente de revisión legal por el jefe de Benji)
+- **Estado:** sustituido por el [ADR-0021](0021-google-news-rss-en-produccion.md) (dictamen de la Dirección del 24/10/2026)
 - **Fecha:** 2026-10-16
 - **Fase:** F3
 - **Decide:** Benji

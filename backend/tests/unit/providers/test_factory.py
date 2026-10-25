@@ -25,18 +25,21 @@ def settings(
     )
 
 
-def test_google_news_rss_esta_desactivado_por_defecto() -> None:
-    assert Settings.model_fields["news_rss_enabled"].default is False
-    assert build_provider(Provider.GOOGLE_NEWS_RSS, settings()).is_configured() is False
+def test_google_news_rss_esta_activado_por_defecto() -> None:
+    # ADR-0021 sustituye al 0011: aprobado para producción.
+    assert Settings.model_fields["news_rss_enabled"].default is True
 
 
-def test_habilitar_rss_deja_una_advertencia(caplog: pytest.LogCaptureFixture) -> None:
+def test_rss_activo_ya_no_advierte_y_apagado_no_consulta(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     with caplog.at_level(logging.WARNING):
         provider = build_provider(Provider.GOOGLE_NEWS_RSS, settings(news_rss_enabled=True))
 
     assert provider.is_configured() is True
-    assert "ADR-0011" in caplog.text
-    assert "solo para desarrollo" in caplog.text
+    # Ya no es "solo desarrollo": la advertencia de cada arranque se quitó.
+    assert "solo para desarrollo" not in caplog.text
+    assert build_provider(Provider.GOOGLE_NEWS_RSS, settings()).is_configured() is False
 
 
 @pytest.mark.parametrize("key", [None, SecretStr("")])

@@ -27,6 +27,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Google News RSS activo también en producción** (ADR-0021, sustituye al ADR-0011): por dictamen de la Dirección del 24/10/2026, las búsquedas vuelven a consultar el RSS de Google News, gratis, además de SearchApi y el índice local. Antes estaba apagado por los términos del feed. `NEWS_RSS_ENABLED=false` lo apaga sin tocar código, y se quitó la advertencia de «solo desarrollo».
 - Historial: el periodo de cada búsqueda se lee como en Explorar ("13 – 20 oct 2026") y no como fechas técnicas ("2026-10-13 a 2026-10-20").
 - La lista de Explorar dice cuántas notas se ven de cuántas trajo la búsqueda ("Noticias (24 de 43)"); antes decía "Noticias (24)" mientras arriba decía "43 notas" y parecía que faltaban. La ayuda del encabezado y de los botones PDF, CSV y GeoJSON aclara que las descargas incluyen solo las notas relevantes.
 - El buscador de regiones (Explorar y "Probar concepto") dice de qué estado es cada municipio o localidad: "Municipio San Pedro — Coahuila de Zaragoza" y "San Pedro Garza García — Nuevo León". Antes solo mostraba la clave INEGI y había que sabérsela para distinguir homónimos.
