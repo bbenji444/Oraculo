@@ -75,6 +75,37 @@ def test_comillas_rectas_y_doble_error(broken: str, expected: str) -> None:
     assert repair_mojibake(broken) == expected
 
 
+def test_comilla_de_cierre_que_perdio_su_ultimo_byte() -> None:
+    # Real (planoinformativo.com): «”» = E2 80 9D y el 9D se perdió.
+    broken = "Javier Aguirre debuta con empate: “El vestuario estaba rabiosoâ€"
+
+    assert (
+        repair_mojibake(broken) == "Javier Aguirre debuta con empate: “El vestuario estaba rabioso”"
+    )
+
+
+@pytest.mark.parametrize(
+    ("broken", "expected"),
+    [
+        # Reales de puentelibre.mx: UTF-8 leído como GBK.
+        (
+            "Maru se帽al贸 corrupci贸n de su exfiscal ante la FGR, revela Go",
+            "Maru señaló corrupción de su exfiscal ante la FGR, revela Go",
+        ),
+        (
+            "驴Qu茅 es el virus shamonda y c贸mo se contagia?馃帵",
+            "¿Qué es el virus shamonda y cómo se contagia?🎦",
+        ),
+    ],
+)
+def test_utf8_leido_como_gbk(broken: str, expected: str) -> None:
+    assert repair_mojibake(broken) == expected
+
+
+def test_chino_legitimo_no_cambia() -> None:
+    assert repair_mojibake("Delegación de 中国 visita Sonora") == "Delegación de 中国 visita Sonora"
+
+
 def test_comilla_recta_legitima_no_cambia() -> None:
     assert repair_mojibake('Dijo "MÉXICO" y "café"') == 'Dijo "MÉXICO" y "café"'
 

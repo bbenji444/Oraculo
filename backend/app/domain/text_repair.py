@@ -16,8 +16,12 @@ arregla solo en la parte rota.
 La usan ``RawArticle.create`` y ``NewsItem.create`` para que ninguna nota
 entre rota, y ``make reparar-texto`` para las que ya se guardaron.
 
-No hace: no adivina encodings distintos de Windows-1252/Latin-1, ni quita
-emojis ni corrige errores de escritura.
+Hay una segunda variante, más rara: UTF-8 leído como **GBK** (chino), que
+convierte ``señaló`` en ``se帽al贸``. Se revierte solo si el texto completo
+vuelve a UTF-8 sin dejar ideogramas.
+
+No hace: no adivina otros encodings (Windows-1252/Latin-1 y GBK son los
+medidos), ni quita emojis ni corrige errores de escritura.
 """
 
 from collections.abc import Sequence
@@ -65,6 +69,16 @@ _C1_END = 0x9F
 # prueba como 0x93 («“») y luego como 0x94 («”»).
 _ASCII_QUOTE = '"'
 _QUOTE_BYTES = (0x93, 0x94)
+# «”» es E2 80 9D, y 0x9D no existe en Windows-1252: los lectores estrictos
+# lo tiran y queda solo ``â€`` («rabiosoâ€», plano informativo, medido el
+# 24/10/2026). Ningún otro carácter deja ese rastro, así que se restituye.
+_LOST_CLOSING_QUOTE = "â€"
+_CLOSING_QUOTE = "”"
+# Ideogramas CJK unificados. puentelibre.mx llega por GDELT como UTF-8 leído
+# como GBK: «Maru se帽al贸» es «Maru señaló» (200 notas del índice al
+# 24/10/2026). En notas en español no aparecen ideogramas legítimos.
+_CJK_START = 0x4E00
+_CJK_END = 0x9FFF
 # Una nota doblemente rota (Mojibake de Mojibake) necesita dos pasadas; tres
 # es el tope para no ciclar nunca.
 MAX_PASSES = 3
@@ -138,9 +152,32 @@ def _repair_once(text: str) -> str:
                 out.append(decoded)
                 i += count + 1
                 continue
+        if text.startswith(_LOST_CLOSING_QUOTE, i):
+            out.append(_CLOSING_QUOTE)
+            i += len(_LOST_CLOSING_QUOTE)
+            continue
         out.append(text[i])
         i += 1
     return "".join(out)
+
+
+def _has_cjk(text: str) -> bool:
+    return any(_CJK_START <= ord(char) <= _CJK_END for char in text)
+
+
+def _repair_gbk(text: str) -> str:
+    """Revierte UTF-8 leído como GBK, si todo el texto se deja revertir."""
+    if not _has_cjk(text):
+        return text
+    try:
+        repaired = text.encode("gb18030").decode("utf-8")
+    except UnicodeError:
+        return text
+    # Si quedan ideogramas o controles, el texto era chino de verdad (o roto
+    # de otra forma): mejor dejarlo como está.
+    if _has_cjk(repaired) or not all(_plausible(c) or ord(c) < _ASCII_LIMIT for c in repaired):
+        return text
+    return repaired
 
 
 def repair_mojibake(text: str) -> str:
@@ -158,6 +195,7 @@ def repair_mojibake(text: str) -> str:
         >>> repair_mojibake("Peñón de los Baños")
         'Peñón de los Baños'
     """
+    text = _repair_gbk(text)
     for _ in range(MAX_PASSES):
         repaired = _repair_once(text)
         if repaired == text:

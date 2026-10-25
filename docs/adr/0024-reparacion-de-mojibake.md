@@ -19,13 +19,15 @@ Medición del 24/10/2026 en la base de desarrollo:
 | Fragmentos, medios, resúmenes, menciones de lugar, frases del cuerpo | 0 | — |
 
 - **Origen:** todo viene de **GDELT** (ngramas y GKG), y solo de cinco medios: tiempo.com.mx (264), puentelibre.mx (64), planoinformativo.com (37), nvinoticias.com (21) y hoytamaulipas.net (10). El RSS de los medios, Google News RSS y SearchApi llegaron limpios.
-- **Dos variantes más difíciles**, ambas en hoytamaulipas.net:
-  - GDELT cambió comillas tipográficas por rectas y con eso borró un byte: `Ã"rdenes` era «Órdenes» y `ðŸ"¸` era 📸.
-  - Un «…» escrito en Windows-1252 pasó por un carácter de control: `Â…`.
+- **Variantes más difíciles:**
+  - En hoytamaulipas.net, GDELT cambió comillas tipográficas por rectas y con eso borró un byte: `Ã"rdenes` era «Órdenes» y `ðŸ"¸` era 📸.
+  - En hoytamaulipas.net, un «…» escrito en Windows-1252 pasó por un carácter de control: `Â…`.
+  - En planoinformativo.com, el «”» final perdió su último byte (0x9D no existe en Windows-1252): `rabiosoâ€`.
+- **Segunda variante, encontrada al aplicar la primera reparación:** puentelibre.mx también llega como UTF-8 leído como **GBK** (chino): `Maru se帽al贸` era «Maru señaló». Son 200 títulos del índice y 2 notas, y los 200 se revierten completos.
 
 ## Decisión
 
-1. **Función propia en el dominio:** `app/domain/text_repair.py` (`repair_mojibake` y `clean_text`). Revierte la lectura equivocada (Windows-1252 → bytes → UTF-8) **solo** en las secuencias que forman un carácter UTF-8 válido **y** creíble en una nota en español: letras latinas, comillas y guiones tipográficos, €, símbolos y emojis. Si el resultado sería cirílico, CJK o un carácter de control, la secuencia se deja como estaba. El texto correcto (`Peñón`, `«ADIÓS”»`) no cambia, y en un texto mitad roto solo se arregla la parte rota. Hasta 3 pasadas, para el Mojibake doble.
+1. **Función propia en el dominio:** `app/domain/text_repair.py` (`repair_mojibake` y `clean_text`). Revierte la lectura equivocada (Windows-1252 → bytes → UTF-8) **solo** en las secuencias que forman un carácter UTF-8 válido **y** creíble en una nota en español: letras latinas, comillas y guiones tipográficos, €, símbolos y emojis. Si el resultado sería cirílico, CJK o un carácter de control, la secuencia se deja como estaba. El texto correcto (`Peñón`, `«ADIÓS”»`) no cambia, y en un texto mitad roto solo se arregla la parte rota. Hasta 3 pasadas, para el Mojibake doble. Para la variante GBK se revierte el texto completo (GBK → bytes → UTF-8), y solo si el resultado ya no tiene ideogramas; un texto con chino legítimo se deja igual.
 2. **Al entrar:** `RawArticle.create` (todos los proveedores: SearchApi, Google News RSS, índice local, BrowserWork cuando llegue) y `NewsItem.create` (toda la ingesta: GDELT y RSS de medios) limpian título, fragmento y medio con `clean_text`. Ninguna nota nueva entra rota.
 3. **Lo ya guardado:** `make reparar-texto`.
    - Sin opciones **no escribe nada**: da conteos por tabla y 5 ejemplos reales.
