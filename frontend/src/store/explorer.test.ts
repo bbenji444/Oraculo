@@ -24,6 +24,27 @@ describe('cuerpo de la búsqueda', () => {
     expect(searchInput({ regionId: 272, conceptIds: [3], range: { kind: '30' } })?.days).toBe(30);
   });
 
+  it('las fuentes encendidas van en el cuerpo; sin ninguna no hay búsqueda (F12.2)', () => {
+    const state = { regionId: 272, conceptIds: [3], range: { kind: '7' as const } };
+
+    expect(searchInput(state, ['indice_local'])?.providers).toEqual(['indice_local']);
+    expect(searchInput(state)).not.toHaveProperty('providers');
+    expect(searchInput(state, [])).toBeNull();
+  });
+
+  it('reabrir una búsqueda trae sus fuentes', () => {
+    useExplorerStore.getState().restoreSearch({
+      searchId: 'b1',
+      regionId: 272,
+      conceptIds: [3],
+      dateFrom: '2026-10-23',
+      dateTo: '2026-10-24',
+      providers: ['google_news_rss'],
+    });
+
+    expect(useExplorerStore.getState().sources).toEqual(['google_news_rss']);
+  });
+
   it('personalizado necesita las dos fechas', () => {
     const custom = { kind: 'custom' as const, from: '2026-10-01', to: '2026-10-07' };
 
@@ -95,12 +116,14 @@ describe('store de Explorar', () => {
     useExplorerStore.getState().setPanelOpen(false);
 
     expect(useExplorerStore.getState().panelOpen).toBe(false);
-    // Se recuerdan las preferencias y el último caso usado (9.3), nunca el panel.
+    // Se recuerdan las preferencias, el último caso usado (9.3) y las fuentes
+    // elegidas (F12.2), nunca el panel.
     expect(useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState())).toEqual(
       {
         earth: useExplorerStore.getState().earth,
         motion: useExplorerStore.getState().motion,
         lastCaseId: useExplorerStore.getState().lastCaseId,
+        sources: useExplorerStore.getState().sources,
       },
     );
     useExplorerStore.getState().setPanelOpen(true);

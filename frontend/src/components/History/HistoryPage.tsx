@@ -24,6 +24,7 @@ function reopen(search: Search) {
     conceptIds: search.concepts.map((c) => c.id),
     dateFrom: search.date_from,
     dateTo: search.date_to,
+    providers: search.providers,
   });
   window.location.hash = '#/explorar';
 }

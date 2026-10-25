@@ -1,6 +1,7 @@
 /**
  * Panel de búsqueda (§14.3): región, conceptos (chips, solo activos), rango de
- * fechas, estimación ("2 consultas · hasta 3 créditos": SearchApi pide páginas
+ * fechas, fuentes (switches, F12.2: apagar SearchApi deja la búsqueda en 0
+ * créditos), estimación ("2 consultas · hasta 3 créditos": SearchApi pide páginas
  * solo mientras vengan llenas), botón Buscar y barra de
  * avance por etapas.
  *
@@ -16,11 +17,14 @@ import { useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useEstimate, useSearch, useStartSearch } from '../../hooks/useSearches';
+import { useSources } from '../../hooks/useSources';
 import { isFinished } from '../../services/searches';
+import { chosenSources } from '../../services/sources';
 import { type RangeKind, searchInput, useExplorerStore } from '../../store/explorer';
 import { DownloadButtons } from './Controls';
 import { formatRange, formatUsd, stageProgress } from './format';
 import { RegionPicker } from './RegionPicker';
+import { SourceSwitches } from './SourceSwitches';
 import { GLASS, PANEL_TITLE, SMALL_BUTTON } from './ui';
 
 const RANGES: { kind: RangeKind; label: string }[] = [
@@ -205,7 +209,14 @@ export function SearchPanel() {
   const range = useExplorerStore((s) => s.range);
   const searchId = useExplorerStore((s) => s.searchId);
   const openSearch = useExplorerStore((s) => s.openSearch);
-  const input = searchInput({ regionId, conceptIds, range });
+  const storedSources = useExplorerStore((s) => s.sources);
+  const setSources = useExplorerStore((s) => s.setSources);
+  const sources = useSources();
+  // Sin la lista de fuentes (cargando o con error), se manda sin `providers`
+  // y el servidor usa las de por defecto (F12.2).
+  const providers = sources.data ? chosenSources(sources.data, storedSources) : undefined;
+  const noSources = providers?.length === 0;
+  const input = searchInput({ regionId, conceptIds, range }, providers);
   const estimate = useEstimate(input);
   const start = useStartSearch(openSearch);
   const running = useSearch(searchId).data;
@@ -253,8 +264,21 @@ export function SearchPanel() {
         <ConceptChips />
       </div>
       <DateRange />
+      {sources.data && (
+        <SourceSwitches options={sources.data} chosen={providers ?? []} onChange={setSources} />
+      )}
+      {sources.error && (
+        <p className="text-[11px] text-slate-500">
+          No se pudieron leer las fuentes; se buscará con las de por defecto.
+        </p>
+      )}
       <div className="text-xs" aria-live="polite">
-        {!input && <p className="text-slate-500">Elige región y al menos un concepto.</p>}
+        {!input && noSources && (
+          <p className="text-amber-200">Enciende al menos una fuente para buscar.</p>
+        )}
+        {!input && !noSources && (
+          <p className="text-slate-500">Elige región y al menos un concepto.</p>
+        )}
         {input && estimate.isFetching && !estimate.data && (
           <p className="text-slate-500">Calculando costo…</p>
         )}

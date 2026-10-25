@@ -18,6 +18,8 @@ export interface SearchInput {
   days?: number;
   date_from?: string;
   date_to?: string;
+  /** Fuentes encendidas (`/sources`); sin mandar, las de por defecto (F12.2). */
+  providers?: string[];
 }
 
 export interface ConceptRef {
@@ -43,6 +45,8 @@ export interface SearchEstimate {
     max_articles: number;
     max_cost_usd: number;
   };
+  /** Fuentes con las que se buscaría (F12.2). */
+  providers?: string[];
 }
 
 export type SearchStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
@@ -80,6 +84,11 @@ export interface Search {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  /**
+   * Fuentes con las que se hizo (F12.2). Vacía en búsquedas de antes de F12.2,
+   * que usaron todas las configuradas.
+   */
+  providers?: string[];
 }
 
 export interface Judgement {
