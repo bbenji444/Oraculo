@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Fase 12 — Monitor automatizado FGR: plan y decisiones iniciales.** El plan de Benji queda en `docs/PLAN_MONITOR_FGR.md`, con los ajustes acordados el 24/10/2026:
+  - una búsqueda nacional por corrida, repartida por estado;
+  - corridas automáticas a las 07:00, 15:00 y 23:00 solo con fuentes gratis (Google News RSS e índice local);
+  - SearchApi y BrowserWork (Bing, Google 2) como switches de la búsqueda manual;
+  - duplicados en tres niveles y tema visual homologado con OSINT Oráculo.
+
+  El reloj de Celery que ya existe dispara las corridas (ADR-0022). Los perfiles de fuentes y la conexión con BrowserWork quedan en el ADR-0023.
 - **Duplicados y vínculos de un caso** (Fase 9.5, §9.8, ADR-0106):
   - **Posibles duplicados:** el sistema sugiere qué entidades del caso podrían ser la misma (mismo nombre, un nombre o alias en común, o nombres muy parecidos) y las muestra lado a lado con sus citas. Solo una persona decide «Son la misma» o «No son la misma»; nada se une solo. Al unir queda la confirmada.
   - **Deshacer:** «separar» deshace una fusión, y «Separar menciones» saca a un homónimo que quedó junto.
