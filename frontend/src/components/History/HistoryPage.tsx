@@ -62,11 +62,11 @@ export function HistoryPage() {
                     {formatMexicoCity(search.created_at)}
                   </p>
                   <p className="mt-0.5 text-[11px] text-slate-500">
-                    {/* Las búsquedas de antes de F12.2 no guardaron fuentes: usaron todas. */}
+                    {/* Antes de F12.2 las búsquedas no guardaban con qué fuentes se hicieron. */}
                     Fuentes:{' '}
                     {search.providers && search.providers.length > 0
                       ? providersLabel(search.providers)
-                      : 'todas las configuradas'}
+                      : 'no se registraban en búsquedas anteriores'}
                   </p>
                 </div>
                 <span className={`rounded-md px-2 py-0.5 text-xs ${status.className}`}>
