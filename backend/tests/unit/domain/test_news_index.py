@@ -134,3 +134,10 @@ def test_repara_el_mojibake_de_gdelt_al_entrar() -> None:
     assert note.snippet == "Jáuregui"
     assert note.source_name == "Éxito"
     assert note.text_norm == "MARU SEÑALO CORRUPCION 🎦 JAUREGUI"
+
+
+@pytest.mark.parametrize("title", ["🎦", "  📸 ", "1 🎦", "A"])
+def test_titulo_sin_letras_no_es_una_nota(title: str) -> None:
+    # 73 «notas» del índice eran solo «🎦» al 24/10/2026 (F12.1b).
+    with pytest.raises(InvalidNewsError, match="sin título"):
+        item(title=title)

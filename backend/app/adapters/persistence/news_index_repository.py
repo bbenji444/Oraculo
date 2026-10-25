@@ -21,7 +21,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.application.ports.ingest import IngestRun
-from app.domain.news_index import NewsItem
+from app.domain.dedupe import canonical_url
+from app.domain.news_index import SAME_OUTLET_WINDOW, NewsItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,14 +46,25 @@ class SourceStats:
     newest: datetime | None
 
 
+# Dos reglas de duplicados (ADR-0025): la misma URL canónica no entra dos
+# veces (``ON CONFLICT``), y el mismo medio con el mismo texto a
+# ±SAME_OUTLET_WINDOW tampoco (``NOT EXISTS``, con el índice
+# news_index_domain_published de la migración 0023). La misma nota en otro
+# medio (sindicada) sí entra: es otra fuente.
 _INSERT = text(
     """
     INSERT INTO news_index (source, url, url_hash, title, snippet, source_name, source_domain,
         published_at, language, text_norm, gdelt_states, gdelt_locations, gdelt_themes,
         body_terms)
-    VALUES (:source, :url, :url_hash, :title, :snippet, :source_name, :source_domain,
+    SELECT :source, :url, :url_hash, :title, :snippet, :source_name, :source_domain,
         :published_at, :language, :text_norm, :gdelt_states, CAST(:gdelt_locations AS jsonb),
-        :gdelt_themes, :body_terms)
+        :gdelt_themes, :body_terms
+    WHERE NOT EXISTS (
+        SELECT 1 FROM news_index n
+        WHERE n.source_domain = :source_domain
+          AND n.published_at BETWEEN :window_from AND :window_to
+          AND n.text_norm = :text_norm
+    )
     ON CONFLICT (url_hash) DO NOTHING
     RETURNING id
     """
@@ -62,13 +74,17 @@ _INSERT = text(
 def url_hash(url: str) -> str:
     """Huella de una URL para la llave única del índice.
 
+    Se calcula sobre la URL canónica (sin ``www.``, puerto por defecto ni
+    parámetros de rastreo): ``https://razon.com.mx:443/a`` y
+    ``https://www.razon.com.mx/a`` son la misma nota (F12.1b).
+
     Args:
-        url: URL de la nota.
+        url: URL de la nota, tal como llegó.
 
     Returns:
         SHA-256 en hexadecimal.
     """
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical_url(url).encode("utf-8")).hexdigest()
 
 
 def _values(item: NewsItem) -> dict[str, object]:
@@ -91,6 +107,8 @@ def _values(item: NewsItem) -> dict[str, object]:
         ),
         "gdelt_themes": list(item.gdelt_themes),
         "body_terms": item.body_terms,
+        "window_from": item.published_at - SAME_OUTLET_WINDOW,
+        "window_to": item.published_at + SAME_OUTLET_WINDOW,
     }
 
 
