@@ -46,7 +46,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
   "items": [
     { "id": "google_news_rss", "label": "Google News RSS", "paid": false, "configured": true, "default_on": true },
     { "id": "indice_local", "label": "Índice local (GDELT + medios)", "paid": false, "configured": true, "default_on": true },
-    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "configured": true, "default_on": true }
+    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "configured": true, "default_on": false }
   ]
 }
 ```

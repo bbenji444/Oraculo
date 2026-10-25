@@ -95,6 +95,9 @@ def make_client(settings: Settings, queue: FakeQueue, **changes: Any) -> TestCli
             "dev_user": "analista-prueba",
             # Con llave, SearchApi se planea (1 crédito); la cola falsa nunca lo consulta.
             "searchapi_api_key": SecretStr("llave-de-prueba"),
+            # Encendido aquí para probar créditos y topes; por defecto va
+            # apagado (ADR-0027, ver la prueba de valores por defecto).
+            "manual_default_sources": "google_news_rss,indice_local,searchapi",
             "openai_api_key": SecretStr("llave-de-prueba"),
             "llm_provider": "openai",
             **changes,
@@ -517,3 +520,18 @@ def test_la_busqueda_lanzada_dice_con_que_fuentes_se_hizo(
 
     assert started.status_code == 202
     assert detail.json()["providers"] == ["indice_local"]
+
+
+def test_por_defecto_searchapi_va_apagado_y_no_gasta(
+    settings: Settings, engine: Engine, queue: FakeQueue, ids: dict[str, int]
+) -> None:
+    # Decisión del 25/10/2026 (ADR-0027): 27 de 30 notas de SearchApi ya venían en el RSS.
+    with make_client(
+        settings, queue, manual_default_sources=Settings().manual_default_sources
+    ) as c:
+        sources = {i["id"]: i["default_on"] for i in c.get("/api/v1/sources").json()["items"]}
+        estimate = c.post(f"{URL}/estimate", json=body(ids)).json()
+
+    assert sources == {"google_news_rss": True, "indice_local": True, "searchapi": False}
+    assert estimate["providers"] == ["google_news_rss", "indice_local"]
+    assert estimate["credits"] == 0

@@ -17,7 +17,7 @@ El ADR-0023 ya fijó dos perfiles: el **automático**, fijo (Google News RSS e �
    - Google News («gratis»), índice local («gratis») y SearchApi («créditos»).
    - GDELT queda fuera mientras siga apagado (ADR-0012).
    - BrowserWork entra en F12.3 agregando sus filas.
-2. **Por defecto** se encienden las de `MANUAL_DEFAULT_SOURCES`, que hoy son las tres. SearchApi queda encendido como antes de F12.2 hasta que la medición de `make comparar-fuentes` diga cuánto aporta sobre el RSS; ese resultado se registra aquí y Benji decide.
+2. **Por defecto** se encienden las de `MANUAL_DEFAULT_SOURCES`: **Google News RSS e índice local**. SearchApi va **apagado por defecto** (decisión de Benji del 25/10/2026, con la medición de abajo); el analista lo enciende cuando quiere más cobertura o el link directo al medio.
 3. **Reglas** (`resolve_sources`):
    - Si el analista no elige, se usan las de por defecto que estén configuradas.
    - Si elige, mandan las suyas.
@@ -42,7 +42,7 @@ El ADR-0023 ya fijó dos perfiles: el **automático**, fijo (Google News RSS e �
 - Buscar solo con fuentes gratis cuesta 0 créditos, y la estimación lo muestra antes de buscar.
 - El historial y la bitácora dicen con qué fuentes se hizo cada búsqueda.
 - **Las corridas automáticas (F12.8)** usarán el mismo campo con su perfil fijo; no hace falta otro mecanismo.
-- **Pendiente:** con la medición de abajo, Benji decide si SearchApi sigue encendido por defecto (`MANUAL_DEFAULT_SOURCES`).
+- **Sin tocar nada, una búsqueda manual ya no gasta créditos.** Antes gastaba hasta 3 por concepto en SearchApi, y 27 de cada 30 de esas notas ya venían en el RSS.
 
 ## Medición RSS contra SearchApi (25/10/2026)
 

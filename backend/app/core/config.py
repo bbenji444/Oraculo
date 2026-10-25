@@ -165,9 +165,9 @@ class Settings(BaseSettings):
     # 24/10/2026 (ADR-0021, sustituye al 0011). NEWS_RSS_ENABLED=false lo apaga.
     news_rss_enabled: bool = True
     # Fuentes encendidas por defecto en la búsqueda manual (switches, F12.2,
-    # ADR-0027). SearchApi sigue encendido como antes de F12.2 hasta medir
-    # cuánto aporta sobre el RSS (make comparar-fuentes).
-    manual_default_sources: str = "google_news_rss,indice_local,searchapi"
+    # ADR-0027). SearchApi va apagado: en la medición del 25/10/2026, 27 de sus
+    # 30 notas ya venían en el RSS (decisión de Benji). El analista lo enciende.
+    manual_default_sources: str = "google_news_rss,indice_local"
     # GDELT: desactivado por defecto mientras responda 429 de forma persistente
     # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
     gdelt_enabled: bool = False
