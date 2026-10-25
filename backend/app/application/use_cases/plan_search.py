@@ -123,9 +123,10 @@ class PlanSearch:
     def available_providers(self) -> tuple[Provider, ...]:
         """Proveedores con los que se planea de verdad, en su orden.
 
-        Los que no están configurados (sin llave, o apagados como GDELT y el RSS
-        de Google, ADR-0011 y 0012) no reciben consultas. "Probar concepto" usa
-        esta misma lista para mostrar lo que una búsqueda mandaría.
+        Los que no están configurados (sin llave, o apagados como GDELT,
+        ADR-0012, o el RSS de Google si se apaga, ADR-0021) no reciben
+        consultas. "Probar concepto" usa esta misma lista para mostrar lo que
+        una búsqueda mandaría.
 
         Returns:
             Los proveedores configurados.

@@ -146,7 +146,8 @@ async def test_desactivado_no_envia_nada_y_explica_por_que() -> None:
     provider = GoogleNewsRssProvider(http, enabled=False)
 
     assert provider.is_configured() is False
-    with pytest.raises(ProviderNotConfiguredError, match="ADR-0011"):
+    # Apagado a propósito: dice cómo volver a encenderlo (ADR-0021).
+    with pytest.raises(ProviderNotConfiguredError, match="ADR-0021"):
         await provider.search(query())
     assert sent == []
     await http.aclose()

@@ -133,7 +133,7 @@ Direcciones útiles con el sistema arriba:
 |---|---|---|
 | **SearchApi** (Google News) | Principal, de pago (1 crédito por búsqueda) | Tu llave en `.env`: `SEARCHAPI_API_KEY=…`. Tope mensual: `SEARCHAPI_MONTHLY_CREDIT_LIMIT` (100 por defecto). |
 | **GDELT** | Gratuito. ⚠️ **Desactivado por defecto**: respondió 429 de forma persistente ([ADR-0012](docs/adr/0012-gdelt-desactivado-por-limite.md)) | `GDELT_ENABLED=false`. `wsl make gdelt-diagnostico` reintenta una consulta de prueba una vez al día y avisa cuando hay evidencia para proponer reactivarlo. |
-| **Google News RSS** | ⚠️ **Fuera de producción** | Desactivado (`NEWS_RSS_ENABLED=false`). Ver la advertencia. |
+| **Google News RSS** | Activo (respaldo gratuito) | `NEWS_RSS_ENABLED=true` por defecto desde el dictamen de la Dirección del 24/10/2026 ([ADR-0021](docs/adr/0021-google-news-rss-en-produccion.md)). |
 | **Índice local** (`indice_local`) | Gratuito y activo. Busca en las notas que el sistema junta solo cada 15 minutos mientras `make up` corre ([ADR-0013](docs/adr/0013-ingesta-periodica-e-indice-local.md)) | Nada que activar. Fuentes: ngramas de GDELT con texto completo (`GDELT_NGRAMS_ENABLED=true`, ~1 GB de descarga al día), archivos GKG solo con títulos (`GDELT_GKG_ENABLED=false` por defecto) y RSS de La Jornada, El Universal e Infobae México (`MEDIA_RSS_ENABLED=true`; cada medio se apaga en `fuentes/medios_rss.csv`). `wsl make ingesta` corre una vez y muestra 5 ejemplos. |
 
 **Cómo funciona el índice local.** Es como una hemeroteca propia: cada 15 minutos el reloj de Celery baja el archivo más reciente de GDELT, se queda con las notas en español que mencionan México y guarda solo título, fragmento, medio, fecha y link (nunca el artículo completo). Al buscar, una nota responde si contiene alguna palabra clave **completa** (sin acentos, conservando la Ñ), ninguna exclusión y el lugar en su texto (las ubicaciones que propone GDELT no cuentan: se equivocan seguido). Ojo: "hackeo" no encuentra "hackeos"; pon las dos formas en el concepto si importan. Las ubicaciones de GDELT tienen errores, así que son solo pistas.
@@ -162,7 +162,7 @@ Se encienden con `GDELT_NGRAMS_ENABLED=true` (~1 GB de descarga al día).
 
 **Ver las notas en la interfaz.** Las notas del índice local aparecen en las búsquedas de la pantalla **Explorar** (<http://localhost:8080/>), junto con las de los demás proveedores. La pestaña temporal "Notas" se retiró en la Fase 6.
 
-> ⚠️ **Google News RSS no se usa en producción.** El propio feed declara que solo puede usarse en un lector de noticias personal y no comercial, y que cualquier otro uso está prohibido (cita exacta en [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). Está desactivado por defecto; solo se habilita a propósito en desarrollo con `NEWS_RSS_ENABLED=true`, y deja una advertencia en el registro. La revisión legal está pendiente.
+> **Google News RSS sí se usa en producción** desde el dictamen de la Dirección del 24/10/2026 ([ADR-0021](docs/adr/0021-google-news-rss-en-produccion.md), que sustituye al [ADR-0011](docs/adr/0011-google-news-rss-fuera-de-produccion.md)). El feed declara que es para un lector personal y no comercial; la Dirección aprobó su uso institucional y el riesgo quedó registrado en el ADR. `NEWS_RSS_ENABLED=false` lo apaga.
 
 Para probar un proveedor con **una** consulta real, que pide confirmación antes de enviarla:
 

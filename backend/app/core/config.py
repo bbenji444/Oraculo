@@ -159,9 +159,9 @@ class Settings(BaseSettings):
     searchapi_max_pages: int = Field(
         default=_DEFAULT_SEARCHAPI_MAX_PAGES, ge=1, le=_MAX_SEARCHAPI_PAGES
     )
-    # Google News RSS: desactivado por defecto por sus términos de uso
-    # (ADR-0011). Solo se activa a propósito en desarrollo; nunca en producción.
-    news_rss_enabled: bool = False
+    # Google News RSS: activado por defecto desde el dictamen de la Dirección del
+    # 24/10/2026 (ADR-0021, sustituye al 0011). NEWS_RSS_ENABLED=false lo apaga.
+    news_rss_enabled: bool = True
     # GDELT: desactivado por defecto mientras responda 429 de forma persistente
     # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
     gdelt_enabled: bool = False

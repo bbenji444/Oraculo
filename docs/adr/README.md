@@ -24,7 +24,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0008](0008-fuentes-y-procesamiento-de-geodatos.md) | Fuentes y procesamiento de geodatos | Aceptado |
 | [0009](0009-construccion-de-consultas.md) | Construcción de consultas a los proveedores de noticias | Aceptado |
 | [0010](0010-httpx2-para-llamadas-externas.md) | httpx2 para las llamadas HTTP externas y sus pruebas | Aceptado |
-| [0011](0011-google-news-rss-fuera-de-produccion.md) | Google News RSS fuera de producción por sus términos de uso | Aceptado (revisión legal pendiente) |
+| [0011](0011-google-news-rss-fuera-de-produccion.md) | Google News RSS fuera de producción por sus términos de uso | Sustituido por el 0021 |
 | [0012](0012-gdelt-desactivado-por-limite.md) | GDELT desactivado mientras responda 429 de forma persistente | Aceptado |
 | [0013](0013-ingesta-periodica-e-indice-local.md) | Ingesta periódica e índice local de notas (GDELT por archivos y RSS de medios) | Aceptado (modificado por 0014) |
 | [0014](0014-ngramas-de-gdelt.md) | Ngramas de GDELT como fuente del índice local | Aceptado |
@@ -34,6 +34,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0018](0018-reportes-pdf-y-datos.md) | Reportes en PDF con mapa dibujado en el servidor y datos en CSV y GeoJSON | Aceptado |
 | [0019](0019-paginas-de-searchapi.md) | Hasta 3 páginas de SearchApi por consulta, solo mientras vengan llenas | Aceptado |
 | [0020](0020-colonias-de-openstreetmap.md) | Colonias de OpenStreetMap y reglas nuevas del geolocalizador | Aceptado |
+| [0021](0021-google-news-rss-en-produccion.md) | Google News RSS en producción por dictamen de la Dirección (sustituye al 0011) | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

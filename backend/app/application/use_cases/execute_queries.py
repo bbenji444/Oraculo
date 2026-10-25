@@ -5,7 +5,7 @@ Recibe las consultas ya planeadas (``build_queries``) y, para cada una:
 1. **Presupuesto.** Si la búsqueda planea más de ``MAX_QUERIES_PER_SEARCH``
    consultas, se rechaza completa **antes** de enviar nada.
 2. **Proveedor disponible.** Si no está configurado (SearchApi sin llave) o
-   está desactivado (Google News RSS, ADR-0011; GDELT, ADR-0012), la
+   está apagado (GDELT, ADR-0012; Google News RSS si se apaga, ADR-0021), la
    consulta se registra como ``skipped`` con el motivo.
 3. **Caché.** Una consulta idéntica reciente se responde desde la caché: no
    se envía ni cuesta créditos. El índice local no usa caché: cambia cada
