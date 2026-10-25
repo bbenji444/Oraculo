@@ -47,6 +47,7 @@ from app.application.use_cases.plan_search import PlanSearch, SearchEstimate, Se
 from app.cli.probar_proveedor import find_concept, window_from
 from app.core.config import Settings, get_settings
 from app.domain.search import SearchStatus, Stage
+from app.domain.sources import parse_sources
 from app.geodata.consola import configure_cli_logging, heading
 from app.worker.celery_app import celery_app
 from app.worker.search_jobs import build_providers, run_search_job
@@ -118,6 +119,7 @@ async def prepare(
         llm=info,
         llm_max_articles=settings.llm_max_articles_per_search,
         credits_limit=settings.searchapi_monthly_credit_limit,
+        default_sources=parse_sources(settings.manual_default_sources),
     ).estimate(SearchRequest(settings.dev_user, concept_ids, region.id, window_from(args)))
 
 

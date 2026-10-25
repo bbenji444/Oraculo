@@ -254,6 +254,13 @@ class RunSearch:
         """
         return [p for p, adapter in self._providers.items() if adapter.is_configured()]
 
+    def _sources_of(self, search: StoredSearch) -> list[Provider]:
+        """Las fuentes elegidas que siguen configuradas (todas, en búsquedas viejas)."""
+        available = self.available_providers()
+        if not search.providers:
+            return available
+        return [p for p in available if p in search.providers]
+
     async def run(self, search_id: UUID) -> SearchReport:
         """Corre la búsqueda.
 
@@ -307,9 +314,7 @@ class RunSearch:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
         searched = await search_area(self._gazetteer, searched)
         window = DateWindow.between(search.date_from, search.date_to)
-        queries = plan_queries(
-            search.concepts, place_for(facts), window, self.available_providers()
-        )
+        queries = plan_queries(search.concepts, place_for(facts), window, self._sources_of(search))
         return searched, queries
 
     async def _dedupe(

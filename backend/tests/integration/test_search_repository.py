@@ -117,6 +117,7 @@ async def new_search(store: PostgresSearchStore, engine: AsyncEngine, concept_id
             concepts=(SearchConcept(concept_id, CONCEPT_NAME, "", ("extorsión",)),),
             queries_planned=2,
             credits_estimated=1,
+            providers=(Provider.SEARCHAPI, Provider.LOCAL_INDEX),
         )
     )
 
@@ -193,7 +194,8 @@ async def test_busqueda_guardada_de_punta_a_punta(
         audit = (
             await conn.execute(
                 text(
-                    "SELECT payload->>'creditos', jsonb_array_length(payload->'consultas') "
+                    "SELECT payload->>'creditos', jsonb_array_length(payload->'consultas'), "
+                    "payload->'fuentes' "
                     "FROM audit_log WHERE entity_type = 'search' AND entity_id = :id"
                 ),
                 {"id": str(search_id)},
@@ -218,7 +220,8 @@ async def test_busqueda_guardada_de_punta_a_punta(
         "stage": "close",
     }
     assert [tuple(r) for r in located] == [("09007", "municipality", True, True)]
-    assert tuple(audit) == ("1", 2)
+    # La bitácora dice con qué fuentes se buscó (F12.2, CLAUDE.md §8).
+    assert tuple(audit) == ("1", 2, ["searchapi", "indice_local"])
     assert [tuple(t) for t in texts] == [("ok", True), ("fallback", False)]
 
     preview = await articles.preview(search_id, 5)
@@ -508,3 +511,17 @@ async def test_reprocesar_con_ia_desde_el_texto_guardado(
 
     monkeypatch.setattr(reubicar, "build_llm", no_key)
     assert await reubicar.run(args, cli_settings(settings), lambda _q: "si") == 1
+
+
+async def test_la_busqueda_guarda_y_lee_sus_fuentes(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    searches, _ = stores
+
+    search_id = await new_search(searches, test_engine, concept_id)
+    stored = await searches.load(search_id)
+
+    assert stored is not None
+    assert stored.providers == (Provider.SEARCHAPI, Provider.LOCAL_INDEX)

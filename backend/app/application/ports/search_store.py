@@ -26,6 +26,7 @@ from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import Mention, Resolution
+from app.domain.queries import Provider
 from app.domain.search import SearchStatus, Stage
 
 
@@ -62,6 +63,7 @@ class NewSearch:
         concepts: Conceptos copiados.
         queries_planned: Consultas planeadas.
         credits_estimated: Créditos estimados.
+        providers: Fuentes con las que corre (switches, ADR-0027).
     """
 
     user_id: str
@@ -71,6 +73,7 @@ class NewSearch:
     concepts: tuple[SearchConcept, ...]
     queries_planned: int
     credits_estimated: int
+    providers: tuple[Provider, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +89,8 @@ class StoredSearch:
         date_to: Último día.
         status: Estado actual.
         concepts: Conceptos copiados al crearla.
+        providers: Fuentes elegidas; vacío en las búsquedas de antes de
+            F12.2, que corrían con todas las configuradas.
     """
 
     search_id: UUID
@@ -96,6 +101,7 @@ class StoredSearch:
     date_to: date
     status: SearchStatus
     concepts: tuple[SearchConcept, ...]
+    providers: tuple[Provider, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

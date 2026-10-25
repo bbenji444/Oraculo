@@ -33,6 +33,7 @@ from app.domain.errors import (
     RegionNotFoundError,
 )
 from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
+from app.domain.sources import resolve_sources
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,12 +45,15 @@ class SearchRequest:
         concept_ids: Conceptos (al menos uno, sin repetir).
         region_id: Región.
         window: Rango de fechas.
+        providers: Fuentes que encendió el analista (switches, ADR-0027), o
+            ``None`` para usar las de por defecto.
     """
 
     user_id: str
     concept_ids: tuple[int, ...]
     region_id: int
     window: DateWindow
+    providers: tuple[Provider, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +101,7 @@ class PlanSearch:
         llm: LLMInfo,
         llm_max_articles: int,
         credits_limit: int,
+        default_sources: Sequence[Provider] = tuple(Provider),
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         """Recibe las piezas.
@@ -109,6 +114,8 @@ class PlanSearch:
             llm: IA elegida y su tarifa.
             llm_max_articles: ``LLM_MAX_ARTICLES_PER_SEARCH``.
             credits_limit: ``SEARCHAPI_MONTHLY_CREDIT_LIMIT``.
+            default_sources: Fuentes encendidas si el analista no elige
+                (``MANUAL_DEFAULT_SOURCES``); por defecto, todas.
             now: Reloj (las pruebas lo fijan).
         """
         self._concepts = concepts
@@ -118,6 +125,7 @@ class PlanSearch:
         self._llm = llm
         self._llm_max_articles = llm_max_articles
         self._credits_limit = credits_limit
+        self._default_sources = tuple(default_sources)
         self._now = now
 
     def available_providers(self) -> tuple[Provider, ...]:
@@ -166,7 +174,7 @@ class PlanSearch:
 
         Raises:
             InvalidRequestError: Sin conceptos, con conceptos repetidos o
-                desactivados.
+                desactivados, sin fuentes o con una fuente no configurada.
             ConceptNotFoundError: Si un concepto no existe o fue borrado.
             RegionNotFoundError: Si la región no existe.
             QueryTooLongError: Si una palabra clave no cabe en un proveedor.
@@ -178,7 +186,14 @@ class PlanSearch:
             raise RegionNotFoundError("No existe esa región.", {"id": request.region_id})
         ancestors = await self._regions.ancestors(region.id)
         available = self.available_providers()
-        queries = tuple(plan_queries(concepts, place_for(facts), request.window, available))
+        # Sin ningún proveedor configurado no hay nada que elegir: StartSearch
+        # responde «no hay proveedores disponibles» (503), como antes de F12.2.
+        sources = (
+            resolve_sources(request.providers, self._default_sources, available)
+            if available
+            else ()
+        )
+        queries = tuple(plan_queries(concepts, place_for(facts), request.window, sources))
         credits_estimated = sum(self._providers[q.provider].estimate_cost(q) for q in queries)
         used = await self._log.credits_used_since(
             Provider.SEARCHAPI.value, month_start(self._now(), MEXICO_CITY)
@@ -193,6 +208,7 @@ class PlanSearch:
                 concepts=concepts,
                 queries_planned=len(queries),
                 credits_estimated=credits_estimated,
+                providers=sources,
             ),
             breadcrumb=" › ".join([*(a.name for a in ancestors), region.name]),
             queries=queries,

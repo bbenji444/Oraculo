@@ -12,9 +12,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
+
+from app.domain.sources import parse_sources
 
 # backend/app/core/config.py → la raíz del repositorio está 3 niveles arriba.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -162,6 +164,10 @@ class Settings(BaseSettings):
     # Google News RSS: activado por defecto desde el dictamen de la Dirección del
     # 24/10/2026 (ADR-0021, sustituye al 0011). NEWS_RSS_ENABLED=false lo apaga.
     news_rss_enabled: bool = True
+    # Fuentes encendidas por defecto en la búsqueda manual (switches, F12.2,
+    # ADR-0027). SearchApi sigue encendido como antes de F12.2 hasta medir
+    # cuánto aporta sobre el RSS (make comparar-fuentes).
+    manual_default_sources: str = "google_news_rss,indice_local,searchapi"
     # GDELT: desactivado por defecto mientras responda 429 de forma persistente
     # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
     gdelt_enabled: bool = False
@@ -201,6 +207,13 @@ class Settings(BaseSettings):
     llm_concurrency: int = Field(default=_DEFAULT_LLM_CONCURRENCY, ge=1)
     llm_max_articles_per_search: int = Field(default=_DEFAULT_LLM_MAX_ARTICLES, ge=1)
     geo_min_confidence: float = Field(default=_DEFAULT_GEO_MIN_CONFIDENCE, ge=0, le=1)
+
+    @field_validator("manual_default_sources")
+    @classmethod
+    def _known_sources(cls, value: str) -> str:
+        """Falla al arrancar si ``MANUAL_DEFAULT_SOURCES`` nombra una fuente que no existe."""
+        parse_sources(value)
+        return value
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.
