@@ -163,7 +163,7 @@ async def test_sin_elegir_se_usan_las_de_por_defecto() -> None:
     ("providers", "message"),
     [
         ((), "Elige al menos una fuente"),
-        ((Provider.SEARCHAPI,), r"SearchApi \(Google\): no está configurada"),
+        ((Provider.SEARCHAPI,), r"SearchApi \(Google News\): no está configurada"),
         ((Provider.GDELT,), "no se puede elegir"),
     ],
 )

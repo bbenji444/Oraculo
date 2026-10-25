@@ -38,7 +38,11 @@ def test_sin_elegir_se_usan_las_de_por_defecto_que_esten_configuradas() -> None:
     [
         ((), ALL, "Elige al menos una fuente"),
         (None, (Provider.SEARCHAPI,), "Elige al menos una fuente"),
-        ((Provider.GOOGLE_NEWS_RSS,), (Provider.LOCAL_INDEX,), "Google News: no está configurada"),
+        (
+            (Provider.GOOGLE_NEWS_RSS,),
+            (Provider.LOCAL_INDEX,),
+            "Google News RSS: no está configurada",
+        ),
         ((Provider.GDELT,), (*ALL, Provider.GDELT), "no se puede elegir"),
     ],
 )

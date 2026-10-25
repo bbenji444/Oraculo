@@ -12,12 +12,14 @@ from app.api.v1.relationships import router as relationships_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.searches import router as searches_router
+from app.api.v1.sources import router as sources_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(regions_router)
 api_router.include_router(concepts_router)
 api_router.include_router(searches_router)
+api_router.include_router(sources_router)
 api_router.include_router(articles_router)
 api_router.include_router(reports_router)
 api_router.include_router(cases_router)
@@ -35,6 +37,13 @@ OPENAPI_TAGS = [
         "description": (
             "Estimar, lanzar y seguir una búsqueda; sus notas y el mapa de calor (§9 y §13). "
             "Lanzar gasta créditos de SearchApi y tokens de la IA: estima primero."
+        ),
+    },
+    {
+        "name": "fuentes",
+        "description": (
+            "Fuentes que el analista enciende o apaga en la búsqueda manual (F12.2, "
+            "ADR-0027): cuáles hay, cuáles cuestan créditos y cuáles están configuradas."
         ),
     },
     {"name": "notas", "description": "Detalle de una nota. Nunca el texto completo (§8)."},

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from app.domain.errors import InvalidRequestError
 from app.domain.queries import Provider
+from app.domain.query_dialects import DIALECTS
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,10 +36,11 @@ class Source:
 
 # En el orden en que se muestran. GDELT sigue apagado por su límite
 # (ADR-0012) y queda fuera de los switches mientras tanto.
-SOURCES: tuple[Source, ...] = (
-    Source(Provider.GOOGLE_NEWS_RSS, "Google News", paid=False),
-    Source(Provider.LOCAL_INDEX, "Índice local", paid=False),
-    Source(Provider.SEARCHAPI, "SearchApi (Google)", paid=True),
+_SWITCHES = (Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX, Provider.SEARCHAPI)
+# El nombre y el costo salen de los dialectos de consulta: una sola lista para
+# la estimación, «Probar concepto» y los switches.
+SOURCES: tuple[Source, ...] = tuple(
+    Source(p, DIALECTS[p].label, paid=DIALECTS[p].credits_per_query > 0) for p in _SWITCHES
 )
 _BY_PROVIDER = {s.provider: s for s in SOURCES}
 

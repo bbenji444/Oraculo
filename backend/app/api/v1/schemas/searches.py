@@ -16,7 +16,7 @@ from app.application.pagination import Page
 from app.application.ports.search_reads import SearchDetail
 from app.application.use_cases.plan_search import SearchEstimate
 from app.domain.errors import InvalidRequestError
-from app.domain.queries import DateWindow
+from app.domain.queries import DateWindow, Provider
 
 # Tope de transporte: una búsqueda con más conceptos no cabría en el
 # presupuesto de consultas de todos modos (MAX_QUERIES_PER_SEARCH).
@@ -37,6 +37,14 @@ class SearchIn(BaseModel):
     )
     date_from: date | None = Field(default=None, description="Rango fijo: primer día.")
     date_to: date | None = Field(default=None, description="Rango fijo: último día.")
+    providers: list[Provider] | None = Field(
+        default=None,
+        description=(
+            "Fuentes encendidas (``/sources``). Sin mandar, las de por defecto; "
+            "lista vacía o una fuente sin configurar responde 422."
+        ),
+        examples=[["google_news_rss", "indice_local"]],
+    )
 
     def window(self, today: date) -> DateWindow:
         """Rango de fechas pedido.
@@ -91,6 +99,9 @@ class EstimateOut(BaseModel):
     credits_limit: int = Field(description="Tope mensual de créditos.")
     over_limit: bool = Field(description="Si se pasaría el tope (la búsqueda no se podría lanzar).")
     llm: LLMEstimateOut
+    providers: list[str] = Field(
+        description="Fuentes con las que se buscaría.", examples=[["google_news_rss"]]
+    )
 
     @classmethod
     def from_estimate(cls, estimate: SearchEstimate) -> "EstimateOut":
@@ -121,6 +132,7 @@ class EstimateOut(BaseModel):
                 max_articles=estimate.llm_max_articles,
                 max_cost_usd=round(estimate.llm_max_cost_usd, 4),
             ),
+            providers=[p.value for p in search.providers],
         )
 
 
@@ -163,6 +175,13 @@ class SearchOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    providers: list[str] = Field(
+        description=(
+            "Fuentes con las que se hizo. Vacía en búsquedas de antes de F12.2, "
+            "que usaron todas las configuradas."
+        ),
+        examples=[["google_news_rss", "indice_local"]],
+    )
 
     @classmethod
     def from_detail(cls, detail: SearchDetail) -> "SearchOut":
@@ -195,6 +214,7 @@ class SearchOut(BaseModel):
             created_at=detail.created_at,
             started_at=detail.started_at,
             finished_at=detail.finished_at,
+            providers=list(detail.providers),
         )
 
 

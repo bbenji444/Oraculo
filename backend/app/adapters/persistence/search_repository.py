@@ -363,6 +363,7 @@ class PostgresSearchStore:
                 created_at=row["created_at"],
                 started_at=row["started_at"],
                 finished_at=row["finished_at"],
+                providers=tuple(row["providers"]),
             )
             for row in rows
         ]

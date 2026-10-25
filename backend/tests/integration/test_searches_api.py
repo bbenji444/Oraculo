@@ -464,3 +464,51 @@ def test_mapa_de_calor_errores(client: TestClient, filled: tuple[str, dict[str, 
 
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "search_not_found")
     assert (bad.status_code, bad.json()["error"]["code"]) == (422, "invalid_request")
+
+
+def test_las_fuentes_para_los_switches(client: TestClient) -> None:
+    # F12.2 (ADR-0027): orden de pantalla, costo y si están configuradas.
+    response = client.get("/api/v1/sources")
+
+    assert response.status_code == 200
+    items = {i["id"]: i for i in response.json()["items"]}
+    assert list(items) == ["google_news_rss", "indice_local", "searchapi"]
+    assert items["searchapi"]["paid"] is True
+    assert items["indice_local"] == {
+        "id": "indice_local",
+        "label": "Índice local (GDELT + medios)",
+        "paid": False,
+        "configured": True,
+        "default_on": True,
+    }
+
+
+def test_estimar_solo_con_las_fuentes_elegidas(client: TestClient, ids: dict[str, int]) -> None:
+    response = client.post(f"{URL}/estimate", json=body(ids, providers=["indice_local"]))
+
+    assert response.status_code == 200
+    data = response.json()
+    assert [q["provider"] for q in data["queries"]] == ["indice_local"]
+    assert data["credits"] == 0
+    assert data["providers"] == ["indice_local"]
+
+
+@pytest.mark.parametrize("providers", [[], ["bing"]])
+def test_fuentes_invalidas_no_se_estiman(
+    client: TestClient, ids: dict[str, int], providers: list[str]
+) -> None:
+    response = client.post(f"{URL}/estimate", json=body(ids, providers=providers))
+
+    assert response.status_code == 422
+
+
+def test_la_busqueda_lanzada_dice_con_que_fuentes_se_hizo(
+    client: TestClient, ids: dict[str, int]
+) -> None:
+    started = client.post(URL, json=body(ids, providers=["indice_local"]))
+    search_id = started.json()["search_id"]
+
+    detail = client.get(f"{URL}/{search_id}")
+
+    assert started.status_code == 202
+    assert detail.json()["providers"] == ["indice_local"]

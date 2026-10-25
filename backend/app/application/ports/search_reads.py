@@ -58,6 +58,8 @@ class SearchDetail:
         created_at: Cuándo se pidió (UTC).
         started_at: Cuándo empezó a correr.
         finished_at: Cuándo terminó.
+        providers: Fuentes con las que se hizo (ADR-0027); vacío en las de
+            antes de F12.2, que usaron todas las configuradas.
     """
 
     search_id: UUID
@@ -80,6 +82,7 @@ class SearchDetail:
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    providers: tuple[str, ...] = ()
 
 
 class SearchReaderPort(Protocol):

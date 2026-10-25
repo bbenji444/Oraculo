@@ -117,7 +117,11 @@ Starter = Annotated[StartSearch, Depends(get_start_search)]
 
 def _request(body: SearchIn, actor: Actor) -> SearchRequest:
     return SearchRequest(
-        actor.user_id, tuple(body.concept_ids), body.region_id, body.window(mexico_city_today())
+        actor.user_id,
+        tuple(body.concept_ids),
+        body.region_id,
+        body.window(mexico_city_today()),
+        tuple(body.providers) if body.providers is not None else None,
     )
 
 

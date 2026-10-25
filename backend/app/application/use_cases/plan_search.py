@@ -33,7 +33,7 @@ from app.domain.errors import (
     RegionNotFoundError,
 )
 from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
-from app.domain.sources import resolve_sources
+from app.domain.sources import SOURCES, Source, resolve_sources
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +88,22 @@ class SearchEstimate:
         return self.credits_month + self.credits > self.credits_limit
 
 
+@dataclass(frozen=True, slots=True)
+class SourceOption:
+    """Un switch de fuente tal como lo ve el analista (F12.2, ADR-0027).
+
+    Attributes:
+        source: La fuente (nombre en pantalla y si cuesta).
+        configured: Si tiene lo necesario para consultar; si no, el switch
+            se ve apagado y deshabilitado.
+        default_on: Si va encendida al abrir la búsqueda.
+    """
+
+    source: Source
+    configured: bool
+    default_on: bool
+
+
 class PlanSearch:
     """Arma una búsqueda con los datos guardados y calcula su costo."""
 
@@ -140,6 +156,22 @@ class PlanSearch:
             Los proveedores configurados.
         """
         return tuple(p for p, adapter in self._providers.items() if adapter.is_configured())
+
+    def source_options(self) -> list[SourceOption]:
+        """Los switches de fuentes de la búsqueda manual, en orden de pantalla.
+
+        Returns:
+            Una opción por fuente del catálogo, configurada o no.
+        """
+        configured = set(self.available_providers())
+        return [
+            SourceOption(
+                source=s,
+                configured=s.provider in configured,
+                default_on=s.provider in self._default_sources and s.provider in configured,
+            )
+            for s in SOURCES
+        ]
 
     async def _concepts_of(self, ids: Sequence[int]) -> tuple[SearchConcept, ...]:
         if not ids:
