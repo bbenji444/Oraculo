@@ -5,12 +5,16 @@
  * aparte). Recibe las notas ya filtradas por relevancia (las mismas que el
  * globo); su interruptor "No relevantes" cambia el store y afecta a los dos.
  * El encabezado dice cuántas se ven de cuántas trajo la búsqueda ("24 de 43").
+ * Las notas del mismo hecho en varios medios van en una sola tarjeta con
+ * «▸ +N medios» (ADR-0026); debajo de las pestañas se dice en cuántas.
  */
 import { useEffect, useRef } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
-import { formatDay, isCoarse, newsCount, PRECISION_LABEL } from './format';
+import { newsCount } from './format';
+import { groupByStory } from './stories';
+import { StoryCard } from './StoryCard';
 import { GLASS, PANEL_TITLE } from './ui';
 
 const TABS: { id: ListFilter; label: string }[] = [
@@ -43,6 +47,8 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
   const setShowIrrelevant = useExplorerStore((s) => s.setShowIrrelevant);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const shown = articles.filter((a) => matches(a, filter));
+  // Mismo hecho en varios medios = una tarjeta con «▸ +N medios» (ADR-0026).
+  const groups = groupByStory(shown);
   const count = newsCount(articles.length, total);
 
   useEffect(() => {
@@ -88,57 +94,24 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
           </button>
         ))}
       </div>
+      {groups.length < shown.length && (
+        <p className="mt-2 text-[11px] text-slate-500">
+          {shown.length} notas en {groups.length} tarjetas: las del mismo hecho van juntas.
+        </p>
+      )}
       <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {shown.length === 0 && <li className="text-xs text-slate-500">Nada en esta pestaña.</li>}
-        {shown.map((article) => {
-          const concept = article.concepts.find((c) => c.is_relevant);
-          const location = article.primary_location;
-          const isSelected = article.article_id === articleId;
-          return (
-            <li key={article.article_id}>
-              <button
-                ref={isSelected ? selectedRef : undefined}
-                type="button"
-                aria-current={isSelected}
-                onClick={() => {
-                  selectArticle(article.article_id);
-                }}
-                className={`flex w-full gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-                  isSelected
-                    ? 'border-sky-400/50 bg-sky-500/15'
-                    : 'border-transparent bg-white/[0.03] hover:bg-white/[0.07]'
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className="mt-1.5 size-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: concept
-                      ? (colors.get(concept.concept_id) ?? '#38BDF8')
-                      : '#64748B',
-                  }}
-                />
-                <span className="min-w-0">
-                  <span className="line-clamp-2 text-[13px] leading-snug text-slate-100">
-                    {article.title}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-                    {article.source_name ?? article.source_domain ?? '—'}
-                    {article.published_at && ` · ${formatDay(article.published_at)}`}
-                    {' · '}
-                    <span
-                      className={
-                        location && isCoarse(location.precision) ? 'text-amber-200/80' : ''
-                      }
-                    >
-                      {location?.place ?? PRECISION_LABEL.unknown}
-                    </span>
-                  </span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
+        {groups.map((group) => (
+          <li key={group.lead.article_id}>
+            <StoryCard
+              group={group}
+              colors={colors}
+              selectedId={articleId}
+              selectedRef={selectedRef}
+              onSelect={selectArticle}
+            />
+          </li>
+        ))}
       </ul>
     </section>
   );

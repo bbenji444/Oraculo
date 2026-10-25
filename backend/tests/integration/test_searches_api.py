@@ -320,6 +320,8 @@ def test_las_notas_relevantes_con_su_ubicacion(
     assert item["article_id"] == articles[IZTA_SEARCHAPI.title]
     assert item["in_region"] is True
     assert item["providers"] == ["searchapi", "indice_local"]
+    # Nota sola: todavía no está en ninguna historia (ADR-0026).
+    assert item["story_id"] is None
     assert item["summary"] == "Resumen propio."
     assert [(c["name"], c["is_relevant"]) for c in item["concepts"]] == [("Prueba pipeline", True)]
     primary = item["primary_location"]

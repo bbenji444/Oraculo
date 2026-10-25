@@ -1,4 +1,4 @@
-"""Similitud de títulos con rapidfuzz, para quitar notas casi duplicadas (§9).
+"""Similitud de títulos con rapidfuzz: notas casi duplicadas (§9) e historias (F12.1c).
 
 El dominio (``app.domain.dedupe``) recibe esta función como parámetro: así
 no importa librerías externas (CLAUDE.md §6.1).
@@ -30,3 +30,20 @@ def title_similarity(a: str, b: str) -> float:
         0.923...
     """
     return fuzz.ratio(a, b) / _PERCENT
+
+
+def title_token_similarity(a: str, b: str) -> float:
+    """Parecido por palabras de dos títulos normalizados, de 0 a 1 (historias, F12.1c).
+
+    Usa ``fuzz.token_set_ratio``: ignora el orden y las palabras de más, así
+    «Balacera en Iztapalapa deja dos muertos» y «Dos muertos por balacera en
+    Ermita Iztapalapa» salen parecidos aunque ``title_similarity`` no.
+
+    Args:
+        a: Título normalizado.
+        b: Otro título normalizado.
+
+    Returns:
+        1.0 si uno contiene todas las palabras del otro.
+    """
+    return fuzz.token_set_ratio(a, b) / _PERCENT

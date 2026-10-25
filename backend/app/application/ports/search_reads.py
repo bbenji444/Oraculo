@@ -208,6 +208,8 @@ class ArticleItem:
         primary: Ubicación principal, si tiene.
         in_region: Si cae en la región buscada (``None``: sin ubicación).
         providers: Quién la encontró en esta búsqueda.
+        story_id: Historia a la que pertenece (id de su primera nota, ADR-0026),
+            o ``None`` si está sola.
     """
 
     article_id: int
@@ -225,6 +227,7 @@ class ArticleItem:
     primary: LocationView | None
     in_region: bool | None
     providers: tuple[str, ...]
+    story_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -27,13 +27,15 @@ from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
+from app.adapters.persistence.stories_repository import PostgresStoryStore
 from app.adapters.providers.factory import build_provider
-from app.adapters.text.similarity import title_similarity
+from app.adapters.text.similarity import title_similarity, title_token_similarity
 from app.application.ports.providers import NewsProviderPort
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
 from app.application.use_cases.run_search import PipelineLimits, RunSearch, SearchReport
+from app.application.use_cases.stories import GroupStories
 from app.core.config import Settings
 from app.domain.queries import Provider
 
@@ -102,6 +104,9 @@ async def search_pipeline(
             llm=llm.llm,
             geocoder=GeocodeMentions(gazetteer, settings.geo_min_confidence),
             similarity=title_similarity,
+            stories=GroupStories(
+                PostgresStoryStore(engine), title_similarity, title_token_similarity
+            ),
             limits=PipelineLimits(
                 settings.llm_max_articles_per_search,
                 settings.llm_concurrency,
