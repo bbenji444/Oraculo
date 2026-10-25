@@ -121,6 +121,11 @@ export interface Article {
   primary_location: ArticleLocation | null;
   in_region: boolean | null;
   providers: string[];
+  /**
+   * Historia: id de la primera nota del mismo hecho en varios medios
+   * (ADR-0026); `null` o ausente si la nota está sola.
+   */
+  story_id?: number | null;
 }
 
 export interface ArticleDetail extends Article {
