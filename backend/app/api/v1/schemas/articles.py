@@ -111,6 +111,13 @@ class ArticleOut(BaseModel):
     )
     in_region: bool | None = Field(description="true dentro, false fuera, null sin ubicación.")
     providers: list[str] = Field(examples=[["searchapi", "indice_local"]])
+    story_id: int | None = Field(
+        default=None,
+        description=(
+            "Historia: id de la primera nota del mismo hecho en varios medios; "
+            "null si la nota está sola (ADR-0026)."
+        ),
+    )
 
     @classmethod
     def from_item(cls, item: ArticleItem) -> "ArticleOut":
@@ -138,6 +145,7 @@ class ArticleOut(BaseModel):
             primary_location=LocationOut.from_view(item.primary) if item.primary else None,
             in_region=item.in_region,
             providers=list(item.providers),
+            story_id=item.story_id,
         )
 
 

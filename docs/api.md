@@ -212,12 +212,15 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
         "lat": 18.732125509858896
       },
       "in_region": false,
-      "providers": ["indice_local"]
+      "providers": ["indice_local"],
+      "story_id": null
     }
   ],
   "next_cursor": "WyJ0IiwgIjIwMjYtMTAtMTdUMDY6MzI6MDAtMDY6MDAiLCAiMTEiXQ"
 }
 ```
+
+`story_id` (F12.1c, ADR-0026) agrupa las notas del **mismo hecho** publicadas por varios medios: es el id de la primera nota de la historia y es igual en todas sus notas. `null` = la nota está sola. El monitor junta en una tarjeta las notas visibles con el mismo `story_id` («▸ +N medios»).
 
 - `summary` lo escribe la IA: nunca se entrega el texto del artículo (CLAUDE.md §8). Para leerlo completo está `url`.
 - El punto (`lon` y `lat`) sale del catálogo INEGI, nunca de la IA.

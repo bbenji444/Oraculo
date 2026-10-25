@@ -18,7 +18,8 @@ from app.application.ports.search_reads import ArticleItem, JudgementView, Locat
 
 ARTICLE_COLUMNS = """
     a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
-    a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status
+    a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status,
+    a.story_id
 """
 LOCATION_COLUMNS = """
     p.mention_text, p.role, p.precision, p.confidence, p.is_primary, r.id AS region_id,
@@ -129,4 +130,5 @@ def article_item(row: RowMapping) -> ArticleItem:
         primary=location_view(row, "p_") if row["p_id"] is not None else None,
         in_region=row["in_region"],
         providers=tuple(row["providers"]),
+        story_id=row["story_id"],
     )
