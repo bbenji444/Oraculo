@@ -12,7 +12,7 @@
 import { type Ref, useState } from 'react';
 
 import type { Article } from '../../services/searches';
-import { formatDay, isCoarse, PRECISION_LABEL } from './format';
+import { formatDay, isCoarse, PRECISION_LABEL, providersLabel } from './format';
 import { moreOutletsLabel, type StoryGroup } from './stories';
 
 /** Color del punto de una nota sin concepto relevante (gris de la paleta). */
@@ -79,6 +79,12 @@ function ArticleRow({
             {location?.place ?? PRECISION_LABEL.unknown}
           </span>
         </span>
+        {article.providers.length > 0 && (
+          // De qué fuente vino la nota en esta búsqueda (F12.2).
+          <span className="mt-0.5 block truncate text-[10px] text-slate-500">
+            vía {providersLabel(article.providers)}
+          </span>
+        )}
       </span>
     </button>
   );

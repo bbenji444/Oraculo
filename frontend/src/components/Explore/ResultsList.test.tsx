@@ -55,6 +55,16 @@ describe('la lista junta las notas del mismo hecho', () => {
     expect(screen.getByText('Detienen a dos por la balacera en Iztapalapa')).toBeTruthy();
   });
 
+  it('cada fila dice de qué fuente vino la nota', () => {
+    const fromRss = {
+      ...article(6, 'Cateo de la FGR en Monterrey', null, 'Milenio'),
+      providers: ['google_news_rss', 'indice_local'],
+    };
+    render(<ResultsList articles={[fromRss]} total={1} colors={new Map()} />);
+
+    expect(screen.getByText('vía Google News RSS · Índice local')).toBeTruthy();
+  });
+
   it('sin historias no hay chevron ni aviso', () => {
     render(
       <ResultsList

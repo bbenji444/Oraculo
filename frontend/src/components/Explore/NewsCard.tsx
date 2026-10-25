@@ -10,20 +10,19 @@
  */
 import type { Article } from '../../services/searches';
 import { AddToCase } from './AddToCase';
-import { eventDateNote, formatMexicoCity, isCoarse, PRECISION_LABEL } from './format';
+import {
+  eventDateNote,
+  formatMexicoCity,
+  isCoarse,
+  PRECISION_LABEL,
+  providersLabel,
+} from './format';
 
 interface NewsCardProps {
   article: Article;
   colors: ReadonlyMap<number, string>;
   onClose?: () => void;
 }
-
-const PROVIDER_LABEL: Record<string, string> = {
-  searchapi: 'Google News',
-  indice_local: 'Índice local',
-  gdelt: 'GDELT',
-  google_news_rss: 'Google News RSS',
-};
 
 export function NewsCard({ article, colors, onClose }: NewsCardProps) {
   const location = article.primary_location;
@@ -109,9 +108,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
         )}
       </p>
       <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="text-[11px] text-slate-500">
-          {article.providers.map((p) => PROVIDER_LABEL[p] ?? p).join(' · ')}
-        </span>
+        <span className="text-[11px] text-slate-500">{providersLabel(article.providers)}</span>
         <a
           href={article.url}
           target="_blank"

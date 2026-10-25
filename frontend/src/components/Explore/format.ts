@@ -224,3 +224,24 @@ export function eventDateNote(eventDate: string | null, publishedAt: string | nu
   if (!Number.isFinite(gap) || gap < OLD_EVENT_DAYS * DAY_MS) return null;
   return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
 }
+
+/**
+ * Nombre corto de cada fuente, para la fila de la lista, la ficha y el
+ * historial (F12.2). Coincide con los switches del panel de búsqueda.
+ */
+export const PROVIDER_LABEL: Readonly<Record<string, string>> = {
+  google_news_rss: 'Google News RSS',
+  indice_local: 'Índice local',
+  searchapi: 'SearchApi',
+  gdelt: 'GDELT',
+};
+
+/**
+ * Fuentes en texto: «Google News RSS · Índice local».
+ *
+ * @param providers `id` de las fuentes (`search_results.provider` o `searches.providers`).
+ * @returns Los nombres separados por « · »; un `id` desconocido se muestra tal cual.
+ */
+export function providersLabel(providers: readonly string[]): string {
+  return providers.map((p) => PROVIDER_LABEL[p] ?? p).join(' · ');
+}

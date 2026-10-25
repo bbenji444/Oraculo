@@ -10,6 +10,7 @@ import {
   formatUsd,
   isCoarse,
   newsCount,
+  providersLabel,
   stageProgress,
   visibleArticles,
 } from './format';
@@ -150,5 +151,15 @@ describe('cuenta de noticias de la lista', () => {
       hint: 'Las descargas incluyen solo las notas relevantes.',
     });
     expect(newsCount(1, 2).hint).toMatch(/^1 no relevante oculta:/);
+  });
+});
+
+describe('nombre de las fuentes (F12.2)', () => {
+  it('une los nombres y deja tal cual un id desconocido', () => {
+    expect(providersLabel(['google_news_rss', 'indice_local'])).toBe(
+      'Google News RSS · Índice local',
+    );
+    expect(providersLabel(['searchapi', 'browserwork_bing'])).toBe('SearchApi · browserwork_bing');
+    expect(providersLabel([])).toBe('');
   });
 });

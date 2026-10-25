@@ -7,7 +7,7 @@
 import { useSearchHistory } from '../../hooks/useSearches';
 import type { Search } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
-import { formatMexicoCity, formatRange, formatUsd } from '../Explore/format';
+import { formatMexicoCity, formatRange, formatUsd, providersLabel } from '../Explore/format';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; className: string }> = {
   pending: { text: 'En cola', className: 'bg-slate-700 text-slate-200' },
@@ -60,6 +60,13 @@ export function HistoryPage() {
                   <p className="mt-0.5 text-xs text-slate-400">
                     {formatRange(search.date_from, search.date_to)} · pedida el{' '}
                     {formatMexicoCity(search.created_at)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {/* Las búsquedas de antes de F12.2 no guardaron fuentes: usaron todas. */}
+                    Fuentes:{' '}
+                    {search.providers && search.providers.length > 0
+                      ? providersLabel(search.providers)
+                      : 'todas las configuradas'}
                   </p>
                 </div>
                 <span className={`rounded-md px-2 py-0.5 text-xs ${status.className}`}>
