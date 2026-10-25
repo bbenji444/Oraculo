@@ -41,6 +41,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0025](0025-duplicados-en-tres-niveles.md) | Duplicados en tres niveles: misma URL, misma nota con otro link y mismo hecho | Aceptado (nivel 3 en el 0026) |
 | [0026](0026-historias-por-primera-nota.md) | Historias: el mismo hecho en varios medios se agrupa comparando con la primera nota | Aceptado |
 | [0027](0027-fuentes-por-busqueda.md) | Cada búsqueda manual elige sus fuentes con switches y las guarda | Aceptado |
+| [0028](0028-browserwork-como-fuente.md) | BrowserWork como fuente de la búsqueda manual (Bing y Google 2) | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

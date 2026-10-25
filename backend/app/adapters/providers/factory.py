@@ -8,6 +8,7 @@ No hace: no decide qué proveedores usar en una búsqueda.
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.providers.browserwork import ENGINES, BrowserWorkProvider
 from app.adapters.providers.gdelt import GdeltProvider
 from app.adapters.providers.google_news_rss import GoogleNewsRssProvider
 from app.adapters.providers.http import ProviderHttpClient
@@ -65,6 +66,21 @@ def build_provider(
         return LocalIndexProvider(engine)
     if provider is Provider.GDELT:
         return build_gdelt(settings, enabled=settings.gdelt_enabled)
+    if provider in ENGINES:
+        return BrowserWorkProvider(
+            provider,
+            ProviderHttpClient(
+                provider,
+                timeout_seconds=settings.provider_timeout_seconds,
+                max_attempts=settings.provider_max_attempts,
+                # Un trabajo a la vez en su servidor: no tiene caso mandar más.
+                max_concurrency=1,
+            ),
+            base_url=settings.browserwork_base_url or None,
+            pages=settings.browserwork_pages,
+            timeout_seconds=settings.browserwork_timeout_seconds,
+            poll_seconds=settings.browserwork_poll_seconds,
+        )
     if provider is Provider.GOOGLE_NEWS_RSS:
         return GoogleNewsRssProvider(
             ProviderHttpClient(

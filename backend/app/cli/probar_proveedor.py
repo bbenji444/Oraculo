@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
+from app.adapters.providers.browserwork import NOT_CONFIGURED_MESSAGE as BROWSERWORK_NOT_CONFIGURED
 from app.adapters.providers.factory import build_provider
 from app.adapters.providers.gdelt import DISABLED_MESSAGE as GDELT_DISABLED_MESSAGE
 from app.adapters.providers.google_news_rss import DISABLED_MESSAGE
@@ -79,6 +80,8 @@ NOT_CONFIGURED = {
     Provider.GDELT: GDELT_DISABLED_MESSAGE,
     # El índice local siempre está disponible; se deja por completitud.
     Provider.LOCAL_INDEX: "El índice local no está disponible.",
+    Provider.BROWSERWORK_BING: BROWSERWORK_NOT_CONFIGURED,
+    Provider.BROWSERWORK_GOOGLE2: BROWSERWORK_NOT_CONFIGURED,
 }
 
 

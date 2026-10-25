@@ -28,6 +28,9 @@ class SourceOut(BaseModel):
     id: str = Field(examples=["google_news_rss"], description="Valor para ``providers``.")
     label: str = Field(examples=["Google News"])
     paid: bool = Field(description="Si gasta créditos (SearchApi) o es gratis.")
+    slow: bool = Field(
+        description="Si tarda más porque abre un navegador real (BrowserWork, ADR-0028)."
+    )
     configured: bool = Field(
         description="Si tiene lo necesario para consultar; si no, el switch se deshabilita."
     )
@@ -47,6 +50,7 @@ class SourceOut(BaseModel):
             id=option.source.provider.value,
             label=option.source.label,
             paid=option.source.paid,
+            slow=option.source.slow,
             configured=option.configured,
             default_on=option.default_on,
         )

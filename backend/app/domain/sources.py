@@ -27,20 +27,32 @@ class Source:
         provider: Proveedor.
         label: Nombre en pantalla.
         paid: Si gasta créditos (SearchApi) o es gratis.
+        slow: Si tarda más que las demás porque abre un navegador real
+            (BrowserWork, ADR-0028).
     """
 
     provider: Provider
     label: str
     paid: bool
+    slow: bool = False
 
 
 # En el orden en que se muestran. GDELT sigue apagado por su límite
 # (ADR-0012) y queda fuera de los switches mientras tanto.
-_SWITCHES = (Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX, Provider.SEARCHAPI)
+_SWITCHES = (
+    Provider.GOOGLE_NEWS_RSS,
+    Provider.LOCAL_INDEX,
+    Provider.SEARCHAPI,
+    Provider.BROWSERWORK_BING,
+    Provider.BROWSERWORK_GOOGLE2,
+)
+# Abren un Chrome real en el servidor de BrowserWork: tardan minutos, no segundos.
+_SLOW = frozenset({Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2})
 # El nombre y el costo salen de los dialectos de consulta: una sola lista para
 # la estimación, «Probar concepto» y los switches.
 SOURCES: tuple[Source, ...] = tuple(
-    Source(p, DIALECTS[p].label, paid=DIALECTS[p].credits_per_query > 0) for p in _SWITCHES
+    Source(p, DIALECTS[p].label, paid=DIALECTS[p].credits_per_query > 0, slow=p in _SLOW)
+    for p in _SWITCHES
 )
 _BY_PROVIDER = {s.provider: s for s in SOURCES}
 

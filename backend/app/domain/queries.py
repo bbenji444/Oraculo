@@ -43,6 +43,11 @@ class Provider(StrEnum):
     # Índice propio que llena la ingesta periódica (ADR-0013): GDELT por
     # archivos y RSS de medios. Gratis y sin límite de consultas.
     LOCAL_INDEX = "indice_local"
+    # BrowserWork (servicio del jefe de Benji, ADR-0028): un Chrome real que
+    # busca en Bing y en Google («opción 2», pasa de página con clic). Gratis
+    # pero lento, y solo en la búsqueda manual.
+    BROWSERWORK_BING = "browserwork_bing"
+    BROWSERWORK_GOOGLE2 = "browserwork_google2"
 
 
 @dataclass(frozen=True, slots=True)

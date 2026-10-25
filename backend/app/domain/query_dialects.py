@@ -110,6 +110,14 @@ def _google_news_rss_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
     return [f"after:{window.date_from.isoformat()}", f"before:{end.isoformat()}"]
 
 
+def _web_date_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
+    # Búsqueda web de Google (BrowserWork → Google 2, ADR-0028): after: y
+    # before: sí son operadores de Google web; before: excluye su fecha, así
+    # que se usa el día siguiente. # VERIFICAR con la primera llamada real.
+    end = window.date_to + timedelta(days=1)
+    return [f"after:{window.date_from.isoformat()}", f"before:{end.isoformat()}"]
+
+
 def gdelt_country(place: QueryPlace) -> str:
     """Valor de ``sourcecountry:`` para GDELT.
 
@@ -250,6 +258,19 @@ DIALECTS: dict[Provider, QueryDialect] = {
     ),
     Provider.GDELT: QueryDialect(
         Provider.GDELT, "GDELT", FREE, None, GDELT_MAX_CHARS, _gdelt_suffix
+    ),
+    # Bing no tiene operador de fecha en el texto: la ventana no se aplica y
+    # la IA marca la fecha del hecho (ADR-0028).
+    Provider.BROWSERWORK_BING: QueryDialect(
+        Provider.BROWSERWORK_BING, "Bing (BrowserWork)", FREE, GOOGLE_MAX_WORDS, None, _no_suffix
+    ),
+    Provider.BROWSERWORK_GOOGLE2: QueryDialect(
+        Provider.BROWSERWORK_GOOGLE2,
+        "Google 2 (BrowserWork)",
+        FREE,
+        GOOGLE_MAX_WORDS,
+        None,
+        _web_date_suffix,
     ),
     Provider.LOCAL_INDEX: QueryDialect(
         Provider.LOCAL_INDEX,

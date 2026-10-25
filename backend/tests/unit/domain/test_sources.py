@@ -14,8 +14,15 @@ def test_catalogo_ordenado_y_sin_gdelt() -> None:
         Provider.GOOGLE_NEWS_RSS,
         Provider.LOCAL_INDEX,
         Provider.SEARCHAPI,
+        Provider.BROWSERWORK_BING,
+        Provider.BROWSERWORK_GOOGLE2,
     ]
     assert [s.provider for s in SOURCES if s.paid] == [Provider.SEARCHAPI]
+    # BrowserWork abre un Chrome real: el switch avisa que tarda más (ADR-0028).
+    assert [s.provider for s in SOURCES if s.slow] == [
+        Provider.BROWSERWORK_BING,
+        Provider.BROWSERWORK_GOOGLE2,
+    ]
     assert source_of(Provider.GDELT) is None
 
 
