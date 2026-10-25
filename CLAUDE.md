@@ -2,6 +2,7 @@
 
 Lee este archivo al inicio de cada sesión. Aquí está **cómo** trabajamos.
 **Qué** construimos está en `docs/ESPECIFICACION.md` (léelo completo antes de planear cualquier fase).
+**Fase activa:** F12, monitor automatizado FGR. Su plan está en `docs/PLAN_MONITOR_FGR.md`; la sección 9 tiene los ajustes acordados y manda sobre el resto.
 Si una petición puntual en el chat contradice algo de aquí, pregunta antes de actuar.
 
 ---
