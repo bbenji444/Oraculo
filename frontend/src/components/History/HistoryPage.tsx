@@ -36,7 +36,7 @@ export function HistoryPage() {
   return (
     <div className="h-full overflow-y-auto bg-slate-950 px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-lg font-semibold text-slate-50">Historial de búsquedas</h2>
+        <h2 className="titulo-oraculo text-base font-bold text-sky-50">Historial de búsquedas</h2>
         <p className="mt-1 text-sm text-slate-400">
           Reabrir una búsqueda no gasta créditos: sus notas ya están guardadas.
         </p>

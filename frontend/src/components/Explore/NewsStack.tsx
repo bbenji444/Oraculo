@@ -29,7 +29,7 @@ export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }
   return (
     <section aria-label="Notas en este lugar" className={`${GLASS} w-80 space-y-2 p-3 text-sm`}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200/80">
+        <h3 className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-sky-200/80">
           {total} notas en este lugar
         </h3>
         <div className="flex items-center gap-1">

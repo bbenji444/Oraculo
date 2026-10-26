@@ -13,7 +13,7 @@ export function SystemStatusPanel() {
     <section aria-labelledby="estado-titulo" className="mx-auto w-full max-w-4xl px-6 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 id="estado-titulo" className="text-xl font-semibold text-slate-100">
+          <h2 id="estado-titulo" className="titulo-oraculo text-base font-bold text-sky-50">
             Estado del sistema
           </h2>
           <p className="mt-1 text-sm text-slate-400">

@@ -1,5 +1,15 @@
 /*
- * Estilos globales: carga Tailwind CSS v4 y define el modo oscuro por clase.
+ * Estilos globales: carga Tailwind CSS v4, el tema Oráculo y el modo oscuro.
+ *
+ * Tema Oráculo (F12.7a, plan F12 §9.1): homologado con OSINT Oráculo
+ * (app/static/osint/resultados.css del servidor, 26/10/2026): fondo #050505,
+ * cian #00d2ff, texto #e0f7fa, títulos en Orbitron y texto en Roboto. Las
+ * fuentes van autoalojadas (src/assets/fonts): nada se descarga de internet.
+ *
+ * En lugar de tocar cada componente, se redefinen las escalas `slate` (fondos
+ * y textos) y `sky` (acento) de Tailwind con los tonos de Oráculo: toda la
+ * interfaz cambia de una vez y sigue usando las mismas clases.
+ *
  * La especificación (14.5) pide modo oscuro por defecto con alternativa
  * clara; por eso `dark` se activa con la clase .dark en <html> y no con la
  * preferencia del sistema operativo.
@@ -8,8 +18,76 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/orbitron-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/orbitron-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('../assets/fonts/roboto-300.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/roboto-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url('../assets/fonts/roboto-500.woff2') format('woff2');
+}
+
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Títulos y cifras «técnicas», como en OSINT (--fuente-tec). */
+  --font-display: 'Orbitron', 'Roboto', sans-serif;
+
+  /* Fondos y textos de Oráculo (--fondo, --papel-solido, --texto, --texto-2,
+     --texto-3), con los pasos intermedios interpolados. */
+  --color-slate-50: #f2fdff;
+  --color-slate-100: #e0f7fa;
+  --color-slate-200: #c4e3e8;
+  --color-slate-300: #a8c5cb;
+  --color-slate-400: #809699;
+  --color-slate-500: #5f7377;
+  --color-slate-600: #3f5256;
+  --color-slate-700: #22343a;
+  --color-slate-800: #122128;
+  --color-slate-900: #0a1218;
+  --color-slate-950: #050505;
+
+  /* Acento cian de Oráculo (--a1 #005f7f, --a2 #0090b8, --a3 #00d2ff). */
+  --color-sky-50: #e6fbff;
+  --color-sky-100: #c7f5ff;
+  --color-sky-200: #9aeeff;
+  --color-sky-300: #7ee9ff;
+  --color-sky-400: #00d2ff;
+  --color-sky-500: #00b4e0;
+  --color-sky-600: #0090b8;
+  --color-sky-700: #00739a;
+  --color-sky-800: #005f7f;
+  --color-sky-900: #004660;
+  --color-sky-950: #002a3a;
+
+  /* Brillos de OSINT (--brillo, --brillo-titulo). */
+  --shadow-glow: 0 0 0 1px rgb(0 210 255 / 0.45), 0 0 18px rgb(0 210 255 / 0.35);
 }
 
 html {
@@ -18,6 +96,30 @@ html {
 
 html.dark {
   color-scheme: dark;
+}
+
+/* Fondo Oráculo: negro con una aurora cian muy tenue arriba (como OSINT). */
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(0 210 255 / 0.08), transparent 70%), #050505;
+}
+
+/* Títulos de sección: Orbitron con el espaciado de OSINT. */
+.titulo-oraculo {
+  font-family: var(--font-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* El nombre del sistema con el brillo de los títulos de OSINT (--brillo-titulo). */
+.marca-oraculo {
+  font-family: var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow:
+    rgb(255 255 255 / 0.5) 0 0 8px,
+    rgb(0 210 255 / 0.55) 0 0 18px,
+    rgb(0 210 255 / 0.3) 0 0 36px;
 }
 
 /* Animaciones de Explorar (ADR-0017): fichas y paneles aparecen suavemente y
