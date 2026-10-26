@@ -33,7 +33,10 @@ from app.adapters.reports.labels import (
     PROVIDER_LABEL,
     mexico_date,
     mexico_datetime,
+    mexico_time,
+    provider_name,
 )
+from app.adapters.reports.oraculo import clean
 from app.adapters.reports.view import build_view
 from app.application.use_cases.reports import ExportData, ReportData
 
@@ -68,7 +71,11 @@ class ReportRenderer:
         )
         self._env.filters["mx_datetime"] = mexico_datetime
         self._env.filters["mx_date"] = mexico_date
+        self._env.filters["mx_time"] = mexico_time
+        self._env.filters["provider_name"] = provider_name
         self._env.filters["paragraphs"] = paragraphs
+        # Sin emojis: la fuente del PDF no los tiene y salían como cuadros (F12.10).
+        self._env.filters["clean"] = clean
         self._css = STYLESHEET.read_text(encoding="utf-8")
 
     def html(self, data: ReportData) -> str:
@@ -120,11 +127,14 @@ class ReportRenderer:
         return to_geojson(data)
 
     def _render(self, data: ReportData, *, inline_css: bool) -> str:
+        view = build_view(data)
         return self._env.get_template(TEMPLATE).render(
             data=data,
-            view=build_view(data),
+            view=view,
             css=Markup(self._css) if inline_css else None,  # noqa: S704 — CSS propio del repositorio
             map_svg=Markup(data.map_svg),  # noqa: S704 — SVG de static_map con los textos ya escapados
+            # Red de la portada: SVG armado aquí solo con números (oraculo.network_svg).
+            network_svg=Markup(view.oraculo.network),  # noqa: S704 — sin texto externo
             precision_label=PRECISION_LABEL,
             provider_label=PROVIDER_LABEL,
         )
