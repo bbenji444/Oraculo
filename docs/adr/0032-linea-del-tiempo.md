@@ -41,3 +41,18 @@ A pedido de Benji («más clara, menos estorbosa, que se lleve con el mundo, sin
 - **La tira de tarjetas se reemplaza por una ficha flotante** al pasar el mouse (hora, título, medio, categoría, lugar y, si es de antes, cuándo ocurrió el hecho). Un clic vuela el globo hacia la nota.
 - **La lista de noticias del panel izquierdo empieza oculta**, porque la línea del tiempo la reemplaza. «☰ Lista» la vuelve a mostrar.
 - **Los puntos van por fecha de publicación**, igual que la curva, y la fecha del hecho se dice en la ficha. Se quitó el botón de orden, que confundía.
+
+## Segundo rediseño: cronología vertical (26/10/2026)
+
+Benji no se convenció con la línea horizontal y eligió, entre tres propuestas, una **cronología vertical**:
+
+- Es un panel delgado a la derecha, como un feed en vivo. El globo queda libre en el centro.
+- **Arriba:** cuántos hechos hay, una curva pequeña de notas publicadas por hora (los picos brillan; un clic filtra esa hora) y los filtros por categoría y estado.
+- **La línea:** vertical y luminosa, con la hora a la izquierda y cada hecho a la derecha, del más reciente al más viejo, agrupados por día.
+  - El mismo hecho en varios medios es una sola entrada («+7 medios»).
+  - Si el hecho es de antes, la entrada lo dice.
+  - Un clic vuela el globo hacia la nota.
+- El vidrio usa los tonos de OSINT: borde cian tenue y desenfoque de 14 px.
+- La lista del panel izquierdo sigue oculta y vuelve con «☰ Lista».
+
+**Globo:** se quitó la luz del Sol en su posición real, porque marcaba demasiado la división entre el día y la noche. El día y la noche los elige el analista con su botón. Se conservan los ajustes de color de las imágenes de la NASA.

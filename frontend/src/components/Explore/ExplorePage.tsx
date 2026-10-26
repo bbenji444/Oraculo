@@ -10,9 +10,8 @@
  *   solo al elegir una noticia, para que se vea su ficha.
  * - Derecha: libre, para que el globo se vea completo (Benji quitó las
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
- * - Abajo: la línea del tiempo (F12.7): picos por hora o por día, filtros por
- *   categoría y estado, y las notas en orden cronológico. Sus filtros se
- *   aplican al globo y a la lista a la vez.
+ * - Derecha: la cronología (F12.7): una línea vertical con cada hecho, del más
+ *   reciente al más viejo, sin repetidos; sus filtros se aplican al globo.
  * - Abajo a la derecha: giro, día/noche, velocidad y leyenda de precisión.
  * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
  * - Modo caso (9.6): con `#/explorar?caso=<id>` el globo muestra el muro del
@@ -42,7 +41,7 @@ import { LatestRunCard } from './LatestRunCard';
 import { visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
-import { Timeline } from './Timeline';
+import { Chronology } from './Chronology';
 import { applyTimeline } from './timelineData';
 import { GLASS } from './ui';
 import { useFinishNotice } from './useFinishNotice';
@@ -88,7 +87,6 @@ export function ExplorePage() {
   const articleId = useExplorerStore((s) => s.articleId);
   const finishedNotice = useFinishNotice(search);
   const earth = useExplorerStore((s) => s.earth);
-  const timelineOpen = useTimelineStore((s) => s.open);
   const listOpen = useTimelineStore((s) => s.listOpen);
   const wallCaseId = useExplorerStore((s) => s.wallCaseId);
   const inWall = wallCaseId !== null;
@@ -165,21 +163,15 @@ export function ExplorePage() {
       )}
 
       {hasResults && (
-        <div
-          className={`pointer-events-none absolute bottom-4 right-4 hidden sm:block ${
-            panelOpen && listOpen ? 'left-[25rem]' : 'left-4'
-          }`}
-        >
-          <Timeline articles={relevant} />
+        // Cronología a la derecha: el globo queda libre en el centro.
+        <div className="pointer-events-none absolute bottom-44 right-14 top-4 hidden w-[22rem] flex-col items-end sm:flex">
+          <div className="pointer-events-auto flex max-h-full w-full flex-col items-end">
+            <Chronology articles={relevant} />
+          </div>
         </div>
       )}
 
-      {/* Con la línea del tiempo abajo, los controles del globo suben a su lado. */}
-      <div
-        className={`pointer-events-none absolute right-4 hidden flex-col items-end gap-2 sm:flex ${
-          hasResults ? (timelineOpen ? 'bottom-[11rem]' : 'bottom-[4.5rem]') : 'bottom-8'
-        }`}
-      >
+      <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
         <div className="pointer-events-auto">
           <PrecisionLegend />
         </div>
