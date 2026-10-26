@@ -29,6 +29,8 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from app.adapters.llm.common import (
+    CLASSIFY_MAX_OUTPUT_TOKENS,
+    CLASSIFY_PROMPT_VERSION,
     ENTITIES_MAX_OUTPUT_TOKENS,
     ENTITIES_PROMPT_VERSION,
     MAX_OUTPUT_TOKENS,
@@ -38,16 +40,22 @@ from app.adapters.llm.common import (
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_PROMPT_VERSION,
     TEMPERATURE,
+    ClassificationOut,
     EnrichmentOut,
     EntitiesOut,
     SummaryOut,
+    build_classify_prompt,
     build_entities_prompt,
     build_prompt,
     build_summary_prompt,
     to_enrichment,
+    to_labels,
     to_raw_proposals,
 )
 from app.application.ports.llm import (
+    ClassificationError,
+    ClassificationRequest,
+    ClassificationResult,
     EnrichmentError,
     EnrichmentRequest,
     EnrichmentResult,
@@ -141,6 +149,11 @@ class GeminiEnricher:
         return SUMMARY_PROMPT_VERSION
 
     @property
+    def classify_prompt_version(self) -> str:
+        """Ver ``ClassifierPort.classify_prompt_version``."""
+        return CLASSIFY_PROMPT_VERSION
+
+    @property
     def entities_prompt_version(self) -> str:
         """Ver ``EntityExtractorPort.entities_prompt_version``."""
         return ENTITIES_PROMPT_VERSION
@@ -222,6 +235,19 @@ class GeminiEnricher:
         if out is None:
             raise SummaryError(f"Gemini no dio un resumen válido tras reintentar: {error}", usage)
         return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
+
+    async def classify(self, request: ClassificationRequest) -> ClassificationResult:
+        """Ver ``ClassifierPort.classify``."""
+        out, usage, error = await self._complete(
+            build_classify_prompt(request), ClassificationOut, CLASSIFY_MAX_OUTPUT_TOKENS
+        )
+        if out is None:
+            raise ClassificationError(
+                f"Gemini no dio una clasificación válida tras reintentar: {error}", usage
+            )
+        return ClassificationResult(
+            to_labels(out, request), usage, self._model, CLASSIFY_PROMPT_VERSION
+        )
 
     async def extract_entities(self, request: EntityExtractionRequest) -> EntityExtractionResult:
         """Ver ``EntityExtractorPort.extract_entities``."""

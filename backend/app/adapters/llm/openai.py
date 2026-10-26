@@ -28,6 +28,8 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from app.adapters.llm.common import (
+    CLASSIFY_MAX_OUTPUT_TOKENS,
+    CLASSIFY_PROMPT_VERSION,
     ENTITIES_MAX_OUTPUT_TOKENS,
     ENTITIES_PROMPT_VERSION,
     MAX_OUTPUT_TOKENS,
@@ -36,17 +38,23 @@ from app.adapters.llm.common import (
     RETRY_NOTE,
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_PROMPT_VERSION,
+    ClassificationOut,
     EnrichmentOut,
     EntitiesOut,
     SummaryOut,
+    build_classify_prompt,
     build_entities_prompt,
     build_prompt,
     build_summary_prompt,
     to_enrichment,
+    to_labels,
     to_raw_proposals,
 )
 from app.adapters.providers.http import ProviderHttpClient
 from app.application.ports.llm import (
+    ClassificationError,
+    ClassificationRequest,
+    ClassificationResult,
     EnrichmentError,
     EnrichmentRequest,
     EnrichmentResult,
@@ -126,6 +134,41 @@ SUMMARY_SCHEMA: dict[str, Any] = {
     "required": ["executive_summary"],
     "properties": {"executive_summary": {"type": "string"}},
 }
+
+
+def classification_schema(categories: list[str]) -> dict[str, Any]:
+    """Esquema estricto de la clasificación (mismo contenido que ``ClassificationOut``).
+
+    La categoría va como lista cerrada (``enum``): el modo estricto de OpenAI
+    la respeta, así que nunca llega una categoría que no esté en el catálogo.
+
+    Args:
+        categories: Nombres del catálogo activo.
+
+    Returns:
+        El esquema JSON.
+    """
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["items"],
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["id", "category", "label"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "category": {"type": "string", "enum": categories},
+                        "label": _NULLABLE_TEXT,
+                    },
+                },
+            }
+        },
+    }
+
 
 # Esquema estricto de las entidades (mismo contenido que EntitiesOut). Aquí
 # sí van los valores permitidos: el modo estricto de OpenAI los respeta, así
@@ -267,6 +310,11 @@ class OpenAIEnricher:
         return SUMMARY_PROMPT_VERSION
 
     @property
+    def classify_prompt_version(self) -> str:
+        """Ver ``ClassifierPort.classify_prompt_version``."""
+        return CLASSIFY_PROMPT_VERSION
+
+    @property
     def entities_prompt_version(self) -> str:
         """Ver ``EntityExtractorPort.entities_prompt_version``."""
         return ENTITIES_PROMPT_VERSION
@@ -347,6 +395,23 @@ class OpenAIEnricher:
         if out is None:
             raise SummaryError(f"OpenAI no dio un resumen válido tras reintentar: {error}", usage)
         return SummaryResult(out.executive_summary, usage, self._model, SUMMARY_PROMPT_VERSION)
+
+    async def classify(self, request: ClassificationRequest) -> ClassificationResult:
+        """Ver ``ClassifierPort.classify``."""
+        out, usage, error = await self._complete(
+            build_classify_prompt(request),
+            ClassificationOut,
+            name="classification",
+            schema=classification_schema([c.name for c in request.categories]),
+            max_output_tokens=CLASSIFY_MAX_OUTPUT_TOKENS,
+        )
+        if out is None:
+            raise ClassificationError(
+                f"OpenAI no dio una clasificación válida tras reintentar: {error}", usage
+            )
+        return ClassificationResult(
+            to_labels(out, request), usage, self._model, CLASSIFY_PROMPT_VERSION
+        )
 
     async def extract_entities(self, request: EntityExtractionRequest) -> EntityExtractionResult:
         """Ver ``EntityExtractorPort.extract_entities``."""
