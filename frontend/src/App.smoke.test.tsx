@@ -225,8 +225,8 @@ describe('flujo principal (H1)', () => {
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
     // Un aviso dice que ya terminó (la persona pudo irse a otra pestaña).
     expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
-    // La línea del tiempo reemplaza a la lista; «☰ Lista» la vuelve a mostrar.
-    expect(await screen.findByRole('region', { name: 'Línea del tiempo' })).toBeTruthy();
+    // La cronología reemplaza a la lista; «☰ Lista» la vuelve a mostrar.
+    expect(await screen.findByRole('region', { name: 'Cronología' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
     const list = await screen.findByRole('region', { name: 'Noticias' });
     expect(screen.queryByText(/Top 5 estados/)).toBeNull();
@@ -309,7 +309,7 @@ describe('flujo principal (H1)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Abrir en el globo' }));
 
-    expect(await screen.findByRole('region', { name: 'Línea del tiempo' }, POLL_WAIT)).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Cronología' }, POLL_WAIT)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
     expect(await screen.findByRole('region', { name: 'Noticias' })).toBeTruthy();
     expect(window.location.hash).toBe('#/explorar');

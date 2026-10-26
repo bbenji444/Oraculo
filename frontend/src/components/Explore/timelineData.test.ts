@@ -7,12 +7,11 @@ import {
   buildTimeline,
   categoriesIn,
   chronological,
-  layoutBeads,
-  MAX_BEADS_PER_BUCKET,
   NO_FILTERS,
   noteMoment,
   stateCodeOf,
   statesIn,
+  storyItems,
 } from './timelineData';
 
 const HUACHICOL = {
@@ -175,34 +174,21 @@ describe('filtros', () => {
   });
 });
 
-describe('layoutBeads', () => {
-  it('el mismo hecho en varios medios es un solo punto, apilado por tramo', () => {
+describe('storyItems', () => {
+  it('un hecho en varios medios es una sola entrada, de la más reciente a la más vieja', () => {
     const notes = [
       note(1, '2026-10-25T21:10:00Z', { story_id: 1 }),
       note(2, '2026-10-25T21:30:00Z', { story_id: 1 }),
-      note(3, '2026-10-25T21:40:00Z'),
-      note(4, '2026-10-25T23:05:00Z'),
+      note(3, '2026-10-26T05:40:00Z'),
+      note(4, null),
     ];
-    const timeline = buildTimeline(notes);
 
-    const { beads, overflow } = layoutBeads(notes, timeline);
+    const items = storyItems(notes);
 
-    expect(beads.map((b) => [b.lead.article_id, b.articleIds, b.bucket, b.row])).toEqual([
-      [1, [1, 2], 0, 0],
-      [3, [3], 0, 1],
-      [4, [4], 2, 0],
+    expect(items.map((i) => [i.lead.article_id, i.articleIds, i.day])).toEqual([
+      // 05:40 UTC del 26 son las 23:40 del 25 en la CDMX.
+      [3, [3], '2026-10-25'],
+      [1, [1, 2], '2026-10-25'],
     ]);
-    expect(overflow.size).toBe(0);
-  });
-
-  it('lo que no cabe en la pila se cuenta aparte', () => {
-    const notes = Array.from({ length: MAX_BEADS_PER_BUCKET + 2 }, (_, i) =>
-      note(i + 1, `2026-10-25T21:${String(10 + i)}:00Z`),
-    );
-
-    const { beads, overflow } = layoutBeads(notes, buildTimeline(notes));
-
-    expect(beads).toHaveLength(MAX_BEADS_PER_BUCKET);
-    expect(overflow.get(0)).toBe(2);
   });
 });

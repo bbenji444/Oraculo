@@ -261,69 +261,45 @@ export function categoriesIn(
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
 }
 
-/** Hasta cuántas historias se apilan en un tramo; las demás se cuentan en «+N». */
-export const MAX_BEADS_PER_BUCKET = 4;
-
-/** Una historia como punto de la línea del tiempo (el mismo hecho en varios medios = un punto). */
-export interface Bead {
-  /** La nota que representa a la historia: la primera que se publicó. */
+/** Un hecho de la cronología: el mismo hecho en varios medios es una sola entrada. */
+export interface StoryItem {
+  /** La nota que representa al hecho: la primera que se publicó. */
   lead: Article;
   /** Todas sus notas (medios), incluida la principal. */
   articleIds: number[];
   /** Cuándo se publicó la principal (milisegundos UTC). */
   at: number;
-  /** Tramo de la línea del tiempo en el que cae. */
-  bucket: number;
-  /** Lugar en la pila del tramo (0 = abajo). */
-  row: number;
+  /** Día en la Ciudad de México (`2026-10-25`), para agrupar. */
+  day: string;
 }
 
-export interface BeadLayout {
-  beads: Bead[];
-  /** Historias que no caben en la pila, por tramo. */
-  overflow: Map<number, number>;
+/** Día de la Ciudad de México de un momento (`AAAA-MM-DD`). */
+export function mexicoDay(at: number): string {
+  return new Date(at + MEXICO_CITY_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /**
- * Acomoda las historias en la línea del tiempo, sin repetir el mismo hecho.
+ * Los hechos de la cronología, del más reciente al más viejo, sin repetir.
  *
- * Las notas de una misma historia (`story_id`, ADR-0026) se juntan en un solo
- * punto; en cada tramo se apilan de la que tiene más medios a la que menos.
+ * Las notas de una misma historia (`story_id`, ADR-0026) se juntan en una
+ * entrada fechada con la primera que se publicó. Las notas sin fecha no entran.
  *
  * @param articles Notas visibles (ya filtradas).
- * @param timeline La línea del tiempo de esas notas (`buildTimeline`).
- * @returns Los puntos y cuántas historias quedaron fuera de cada pila.
+ * @returns Una entrada por hecho.
  */
-export function layoutBeads(articles: readonly Article[], timeline: Timeline): BeadLayout {
-  const first = timeline.buckets[0];
-  const overflow = new Map<number, number>();
-  if (!first) return { beads: [], overflow };
-  const size = timeline.unit === 'hour' ? HOUR_MS : DAY_MS;
+export function storyItems(articles: readonly Article[]): StoryItem[] {
   const byStory = new Map<number, Article[]>();
   for (const article of chronological(articles, 'published')) {
     if (publishedAt(article) === null) continue;
     const key = article.story_id ?? -article.article_id;
     byStory.set(key, [...(byStory.get(key) ?? []), article]);
   }
-  const byBucket = new Map<number, Omit<Bead, 'row'>[]>();
+  const items: StoryItem[] = [];
   for (const notes of byStory.values()) {
     const lead = notes[0];
-    if (!lead) continue;
-    const at = publishedAt(lead) ?? 0;
-    const bucket = Math.min(
-      Math.max(0, Math.floor((at - first.start) / size)),
-      timeline.buckets.length - 1,
-    );
-    const item = { lead, articleIds: notes.map((n) => n.article_id), at, bucket };
-    byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), item]);
+    const at = lead ? publishedAt(lead) : null;
+    if (!lead || at === null) continue;
+    items.push({ lead, articleIds: notes.map((n) => n.article_id), at, day: mexicoDay(at) });
   }
-  const beads: Bead[] = [];
-  for (const [bucket, items] of byBucket) {
-    items.sort((a, b) => b.articleIds.length - a.articleIds.length || a.at - b.at);
-    items.slice(0, MAX_BEADS_PER_BUCKET).forEach((item, row) => beads.push({ ...item, row }));
-    if (items.length > MAX_BEADS_PER_BUCKET) {
-      overflow.set(bucket, items.length - MAX_BEADS_PER_BUCKET);
-    }
-  }
-  return { beads: beads.sort((a, b) => a.at - b.at), overflow };
+  return items.sort((a, b) => b.at - a.at || b.lead.article_id - a.lead.article_id);
 }
