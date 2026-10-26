@@ -12,6 +12,7 @@
 import { type Ref, useState } from 'react';
 
 import type { Article } from '../../services/searches';
+import { CategoryTag } from './CategoryTag';
 import { formatDay, isCoarse, PRECISION_LABEL, providersLabel } from './format';
 import { moreOutletsLabel, type StoryGroup } from './stories';
 
@@ -79,10 +80,13 @@ function ArticleRow({
             {location?.place ?? PRECISION_LABEL.unknown}
           </span>
         </span>
-        {article.providers.length > 0 && (
-          // De qué fuente vino la nota en esta búsqueda (F12.2).
-          <span className="mt-0.5 block truncate text-[10px] text-slate-500">
-            vía {providersLabel(article.providers)}
+        {(Boolean(article.category) || article.providers.length > 0) && (
+          // El delito según la IA (F12.4) y de qué fuente vino la nota (F12.2).
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-slate-500">
+            <CategoryTag article={article} />
+            {article.providers.length > 0 && (
+              <span className="truncate">vía {providersLabel(article.providers)}</span>
+            )}
           </span>
         )}
       </span>
