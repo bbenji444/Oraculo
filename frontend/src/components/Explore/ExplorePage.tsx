@@ -4,10 +4,11 @@
  * translúcidos a los lados.
  *
  * - Izquierda: la última corrida del monitor FGR (si no hay búsqueda abierta),
- *   la búsqueda (al terminar, un renglón con sus descargas) y la lista de
- *   noticias. La lista ocupa el espacio libre y el panel se puede ocultar
- *   ("Ocultar ‹") para ver el globo completo; en pantallas angostas se oculta
- *   solo al elegir una noticia, para que se vea su ficha.
+ *   la búsqueda (al terminar, compacta con sus descargas) y la cronología o la
+ *   lista de noticias, que ocupa el espacio libre. La búsqueda y la cronología
+ *   se pliegan cada una por su lado («Ocultar ‹» y «›»). En pantallas
+ *   angostas el panel entero se oculta solo al elegir una noticia, para que se
+ *   vea su ficha.
  * - Derecha: libre, para que el globo se vea completo (Benji quitó las
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
  * - Izquierda, debajo de la búsqueda: la cronología (F12.7), una línea vertical

@@ -124,9 +124,13 @@ interface Callout {
   visible: boolean;
 }
 
-// Vista inicial: México con el eje inclinado (map/spin.ts).
+// Vista de «inicio»: México con el eje inclinado (map/spin.ts). Es a donde
+// vuelven «Limpiar globo» y el botón de inicio.
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
 const INITIAL_ZOOM = 1.8;
+// Al abrir el sistema la entrada termina sobre el Atlántico (Benji, 26/10/2026)
+// y desde ahí el giro normal trae a América y a México a la vista.
+const INTRO_CENTER: [number, number] = [-35, 20];
 // «Acercar» un grupo: 1.5 niveles más que donde se separa, sin pasar de 15.
 const STACK_EXTRA_ZOOM = 1.5;
 const MAX_STACK_ZOOM = 15;
@@ -283,7 +287,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
       container,
       style: buildMapStyle(window.location.origin, earthRef.current),
       center: intro
-        ? [INITIAL_CENTER[0] + INTRO_LNG_OFFSET_DEGREES, INITIAL_CENTER[1]]
+        ? [INTRO_CENTER[0] + INTRO_LNG_OFFSET_DEGREES, INTRO_CENTER[1]]
         : INITIAL_CENTER,
       zoom: intro ? INTRO_FROM_ZOOM : INITIAL_ZOOM,
       bearing: GLOBE_BEARING,
@@ -346,7 +350,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
         });
         fly(INTRO_DURATION_MS, () => {
           map.easeTo({
-            center: INITIAL_CENTER,
+            center: INTRO_CENTER,
             zoom: INITIAL_ZOOM,
             duration: INTRO_DURATION_MS,
             easing: easeOutQuint,
@@ -824,7 +828,8 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
         style={{
           background:
             // closest-side: los % son del radio del cuadro (el globo llega al 71 %).
-            'radial-gradient(circle closest-side, transparent 0 70.5%, rgb(90 220 255 / 0.42) 72%, rgb(0 180 255 / 0.16) 77%, rgb(0 120 255 / 0.05) 87%, transparent 100%)',
+            // Cian apagado, casi gris: el cian puro se veía demasiado azul.
+            'radial-gradient(circle closest-side, transparent 0 70.5%, rgb(175 214 230 / 0.32) 72%, rgb(130 175 205 / 0.12) 77%, rgb(110 145 185 / 0.04) 87%, transparent 100%)',
         }}
       />
       <div

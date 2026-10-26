@@ -116,7 +116,7 @@ export function DownloadButtons({ searchId }: { searchId: string }) {
             onClick={() => {
               downloads.start(kind);
             }}
-            className={`${SMALL_BUTTON} flex items-center justify-center gap-1 px-1 py-1 text-[11px] ${
+            className={`${SMALL_BUTTON} flex items-center justify-center gap-1 px-1 py-0.5 text-[11px] ${
               kind === 'pdf' ? 'border-sky-400/40 bg-sky-500/15 text-sky-100' : ''
             }`}
           >

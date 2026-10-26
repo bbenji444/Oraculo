@@ -8,10 +8,11 @@
  * Lanzar gasta créditos y tokens: la estimación siempre se ve antes del botón,
  * y el botón se apaga si se pasaría el tope o falta la llave de la IA.
  *
- * Con una búsqueda terminada, el panel se reduce a un renglón ("Extorsión ·
- * Jalisco · 10 – 17 oct 2026") con "Editar" y una fila de descargas: así la
- * lista de noticias tiene espacio en pantallas bajas. "Ocultar" esconde todo el
- * lado izquierdo para ver el globo completo.
+ * Con una búsqueda terminada, el panel se reduce a tres renglones cortos (qué se
+ * buscó, sus datos con «Editar» y «‹ Volver», y las descargas): así la
+ * cronología de abajo tiene espacio. «Ocultar ‹» pliega solo la búsqueda a un
+ * renglón; la cronología se pliega aparte con su propio botón (Benji,
+ * 26/10/2026).
  */
 import { useState } from 'react';
 
@@ -152,61 +153,90 @@ function Progress({ searchId }: { searchId: string }) {
   );
 }
 
-/** Botón para esconder el panel izquierdo y ver el globo completo. */
-function HidePanelButton() {
-  const setPanelOpen = useExplorerStore((s) => s.setPanelOpen);
+/**
+ * Pliega la búsqueda a un renglón. Solo la búsqueda: la cronología tiene su
+ * propio botón para plegarse (Benji, 26/10/2026).
+ */
+function CollapseSearchButton() {
+  const setSearchCollapsed = useExplorerStore((s) => s.setSearchCollapsed);
   return (
     <button
       type="button"
       onClick={() => {
-        setPanelOpen(false);
+        setSearchCollapsed(true);
       }}
-      title="Ocultar el panel para ver el globo completo"
-      className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
+      title="Ocultar la búsqueda (la cronología se queda)"
+      className={`${SMALL_BUTTON} px-2 py-0.5 text-[11px]`}
     >
       Ocultar ‹
     </button>
   );
 }
 
-/** La búsqueda terminada en un renglón con sus descargas, para dejarle espacio a la lista. */
+/** La búsqueda plegada: un renglón que la vuelve a abrir. */
+function CollapsedSearch({ label }: { label: string }) {
+  const setSearchCollapsed = useExplorerStore((s) => s.setSearchCollapsed);
+  return (
+    <button
+      type="button"
+      aria-label="Mostrar la búsqueda"
+      onClick={() => {
+        setSearchCollapsed(false);
+      }}
+      title="Mostrar la búsqueda"
+      className={`${GLASS} flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+    >
+      <span className={PANEL_TITLE}>Búsqueda</span>
+      <span className="min-w-0 flex-1 truncate text-slate-400">{label}</span>
+      <span aria-hidden="true" className="text-slate-400">
+        ›
+      </span>
+    </button>
+  );
+}
+
+/**
+ * La búsqueda terminada, compacta: qué se buscó y sus botones en el primer
+ * renglón, los datos en el segundo y las descargas en el tercero. Así la
+ * cronología de abajo tiene más alto (Benji, 26/10/2026).
+ */
 function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => void }) {
   const search = useSearch(searchId).data;
   if (!search) return null;
   return (
-    <section aria-label="Búsqueda" className={`${GLASS} space-y-2 p-3`}>
+    <section aria-label="Búsqueda" className={`${GLASS} space-y-1.5 px-3 py-2`}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className={PANEL_TITLE}>Búsqueda</h2>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              useExplorerStore.getState().clearGlobe();
-            }}
-            title="Quitar los resultados del globo y empezar otra búsqueda (esta queda en Historial)"
-            className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
-          >
-            ‹ Volver
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            title="Cambiar región, conceptos o fechas"
-            className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
-          >
-            Editar
-          </button>
-          <HidePanelButton />
-        </div>
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-slate-100">
+        <h2 className="min-w-0 truncate text-[13px] font-semibold text-slate-100">
           {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
-        </p>
-        <p className="mt-0.5 text-[11px] text-slate-400">
+        </h2>
+        <CollapseSearchButton />
+      </div>
+      <div className="flex items-baseline gap-2 text-[11px]">
+        <p className="min-w-0 flex-1 text-slate-400">
           {formatRange(search.date_from, search.date_to)} · {search.results_count} notas ·{' '}
-          {search.credits_used} crédito(s) · {formatUsd(search.llm_cost_usd)}
+          {/* Los créditos solo si se gastaron: las corridas automáticas siempre van en 0. */}
+          {search.credits_used > 0 && `${String(search.credits_used)} crédito(s) · `}
+          {formatUsd(search.llm_cost_usd)}
         </p>
+        {/* Como links y no botones con borde: ocupan menos y se leen igual. */}
+        <button
+          type="button"
+          onClick={onEdit}
+          title="Cambiar región, conceptos o fechas"
+          className="shrink-0 text-sky-300 hover:text-sky-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          Editar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            useExplorerStore.getState().clearGlobe();
+          }}
+          title="Quitar los resultados del globo y empezar otra búsqueda (esta queda en Historial)"
+          className="shrink-0 text-sky-300 hover:text-sky-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          ‹ Volver
+        </button>
       </div>
       <DownloadButtons searchId={searchId} />
     </section>
@@ -236,6 +266,16 @@ export function SearchPanel() {
   // Abierto para editar aunque haya una búsqueda terminada. ExplorePage
   // remonta el panel al cambiar de búsqueda, así que vuelve a empezar cerrado.
   const [editing, setEditing] = useState(false);
+  const collapsed = useExplorerStore((s) => s.searchCollapsed);
+
+  if (collapsed) {
+    const label = running
+      ? `${running.concepts.map((c) => c.name).join(', ')} · ${running.region_name}${
+          busy ? ' · buscando…' : ''
+        }`
+      : 'Buscar noticias';
+    return <CollapsedSearch label={label} />;
+  }
 
   if (searchId && running && isFinished(running.status) && !editing) {
     return (
@@ -265,7 +305,7 @@ export function SearchPanel() {
               Listo
             </button>
           )}
-          <HidePanelButton />
+          <CollapseSearchButton />
         </div>
       </div>
       <RegionPicker />

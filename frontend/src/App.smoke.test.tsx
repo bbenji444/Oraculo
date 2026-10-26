@@ -250,13 +250,13 @@ describe('flujo principal (H1)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Listo' }));
     expect(screen.getByRole('button', { name: 'Editar' })).toBeTruthy();
 
-    // "Ocultar" deja el globo completo; el botón flotante vuelve a mostrar el panel.
+    // "Ocultar" pliega solo la búsqueda: lo de abajo (aquí la lista) se queda a la vista.
     fireEvent.click(screen.getByRole('button', { name: 'Ocultar ‹' }));
-    const reopen = screen.getByRole('button', { name: /Búsqueda y noticias/ });
-    expect(useExplorerStore.getState().panelOpen).toBe(false);
-    fireEvent.click(reopen);
+    expect(screen.queryByRole('region', { name: 'Búsqueda' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Noticias' })).toBe(list);
     expect(useExplorerStore.getState().panelOpen).toBe(true);
-    expect(screen.queryByRole('button', { name: /Búsqueda y noticias/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar la búsqueda' }));
+    expect(screen.getByRole('region', { name: 'Búsqueda' })).toBeTruthy();
 
     // Por defecto solo las relevantes, en la lista y en el globo por igual; la
     // pestaña "Fuera" las separa (§9 paso 7).

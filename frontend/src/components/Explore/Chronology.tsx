@@ -411,7 +411,7 @@ export function Chronology({ articles }: ChronologyProps) {
         onClick={() => {
           setOpen(true);
         }}
-        className={`${GLASS_OSINT} px-3 py-2 text-xs text-slate-100 hover:border-sky-400/40 focus-visible:outline-2 focus-visible:outline-sky-400`}
+        className={`${GLASS_OSINT} w-full px-3 py-1.5 text-left text-xs text-slate-100 hover:border-sky-400/40 focus-visible:outline-2 focus-visible:outline-sky-400`}
       >
         <span className={PANEL_TITLE}>Cronología</span>{' '}
         <span className="text-slate-400">· {items.length} hechos ‹</span>

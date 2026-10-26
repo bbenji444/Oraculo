@@ -47,6 +47,11 @@ export interface ExplorerState {
   showIrrelevant: boolean;
   /** Panel izquierdo visible; se oculta para ver el globo completo. */
   panelOpen: boolean;
+  /**
+   * La búsqueda plegada a un renglón («Ocultar ‹»). Es aparte de la
+   * cronología, que se pliega con su propio botón (Benji, 26/10/2026).
+   */
+  searchCollapsed: boolean;
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
@@ -88,6 +93,7 @@ export interface ExplorerState {
   setListFilter: (filter: ListFilter) => void;
   setShowIrrelevant: (showIrrelevant: boolean) => void;
   setPanelOpen: (panelOpen: boolean) => void;
+  setSearchCollapsed: (searchCollapsed: boolean) => void;
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
@@ -171,6 +177,7 @@ export const useExplorerStore = create<ExplorerState>()(
       listFilter: 'all',
       showIrrelevant: false,
       panelOpen: true,
+      searchCollapsed: false,
       earth: 'night',
       // "Menos movimiento" del sistema manda sobre la preferencia guardada.
       motion: prefersReducedMotion() ? 'off' : 'normal',
@@ -230,6 +237,9 @@ export const useExplorerStore = create<ExplorerState>()(
       setPanelOpen: (panelOpen) => {
         set({ panelOpen });
       },
+      setSearchCollapsed: (searchCollapsed) => {
+        set({ searchCollapsed });
+      },
       setEarth: (earth) => {
         set({ earth });
       },
@@ -277,6 +287,8 @@ export const useExplorerStore = create<ExplorerState>()(
           wallNodeId: null,
           constellation: false,
           panelOpen: true,
+          // Otra búsqueda empieza con el formulario a la vista.
+          searchCollapsed: false,
           homeRequest: state.homeRequest + 1,
         }));
       },

@@ -46,6 +46,9 @@ export const EARTH_FADE_END_ZOOM = 7;
 // Las etiquetas del mapa base aparecen desde aquí: en la vista de globo no
 // ensucian la Tierra (como en las imágenes de referencia de Benji).
 export const LABELS_MIN_ZOOM = 3.5;
+// Fuerza del halo atmosférico de MapLibre (`atmosphere-blend`, 0 a 1): con 1
+// el borde del globo se veía demasiado azul (Benji, 26/10/2026).
+export const ATMOSPHERE_STRENGTH = 0.6;
 export const ATTRIBUTION_OSM =
   '© <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a> · <a href="https://protomaps.com" target="_blank" rel="noopener noreferrer">Protomaps</a>';
 
@@ -300,8 +303,21 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
   return {
     version: 8,
     projection: { type: 'globe' },
-    // Halo atmosférico alrededor del globo, que se desvanece al acercarse.
-    sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
+    // Halo atmosférico alrededor del globo, que se desvanece al acercarse. Al
+    // 60 %: completo se veía demasiado azul (Benji, 26/10/2026).
+    sky: {
+      'atmosphere-blend': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        0,
+        ATMOSPHERE_STRENGTH,
+        5,
+        ATMOSPHERE_STRENGTH,
+        7,
+        0,
+      ],
+    },
     glyphs: `${assets}/fonts/{fontstack}/{range}.pbf`,
     sprite: `${assets}/sprites/v4/${flavor}`,
     sources: {
