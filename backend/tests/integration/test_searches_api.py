@@ -537,3 +537,38 @@ def test_por_defecto_searchapi_va_apagado_y_no_gasta(
     assert sources == {"google_news_rss": True, "indice_local": True, "searchapi": False}
     assert estimate["providers"] == ["google_news_rss", "indice_local"]
     assert estimate["credits"] == 0
+
+
+def test_el_catalogo_de_categorias(client: TestClient) -> None:
+    # F12.4 (ADR-0029): la lista provisional, con «Otros» al final y sin colores aún.
+    items = client.get("/api/v1/categories").json()["items"]
+
+    assert len(items) == 14
+    assert items[-1]["name"] == "Otros"
+    assert items[-1]["is_other"] is True
+    assert all(i["color"] is None for i in items)
+
+
+def test_cada_nota_trae_su_categoria_y_se_cuentan_por_categoria(
+    client: TestClient, filled: tuple[str, dict[str, int]], engine: Engine
+) -> None:
+    search_id, articles = filled
+    article_id = articles[IZTA_SEARCHAPI.title]
+    with engine.begin() as conn:
+        extortion = conn.execute(
+            text("SELECT id FROM categories WHERE name_norm = 'EXTORSION'")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "UPDATE articles SET category_id = :c, category_raw = 'cobro de piso', "
+                "category_version = 'classify_v1' WHERE id = :a"
+            ),
+            {"c": extortion, "a": article_id},
+        )
+
+    [item] = client.get(f"{URL}/{search_id}/articles").json()["items"]
+    aggregates = client.get(f"{URL}/{search_id}/aggregates?level=state").json()
+
+    assert item["category"] == {"id": extortion, "name": "Extorsión", "color": None, "symbol": None}
+    assert item["category_raw"] == "cobro de piso"
+    assert {"category": item["category"], "count": 1} in aggregates["by_category"]

@@ -15,6 +15,7 @@ from app.application.pagination import Page
 from app.application.ports.search_reads import (
     ArticleDetail,
     ArticleItem,
+    CategoryView,
     JudgementView,
     LocationView,
 )
@@ -89,6 +90,27 @@ class LocationOut(BaseModel):
         )
 
 
+class CategoryOut(BaseModel):
+    """El delito del que trata una nota (F12.4, ADR-0029)."""
+
+    id: int
+    name: str = Field(examples=["Armas y explosivos"])
+    color: str | None = Field(default=None, description="Se define después, con datos reales.")
+    symbol: str | None = Field(default=None, description="Se define después, con datos reales.")
+
+    @classmethod
+    def from_view(cls, view: CategoryView) -> "CategoryOut":
+        """Convierte la categoría leída.
+
+        Args:
+            view: Categoría.
+
+        Returns:
+            El esquema.
+        """
+        return cls(id=view.category_id, name=view.name, color=view.color, symbol=view.symbol)
+
+
 class ArticleOut(BaseModel):
     """Una nota en la lista de resultados."""
 
@@ -119,6 +141,15 @@ class ArticleOut(BaseModel):
         ),
     )
 
+    category: CategoryOut | None = Field(
+        default=None, description="El delito del que trata; null si falta clasificarla."
+    )
+    category_raw: str | None = Field(
+        default=None,
+        description="Etiqueta libre que propuso la IA (para afinar las categorías después).",
+        examples=["tráfico de armas"],
+    )
+
     @classmethod
     def from_item(cls, item: ArticleItem) -> "ArticleOut":
         """Convierte la nota leída.
@@ -146,6 +177,8 @@ class ArticleOut(BaseModel):
             in_region=item.in_region,
             providers=list(item.providers),
             story_id=item.story_id,
+            category=CategoryOut.from_view(item.category) if item.category else None,
+            category_raw=item.category_raw,
         )
 
 
@@ -208,6 +241,13 @@ class AggregateItemOut(BaseModel):
     lat: float
 
 
+class CategoryCountOut(BaseModel):
+    """Cuántas notas hay en una categoría."""
+
+    category: CategoryOut | None = Field(description="null = notas todavía sin clasificar.")
+    count: int
+
+
 class AggregatesOut(BaseModel):
     """Conteo de notas por región, para el mapa de calor."""
 
@@ -219,6 +259,9 @@ class AggregatesOut(BaseModel):
     abroad: int = Field(description="Notas de otro país (en los niveles de México).")
     unlocated: int = Field(description="Notas sin ubicación.")
     total: int
+    by_category: list[CategoryCountOut] = Field(
+        default_factory=list, description="Notas por categoría, de la que más tiene a la que menos."
+    )
 
     @classmethod
     def from_view(cls, view: AggregatesView) -> "AggregatesOut":
@@ -247,4 +290,11 @@ class AggregatesOut(BaseModel):
             abroad=view.abroad,
             unlocated=view.unlocated,
             total=view.total,
+            by_category=[
+                CategoryCountOut(
+                    category=CategoryOut.from_view(c.category) if c.category else None,
+                    count=c.count,
+                )
+                for c in view.by_category
+            ],
         )

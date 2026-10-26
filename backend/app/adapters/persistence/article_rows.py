@@ -12,14 +12,24 @@ No hace: no arma consultas completas ni decide qué notas se piden (eso es
 cada repositorio); nunca lee el texto de la nota (CLAUDE.md §8).
 """
 
+from collections.abc import Mapping
+from typing import Any
+
 from sqlalchemy import RowMapping
 
-from app.application.ports.search_reads import ArticleItem, JudgementView, LocationView
+from app.application.ports.search_reads import (
+    ArticleItem,
+    CategoryView,
+    JudgementView,
+    LocationView,
+)
 
 ARTICLE_COLUMNS = """
     a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
     a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status,
-    a.story_id
+    a.story_id, a.category_raw,
+    (SELECT json_build_object('id', c.id, 'name', c.name, 'color', c.color, 'symbol', c.symbol)
+     FROM categories c WHERE c.id = a.category_id) AS category
 """
 LOCATION_COLUMNS = """
     p.mention_text, p.role, p.precision, p.confidence, p.is_primary, r.id AS region_id,
@@ -131,4 +141,22 @@ def article_item(row: RowMapping) -> ArticleItem:
         in_region=row["in_region"],
         providers=tuple(row["providers"]),
         story_id=row["story_id"],
+        category=category_view(row["category"]),
+        category_raw=row["category_raw"],
+    )
+
+
+def category_view(value: Mapping[str, Any] | None) -> CategoryView | None:
+    """La categoría que trae la columna ``category`` (JSON) de ``ARTICLE_COLUMNS``.
+
+    Args:
+        value: ``{id, name, color, symbol}`` o ``None`` si falta clasificar.
+
+    Returns:
+        La categoría, o ``None``.
+    """
+    if not value:
+        return None
+    return CategoryView(
+        int(value["id"]), str(value["name"]), value.get("color"), value.get("symbol")
     )

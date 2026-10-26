@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.articles import router as articles_router
 from app.api.v1.cases import router as cases_router
+from app.api.v1.categories import router as categories_router
 from app.api.v1.concepts import router as concepts_router
 from app.api.v1.entities import router as entities_router
 from app.api.v1.health import router as health_router
@@ -20,6 +21,7 @@ api_router.include_router(regions_router)
 api_router.include_router(concepts_router)
 api_router.include_router(searches_router)
 api_router.include_router(sources_router)
+api_router.include_router(categories_router)
 api_router.include_router(articles_router)
 api_router.include_router(reports_router)
 api_router.include_router(cases_router)
@@ -44,6 +46,13 @@ OPENAPI_TAGS = [
         "description": (
             "Fuentes que el analista enciende o apaga en la búsqueda manual (F12.2, "
             "ADR-0027): cuáles hay, cuáles cuestan créditos y cuáles están configuradas."
+        ),
+    },
+    {
+        "name": "categorías",
+        "description": (
+            "Catálogo con que la IA clasifica cada nota por delito (F12.4, ADR-0029), "
+            "con «Otros» para lo que no encaje."
         ),
     },
     {"name": "notas", "description": "Detalle de una nota. Nunca el texto completo (§8)."},

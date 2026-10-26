@@ -37,6 +37,19 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 5. `GET /articles/{id}`: el detalle de una nota.
 6. `POST /searches/{id}/report` y `GET /searches/{id}/export`: el reporte en PDF o HTML y las notas en CSV o GeoJSON.
 
+## Categorías de noticias
+
+`GET /categories`. El catálogo con que la IA clasifica cada nota por delito (F12.4, ADR-0029), en su orden, con «Otros» (`is_other: true`) al final. `color` y `symbol` vienen en `null` hasta que se definan con datos reales.
+
+```json
+{
+  "items": [
+    { "id": 1, "name": "Narcotráfico y delitos contra la salud", "description": "Producción, transporte o venta de drogas…", "is_other": false, "color": null, "symbol": null },
+    { "id": 14, "name": "Otros", "description": "Cualquier tema que no encaje…", "is_other": true, "color": null, "symbol": null }
+  ]
+}
+```
+
 ## Fuentes de la búsqueda (switches)
 
 `GET /sources`. Una por fuente, en el orden de pantalla. Las que no están configuradas (`configured: false`) se muestran apagadas y no se pueden encender. `slow: true` = abre un navegador real (BrowserWork, ADR-0028): tarda más y, si pide captcha, esa fuente se omite y la búsqueda queda `partial`. BrowserWork está programado pero **oculto** desde el 25/10/2026 hasta que corrija sus links; mientras tanto no aparece aquí y pedirlo responde `422`.
@@ -232,12 +245,16 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
       },
       "in_region": false,
       "providers": ["indice_local"],
-      "story_id": null
+      "story_id": null,
+      "category": { "id": 11, "name": "Extorsión", "color": null, "symbol": null },
+      "category_raw": "cobro de piso"
     }
   ],
   "next_cursor": "WyJ0IiwgIjIwMjYtMTAtMTdUMDY6MzI6MDAtMDY6MDAiLCAiMTEiXQ"
 }
 ```
+
+`category` (F12.4, ADR-0029) es el **delito** del que trata la nota, de las categorías de `GET /categories`; `null` si todavía no se clasifica. `category_raw` es la etiqueta libre que propuso la IA. No confundir con `event_type`, que es lo que hizo la autoridad (detención, cateo).
 
 `story_id` (F12.1c, ADR-0026) agrupa las notas del **mismo hecho** publicadas por varios medios: es el id de la primera nota de la historia y es igual en todas sus notas. `null` = la nota está sola. El monitor junta en una tarjeta las notas visibles con el mismo `story_id` («▸ +N medios»).
 
@@ -280,9 +297,15 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
   "coarser": 0,
   "abroad": 0,
   "unlocated": 2,
-  "total": 14
+  "total": 14,
+  "by_category": [
+    { "category": { "id": 6, "name": "Armas y explosivos", "color": null, "symbol": null }, "count": 5 },
+    { "category": null, "count": 2 }
+  ]
 }
 ```
+
+`by_category` cuenta las mismas notas por categoría (F12.4), de la que más tiene a la que menos; `category: null` = notas todavía sin clasificar.
 
 Por municipio (`level=municipality`), la nota de Morelos, que solo tiene estado, **no se reparte entre municipios**: se cuenta en `coarser`.
 

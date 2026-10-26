@@ -20,6 +20,7 @@ from app.application.ports.search_reads import (
     ArticleDetail,
     ArticleFilters,
     ArticleItem,
+    CategoryCount,
     ConceptRef,
     LocationView,
     RegionPoint,
@@ -147,6 +148,12 @@ class Articles:
             NoteLocation("FRA", "FRA", Precision.COUNTRY),  # París: fuera
             NoteLocation(None, None, Precision.UNKNOWN),
         ]
+
+    async def category_counts(
+        self, search_id: UUID, filters: ArticleFilters
+    ) -> list[CategoryCount]:
+        # Sin categorías en estas pruebas (F12.4 se prueba aparte).
+        return []
 
     async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
         names = {"09007": "Iztapalapa", "09015": "Cuauhtémoc"}
