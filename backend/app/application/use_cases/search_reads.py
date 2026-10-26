@@ -12,6 +12,7 @@ from app.application.ports.search_reads import (
     ArticleFilters,
     ArticleItem,
     ArticleReaderPort,
+    CategoryCount,
     RegionPoint,
     SearchDetail,
     SearchReaderPort,
@@ -229,6 +230,7 @@ class AggregatesView:
         abroad: Notas de otro país.
         unlocated: Notas sin ubicación.
         total: Todas las notas contadas.
+        by_category: Notas por categoría (F12.4), de la que más tiene a la que menos.
     """
 
     level: AggregateLevel
@@ -237,6 +239,7 @@ class AggregatesView:
     abroad: int
     unlocated: int
     total: int
+    by_category: tuple[CategoryCount, ...] = ()
 
 
 class GetAggregates:
@@ -279,6 +282,13 @@ class GetAggregates:
             ),
             key=lambda i: (-i.count, i.region.name),
         )
+        by_category = await self._articles.category_counts(search_id, filters)
         return AggregatesView(
-            level, tuple(items), result.coarser, result.abroad, result.unlocated, result.total
+            level,
+            tuple(items),
+            result.coarser,
+            result.abroad,
+            result.unlocated,
+            result.total,
+            tuple(by_category),
         )

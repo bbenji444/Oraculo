@@ -19,6 +19,8 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app.application.clock import MEXICO_CITY
 from app.application.ports.llm import (
+    ClassificationLabel,
+    ClassificationRequest,
     EnrichmentRequest,
     EntityExtractionRequest,
     SummaryNote,
@@ -257,3 +259,69 @@ def to_raw_proposals(out: EntitiesOut) -> tuple[RawProposal, ...]:
         )
         for e in out.entities
     )
+
+
+# Clasificación por categoría (F12.4, ADR-0029): una llamada por lote.
+CLASSIFY_PROMPT_VERSION = "classify_v1"
+CLASSIFY_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{CLASSIFY_PROMPT_VERSION}.md"
+# Notas por llamada: con título y resumen (~80 tokens cada una) el prompt
+# queda en ~2,600 tokens; más notas alargan la respuesta sin ahorrar mucho.
+CLASSIFY_BATCH_SIZE = 25
+# ~30 tokens por nota (id, categoría y etiqueta) × 25 caben de sobra.
+CLASSIFY_MAX_OUTPUT_TOKENS = 2048
+# Un resumen largo no ayuda a clasificar y encarece el lote.
+CLASSIFY_SUMMARY_CHARS = 400
+
+
+class ClassifiedItemOut(BaseModel):
+    """Una nota clasificada en la respuesta de la IA."""
+
+    id: int
+    category: str
+    label: str | None = None
+
+
+class ClassificationOut(BaseModel):
+    """Esquema de la respuesta de la clasificación."""
+
+    items: list[ClassifiedItemOut]
+
+
+def build_classify_prompt(request: ClassificationRequest) -> str:
+    """Llena la plantilla ``classify_v1.md`` con el catálogo y el lote.
+
+    Args:
+        request: Notas (título y resumen, nunca el texto, §8) y catálogo.
+
+    Returns:
+        El texto que se manda a la IA.
+    """
+    template = CLASSIFY_PROMPT_PATH.read_text(encoding="utf-8")
+    categories = "\n".join(f"- {c.name}: {c.description}" for c in request.categories)
+    notes = "\n".join(
+        f"[{n.article_id}] {n.title} — {(n.summary or 'sin resumen')[:CLASSIFY_SUMMARY_CHARS]}"
+        for n in request.notes
+    )
+    return template.format(other=request.other, categories=categories, notes=notes)
+
+
+def to_labels(
+    out: ClassificationOut, request: ClassificationRequest
+) -> tuple[ClassificationLabel, ...]:
+    """Las etiquetas de la respuesta, solo de notas que estaban en el lote.
+
+    Args:
+        out: Respuesta validada.
+        request: Lote enviado.
+
+    Returns:
+        Una etiqueta por nota del lote que la IA respondió (sin repetir).
+    """
+    wanted = {n.article_id for n in request.notes}
+    seen: set[int] = set()
+    labels: list[ClassificationLabel] = []
+    for item in out.items:
+        if item.id in wanted and item.id not in seen:
+            seen.add(item.id)
+            labels.append(ClassificationLabel(item.id, item.category, item.label))
+    return tuple(labels)

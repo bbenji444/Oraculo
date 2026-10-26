@@ -18,6 +18,7 @@ from app.application.ports.search_reads import (
     ArticleDetail,
     ArticleFilters,
     ArticleItem,
+    CategoryCount,
     ConceptRef,
     InRegion,
     RegionPoint,
@@ -176,6 +177,12 @@ class Articles:
             # Clave que ya no está en el catálogo: no se pinta.
             NoteLocation("99001", "MEX", Precision.MUNICIPALITY),
         ]
+
+    async def category_counts(
+        self, search_id: UUID, filters: ArticleFilters
+    ) -> list[CategoryCount]:
+        # Sin categorías en estas pruebas (F12.4 se prueba aparte).
+        return []
 
     async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:
         known = {"14": "Jalisco", "17": "Morelos"}

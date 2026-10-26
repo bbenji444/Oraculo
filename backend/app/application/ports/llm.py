@@ -313,3 +313,127 @@ class EntityExtractorPort(Protocol):
             ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
         """
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationNote:
+    """Una nota tal como se le da a la IA para clasificarla (F12.4, ADR-0029).
+
+    Solo título y resumen (o fragmento): nunca el texto completo (§8).
+
+    Attributes:
+        article_id: Nota (la IA responde con este id).
+        title: Título.
+        summary: Resumen de la IA o fragmento del medio, si hay.
+    """
+
+    article_id: int
+    title: str
+    summary: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryOption:
+    """Una categoría del catálogo como se le explica a la IA.
+
+    Attributes:
+        name: Nombre exacto que debe responder.
+        description: Qué entra en ella.
+    """
+
+    name: str
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationRequest:
+    """Un lote de notas por clasificar.
+
+    Attributes:
+        notes: Notas del lote.
+        categories: Catálogo activo, con «Otros».
+        other: Nombre de la categoría de respaldo («Otros»).
+    """
+
+    notes: Sequence[ClassificationNote]
+    categories: Sequence[CategoryOption]
+    other: str
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationLabel:
+    """Lo que respondió la IA para una nota.
+
+    Attributes:
+        article_id: Nota.
+        category: Nombre de categoría que eligió (se valida contra el catálogo).
+        raw_label: Etiqueta libre que propuso, o ``None``.
+    """
+
+    article_id: int
+    category: str | None
+    raw_label: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationResult:
+    """Las categorías de un lote con su costo y procedencia.
+
+    Attributes:
+        labels: Una por nota que respondió la IA (puede faltar alguna).
+        usage: Tokens gastados (suma de intentos, si hubo reintento).
+        model: Modelo usado.
+        prompt_version: Versión del prompt (``classify_v1``).
+    """
+
+    labels: tuple[ClassificationLabel, ...]
+    usage: LLMUsage
+    model: str
+    prompt_version: str
+
+
+class ClassificationError(RuntimeError):
+    """La IA no dio una clasificación válida tras reintentar.
+
+    Attributes:
+        usage: Tokens que se gastaron de todos modos.
+    """
+
+    def __init__(self, message: str, usage: LLMUsage) -> None:
+        """Guarda el mensaje y lo que se gastó.
+
+        Args:
+            message: Qué falló.
+            usage: Tokens gastados en los intentos.
+        """
+        super().__init__(message)
+        self.usage = usage
+
+
+class ClassifierPort(Protocol):
+    """La IA que clasifica notas por categoría (F12.4, ADR-0029)."""
+
+    @property
+    def model(self) -> str:
+        """Modelo que se usa."""
+        ...
+
+    @property
+    def classify_prompt_version(self) -> str:
+        """Versión del prompt de clasificación (se guarda con cada nota)."""
+        ...
+
+    async def classify(self, request: ClassificationRequest) -> ClassificationResult:
+        """Clasifica un lote de notas.
+
+        Args:
+            request: Notas y catálogo.
+
+        Returns:
+            La categoría de cada nota, con su costo.
+
+        Raises:
+            ClassificationError: Si la respuesta no fue válida tras un reintento.
+            ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
+        """
+        ...

@@ -37,6 +37,7 @@ from uuid import UUID
 from app.application.audit import Actor
 from app.application.ports.geocoding import GazetteerPort
 from app.application.ports.llm import (
+    ClassificationError,
     EnrichmentError,
     EnrichmentRequest,
     EnrichmentResult,
@@ -54,6 +55,7 @@ from app.application.ports.search_store import (
     StoredArticle,
     StoredSearch,
 )
+from app.application.use_cases.classify import ClassifyArticles
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionResult
 from app.application.use_cases.extraction import ArticleText, ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions, search_area
@@ -212,6 +214,7 @@ class RunSearch:
         similarity: TitleSimilarity,
         limits: PipelineLimits,
         stories: GroupStories | None = None,
+        classifier: ClassifyArticles | None = None,
         log_progress: Callable[[UUID, Mapping[str, object]], None] = lambda _id, _p: None,
     ) -> None:
         """Recibe una pieza por etapa.
@@ -230,6 +233,8 @@ class RunSearch:
             limits: Topes y precios.
             stories: Agrupa en historias las notas encontradas (F12.1c); sin
                 él, no se agrupa.
+            classifier: Clasifica las notas por categoría (F12.4); sin él,
+                no se clasifica.
             log_progress: Aviso de avance (el comando lo muestra en pantalla).
         """
         self._searches = searches
@@ -244,6 +249,7 @@ class RunSearch:
         self._similarity = similarity
         self._limits = limits
         self._stories = stories
+        self._classifier = classifier
         self._log_progress = log_progress
 
     def available_providers(self) -> list[Provider]:
@@ -430,6 +436,34 @@ class RunSearch:
                 w.primary = await self._gazetteer.by_code(w.stored.primary_code)
         tally.stages[Stage.GEOCODE] = StageCount(Stage.GEOCODE, geocoded, 0)
 
+    async def _classify(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> None:
+        """Clasifica por categoría las notas encontradas (F12.4, ADR-0029).
+
+        Va al cierre porque usa el resumen de la IA. Su costo se suma al de
+        la búsqueda. Si falla, la búsqueda sigue con su estado y el error queda
+        en ``processing_errors``: las notas se clasifican en otra pasada.
+        """
+        if self._classifier is None or not work:
+            return
+        try:
+            report = await self._classifier.run([w.stored.article_id for w in work])
+        except ClassificationError as error:
+            tally.usage += error.usage
+            await self._record_close_error(search, error, f"Clasificación: {error}")
+            return
+        except Exception as error:
+            await self._record_close_error(search, error, f"Clasificación: {error}")
+            return
+        tally.usage += report.usage
+        tally.extra["classified"] = report.classified
+
+    async def _record_close_error(
+        self, search: StoredSearch, error: Exception, message: str
+    ) -> None:
+        await self._searches.record_error(
+            ProcessingErrorRecord(search.search_id, Stage.CLOSE, type(error).__name__, message)
+        )
+
     async def _group_stories(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> None:
         """Junta en historias las notas encontradas (F12.1c, ADR-0026).
 
@@ -469,6 +503,7 @@ class RunSearch:
             )
         if rows:
             await self._articles.link_results(search.search_id, rows)
+        await self._classify(search, tally, work)
         await self._group_stories(search, tally, work)
         tally.extra.update(
             {

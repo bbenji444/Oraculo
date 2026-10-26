@@ -135,6 +135,20 @@ export interface Article {
    * (ADR-0026); `null` o ausente si la nota está sola.
    */
   story_id?: number | null;
+  /**
+   * Categoría (el delito) que eligió la IA (ADR-0029); `null` o ausente si
+   * todavía no se clasifica. Colores y símbolos llegan después.
+   */
+  category?: ArticleCategory | null;
+  /** Etiqueta libre que propuso la IA («robo de combustible»). */
+  category_raw?: string | null;
+}
+
+export interface ArticleCategory {
+  id: number;
+  name: string;
+  color: string | null;
+  symbol: string | null;
 }
 
 export interface ArticleDetail extends Article {

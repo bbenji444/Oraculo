@@ -10,7 +10,12 @@ import pytest
 
 from app.application.audit import Actor
 from app.application.ports.extraction import Extraction
-from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
+from app.application.ports.llm import (
+    ClassificationError,
+    EnrichmentError,
+    EnrichmentRequest,
+    EnrichmentResult,
+)
 from app.application.ports.providers import ProviderResponse
 from app.application.ports.search_store import (
     NewSearch,
@@ -21,6 +26,7 @@ from app.application.ports.search_store import (
     StoredArticle,
     StoredSearch,
 )
+from app.application.use_cases.classify import ClassifyReport
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
@@ -277,6 +283,7 @@ def pipeline(
     max_llm_articles: int = 150,
     region_missing: bool = False,
     stories: Any = None,
+    classifier: Any = None,
 ) -> tuple[RunSearch, Searches, Articles, LLM, Extractor]:
     sources = (
         sources
@@ -311,6 +318,7 @@ def pipeline(
         similarity=lambda a, b: 1.0 if a == b else 0.0,
         limits=PipelineLimits(max_llm_articles, 2, 0.10, 0.50),
         stories=stories,
+        classifier=classifier,
     )
     return use_case, searches, articles, llm, extractor
 
@@ -620,3 +628,41 @@ async def test_corre_con_las_fuentes_de_la_busqueda(
     await use_case.run(search.search_id)
 
     assert {s.provider for s in sources if s.queries} == queried
+
+
+class Classifier:
+    """``ClassifyArticles`` falso: cuesta tokens o falla."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.received: list[list[int]] = []
+
+    async def run(self, article_ids: Sequence[int]) -> Any:
+        self.received.append(list(article_ids))
+        if self.error:
+            raise self.error
+        return ClassifyReport(classified=len(article_ids), usage=LLMUsage(1000, 100))
+
+
+async def test_al_cerrar_clasifica_y_suma_su_costo_a_la_busqueda() -> None:
+    use_case, searches, _a, _l, _e = pipeline(classifier=Classifier())
+    without, _s2, _a2, _l2, _e2 = pipeline()
+
+    report = await use_case.run(uuid4())
+    base = await without.run(uuid4())
+
+    assert report.status is SearchStatus.COMPLETED
+    # 1000 tokens de entrada y 100 de salida a 0.10 y 0.50 USD por millón.
+    assert report.llm_usage.tokens_in == base.llm_usage.tokens_in + 1000
+    assert searches.closing is not None
+    assert searches.closing.llm_usage.tokens_out == base.llm_usage.tokens_out + 100
+
+
+async def test_si_clasificar_falla_la_busqueda_sigue_y_cuenta_lo_gastado() -> None:
+    failing = Classifier(ClassificationError("JSON inválido", LLMUsage(300, 5)))
+    use_case, searches, _a, _l, _e = pipeline(classifier=failing)
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.COMPLETED
+    assert any(e.message.startswith("Clasificación:") for e in searches.errors)

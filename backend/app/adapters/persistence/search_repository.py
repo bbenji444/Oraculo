@@ -38,6 +38,8 @@ from app.application.ports.search_reads import (
     ArticleDetail,
     ArticleFilters,
     ArticleItem,
+    CategoryCount,
+    CategoryView,
     ConceptRef,
     InRegion,
     RegionPoint,
@@ -961,6 +963,31 @@ class PostgresArticleStore:
         return [
             NoteLocation(code, country, Precision(precision) if precision else Precision.UNKNOWN)
             for code, country, precision in rows
+        ]
+
+    async def category_counts(
+        self, search_id: UUID, filters: ArticleFilters
+    ) -> list[CategoryCount]:
+        """Ver ``ArticleReaderPort.category_counts``."""
+        where, params = _article_filters(filters)
+        params["s"] = search_id
+        sql = f"""
+            SELECT c.id, c.name, c.color, c.symbol, count(*) AS n
+            FROM (SELECT article_id, bool_or(in_region) AS in_region
+                  FROM search_results WHERE search_id = :s GROUP BY article_id) sr
+            JOIN articles a ON a.id = sr.article_id
+            LEFT JOIN categories c ON c.id = a.category_id
+            WHERE {" AND ".join(where) or "true"}
+            GROUP BY c.id, c.name, c.color, c.symbol, c.sort_order
+            ORDER BY count(*) DESC, c.sort_order NULLS LAST
+        """  # noqa: S608 — condiciones de texto fijo de este módulo
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(text(sql), params)).all()
+        return [
+            CategoryCount(
+                CategoryView(r.id, r.name, r.color, r.symbol) if r.id is not None else None, r.n
+            )
+            for r in rows
         ]
 
     async def regions_by_code(self, codes: Sequence[str]) -> list[RegionPoint]:

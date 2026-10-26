@@ -192,6 +192,36 @@ class LocationView:
 
 
 @dataclass(frozen=True, slots=True)
+class CategoryView:
+    """La categoría de una nota, como se muestra (F12.4, ADR-0029).
+
+    Attributes:
+        category_id: Id en ``categories``.
+        name: Nombre («Armas y explosivos»).
+        color: Color, cuando se decida.
+        symbol: Símbolo, cuando se decida.
+    """
+
+    category_id: int
+    name: str
+    color: str | None = None
+    symbol: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryCount:
+    """Cuántas notas de una búsqueda hay en una categoría.
+
+    Attributes:
+        category: La categoría, o ``None`` para las notas todavía sin clasificar.
+        count: Notas.
+    """
+
+    category: CategoryView | None
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
 class ArticleItem:
     """Una nota en la lista de resultados.
 
@@ -213,6 +243,9 @@ class ArticleItem:
         providers: Quién la encontró en esta búsqueda.
         story_id: Historia a la que pertenece (id de su primera nota, ADR-0026),
             o ``None`` si está sola.
+        category: El delito del que trata (ADR-0029), o ``None`` si falta
+            clasificarla.
+        category_raw: Etiqueta libre que propuso la IA.
     """
 
     article_id: int
@@ -231,6 +264,8 @@ class ArticleItem:
     in_region: bool | None
     providers: tuple[str, ...]
     story_id: int | None = None
+    category: CategoryView | None = None
+    category_raw: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,6 +345,20 @@ class ArticleReaderPort(Protocol):
 
         Returns:
             Una por nota.
+        """
+        ...
+
+    async def category_counts(
+        self, search_id: UUID, filters: ArticleFilters
+    ) -> list[CategoryCount]:
+        """Cuántas notas de la búsqueda hay en cada categoría (F12.4).
+
+        Args:
+            search_id: Búsqueda.
+            filters: Los mismos filtros de la lista de notas.
+
+        Returns:
+            Una por categoría con notas (incluidas las sin clasificar).
         """
         ...
 

@@ -28,6 +28,7 @@ from app.adapters.llm.factory import (
     llm_info,
 )
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
+from app.adapters.persistence.categories_repository import PostgresCategoryStore
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
@@ -135,6 +136,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             default_sources=parse_sources(settings.manual_default_sources),
         )
         app.state.search_store = PostgresSearchStore(engine)
+        # Catálogo de categorías de noticias (F12.4, ADR-0029).
+        app.state.category_store = PostgresCategoryStore(engine)
         app.state.article_store = PostgresArticleStore(engine)
         app.state.search_queue = CelerySearchQueue(celery_app)
         app.state.max_queries_per_search = settings.max_queries_per_search
