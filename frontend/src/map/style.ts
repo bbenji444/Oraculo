@@ -361,7 +361,8 @@ export function featureLabel(props: RegionFeatureProps): string | null {
  */
 export const FLY_MAX_ZOOM: Record<RegionLevel, number> = {
   country: 6,
-  state: 7,
-  municipality: 11,
-  locality: 14,
+  // Más cerca desde el 26/10/2026 (Benji: acercarse al lugar de los hechos).
+  state: 8,
+  municipality: 12.5,
+  locality: 15,
 };

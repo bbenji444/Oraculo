@@ -124,7 +124,7 @@ export const PITCH_BY_TARGET = {
   state: 20,
   municipality: 35,
   locality: 45,
-  article: 30,
+  article: 45,
 } as const;
 
 export type PitchTarget = keyof typeof PITCH_BY_TARGET;

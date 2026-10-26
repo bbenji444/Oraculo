@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ARTICLE_ZOOM,
+  AURA_FULL_ZOOM,
+  AURA_GONE_ZOOM,
+  auraOpacity,
   articleOffset,
   articleZoom,
   CALLOUT_WIDTH,
@@ -12,8 +15,11 @@ import {
   MIN_FRAME_PX,
   MIN_FRAME_ZOOM,
   PANEL_CLEARANCE_PX,
+  ringAround,
   WORLD_DETAIL_MAX_ZOOM,
 } from './framing';
+
+const DEG = Math.PI / 180;
 
 const LAPTOP = { width: 1366, height: 650 };
 const PHONE = { width: 375, height: 812 };
@@ -199,5 +205,31 @@ describe('zoom al volar a una nota', () => {
     // París a zoom 11 quedaba vacío: el detalle de calles solo es de México.
     expect(articleZoom('locality', ...PARIS)).toBe(WORLD_DETAIL_MAX_ZOOM);
     expect(articleZoom('country', ...PARIS)).toBe(ARTICLE_ZOOM.country);
+  });
+});
+
+describe('aureola del globo', () => {
+  it('se ve completa con el globo entero y se apaga al acercarse', () => {
+    expect(auraOpacity(1.8)).toBe(1);
+    expect(auraOpacity(AURA_FULL_ZOOM)).toBe(1);
+    expect(auraOpacity((AURA_FULL_ZOOM + AURA_GONE_ZOOM) / 2)).toBeCloseTo(0.5);
+    expect(auraOpacity(AURA_GONE_ZOOM)).toBe(0);
+    expect(auraOpacity(10)).toBe(0);
+  });
+
+  it('el anillo queda a la distancia pedida, empezando por el norte', () => {
+    const ring = ringAround([-99, 19], 60, 8);
+    expect(ring).toHaveLength(8);
+    expect(ring[0]?.[0]).toBeCloseTo(-99);
+    expect(ring[0]?.[1]).toBeCloseTo(79);
+    // El segundo cuarto del anillo va hacia el este.
+    expect(ring[2]?.[0]).toBeGreaterThan(-99);
+    for (const [lng, lat] of ring) {
+      // Distancia sobre la esfera (ley de cosenos), en grados.
+      const cosD =
+        Math.sin(19 * DEG) * Math.sin(lat * DEG) +
+        Math.cos(19 * DEG) * Math.cos(lat * DEG) * Math.cos((lng + 99) * DEG);
+      expect(Math.acos(cosD) / DEG).toBeCloseTo(60);
+    }
   });
 });
