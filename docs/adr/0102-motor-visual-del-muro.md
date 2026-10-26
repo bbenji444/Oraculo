@@ -208,3 +208,10 @@ A esa resolución el globo solo ya va a 35–40 fps; el muro resta lo mismo en p
 - **El globo compartido.** En la 9.6, la creación del mapa sale de `ExploreGlobe.tsx` a un componente base, para que Explorar y el muro usen el mismo globo y no dos copias.
 - **El laboratorio se queda** (`?laboratorio`) con el control y la opción A, para volver a medir cada vez que el muro cambie.
 - **Riesgo:** en equipos más lentos que este, el vuelo con muro puede bajar de 30 fps. Los ajustes del punto 5 se pueden activar solos si el promedio de un vuelo cae por debajo de un umbral (se decide en la 9.6).
+
+## Seguimiento en la 9.6 (23/10/2026)
+
+- **Motor movido a `src/map/muro/`** (`engine.ts`, `labels.ts`, `geometry.ts`, `types.ts`); el laboratorio lo importa de ahí. No se sacó la creación del mapa a un componente base: el muro recibe el mismo mapa de `ExploreGlobe` (prop `onMap`), que no lo entrega hasta que termina la entrada desde el espacio (si no, ese vuelo pisaba el del muro).
+- **Ajustes del punto 5 aplicados:** resolución reducida mientras la cámara orbita (5.1), cinta de 14 a 10 px con grosor según la confianza (5.3) y el muro deja de pedir cuadros a los 4 s sin movimiento (5.4). El tope de nodos (5.2) es `CASE_MAX_VISIBLE_NODES` en el servidor.
+- **Piso de los arcos de 1,500 a 120 m:** en un caso real los nodos quedan a ~500 m (todo cae en una alcaldía) y con 1,500 m los arcos salían como agujas.
+- **Pendiente: la medición final de fps.** En la 9.6 el navegador integrado de las pruebas estaba oculto y frena el dibujo, así que los fps no valen. Se mide en el equipo de los analistas con `?laboratorio` (pestaña Laboratorio, 150 nodos, control contra opción A); el criterio sigue siendo no bajar más de 10 % frente al globo solo.

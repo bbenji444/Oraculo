@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.articles import router as articles_router
+from app.api.v1.case_graph import router as case_graph_router
 from app.api.v1.cases import router as cases_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.concepts import router as concepts_router
@@ -24,6 +25,8 @@ api_router.include_router(sources_router)
 api_router.include_router(categories_router)
 api_router.include_router(articles_router)
 api_router.include_router(reports_router)
+# Antes que cases_router: "/cases/map" no debe leerse como "/cases/{id}".
+api_router.include_router(case_graph_router)
 api_router.include_router(cases_router)
 api_router.include_router(entities_router)
 api_router.include_router(resolution_router)

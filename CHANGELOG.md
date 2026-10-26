@@ -28,6 +28,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **`make comparar-fuentes`** (F12.2): hace la misma consulta en SearchApi y Google News RSS y dice cuántas notas trajo solo cada una y cuántas las dos, con 5 ejemplos de lo que solo trajo SearchApi. Gasta hasta 3 créditos y pide «si».
 - **Historias** (F12.1c, ADR-0026): las notas del mismo hecho publicadas por varios medios se juntan en una historia, sin borrar ninguna. Cada búsqueda agrupa al cerrar sus notas con las de los días cercanos; `make agrupar-historias` lo hace con las ya guardadas (sin opciones solo muestra 5 historias; con `ARGS=--aplicar` pide «si»). Con las notas del 24/10/2026: 172 historias con 491 notas, de 1,450 a ~1,131 tarjetas. La migración 0024 agrega `articles.story_id`.
 - **`make limpiar-duplicados`** (F12.1b, ADR-0025): quita del índice local las notas repetidas que entraron antes: la misma URL con otra forma (`:443`, `www.`), el mismo medio con el mismo texto y cuerpo, y títulos sin letras. Sin opciones solo muestra conteos y 5 ejemplos reales; con `ARGS=--aplicar` pide «si» y borra por lotes. No toca notas de búsquedas, casos ni reportes.
+- **El muro del caso sobre el globo** (Fase 9.6, historia H9.3):
+  - **Abrirlo:** «🌐 Ver en el globo» en el detalle del caso (o `#/explorar?caso=<id>`, que se puede compartir) vuela a donde ocurrió el caso.
+  - **Qué se ve:** cada entidad confirmada es un nodo que late, con color por tipo y borde por estatus legal; los vínculos son arcos de luz, punteados si están sugeridos.
+  - **Al elegir una entidad:** la cámara la orbita, lo demás se atenúa y entra un panel con su estatus legal, sus vínculos (un clic vuela a la otra entidad) y sus citas.
+  - **Constelación:** las notas del caso aparecen como puntos de luz unidos por las entidades que comparten.
+  - **Base técnica:** el servidor calcula las posiciones (`GET /cases/{id}/graph`) y las personas se reparten alrededor del lugar de sus notas sin encimarse. Abrir el muro queda en la bitácora.
+- **Mis casos en el globo** (Fase 9.6): el interruptor «Mis casos» pone cada caso abierto como marcador ámbar; un clic abre su muro (`GET /cases/map`).
+- **Limpiar el globo** (Fase 9.6): «✕ Limpiar globo» y «Nueva búsqueda» quitan lo pintado y dejan el formulario listo para otra búsqueda con la misma región, conceptos y fechas. La búsqueda anterior sigue en Historial.
 - **Duplicados y vínculos de un caso** (Fase 9.5, §9.8, ADR-0106):
   - **Posibles duplicados:** el sistema sugiere qué entidades del caso podrían ser la misma (mismo nombre, un nombre o alias en común, o nombres muy parecidos) y las muestra lado a lado con sus citas. Solo una persona decide «Son la misma» o «No son la misma»; nada se une solo. Al unir queda la confirmada.
   - **Deshacer:** «separar» deshace una fusión, y «Separar menciones» saca a un homónimo que quedó junto.

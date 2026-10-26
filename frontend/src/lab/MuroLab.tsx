@@ -26,10 +26,10 @@ import { setupMapLibre } from '../map/setup';
 import { buildMapStyle } from '../map/style';
 import { useCameraStore } from '../store/camera';
 import { type FrameStats, FRAME_BUDGET_MS, summarizeRuns } from './fpsMeter';
-import { DEMO_CASE, type LabCase, syntheticCase } from './labCase';
+import { DEMO_CASE, type LabCase, syntheticCase, toWall } from './labCase';
 import { PHASE_LABEL, PHASES, type Phase, runPhase } from './labScript';
-import type { MuroEngine } from './muroLabels';
-import { addMapLibreMuro } from './muroMapLibre';
+import { addWall } from '../map/muro/engine';
+import type { MuroEngine } from '../map/muro/labels';
 
 type EngineKey = 'control' | 'maplibre';
 type CaseKey = 'demo' | '25' | '150' | '500';
@@ -60,7 +60,7 @@ function caseFor(key: CaseKey): LabCase {
 }
 
 function addEngine(map: MapLibreMap, key: EngineKey, labCase: LabCase): MuroEngine | null {
-  return key === 'maplibre' ? addMapLibreMuro(map, labCase) : null;
+  return key === 'maplibre' ? addWall(map, toWall(labCase)) : null;
 }
 
 /** Verde si cumple el criterio de la 9.1, ámbar si no. */

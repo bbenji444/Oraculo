@@ -576,6 +576,16 @@ Solo entre entidades **confirmadas** del caso (cada una como la raíz de su grup
 - **Evidencia:** cada vínculo muestra las notas del caso donde aparecen las dos entidades.
 - **Bitácora:** `relationship.created`, `relationship.confirmed` y `relationship.discarded`.
 
+### 10.4 El muro de un caso sobre el globo (Fase 9.6, H9.3)
+
+- **Entrada:** «🌐 Ver en el globo» en el detalle del caso, un marcador de «Mis casos» en Explorar o la URL `#/explorar?caso=<id>`. El globo deja de mostrar la búsqueda y dibuja el muro; «✕ Salir del muro» regresa.
+- **Qué se dibuja** (`GET /cases/{id}/graph`): solo entidades confirmadas (ADR-0104), hasta `CASE_MAX_VISIBLE_NODES` (150); los vínculos no descartados (sugeridos punteados).
+- **Dónde** (`domain/case_graph.py`): un lugar va a su punto del catálogo; lo demás va al lugar más repetido de sus notas, repartido en espiral (determinista) para que no se encime. Es una posición visual, no un domicilio, y el panel lo dice.
+- **Cámara:** al abrir encuadra todo; al elegir una entidad la orbita, atenúa lo demás y muestra su panel (estatus legal, vínculos, citas). Esc regresa.
+- **Constelación:** las notas del caso unidas por las entidades confirmadas que comparten.
+- **Bitácora:** abrir el muro es ver el caso (`case.viewed`, una vez cada 5 minutos por persona).
+- **«Limpiar globo» / «Nueva búsqueda»:** quitan resultados, nota y muro y vuelven a México con el formulario listo.
+
 ---
 
 ## 11. Geolocalización

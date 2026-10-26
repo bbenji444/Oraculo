@@ -523,6 +523,13 @@ El sistema **sugiere** qué entidades del caso podrían ser la misma; solo una p
 
 Las cuatro escrituras piden editor o dueño con el caso abierto.
 
+## El muro y mis casos en el globo (Fase 9.6)
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/cases/{id}/graph` | Lo que dibuja el globo: `nodes` (solo entidades **confirmadas**, hasta `CASE_MAX_VISIBLE_NODES`; el resto en `hidden_nodes`), cada una con `lon`/`lat` ya calculados, `pinned` (su propio punto si es un lugar; si no, una posición visual alrededor del lugar de sus notas), estatus legal con etiqueta, menciones y fechas; `edges` (vínculos no descartados entre nodos visibles, como en `/relationships`); `notes` y `note_links` para la constelación (notas ubicadas y cuántas entidades comparten). Abrirlo cuenta como ver el caso (`case.viewed`, una vez cada 5 minutos por persona). Cualquier miembro. |
+| GET | `/cases/map` | Mis casos abiertos con al menos una nota ubicada: nombre, sensibilidad, notas, entidades confirmadas y el centro de sus notas (`lon`/`lat`). No abre ningún caso. |
+
 ## Vínculos de un caso (Fase 9.5)
 
 Solo entre entidades **confirmadas** del caso. «Aparecen juntas» se calcula de las notas que comparten; los demás los dibuja el analista.

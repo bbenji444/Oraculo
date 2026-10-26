@@ -1,5 +1,5 @@
 /**
- * Opción A del ADR-0102: el muro con MapLibre puro, sin dependencias nuevas.
+ * Motor del muro (Fases 9.1 y 9.6, ADR-0102): MapLibre puro, sin dependencias nuevas.
  *
  * - **Arcos de luz:** una capa propia (`CustomLayerInterface`, modo 3D) que
  *   dibuja cada arco como una cinta en pantalla, levantada sobre el globo con
@@ -14,7 +14,13 @@
  * API del preludio verificada en `maplibre-gl@6.14.0` instalado
  * (`CustomRenderMethodInput.shaderData` y `defaultProjectionData`).
  *
- * No hace: no mueve la cámara (eso es `labScript.ts`).
+ * En la 9.6 pasó del laboratorio al producto: dibuja cualquier `WallCase`
+ * (`wall.ts`), se actualiza sin recrear capas (realce del nodo elegido,
+ * constelación) y deja de pedir cuadros cuando nadie mueve el globo
+ * (ADR-0102, punto 5.4: calor y batería).
+ *
+ * No hace: no mueve la cámara (`orbit.ts` en Explorar, `labScript.ts` en el
+ * laboratorio).
  */
 import {
   type CustomLayerInterface,
@@ -23,17 +29,30 @@ import {
   MercatorCoordinate,
 } from 'maplibre-gl';
 
-import { arcPath, type LabCase, metersInMercatorUnits, nodesById } from './labCase';
-import { addNodeLabels, MURO_SOURCE, type MuroEngine, removeNodeSource } from './muroLabels';
+import { arcPath, metersInMercatorUnits } from './geometry';
+import {
+  addNodeLabels,
+  MURO_SOURCE,
+  type MuroEngine,
+  removeNodeSource,
+  setNodeData,
+} from './labels';
+import type { WallCase } from './types';
 
 const ARCS_LAYER = 'muro-arcs';
 const HALO_LAYER = 'muro-node-halo';
-const CORE_LAYER = 'muro-node-core';
+// Capa de los núcleos: la que se consulta al hacer clic en un nodo.
+export const WALL_NODE_LAYER = 'muro-node-core';
+const CORE_LAYER = WALL_NODE_LAYER;
 // Puntos por arco: 48 bastan para que CDMX–Cancún se vea curvo y no se corte
 // en el horizonte (la documentación de MapLibre pide subdividir).
 const ARC_SAMPLES = 48;
-// Ancho de la cinta en píxeles CSS: el núcleo ocupa el centro y el resto es halo.
-const RIBBON_WIDTH_PX = 14;
+// Ancho de la cinta en píxeles CSS con confianza 1: el núcleo ocupa el centro y
+// el resto es halo. Bajó de 14 a 10 en la 9.6 (ADR-0102, punto 5.3: los arcos
+// eran más de la mitad del costo de GPU del muro).
+const RIBBON_WIDTH_PX = 10;
+// Sin movimiento del globo durante este tiempo, el muro deja de animarse.
+export const IDLE_AFTER_MS = 4000;
 // El halo de los nodos late a 30 cuadros por segundo: suficiente y barato.
 const PULSE_FRAME_MS = 1000 / 30;
 const ARC_CONFIRMED_COLOR: [number, number, number] = [0.49, 0.83, 0.99];
@@ -94,7 +113,8 @@ void main() {
   vec2 sn = next.xy / next.w * u_viewport;
   vec2 dir = normalize(sn - sp + vec2(1e-6, 0.0));
   vec2 normal = vec2(-dir.y, dir.x);
-  cur.xy += normal * a_side_t.x * u_width / u_viewport * cur.w;
+  // Grosor según la confianza (plan §9.5): de 45 % a 100 % del ancho.
+  cur.xy += normal * a_side_t.x * u_width * (0.45 + 0.55 * a_color.a) / u_viewport * cur.w;
   gl_Position = cur;
   v_side = a_side_t.x;
   v_t = a_side_t.y;
@@ -128,12 +148,12 @@ interface ArcBuffers {
 }
 
 /** Geometría de cintas: 2 vértices por punto del arco (un lado y el otro). */
-export function arcRibbons(labCase: LabCase, samples = ARC_SAMPLES) {
-  const byId = nodesById(labCase);
+export function arcRibbons(wall: WallCase, samples = ARC_SAMPLES) {
+  const byId = new Map(wall.nodes.map((node) => [node.id, node]));
   const floats: number[] = [];
   const indices: number[] = [];
   let vertex = 0;
-  labCase.links.forEach((link, linkIndex) => {
+  wall.links.forEach((link, linkIndex) => {
     const a = byId.get(link.from);
     const b = byId.get(link.to);
     if (!a || !b) return;
@@ -203,7 +223,7 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   return shader;
 }
 
-/** Capa propia de arcos de luz (opción A). */
+/** Capa propia de arcos de luz (opción A del ADR-0102). */
 class ArcGlowLayer implements CustomLayerInterface {
   readonly id = ARCS_LAYER;
   readonly type = 'custom' as const;
@@ -212,25 +232,40 @@ class ArcGlowLayer implements CustomLayerInterface {
   private program: WebGLProgram | null = null;
   private programKey = '';
   private geometry: ArcBuffers | null = null;
-  private readonly labCase: LabCase;
+  private wall: WallCase;
+  // Los datos cambiaron: se vuelven a subir a la GPU en el siguiente cuadro.
+  private dirty = false;
+  /** Hasta cuándo se anima (el motor lo extiende con cada movimiento). */
+  activeUntil = 0;
 
-  constructor(labCase: LabCase) {
-    this.labCase = labCase;
+  constructor(wall: WallCase) {
+    this.wall = wall;
+  }
+
+  setCase(wall: WallCase): void {
+    this.wall = wall;
+    this.dirty = true;
+    this.map?.triggerRepaint();
+  }
+
+  private upload(gl: WebGL2RenderingContext, geometry: ArcBuffers): void {
+    const { floats, indices } = arcRibbons(this.wall);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry.buffers[0] ?? null);
+    gl.bufferData(gl.ARRAY_BUFFER, floats, gl.STATIC_DRAW);
+    gl.bindVertexArray(geometry.vao);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geometry.buffers[1] ?? null);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    gl.bindVertexArray(null);
+    geometry.indexCount = indices.length;
   }
 
   onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
     this.map = map;
-    const { floats, indices } = arcRibbons(this.labCase);
     const vao = gl.createVertexArray();
     const vbo = gl.createBuffer();
     const ibo = gl.createBuffer();
-    gl.bindVertexArray(vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, floats, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-    gl.bindVertexArray(null);
-    this.geometry = { vao, buffers: [vbo, ibo], indexCount: indices.length };
+    this.geometry = { vao, buffers: [vbo, ibo], indexCount: 0 };
+    this.upload(gl, this.geometry);
   }
 
   private ensureProgram(gl: WebGL2RenderingContext, args: CustomRenderMethodInput): WebGLProgram {
@@ -267,6 +302,11 @@ class ArcGlowLayer implements CustomLayerInterface {
   render(gl: WebGL2RenderingContext, args: CustomRenderMethodInput): void {
     const geometry = this.geometry;
     if (!geometry || !this.map) return;
+    if (this.dirty) {
+      this.upload(gl, geometry);
+      this.dirty = false;
+    }
+    if (geometry.indexCount === 0) return;
     const program = this.ensureProgram(gl, args);
     const projection = args.defaultProjectionData;
     const uniform = (name: string) => gl.getUniformLocation(program, name);
@@ -298,8 +338,9 @@ class ArcGlowLayer implements CustomLayerInterface {
     gl.bindVertexArray(geometry.vao);
     gl.drawElements(gl.TRIANGLES, geometry.indexCount, gl.UNSIGNED_INT, 0);
     gl.bindVertexArray(null);
-    // El pulso de luz recorre los arcos: se pide el siguiente cuadro.
-    this.map.triggerRepaint();
+    // El pulso de luz recorre los arcos mientras alguien usa el globo; quieto,
+    // se deja de pedir cuadros (ADR-0102, punto 5.4).
+    if (performance.now() < this.activeUntil) this.map.triggerRepaint();
   }
 
   onRemove(_map: MapLibreMap, gl: WebGL2RenderingContext): void {
@@ -314,25 +355,32 @@ class ArcGlowLayer implements CustomLayerInterface {
   }
 }
 
+// Radio del halo de los nodos: base y latido (px).
+const HALO_BASE_PX = 14;
+const HALO_PULSE_PX = 5;
+// El nodo elegido late más grande (plan §9.5: "el seleccionado late más fuerte").
+const SELECTED_EXTRA_PX = 9;
+
 /**
- * Dibuja el caso con la opción A.
+ * Dibuja un muro sobre el globo.
  *
  * @param map Mapa ya cargado.
- * @param labCase Caso a dibujar.
- * @returns Cómo quitarlo.
+ * @param wall Nodos y arcos a dibujar.
+ * @returns Cómo actualizarlo o quitarlo.
  */
-export function addMapLibreMuro(map: MapLibreMap, labCase: LabCase): MuroEngine {
-  addNodeLabels(map, labCase);
-  map.addLayer(new ArcGlowLayer(labCase));
+export function addWall(map: MapLibreMap, wall: WallCase): MuroEngine {
+  addNodeLabels(map, wall);
+  const arcs = new ArcGlowLayer(wall);
+  map.addLayer(arcs);
   map.addLayer({
     id: HALO_LAYER,
     type: 'circle',
     source: MURO_SOURCE,
     paint: {
-      'circle-radius': 16,
+      'circle-radius': HALO_BASE_PX,
       'circle-color': ['get', 'color'],
       'circle-blur': 1,
-      'circle-opacity': 0.55,
+      'circle-opacity': ['*', 0.55, ['get', 'focus']],
     },
   });
   map.addLayer({
@@ -340,24 +388,44 @@ export function addMapLibreMuro(map: MapLibreMap, labCase: LabCase): MuroEngine 
     type: 'circle',
     source: MURO_SOURCE,
     paint: {
-      'circle-radius': 5.5,
+      'circle-radius': ['case', ['get', 'selected'], 8, 5.5],
       'circle-color': ['get', 'color'],
-      'circle-stroke-width': 2,
+      'circle-opacity': ['max', 0.35, ['get', 'focus']],
+      'circle-stroke-width': ['case', ['get', 'selected'], 3, 2],
       'circle-stroke-color': ['get', 'ring'],
+      'circle-stroke-opacity': ['max', 0.35, ['get', 'focus']],
     },
   });
+  const wake = () => {
+    arcs.activeUntil = performance.now() + IDLE_AFTER_MS;
+    map.triggerRepaint();
+  };
+  map.on('move', wake);
+  wake();
   let frame = 0;
   let last = 0;
   const pulse = (now: number) => {
     frame = requestAnimationFrame(pulse);
-    if (now - last < PULSE_FRAME_MS) return;
+    if (now - last < PULSE_FRAME_MS || now > arcs.activeUntil) return;
     last = now;
-    map.setPaintProperty(HALO_LAYER, 'circle-radius', 14 + 5 * Math.sin(now / 450));
+    const beat = HALO_BASE_PX + HALO_PULSE_PX * Math.sin(now / 450);
+    map.setPaintProperty(HALO_LAYER, 'circle-radius', [
+      'case',
+      ['get', 'selected'],
+      beat + SELECTED_EXTRA_PX,
+      beat,
+    ]);
   };
   frame = requestAnimationFrame(pulse);
   return {
+    update: (next: WallCase) => {
+      setNodeData(map, next);
+      arcs.setCase(next);
+      wake();
+    },
     remove: () => {
       cancelAnimationFrame(frame);
+      map.off('move', wake);
       removeNodeSource(map, [ARCS_LAYER, HALO_LAYER, CORE_LAYER]);
     },
   };

@@ -172,7 +172,6 @@ function HidePanelButton() {
 /** La búsqueda terminada en un renglón con sus descargas, para dejarle espacio a la lista. */
 function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => void }) {
   const search = useSearch(searchId).data;
-  const openSearch = useExplorerStore((s) => s.openSearch);
   if (!search) return null;
   return (
     <section aria-label="Búsqueda" className={`${GLASS} space-y-2 p-3`}>
@@ -182,10 +181,9 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
           <button
             type="button"
             onClick={() => {
-              // Cierra la búsqueda: vuelve al inicio de Explorar (con el acceso al monitor).
-              openSearch(null);
+              useExplorerStore.getState().clearGlobe();
             }}
-            title="Cerrar esta búsqueda y volver al inicio"
+            title="Quitar los resultados del globo y empezar otra búsqueda (esta queda en Historial)"
             className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
           >
             ‹ Volver

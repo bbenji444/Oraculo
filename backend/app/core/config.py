@@ -55,6 +55,9 @@ _DEFAULT_GDELT_MIN_INTERVAL_SECONDS = 5.0
 _DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS = 15.0
 # - Especificación §7.2: máximo 10 consultas por búsqueda; caché de 6 h.
 _DEFAULT_MAX_QUERIES_PER_SEARCH = 10
+# - Plan de fases §9.5 (rendimiento del muro): 150 nodos visibles; la 9.1
+#   midió que hasta ahí el muro cuesta de 0.5 a 2 ms de GPU por cuadro.
+_DEFAULT_CASE_MAX_VISIBLE_NODES = 150
 _DEFAULT_QUERY_CACHE_TTL_HOURS = 6.0
 # - Tope mensual de créditos de SearchApi: las 100 búsquedas de la prueba
 #   gratuita. Red de seguridad contra gastos por error.
@@ -174,6 +177,7 @@ class Settings(BaseSettings):
         default=_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS, ge=0
     )
     max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
+    case_max_visible_nodes: int = Field(default=_DEFAULT_CASE_MAX_VISIBLE_NODES, ge=1)
     query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
     searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
     searchapi_max_pages: int = Field(
