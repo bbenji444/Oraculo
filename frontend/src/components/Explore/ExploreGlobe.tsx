@@ -71,7 +71,6 @@ import { setupMapLibre } from '../../map/setup';
 import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
 import {
   buildMapStyle,
-  sunLight,
   featureLabel,
   FLY_MAX_ZOOM,
   INTERACTIVE_LAYERS,
@@ -126,8 +125,6 @@ interface Callout {
 // Vista inicial: México con el eje inclinado (map/spin.ts).
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
 const INITIAL_ZOOM = 1.8;
-// Cada minuto el Sol avanza ~0.25°: basta para que la luz siga a la hora real.
-const SUN_UPDATE_MS = 60_000;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
@@ -450,12 +447,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
     });
     observer.observe(container);
     mapRef.current = map;
-    // El Sol avanza con la hora real: la luz de la atmósfera se mueve sola.
-    const sunTimer = window.setInterval(() => {
-      if (map.isStyleLoaded()) map.setLight(sunLight());
-    }, SUN_UPDATE_MS);
     return () => {
-      window.clearInterval(sunTimer);
       observer.disconnect();
       stopAttribution();
       cancelAnimationFrame(calloutFrame);

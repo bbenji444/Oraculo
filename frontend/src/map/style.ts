@@ -15,12 +15,9 @@ import { layers as basemapLayers, namedFlavor } from '@protomaps/basemaps';
 import type {
   ExpressionSpecification,
   LayerSpecification,
-  LightSpecification,
   SourceSpecification,
   StyleSpecification,
 } from 'maplibre-gl';
-
-import { subsolarPoint, sunLightPosition } from './sun';
 
 /** Zoom a partir del cual se usa el mapa base detallado de México. */
 export const BASEMAP_SWITCH_ZOOM = 7;
@@ -245,16 +242,6 @@ const EARTH_LOOK: Record<EarthMode, Record<string, number>> = {
   night: { 'raster-saturation': 0.25, 'raster-contrast': 0.22, 'raster-brightness-max': 1 },
 };
 
-/**
- * La luz del Sol en su posición real: la atmósfera del globo brilla del lado de
- * día y se apaga del lado de noche (ver `map/sun.ts`).
- *
- * @param date Momento (por defecto, ahora).
- */
-export function sunLight(date: Date = new Date()): LightSpecification {
-  return { anchor: 'map', position: sunLightPosition(subsolarPoint(date)) };
-}
-
 function earthLayer(mode: EarthMode, visible: boolean): LayerSpecification {
   return {
     id: EARTH_LAYER[mode],
@@ -274,9 +261,9 @@ function earthLayer(mode: EarthMode, visible: boolean): LayerSpecification {
       ],
       // Interpolación suave entre píxeles: sin escalones al acercarse.
       'raster-resampling': 'linear',
-      // Más vida a las imágenes de la NASA (rediseño del 26/10/2026): de día,
-      // un poco más de color y contraste; de noche, las luces de las ciudades
-      // resaltan sobre el negro.
+      // Más vida a las imágenes de la NASA (26/10/2026): de día, un poco más
+      // de color y contraste; de noche, las luces de las ciudades resaltan.
+      // La iluminación sigue pareja: el día y la noche los elige el analista.
       ...EARTH_LOOK[mode],
       // Sin parpadeo al llegar teselas nuevas mientras gira.
       'raster-fade-duration': 0,
@@ -315,8 +302,6 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
     projection: { type: 'globe' },
     // Halo atmosférico alrededor del globo, que se desvanece al acercarse.
     sky: { 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
-    // El Sol en su posición real ilumina la atmósfera (día, ocaso y noche).
-    light: sunLight(),
     glyphs: `${assets}/fonts/{fontstack}/{range}.pbf`,
     sprite: `${assets}/sprites/v4/${flavor}`,
     sources: {

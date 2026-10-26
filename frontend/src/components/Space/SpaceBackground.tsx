@@ -16,7 +16,6 @@ import {
   BackSide,
   BufferAttribute,
   BufferGeometry,
-  CanvasTexture,
   Color,
   Mesh,
   MeshBasicMaterial,
@@ -25,8 +24,6 @@ import {
   Scene,
   ShaderMaterial,
   SphereGeometry,
-  Sprite,
-  SpriteMaterial,
   SRGBColorSpace,
   TextureLoader,
   WebGLRenderer,
@@ -42,7 +39,6 @@ import {
   TWINKLE_MIN,
 } from '../../map/space';
 import { prefersReducedMotion } from '../../map/spin';
-import { subsolarPoint, sunSkyDirection } from '../../map/sun';
 import { useCameraStore } from '../../store/camera';
 
 // Radio de la esfera del cielo y campo de visión de su cámara. El campo de
@@ -54,34 +50,6 @@ const SPHERE_SEGMENTS = 64;
 // Las estrellas propias van un poco dentro de la esfera para quedar encima.
 const STARS_RADIUS = 95;
 const MS_PER_SECOND = 1000;
-// El Sol: un halo cálido en su dirección real, detrás del globo (se asoma por
-// el borde como en un eclipse). Tamaño en unidades del cielo y textura del halo.
-const SUN_DISTANCE = 90;
-const SUN_SIZE = 46;
-const SUN_TEXTURE_PX = 256;
-const SUN_UPDATE_MS = 60_000;
-
-/** Halo radial del Sol: núcleo blanco, corona cálida y desvanecido suave. */
-function sunHaloTexture(): CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = SUN_TEXTURE_PX;
-  canvas.height = SUN_TEXTURE_PX;
-  const context = canvas.getContext('2d');
-  if (context) {
-    const half = SUN_TEXTURE_PX / 2;
-    const glow = context.createRadialGradient(half, half, 0, half, half, half);
-    glow.addColorStop(0, 'rgba(255,255,255,1)');
-    glow.addColorStop(0.06, 'rgba(255,246,220,0.95)');
-    glow.addColorStop(0.18, 'rgba(255,214,150,0.45)');
-    glow.addColorStop(0.45, 'rgba(120,200,255,0.12)');
-    glow.addColorStop(1, 'rgba(0,0,0,0)');
-    context.fillStyle = glow;
-    context.fillRect(0, 0, SUN_TEXTURE_PX, SUN_TEXTURE_PX);
-  }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  return texture;
-}
 
 const STAR_VERTEX = /* glsl */ `
   attribute float size;
@@ -180,27 +148,6 @@ export function SpaceBackground() {
     });
     scene.add(new Points(geometry, material));
 
-    const sunTexture = sunHaloTexture();
-    const sunMaterial = new SpriteMaterial({
-      map: sunTexture,
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    });
-    const sun = new Sprite(sunMaterial);
-    sun.scale.set(SUN_SIZE, SUN_SIZE, 1);
-    const placeSun = () => {
-      const direction = sunSkyDirection(subsolarPoint(new Date()));
-      sun.position.set(
-        direction.x * SUN_DISTANCE,
-        direction.y * SUN_DISTANCE,
-        direction.z * SUN_DISTANCE,
-      );
-    };
-    placeSun();
-    scene.add(sun);
-    const sunTimer = window.setInterval(placeSun, SUN_UPDATE_MS);
-
     const resize = () => {
       const { clientWidth, clientHeight } = canvas;
       renderer.setSize(clientWidth, clientHeight, false);
@@ -240,9 +187,6 @@ export function SpaceBackground() {
     if (!reduced) frame = requestAnimationFrame(tick);
 
     return () => {
-      window.clearInterval(sunTimer);
-      sunTexture.dispose();
-      sunMaterial.dispose();
       cancelAnimationFrame(frame);
       unsubscribe();
       observer.disconnect();
