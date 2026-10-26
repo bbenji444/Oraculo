@@ -103,7 +103,7 @@ async def test_openai_clasifica_con_lista_cerrada_e_ignora_ids_ajenos() -> None:
         (12, "Corrupción", "enriquecimiento ilícito", Authority.STATE),
     ]
     assert (result.usage, result.prompt_version) == (LLMUsage(900, 80), CLASSIFY_PROMPT_VERSION)
-    assert CLASSIFY_PROMPT_VERSION == "classify_v2"
+    assert CLASSIFY_PROMPT_VERSION == "classify_v3"
     schema = seen[0]["body"]["text"]["format"]["schema"]
     item = schema["properties"]["items"]["items"]
     assert item["properties"]["category"]["enum"] == [c.name for c in CATEGORIES]

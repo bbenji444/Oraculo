@@ -264,9 +264,10 @@ def to_raw_proposals(out: EntitiesOut) -> tuple[RawProposal, ...]:
 
 
 # Clasificación por categoría (F12.4, ADR-0029) y quién actúa (F12.5,
-# ADR-0030): una llamada por lote. v2 agrega ``authority``; cambiar la
+# ADR-0030): una llamada por lote. v2 agrega ``authority``; v3 cuenta como FGR
+# sus nombramientos, a su titular y los juicios donde es parte. Cambiar la
 # versión hace que las notas se vuelvan a clasificar.
-CLASSIFY_PROMPT_VERSION = "classify_v2"
+CLASSIFY_PROMPT_VERSION = "classify_v3"
 CLASSIFY_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{CLASSIFY_PROMPT_VERSION}.md"
 # Notas por llamada: con título y resumen (~80 tokens cada una) el prompt
 # queda en ~2,600 tokens; más notas alargan la respuesta sin ahorrar mucho.
@@ -298,7 +299,7 @@ class ClassificationOut(BaseModel):
 
 
 def build_classify_prompt(request: ClassificationRequest) -> str:
-    """Llena la plantilla ``classify_v2.md`` con el catálogo y el lote.
+    """Llena la plantilla ``classify_v3.md`` con el catálogo y el lote.
 
     Args:
         request: Notas (título y resumen, nunca el texto, §8) y catálogo.
