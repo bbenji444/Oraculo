@@ -11,6 +11,7 @@ import type {
   Search,
   SearchProgress,
 } from '../../services/searches';
+import { isFinished } from '../../services/searches';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const DATE_TIME = new Intl.DateTimeFormat('es-MX', {
@@ -256,6 +257,14 @@ export function automaticRunLabel(
   }
   const hour = RUN_HOUR.format(new Date(search.scheduled_for));
   return `Monitor automático · corrida de las ${hour} del ${formatDay(search.scheduled_for)}`;
+}
+
+/**
+ * La corrida automática terminada más reciente (F12.8), para el acceso directo
+ * de Explorar. El historial viene de la más nueva a la más vieja.
+ */
+export function latestRun(searches: readonly Search[]): Search | undefined {
+  return searches.find((s) => s.trigger === 'automatic' && isFinished(s.status));
 }
 
 /** Quién actúa en la nota, en palabras (F12.5, ADR-0030). */
