@@ -39,12 +39,16 @@ class Source:
 
 # En el orden en que se muestran. GDELT sigue apagado por su límite
 # (ADR-0012) y queda fuera de los switches mientras tanto.
+#
+# BrowserWork (Bing y Google 2) está programado y probado, pero **oculto**
+# desde el 25/10/2026 por decisión de Benji (ADR-0028): Bing devolvió solo
+# sitios oficiales y Google 2 links rotos por un error de BrowserWork. Para
+# volver a ofrecerlo, agrega aquí Provider.BROWSERWORK_BING y
+# Provider.BROWSERWORK_GOOGLE2 cuando BrowserWork esté corregido.
 _SWITCHES = (
     Provider.GOOGLE_NEWS_RSS,
     Provider.LOCAL_INDEX,
     Provider.SEARCHAPI,
-    Provider.BROWSERWORK_BING,
-    Provider.BROWSERWORK_GOOGLE2,
 )
 # Abren un Chrome real en el servidor de BrowserWork: tardan minutos, no segundos.
 _SLOW = frozenset({Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2})

@@ -480,20 +480,9 @@ def test_las_fuentes_para_los_switches(client: TestClient) -> None:
 
     assert response.status_code == 200
     items = {i["id"]: i for i in response.json()["items"]}
-    assert list(items) == [
-        "google_news_rss",
-        "indice_local",
-        "searchapi",
-        "browserwork_bing",
-        "browserwork_google2",
-    ]
+    # BrowserWork está oculto hasta que corrija sus links (ADR-0028).
+    assert list(items) == ["google_news_rss", "indice_local", "searchapi"]
     assert items["searchapi"]["paid"] is True
-    # BrowserWork: gratis, lento (navegador real) y apagado por defecto (ADR-0028).
-    assert {k: items["browserwork_bing"][k] for k in ("paid", "slow", "default_on")} == {
-        "paid": False,
-        "slow": True,
-        "default_on": False,
-    }
     assert items["indice_local"] == {
         "id": "indice_local",
         "label": "Índice local (GDELT + medios)",
@@ -545,12 +534,6 @@ def test_por_defecto_searchapi_va_apagado_y_no_gasta(
         sources = {i["id"]: i["default_on"] for i in c.get("/api/v1/sources").json()["items"]}
         estimate = c.post(f"{URL}/estimate", json=body(ids)).json()
 
-    assert sources == {
-        "google_news_rss": True,
-        "indice_local": True,
-        "searchapi": False,
-        "browserwork_bing": False,
-        "browserwork_google2": False,
-    }
+    assert sources == {"google_news_rss": True, "indice_local": True, "searchapi": False}
     assert estimate["providers"] == ["google_news_rss", "indice_local"]
     assert estimate["credits"] == 0

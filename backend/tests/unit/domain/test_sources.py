@@ -14,15 +14,16 @@ def test_catalogo_ordenado_y_sin_gdelt() -> None:
         Provider.GOOGLE_NEWS_RSS,
         Provider.LOCAL_INDEX,
         Provider.SEARCHAPI,
-        Provider.BROWSERWORK_BING,
-        Provider.BROWSERWORK_GOOGLE2,
     ]
     assert [s.provider for s in SOURCES if s.paid] == [Provider.SEARCHAPI]
-    # BrowserWork abre un Chrome real: el switch avisa que tarda más (ADR-0028).
-    assert [s.provider for s in SOURCES if s.slow] == [
-        Provider.BROWSERWORK_BING,
-        Provider.BROWSERWORK_GOOGLE2,
-    ]
+
+
+@pytest.mark.parametrize("provider", [Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2])
+def test_browserwork_esta_oculto_y_no_se_puede_pedir(provider: Provider) -> None:
+    # ADR-0028: oculto hasta que BrowserWork corrija sus links (25/10/2026).
+    assert source_of(provider) is None
+    with pytest.raises(InvalidRequestError, match="no se puede elegir"):
+        resolve_sources((provider,), (), (*ALL, provider))
     assert source_of(Provider.GDELT) is None
 
 

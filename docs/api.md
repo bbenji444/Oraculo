@@ -39,16 +39,14 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 ## Fuentes de la búsqueda (switches)
 
-`GET /sources`. Una por fuente, en el orden de pantalla. Las que no están configuradas (`configured: false`) se muestran apagadas y no se pueden encender. `slow: true` = abre un navegador real (BrowserWork, ADR-0028): tarda minutos y, si pide captcha, esa fuente se omite y la búsqueda queda `partial`.
+`GET /sources`. Una por fuente, en el orden de pantalla. Las que no están configuradas (`configured: false`) se muestran apagadas y no se pueden encender. `slow: true` = abre un navegador real (BrowserWork, ADR-0028): tarda más y, si pide captcha, esa fuente se omite y la búsqueda queda `partial`. BrowserWork está programado pero **oculto** desde el 25/10/2026 hasta que corrija sus links; mientras tanto no aparece aquí y pedirlo responde `422`.
 
 ```json
 {
   "items": [
     { "id": "google_news_rss", "label": "Google News RSS", "paid": false, "slow": false, "configured": true, "default_on": true },
     { "id": "indice_local", "label": "Índice local (GDELT + medios)", "paid": false, "slow": false, "configured": true, "default_on": true },
-    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "slow": false, "configured": true, "default_on": false },
-    { "id": "browserwork_bing", "label": "Bing (BrowserWork)", "paid": false, "slow": true, "configured": true, "default_on": false },
-    { "id": "browserwork_google2", "label": "Google 2 (BrowserWork)", "paid": false, "slow": true, "configured": true, "default_on": false }
+    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "slow": false, "configured": true, "default_on": false }
   ]
 }
 ```

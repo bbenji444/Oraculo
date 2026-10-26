@@ -1,6 +1,6 @@
 # ADR-0028: BrowserWork como fuente de la búsqueda manual (Bing y Google 2)
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado; **switches ocultos desde el 25/10/2026** (ver «Decisión tras la medición»)
 - **Fecha:** 25 de octubre de 2026
 - **Fase:** F12.3 (aplica el ADR-0023)
 - **Decide:** Benji («Integra ya todo con BrowserWork… mediante switches»), con el dictamen de la Dirección del 24/10/2026 que autoriza BrowserWork como fuente complementaria (ADR-0021)
@@ -74,3 +74,13 @@ Con permiso de Benji: una búsqueda por motor de «Fiscalia General de la Republ
 - **Bing web no sirve para noticias** con el texto de consulta actual: sin operador de fecha, el buscador prioriza los sitios oficiales del término.
 - **Google 2 devuelve links reconstruidos.** Es un error de BrowserWork. En `app/engines.py`, `_prefer_google_url`, cuando Google da su link de redirección (`google.com/url?q=<link real>`), BrowserWork no lee el parámetro `q` y arma la URL con el texto que Google muestra arriba del título. Así, «3 reacciones · hace 6 horas» se vuelve `https://3reacciones/` y la nota de El Economista queda como `https://www.eleconomista.com.mx/Politica`. El link real ya no llega a este sistema, así que no se puede corregir aquí.
 - **La cancelación** no se probó: no hubo captcha.
+
+## Decisión tras la medición (25/10/2026)
+
+Benji decidió **ocultar los dos switches** hasta que BrowserWork se corrija, y avisar a su jefe:
+
+- El adaptador, su configuración (`BROWSERWORK_BASE_URL` ya está en `.env`) y sus pruebas quedan listos, pero las dos fuentes no se ofrecen en `GET /sources`. Pedirlas en una búsqueda responde `422`.
+- **Para reactivarlo:** agregar `Provider.BROWSERWORK_BING` y `Provider.BROWSERWORK_GOOGLE2` a `_SWITCHES` en `app/domain/sources.py`, cuando:
+  - Google 2 devuelva el link real (leer el parámetro `q`, o `url`, del link `google.com/url?…` en `_prefer_google_url`);
+  - para Bing, haya un motor de noticias (por ejemplo `bing.com/news/search`) o se compruebe otra consulta que traiga notas.
+- Antes de reactivarlo, repetir `make probar-proveedor` con los dos motores y revisar 5 notas de cada uno.

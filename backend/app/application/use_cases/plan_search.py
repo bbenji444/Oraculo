@@ -33,7 +33,7 @@ from app.domain.errors import (
     RegionNotFoundError,
 )
 from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
-from app.domain.sources import SOURCES, Source, resolve_sources
+from app.domain.sources import SOURCES, Source, resolve_sources, source_of
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +156,18 @@ class PlanSearch:
             Los proveedores configurados.
         """
         return tuple(p for p, adapter in self._providers.items() if adapter.is_configured())
+
+    def offered_providers(self) -> tuple[Provider, ...]:
+        """Los configurados que el analista puede elegir como switch, en su orden.
+
+        «Probar concepto» los usa para mostrar lo que una búsqueda podría
+        mandar: sin fuentes ocultas (BrowserWork, ADR-0028) aunque estén
+        configuradas.
+
+        Returns:
+            Los proveedores configurados que se ofrecen como fuente.
+        """
+        return tuple(p for p in self.available_providers() if source_of(p) is not None)
 
     def source_options(self) -> list[SourceOption]:
         """Los switches de fuentes de la búsqueda manual, en orden de pantalla.
