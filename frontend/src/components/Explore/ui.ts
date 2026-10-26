@@ -15,7 +15,8 @@ export const GLASS =
   'rounded-2xl border border-white/10 bg-slate-950/60 shadow-2xl shadow-black/50 backdrop-blur-md [[data-earth=day]_&]:bg-slate-950/85';
 
 /** Título de panel. */
-export const PANEL_TITLE = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/80';
+export const PANEL_TITLE =
+  'font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/80';
 
 /** Botón secundario pequeño. */
 export const SMALL_BUTTON =

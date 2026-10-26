@@ -74,18 +74,23 @@ export function App() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col bg-slate-950 font-sans text-slate-100">
-      <header className="z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
+    <div className="flex h-dvh flex-col font-sans text-slate-100">
+      <header className="z-30 border-b border-sky-400/20 bg-slate-950/85 shadow-[0_1px_18px_rgb(0_210_255/0.08)] backdrop-blur-md">
         {/* En celular las pestañas bajan a su propio renglón y se deslizan si no caben. */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:flex-nowrap sm:px-6 sm:py-3">
           <div className="flex shrink-0 items-center gap-3">
-            <img src="/globo.svg" alt="" className="size-7" />
+            <img
+              src="/globo.svg"
+              alt=""
+              className="size-7 drop-shadow-[0_0_10px_rgb(0_210_255/0.45)]"
+            />
             <div>
-              <h1 className="text-base font-semibold leading-tight tracking-tight">
+              {/* Marca homologada con OSINT Oráculo (F12.7a): Orbitron con brillo cian. */}
+              <h1 className="marca-oraculo text-[15px] font-bold leading-tight text-sky-50">
                 Monitor de Noticias
               </h1>
-              <p className="hidden text-xs text-slate-400 sm:block">
-                Noticias geolocalizadas sobre México
+              <p className="hidden text-[11px] tracking-wide text-slate-400 sm:block">
+                Oráculo · Noticias geolocalizadas sobre México
               </p>
             </div>
           </div>
@@ -100,8 +105,8 @@ export function App() {
                 aria-current={tab === item.id ? 'page' : undefined}
                 className={`shrink-0 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] sm:px-3 sm:text-sm transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
                   tab === item.id
-                    ? 'bg-slate-800 text-slate-50'
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                    ? 'bg-sky-400/10 text-sky-100 shadow-glow'
+                    : 'text-slate-400 hover:bg-sky-400/5 hover:text-slate-100'
                 }`}
               >
                 {item.label}

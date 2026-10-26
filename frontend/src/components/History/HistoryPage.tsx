@@ -7,7 +7,13 @@
 import { useSearchHistory } from '../../hooks/useSearches';
 import type { Search } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
-import { formatMexicoCity, formatRange, formatUsd, providersLabel } from '../Explore/format';
+import {
+  automaticRunLabel,
+  formatMexicoCity,
+  formatRange,
+  formatUsd,
+  providersLabel,
+} from '../Explore/format';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; className: string }> = {
   pending: { text: 'En cola', className: 'bg-slate-700 text-slate-200' },
@@ -36,7 +42,7 @@ export function HistoryPage() {
   return (
     <div className="h-full overflow-y-auto bg-slate-950 px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-lg font-semibold text-slate-50">Historial de búsquedas</h2>
+        <h2 className="titulo-oraculo text-base font-bold text-sky-50">Historial de búsquedas</h2>
         <p className="mt-1 text-sm text-slate-400">
           Reabrir una búsqueda no gasta créditos: sus notas ya están guardadas.
         </p>
@@ -48,12 +54,24 @@ export function HistoryPage() {
         <ul className="mt-6 space-y-3">
           {searches.map((search) => {
             const status = STATUS_LABEL[search.status];
+            const automatic = automaticRunLabel(search);
             return (
               <li
                 key={search.search_id}
-                className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3"
+                className={`flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-3 ${
+                  automatic
+                    ? 'border-sky-400/30 bg-sky-400/[0.04] shadow-[0_0_18px_rgb(0_210_255/0.06)]'
+                    : 'border-slate-800 bg-slate-900/70'
+                }`}
               >
                 <div className="min-w-0 flex-1">
+                  {automatic && (
+                    // Corrida del reloj (F12.8): la ven todos los analistas.
+                    <p className="titulo-oraculo mb-1 text-[10px] font-bold text-sky-300">
+                      <span aria-hidden="true">◉ </span>
+                      {automatic}
+                    </p>
+                  )}
                   <p className="font-medium text-slate-100">
                     {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
                   </p>

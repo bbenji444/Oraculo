@@ -231,6 +231,33 @@ export function eventDateNote(eventDate: string | null, publishedAt: string | nu
   return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
 }
 
+const RUN_HOUR = new Intl.DateTimeFormat('es-MX', {
+  timeZone: MEXICO_CITY,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * Rótulo de una corrida del monitor automático FGR (F12.8, ADR-0031).
+ *
+ * @example automaticRunLabel({ trigger: 'automatic', scheduled_for: '2026-10-26T05:00:00Z' })
+ * // 'Monitor automático · corrida de las 23:00 del 25 oct'
+ * @returns El rótulo, o `null` si la pidió una persona.
+ */
+export function automaticRunLabel(
+  search: Pick<Search, 'trigger' | 'scheduled_for'>,
+): string | null {
+  if (search.trigger !== 'automatic') {
+    return null;
+  }
+  if (!search.scheduled_for) {
+    return 'Monitor automático';
+  }
+  const hour = RUN_HOUR.format(new Date(search.scheduled_for));
+  return `Monitor automático · corrida de las ${hour} del ${formatDay(search.scheduled_for)}`;
+}
+
 /** Quién actúa en la nota, en palabras (F12.5, ADR-0030). */
 export const AUTHORITY_LABEL: Readonly<Record<Authority, string>> = {
   fgr: 'FGR federal',

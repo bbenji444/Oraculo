@@ -32,7 +32,7 @@ export function CasesPage() {
         <section aria-labelledby="casos-titulo" className="min-w-0">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 id="casos-titulo" className="text-lg font-semibold text-slate-50">
+              <h2 id="casos-titulo" className="titulo-oraculo text-base font-bold text-sky-50">
                 Casos
               </h2>
               <p className="text-sm text-slate-400">
