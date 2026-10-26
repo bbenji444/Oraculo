@@ -1,13 +1,22 @@
 /**
  * Switches de fuentes del panel de búsqueda (F12.2, ADR-0027): el analista
  * enciende o apaga Google News, el índice local, SearchApi y, desde F12.3,
- * BrowserWork. Cada switch dice si la fuente es gratis o gasta créditos; las
+ * BrowserWork. Cada switch dice si la fuente es gratis o gasta créditos (y si
+ * tarda más, como BrowserWork, que abre un navegador real); las
  * que no están configuradas en el servidor se ven apagadas y deshabilitadas.
  *
  * No hace: no pide datos (los recibe) ni calcula costos (la estimación se
  * recalcula sola porque la elección forma parte de la búsqueda).
  */
 import type { SourceOption } from '../../services/sources';
+
+/** «Gratis», «Gasta créditos», «Gratis · tarda más» o «No configurada». */
+function sourceNote(option: SourceOption): string {
+  if (!option.configured) return 'No configurada';
+  const cost = option.paid ? 'Gasta créditos' : 'Gratis';
+  // BrowserWork abre un Chrome real: tarda minutos y puede pedir captcha (ADR-0028).
+  return option.slow ? `${cost} · tarda más` : cost;
+}
 
 interface SourceSwitchesProps {
   options: readonly SourceOption[];
@@ -44,7 +53,7 @@ export function SourceSwitches({ options, chosen, onChange }: SourceSwitchesProp
               <span
                 className={`text-[11px] ${option.paid ? 'text-amber-200/80' : 'text-slate-400'}`}
               >
-                {option.configured ? (option.paid ? 'Gasta créditos' : 'Gratis') : 'No configurada'}
+                {sourceNote(option)}
               </span>
             </span>
             <span

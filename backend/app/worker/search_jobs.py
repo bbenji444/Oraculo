@@ -44,7 +44,14 @@ logger = logging.getLogger(__name__)
 # Proveedores de una búsqueda, en orden (plan de F4). Google News RSS entra
 # desde el ADR-0021; si NEWS_RSS_ENABLED=false se arma igual pero dice que no
 # está configurado y no recibe consultas.
-SEARCH_PROVIDERS = (Provider.SEARCHAPI, Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX)
+SEARCH_PROVIDERS = (
+    Provider.SEARCHAPI,
+    Provider.GOOGLE_NEWS_RSS,
+    Provider.LOCAL_INDEX,
+    # Sin BROWSERWORK_BASE_URL dicen que no están configurados (ADR-0028).
+    Provider.BROWSERWORK_BING,
+    Provider.BROWSERWORK_GOOGLE2,
+)
 
 
 def build_providers(settings: Settings, engine: AsyncEngine) -> dict[Provider, NewsProviderPort]:

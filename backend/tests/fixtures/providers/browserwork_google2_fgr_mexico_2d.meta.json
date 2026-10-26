@@ -1,0 +1,12 @@
+{
+  "proveedor": "browserwork_google2",
+  "texto": "(\"Fiscalia General de la Republica\" OR FGR) after:2026-10-23 before:2026-10-26",
+  "parametros": {
+    "query": "(\"Fiscalia General de la Republica\" OR FGR) after:2026-10-23 before:2026-10-26",
+    "pages": "1",
+    "engines": "google2",
+    "job_id": "092dd57683d3"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-26T03:29:22+00:00"
+}

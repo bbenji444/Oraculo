@@ -1,0 +1,12 @@
+{
+  "proveedor": "browserwork_bing",
+  "texto": "(\"Fiscalia General de la Republica\" OR FGR)",
+  "parametros": {
+    "query": "(\"Fiscalia General de la Republica\" OR FGR)",
+    "pages": "1",
+    "engines": "bing",
+    "job_id": "6fff0daa19b9"
+  },
+  "http_status": 200,
+  "grabado": "2026-10-26T03:28:57+00:00"
+}

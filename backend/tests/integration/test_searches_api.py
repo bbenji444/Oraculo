@@ -480,12 +480,14 @@ def test_las_fuentes_para_los_switches(client: TestClient) -> None:
 
     assert response.status_code == 200
     items = {i["id"]: i for i in response.json()["items"]}
+    # BrowserWork está oculto hasta que corrija sus links (ADR-0028).
     assert list(items) == ["google_news_rss", "indice_local", "searchapi"]
     assert items["searchapi"]["paid"] is True
     assert items["indice_local"] == {
         "id": "indice_local",
         "label": "Índice local (GDELT + medios)",
         "paid": False,
+        "slow": False,
         "configured": True,
         "default_on": True,
     }

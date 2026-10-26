@@ -102,6 +102,13 @@ _DEFAULT_LLM_TIMEOUT_SECONDS = 60.0
 _DEFAULT_LLM_CONCURRENCY = 4
 # - Tope por búsqueda (ADR-0015): ~0.20 USD como máximo.
 _DEFAULT_LLM_MAX_ARTICLES = 150
+# BrowserWork (ADR-0028). Su API acepta de 1 a 10 páginas (SearchRequest de
+# BrowserWork); 240 s < CAPTCHA_WAIT_S (600 s) de su servidor; preguntar cada
+# 3 s no carga su API y avisa pronto.
+_DEFAULT_BROWSERWORK_PAGES = 1
+_MAX_BROWSERWORK_PAGES = 10
+_DEFAULT_BROWSERWORK_TIMEOUT_SECONDS = 240.0
+_DEFAULT_BROWSERWORK_POLL_SECONDS = 3.0
 # - Confianza mínima de la ubicación principal (§11).
 _DEFAULT_GEO_MIN_CONFIDENCE = 0.6
 
@@ -168,6 +175,18 @@ class Settings(BaseSettings):
     # ADR-0027). SearchApi va apagado: en la medición del 25/10/2026, 27 de sus
     # 30 notas ya venían en el RSS (decisión de Benji). El analista lo enciende.
     manual_default_sources: str = "google_news_rss,indice_local"
+    # BrowserWork (ADR-0028): servicio del jefe de Benji que busca en Bing y en
+    # Google 2 con un Chrome real. Sin dirección no se ofrece. No lleva llave.
+    browserwork_base_url: str | None = None
+    # 1 página (unas 10 notas por motor): su navegador atiende una búsqueda a
+    # la vez para todos sus usuarios, así que se pide lo mínimo.
+    browserwork_pages: int = Field(
+        default=_DEFAULT_BROWSERWORK_PAGES, ge=1, le=_MAX_BROWSERWORK_PAGES
+    )
+    # Tope de espera por búsqueda: menos que los 600 s que BrowserWork espera
+    # a que una persona resuelva un captcha, para no colgar la búsqueda.
+    browserwork_timeout_seconds: float = Field(default=_DEFAULT_BROWSERWORK_TIMEOUT_SECONDS, gt=0)
+    browserwork_poll_seconds: float = Field(default=_DEFAULT_BROWSERWORK_POLL_SECONDS, gt=0)
     # GDELT: desactivado por defecto mientras responda 429 de forma persistente
     # (ADR-0012). Se propone reactivarlo con evidencia: make gdelt-diagnostico.
     gdelt_enabled: bool = False

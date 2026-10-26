@@ -176,3 +176,23 @@ async def test_fuentes_invalidas_no_se_planean(
 
     with pytest.raises(InvalidRequestError, match=message):
         await planner(repo, searchapi=False).estimate(request)
+
+
+def test_probar_concepto_no_muestra_fuentes_ocultas() -> None:
+    # BrowserWork configurado pero oculto (ADR-0028): no aparece en lo ofrecido.
+    repo = FakeConceptRepository()
+    plan = PlanSearch(
+        concepts=repo,
+        regions=FakeRegionRepository(),
+        providers={
+            p: Source(p, [])
+            for p in (Provider.SEARCHAPI, Provider.LOCAL_INDEX, Provider.BROWSERWORK_BING)
+        },
+        log=FakeLog(used=0),
+        llm=OPENAI,
+        llm_max_articles=150,
+        credits_limit=100,
+    )
+
+    assert Provider.BROWSERWORK_BING in plan.available_providers()
+    assert plan.offered_providers() == (Provider.SEARCHAPI, Provider.LOCAL_INDEX)

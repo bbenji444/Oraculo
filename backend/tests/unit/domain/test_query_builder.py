@@ -85,8 +85,28 @@ def test_una_consulta_por_proveedor_con_pais_idioma_fechas_y_creditos() -> None:
     assert {q.language for q in queries} == {"es"}
     assert {q.country for q in queries} == {MEXICO}
     assert {q.window for q in queries} == {WEEK}
-    assert [q.estimated_credits for q in queries] == [1, 0, 0, 0]
+    # Solo SearchApi cuesta; RSS, GDELT, el índice y BrowserWork son gratis.
+    assert [q.estimated_credits for q in queries] == [1, 0, 0, 0, 0, 0]
     assert queries[0].keywords == CIBERSEGURIDAD.keywords
+
+
+def test_browserwork_usa_la_sintaxis_de_google_y_google2_acota_fechas() -> None:
+    # ADR-0028: Bing no tiene filtro de fecha en el texto; Google web sí
+    # (after:/before:, y before: excluye su día).
+    bing, google2 = (
+        build_queries(CIBERSEGURIDAD, IZTAPALAPA, WEEK, [p])[0].text
+        for p in (Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2)
+    )
+    base = (
+        '(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) '
+        "Iztapalapa -curso -webinar -diplomado"
+    )
+
+    assert bing == base
+    assert google2 == (
+        f"{base} after:{WEEK.date_from.isoformat()} "
+        f"before:{(WEEK.date_to + timedelta(days=1)).isoformat()}"
+    )
 
 
 def test_se_pueden_pedir_solo_algunos_proveedores() -> None:

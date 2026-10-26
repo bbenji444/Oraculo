@@ -57,7 +57,7 @@ def get_concept_repository(request: Request) -> ConceptRepositoryPort:
 
 
 def get_preview_providers(request: Request) -> tuple[Provider, ...]:
-    """Proveedores que recibirían una búsqueda real (los configurados).
+    """Proveedores que podría recibir una búsqueda real (configurados y ofrecidos).
 
     Sale de la misma planeación que usa ``POST /searches``, para que "Probar
     concepto" muestre lo que de verdad se mandaría (las pruebas lo reemplazan).
@@ -66,10 +66,10 @@ def get_preview_providers(request: Request) -> tuple[Provider, ...]:
         request: Petición actual.
 
     Returns:
-        Los proveedores configurados, en su orden.
+        Los proveedores configurados que se ofrecen como fuente, en su orden.
     """
     planner: PlanSearch = request.app.state.search_planner
-    return planner.available_providers()
+    return planner.offered_providers()
 
 
 def client_ip(request: Request) -> str | None:

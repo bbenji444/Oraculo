@@ -126,6 +126,8 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
         "google_news_rss",
         "gdelt",
         "indice_local",
+        "browserwork_bing",
+        "browserwork_google2",
     ]
     assert body["queries"][0]["provider_label"] == "SearchApi (Google News)"
     assert body["queries"][0]["filters"] == {
@@ -133,7 +135,7 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
         "language": "español",
         "period": "últimos 7 días",
     }
-    assert (body["total_queries"], body["total_credits"]) == (4, 1)
+    assert (body["total_queries"], body["total_credits"]) == (6, 1)
     assert concepts.concepts == {}
 
 

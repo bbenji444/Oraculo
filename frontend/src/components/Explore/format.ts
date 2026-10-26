@@ -234,6 +234,8 @@ export const PROVIDER_LABEL: Readonly<Record<string, string>> = {
   indice_local: 'Índice local',
   searchapi: 'SearchApi',
   gdelt: 'GDELT',
+  browserwork_bing: 'Bing',
+  browserwork_google2: 'Google 2',
 };
 
 /**

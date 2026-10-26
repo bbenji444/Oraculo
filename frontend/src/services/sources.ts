@@ -17,6 +17,8 @@ export interface SourceOption {
   label: string;
   /** Si gasta créditos (SearchApi) o es gratis. */
   paid: boolean;
+  /** Si tarda más porque abre un navegador real (BrowserWork, ADR-0028). */
+  slow?: boolean;
   /** Sin configurar, el switch se ve apagado y no se puede encender. */
   configured: boolean;
   default_on: boolean;

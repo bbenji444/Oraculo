@@ -73,3 +73,17 @@ def test_el_indice_local_siempre_esta_disponible_y_es_gratis() -> None:
 
     assert provider.provider is Provider.LOCAL_INDEX
     assert provider.is_configured() is True
+
+
+@pytest.mark.parametrize("provider", [Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2])
+def test_browserwork_solo_con_su_direccion(provider: Provider) -> None:
+    # ADR-0028: sin llave ni credenciales; basta la dirección de su API.
+    off = build_provider(provider, Settings().model_copy(update={"browserwork_base_url": None}))
+    on = build_provider(
+        provider,
+        Settings().model_copy(update={"browserwork_base_url": "http://192.168.0.37:8787"}),
+    )
+
+    assert off.is_configured() is False
+    assert on.is_configured() is True
+    assert on.provider is provider
