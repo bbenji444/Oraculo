@@ -9,7 +9,10 @@
  *   solo al elegir una noticia, para que se vea su ficha.
  * - Derecha: libre, para que el globo se vea completo (Benji quitó las
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
- * - Abajo: giro, día/noche, velocidad y leyenda de precisión.
+ * - Abajo: la línea del tiempo (F12.7): picos por hora o por día, filtros por
+ *   categoría y estado, y las notas en orden cronológico. Sus filtros se
+ *   aplican al globo y a la lista a la vez.
+ * - Abajo a la derecha: giro, día/noche, velocidad y leyenda de precisión.
  * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
  *
  * Lee el store y pide los datos con los hooks; el globo y los paneles se
@@ -21,12 +24,15 @@ import { useConcepts } from '../../hooks/useConcepts';
 import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
+import { useTimelineStore } from '../../store/timeline';
 import { SpaceBackground } from '../Space/SpaceBackground';
 import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
 import { visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
+import { Timeline } from './Timeline';
+import { applyTimeline } from './timelineData';
 import { GLASS } from './ui';
 import { useFinishNotice } from './useFinishNotice';
 
@@ -52,10 +58,18 @@ export function ExplorePage() {
     [concepts],
   );
   const showIrrelevant = useExplorerStore((s) => s.showIrrelevant);
-  // Lo mismo para el globo y la lista: nunca muestran notas distintas.
-  const shown = useMemo(
+  const relevant = useMemo(
     () => visibleArticles(articles, showIrrelevant),
     [articles, showIrrelevant],
+  );
+  const range = useTimelineStore((s) => s.range);
+  const categoryId = useTimelineStore((s) => s.categoryId);
+  const stateCode = useTimelineStore((s) => s.stateCode);
+  const clearTimeline = useTimelineStore((s) => s.clear);
+  // Lo mismo para el globo, la lista y la línea del tiempo: nunca muestran notas distintas.
+  const shown = useMemo(
+    () => applyTimeline(relevant, { range, categoryId, stateCode }),
+    [relevant, range, categoryId, stateCode],
   );
   const hasResults = finished && articles.length > 0;
   const panelOpen = useExplorerStore((s) => s.panelOpen);
@@ -63,10 +77,16 @@ export function ExplorePage() {
   const articleId = useExplorerStore((s) => s.articleId);
   const finishedNotice = useFinishNotice(search);
   const earth = useExplorerStore((s) => s.earth);
+  const timelineOpen = useTimelineStore((s) => s.open);
 
   useEffect(() => {
     if (articleId !== null && isNarrowScreen()) setPanelOpen(false);
   }, [articleId, setPanelOpen]);
+
+  // Otra búsqueda empieza sin filtros de la línea del tiempo.
+  useEffect(() => {
+    clearTimeline();
+  }, [searchId, clearTimeline]);
 
   return (
     // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
@@ -103,7 +123,22 @@ export function ExplorePage() {
         </button>
       )}
 
-      <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
+      {hasResults && (
+        <div
+          className={`pointer-events-auto absolute bottom-4 right-4 hidden sm:block ${
+            panelOpen ? 'left-[25rem]' : 'left-4'
+          }`}
+        >
+          <Timeline articles={relevant} />
+        </div>
+      )}
+
+      {/* Con la línea del tiempo abajo, los controles del globo suben a su lado. */}
+      <div
+        className={`pointer-events-none absolute right-4 hidden flex-col items-end gap-2 sm:flex ${
+          hasResults ? (timelineOpen ? 'bottom-[19.5rem]' : 'bottom-[5rem]') : 'bottom-8'
+        }`}
+      >
         <div className="pointer-events-auto">
           <PrecisionLegend />
         </div>
