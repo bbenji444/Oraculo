@@ -44,6 +44,21 @@ Escribir una descripción más estricta del concepto no alcanza:
 | Regla fija en el código para «el concepto FGR» | Depende del nombre; con `relevance_rule` la regla es explícita y se puede poner a otro concepto. |
 | Palabras clave («Fiscalía del Estado») | La fosa de SLP nombra a las dos fiscalías; hace falta saber quién actúa, no quién aparece. |
 
+## Resultado con datos reales (26/10/2026)
+
+- **Prompt `classify_v3`:**
+  - Cada nota llega con título, resumen y las razones que la IA ya escribió al leerla completa (`article_concepts.relevance_reason`). Así sabe quién actuó aunque el resumen no lo diga, sin releer ni pagar el texto.
+  - «Estatal» se elige solo si la nota nombra a una fiscalía estatal.
+  - Cuentan como «fgr» sus nombramientos, su titular y los juicios donde es parte.
+- **Validación:** 12 casos elegidos, todos como se esperaba, entre ellos:
+  - la fosa de SLP: fuera;
+  - los cateos de la FGR en Nuevo León: dentro;
+  - los falsos retenes en Teotihuacán (operativo conjunto con la FGR): dentro;
+  - «Don Rodo gana amparo a la FGR»: dentro;
+  - las caravanas frente a la FGR: fuera.
+- **Las 1,450 notas:** costó 0.038 USD. Quién actúa: FGR federal 123, sin dato 298, fiscalía estatal 68, FGR solo mencionada 26, otra autoridad 935.
+- **Búsqueda FGR del 24/10:** **de 120 a 93 notas relevantes.** Salen 21 de solo mención (protestas, columnas, el pleito político por Jáuregui), 5 de otra autoridad y la de la fosa.
+
 ## Consecuencias
 
 - **El monitor FGR y las corridas automáticas (F12.8)** solo cuentan lo que hace la FGR federal, porque usan el mismo concepto.
