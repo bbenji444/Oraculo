@@ -1,8 +1,8 @@
 /**
  * Tarjeta de noticia (especificación §14.4): título, medio y fecha (hora de
- * CDMX), fecha del hecho si es de otro momento, categoría de la IA (F12.4),
- * conceptos con su color, resumen
- * marcado como automático, ubicación con insignia de precisión (y "lugar
+ * CDMX), fecha del hecho si es de otro momento, categoría y quién actúa según
+ * la IA (F12.4–F12.5), conceptos con su color, resumen marcado como
+ * automático, ubicación con insignia de precisión (y "lugar
  * mencionado" si no es la del hecho), proveedores y "Ver nota original", que
  * abre en otra pestaña. Abajo, «Agregar al caso» (Fase 9.3, `AddToCase`).
  *
@@ -13,6 +13,7 @@ import type { Article } from '../../services/searches';
 import { AddToCase } from './AddToCase';
 import { CategoryTag } from './CategoryTag';
 import {
+  authorityNote,
   eventDateNote,
   formatMexicoCity,
   isCoarse,
@@ -29,6 +30,7 @@ interface NewsCardProps {
 export function NewsCard({ article, colors, onClose }: NewsCardProps) {
   const location = article.primary_location;
   const eventDate = eventDateNote(article.event_date, article.published_at);
+  const authority = authorityNote(article.authority);
   const relevant = article.concepts.filter((c) => c.is_relevant);
   return (
     <article className="space-y-2.5 text-sm" aria-label={article.title}>
@@ -62,6 +64,14 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
       {article.category && (
         <p className="-mt-1 flex items-center gap-1.5 text-xs text-slate-400">
           Categoría: <CategoryTag article={article} size="card" />
+        </p>
+      )}
+      {authority && (
+        <p
+          className="-mt-1.5 text-xs text-slate-400"
+          title="Según la IA: quién actúa en el hecho. En las búsquedas de la FGR solo cuentan las de la FGR federal."
+        >
+          {authority}
         </p>
       )}
       {relevant.length > 0 && (

@@ -20,6 +20,7 @@ from app.application.ports.search_reads import (
     LocationView,
 )
 from app.application.use_cases.search_reads import AggregatesView
+from app.domain.authority import Authority
 
 
 class JudgementOut(BaseModel):
@@ -149,6 +150,15 @@ class ArticleOut(BaseModel):
         description="Etiqueta libre que propuso la IA (para afinar las categorías después).",
         examples=["tráfico de armas"],
     )
+    authority: Authority | None = Field(
+        default=None,
+        description=(
+            "Quién actúa en el hecho según la IA: fgr, fgr_mencion, estatal, otra o "
+            "sin_dato; null si falta clasificarla. En los conceptos con la regla "
+            "«FGR federal» la relevancia ya lo toma en cuenta (ADR-0030)."
+        ),
+        examples=["estatal"],
+    )
 
     @classmethod
     def from_item(cls, item: ArticleItem) -> "ArticleOut":
@@ -179,6 +189,7 @@ class ArticleOut(BaseModel):
             story_id=item.story_id,
             category=CategoryOut.from_view(item.category) if item.category else None,
             category_raw=item.category_raw,
+            authority=item.authority,
         )
 
 

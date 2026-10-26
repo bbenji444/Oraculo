@@ -136,7 +136,9 @@ class ClassifyArticles:
             result = await self._classifier.classify(ClassificationRequest(batch, options, other))
             report.usage += result.usage
             choices = [
-                choose_category(label.article_id, label.category, label.raw_label, categories)
+                choose_category(
+                    label.article_id, label.category, label.raw_label, categories, label.authority
+                )
                 for label in result.labels
             ]
             if save and choices:

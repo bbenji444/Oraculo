@@ -142,7 +142,15 @@ export interface Article {
   category?: ArticleCategory | null;
   /** Etiqueta libre que propuso la IA («robo de combustible»). */
   category_raw?: string | null;
+  /**
+   * Quién actúa en el hecho según la IA (ADR-0030); `null` o ausente si
+   * todavía no se clasifica. La relevancia de `concepts` ya lo toma en cuenta.
+   */
+  authority?: Authority | null;
 }
+
+/** Quién actúa en una nota (F12.5): la FGR federal, solo mencionada, una fiscalía estatal… */
+export type Authority = 'fgr' | 'fgr_mencion' | 'estatal' | 'otra' | 'sin_dato';
 
 export interface ArticleCategory {
   id: number;

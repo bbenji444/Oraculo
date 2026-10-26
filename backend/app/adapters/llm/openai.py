@@ -65,6 +65,7 @@ from app.application.ports.llm import (
     SummaryRequest,
     SummaryResult,
 )
+from app.domain.authority import Authority
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import EXTRACTABLE_TYPES
 from app.domain.investigation import LegalStatus
@@ -139,8 +140,9 @@ SUMMARY_SCHEMA: dict[str, Any] = {
 def classification_schema(categories: list[str]) -> dict[str, Any]:
     """Esquema estricto de la clasificación (mismo contenido que ``ClassificationOut``).
 
-    La categoría va como lista cerrada (``enum``): el modo estricto de OpenAI
-    la respeta, así que nunca llega una categoría que no esté en el catálogo.
+    La categoría y quién actúa van como listas cerradas (``enum``): el modo
+    estricto de OpenAI las respeta, así que nunca llega una categoría que no
+    esté en el catálogo ni una autoridad que no exista (F12.5).
 
     Args:
         categories: Nombres del catálogo activo.
@@ -158,11 +160,12 @@ def classification_schema(categories: list[str]) -> dict[str, Any]:
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["id", "category", "label"],
+                    "required": ["id", "category", "label", "authority"],
                     "properties": {
                         "id": {"type": "integer"},
                         "category": {"type": "string", "enum": categories},
                         "label": _NULLABLE_TEXT,
+                        "authority": {"type": "string", "enum": [a.value for a in Authority]},
                     },
                 },
             }

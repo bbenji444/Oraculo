@@ -1,7 +1,10 @@
 """Catálogo de categorías y categoría de cada nota sobre PostgreSQL (F12.4, ADR-0029).
 
-Implementa ``CategoryStorePort``. Las notas pendientes son las que no tienen
-categoría de la versión vigente del prompt (``category_version``). Se leen
+Implementa ``CategoryStorePort``. Al guardar la categoría guarda también
+quién actúa en la nota (``articles.authority``, F12.5, ADR-0030).
+
+Las notas pendientes son las que no tienen categoría de la versión vigente
+del prompt (``category_version``). Se leen
 por cursor (``WHERE id > :after ORDER BY id``, nunca ``OFFSET``) y se manda a
 la IA solo título y resumen (o el fragmento del medio si no hay resumen).
 
@@ -18,7 +21,9 @@ from app.application.ports.llm import ClassificationNote
 from app.domain.categories import Category, CategoryChoice
 
 _PENDING = """
-    SELECT a.id, a.title, COALESCE(a.summary, a.snippet) AS summary
+    SELECT a.id, a.title, COALESCE(a.summary, a.snippet) AS summary,
+        (SELECT string_agg(ac.relevance_reason, ' ' ORDER BY ac.concept_id)
+         FROM article_concepts ac WHERE ac.article_id = a.id) AS reading_notes
     FROM articles a
     WHERE a.category_version IS DISTINCT FROM :version
 """
@@ -56,7 +61,7 @@ class PostgresCategoryStore:
                 text(f"{_PENDING} AND a.id = ANY(:ids) ORDER BY a.id"),
                 {"version": version, "ids": list(article_ids)},
             )
-            return [ClassificationNote(r.id, r.title, r.summary) for r in rows]
+            return [ClassificationNote(r.id, r.title, r.summary, r.reading_notes) for r in rows]
 
     async def pending_after(
         self, after_id: int, limit: int, version: str
@@ -67,7 +72,7 @@ class PostgresCategoryStore:
                 text(f"{_PENDING} AND a.id > :after ORDER BY a.id LIMIT :limit"),
                 {"version": version, "after": after_id, "limit": limit},
             )
-            return [ClassificationNote(r.id, r.title, r.summary) for r in rows]
+            return [ClassificationNote(r.id, r.title, r.summary, r.reading_notes) for r in rows]
 
     async def save(self, choices: Sequence[CategoryChoice], version: str) -> None:
         """Ver ``CategoryStorePort.save``."""
@@ -78,9 +83,11 @@ class PostgresCategoryStore:
                 text(
                     """
                     UPDATE articles a SET category_id = v.category_id, category_raw = v.raw,
-                        category_version = :version, updated_at = now()
+                        authority = v.authority, category_version = :version,
+                        updated_at = now()
                     FROM unnest(CAST(:ids AS bigint[]), CAST(:categories AS bigint[]),
-                        CAST(:raws AS text[])) AS v(id, category_id, raw)
+                        CAST(:raws AS text[]), CAST(:authorities AS text[]))
+                        AS v(id, category_id, raw, authority)
                     WHERE a.id = v.id
                     """
                 ),
@@ -88,6 +95,7 @@ class PostgresCategoryStore:
                     "ids": [c.article_id for c in choices],
                     "categories": [c.category.category_id for c in choices],
                     "raws": [c.raw_label for c in choices],
+                    "authorities": [c.authority.value if c.authority else None for c in choices],
                     "version": version,
                 },
             )

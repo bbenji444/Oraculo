@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.categories_repository import PostgresCategoryStore
 from app.core.config import Settings
+from app.domain.authority import Authority
 from app.domain.categories import CategoryChoice, other_category
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -74,7 +75,12 @@ async def test_pendientes_guardar_y_volver_a_pedir(
 
     pending = await store.pending_notes([armas, sin_resumen], "classify_v1")
     count_before = await store.count_pending("classify_v1")
-    await store.save([CategoryChoice(armas, weapons, "tráfico de armas")], "classify_v1")
+    await store.save(
+        [
+            CategoryChoice(armas, weapons, "tráfico de armas", Authority.FGR),
+        ],
+        "classify_v1",
+    )
     # La base de pruebas puede tener otras notas: se mide la diferencia.
     assert await store.count_pending("classify_v1") == count_before - 1
     again = await store.pending_notes([armas, sin_resumen], "classify_v1")
@@ -90,7 +96,10 @@ async def test_pendientes_guardar_y_volver_a_pedir(
     assert [n.article_id for n in newer] == [armas, sin_resumen]
     with sync_engine.connect() as conn:
         row = conn.execute(
-            text("SELECT category_id, category_raw, category_version FROM articles WHERE id = :id"),
+            text(
+                "SELECT category_id, category_raw, category_version, authority "
+                "FROM articles WHERE id = :id"
+            ),
             {"id": armas},
         ).one()
-    assert tuple(row) == (weapons.category_id, "tráfico de armas", "classify_v1")
+    assert tuple(row) == (weapons.category_id, "tráfico de armas", "classify_v1", "fgr")

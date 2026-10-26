@@ -11,6 +11,7 @@ from app.application.ports.llm import (
     ClassificationResult,
 )
 from app.application.use_cases.classify import ClassifyArticles
+from app.domain.authority import Authority
 from app.domain.categories import Category, CategoryChoice
 from app.domain.enrichment import LLMUsage
 
@@ -67,6 +68,7 @@ class FakeClassifier:
                 n.article_id,
                 "Armas y explosivos" if "armas" in n.title else "Robo de autos",
                 "tráfico de armas" if "armas" in n.title else "robo de autos",
+                Authority.FGR if "armas" in n.title else Authority.STATE,
             )
             for n in request.notes
             if n.article_id != self.skip
@@ -87,11 +89,16 @@ async def test_clasifica_por_lotes_y_lo_que_no_encaja_va_a_otros() -> None:
     assert ai.batches == [[1, 2], [3]]
     assert report.classified == 3
     assert report.usage == LLMUsage(200, 20)
-    saved = {c.article_id: (c.category, c.raw_label) for batch, _ in store.saved for c in batch}
+    saved = {
+        c.article_id: (c.category, c.raw_label, c.authority)
+        for batch, _ in store.saved
+        for c in batch
+    }
+    # Quién actúa (F12.5) se guarda junto con la categoría.
     assert saved == {
-        1: (ARMAS, "tráfico de armas"),
-        2: (OTROS, "robo de autos"),
-        3: (ARMAS, "tráfico de armas"),
+        1: (ARMAS, "tráfico de armas", Authority.FGR),
+        2: (OTROS, "robo de autos", Authority.STATE),
+        3: (ARMAS, "tráfico de armas", Authority.FGR),
     }
     assert {version for _, version in store.saved} == {"classify_v1"}
 

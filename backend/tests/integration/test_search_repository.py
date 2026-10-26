@@ -25,6 +25,7 @@ from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.application.ports.llm import EnrichmentError
+from app.application.ports.search_reads import ArticleFilters, ArticleItem
 from app.application.ports.search_store import NewSearch, SearchConcept
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.extraction import ExtractTexts
@@ -32,6 +33,7 @@ from app.application.use_cases.geocoding import GeocodeMentions
 from app.application.use_cases.run_search import PipelineLimits, RunSearch
 from app.cli import buscar, reubicar
 from app.core.config import Settings
+from app.domain.authority import Authority
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.queries import Provider
@@ -525,3 +527,56 @@ async def test_la_busqueda_guarda_y_lee_sus_fuentes(
 
     assert stored is not None
     assert stored.providers == (Provider.SEARCHAPI, Provider.LOCAL_INDEX)
+
+
+async def _izta(
+    articles: PostgresArticleStore, search_id: UUID, *, relevant_only: bool
+) -> ArticleItem | None:
+    items = await articles.search_articles(
+        search_id, ArticleFilters(relevant_only=relevant_only), None, 10
+    )
+    return next((i for i in items if i.title == IZTA_SEARCHAPI.title), None)
+
+
+async def test_la_regla_fgr_federal_saca_lo_que_hace_una_fiscalia_estatal(
+    test_engine: AsyncEngine,
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    concept_id: int,
+) -> None:
+    # F12.5, ADR-0030: la IA dijo «relevante», pero quien actúa es la fiscalía estatal.
+    searches, articles = stores
+    search_id = await new_search(searches, test_engine, concept_id)
+    await run_search(test_engine, searches, articles, LLM(REPLIES)).run(search_id)
+    assert await _izta(articles, search_id, relevant_only=True) is not None
+
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE concepts SET relevance_rule = 'fgr_federal' WHERE id = :id"),
+            {"id": concept_id},
+        )
+        await conn.execute(
+            text("UPDATE articles SET authority = 'estatal' WHERE title = :t"),
+            {"t": IZTA_SEARCHAPI.title},
+        )
+
+    # Fuera de las relevantes, de la vista previa y con la razón fija.
+    assert await _izta(articles, search_id, relevant_only=True) is None
+    hidden = await _izta(articles, search_id, relevant_only=False)
+    assert hidden is not None
+    assert hidden.authority is Authority.STATE
+    assert [(j.is_relevant, j.relevance_reason) for j in hidden.judgements] == [
+        (False, "Actúa una fiscalía estatal, no la FGR.")
+    ]
+    preview = await articles.preview(search_id, 5)
+    assert next(p for p in preview if p.title == IZTA_SEARCHAPI.title).concepts == ()
+    detail = await articles.article_detail(hidden.article_id)
+    assert detail is not None
+    assert [j.is_relevant for j in detail.item.judgements] == [False]
+
+    # Con la regla general, quién actúa no cambia nada.
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE concepts SET relevance_rule = 'general' WHERE id = :id"),
+            {"id": concept_id},
+        )
+    assert await _izta(articles, search_id, relevant_only=True) is not None

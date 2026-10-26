@@ -26,6 +26,7 @@ from app.adapters.persistence.article_rows import (
     ALL_JUDGEMENTS,
     ALL_PROVIDERS,
     ARTICLE_COLUMNS,
+    KEEPS_RELEVANCE,
     LOCATION_COLUMNS,
     PRIMARY_COLUMNS,
     article_item,
@@ -1040,7 +1041,7 @@ class PostgresArticleStore:
                 (
                     await conn.execute(
                         text(
-                            """
+                            f"""
                             SELECT a.title, a.source_name, a.url_canonical, a.published_at,
                                 a.summary, a.extraction_status, sr.in_region, sr.best_rank,
                                 al.precision, al.confidence,
@@ -1051,7 +1052,9 @@ class PostgresArticleStore:
                                 COALESCE((SELECT array_agg(sc.concept_name ORDER BY sc.concept_name)
                                     FROM article_concepts ac JOIN search_concepts sc
                                         ON sc.concept_id = ac.concept_id AND sc.search_id = :s
-                                    WHERE ac.article_id = a.id AND ac.is_relevant), '{}')
+                                    JOIN concepts c ON c.id = ac.concept_id
+                                    WHERE ac.article_id = a.id AND ac.is_relevant
+                                        AND {KEEPS_RELEVANCE}), '{{}}')
                                     AS concepts
                             FROM (SELECT article_id, bool_or(in_region) AS in_region,
                                     min(provider_rank) AS best_rank
@@ -1065,7 +1068,7 @@ class PostgresArticleStore:
                                 (al.id IS NOT NULL) DESC, sr.in_region DESC NULLS LAST,
                                 sr.best_rank, a.id
                             LIMIT :n
-                            """
+                            """  # noqa: S608 — condición fija de article_rows
                         ),
                         {"s": search_id, "n": limit},
                     )
@@ -1132,12 +1135,16 @@ async def _write_locations(
         )
 
 
-# Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces.
+# Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces
+# y la regla actual del concepto (la de «FGR federal» se aplica al armarlos,
+# ADR-0030).
 _JUDGEMENTS_IN_SEARCH = """
     COALESCE((SELECT json_agg(json_build_array(ac.concept_id, sc.concept_name,
-        ac.is_relevant, ac.relevance_score, ac.relevance_reason) ORDER BY ac.concept_id)
+        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule)
+        ORDER BY ac.concept_id)
         FROM article_concepts ac JOIN search_concepts sc
             ON sc.concept_id = ac.concept_id AND sc.search_id = :s
+        JOIN concepts c ON c.id = ac.concept_id
         WHERE ac.article_id = a.id), '[]')
 """
 _UNKNOWN = "unknown"
@@ -1149,10 +1156,12 @@ def _article_filters(filters: ArticleFilters) -> tuple[list[str], dict[str, obje
     params: dict[str, object] = {}
     judged = (
         "EXISTS (SELECT 1 FROM article_concepts ac JOIN search_concepts sc "
-        "ON sc.concept_id = ac.concept_id AND sc.search_id = :s WHERE ac.article_id = a.id"
+        "ON sc.concept_id = ac.concept_id AND sc.search_id = :s "
+        "JOIN concepts c ON c.id = ac.concept_id WHERE ac.article_id = a.id"
     )
     if filters.relevant_only:
-        judged += " AND ac.is_relevant"
+        # La misma relevancia final que muestran los juicios (ADR-0030).
+        judged += f" AND ac.is_relevant AND {KEEPS_RELEVANCE}"
     if filters.concept_id is not None:
         judged += " AND ac.concept_id = :concept_id"
         params["concept_id"] = filters.concept_id

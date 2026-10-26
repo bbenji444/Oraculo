@@ -4,7 +4,13 @@
  * Fechas siempre en hora de la Ciudad de México (CLAUDE.md §6.3), aunque el
  * navegador esté en otra zona.
  */
-import type { Article, Precision, Search, SearchProgress } from '../../services/searches';
+import type {
+  Article,
+  Authority,
+  Precision,
+  Search,
+  SearchProgress,
+} from '../../services/searches';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const DATE_TIME = new Intl.DateTimeFormat('es-MX', {
@@ -223,6 +229,28 @@ export function eventDateNote(eventDate: string | null, publishedAt: string | nu
   const gap = Math.abs(Date.parse(publishedAt) - Date.UTC(year, month - 1, day));
   if (!Number.isFinite(gap) || gap < OLD_EVENT_DAYS * DAY_MS) return null;
   return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
+}
+
+/** Quién actúa en la nota, en palabras (F12.5, ADR-0030). */
+export const AUTHORITY_LABEL: Readonly<Record<Authority, string>> = {
+  fgr: 'FGR federal',
+  fgr_mencion: 'FGR solo mencionada',
+  estatal: 'Fiscalía estatal',
+  otra: 'Otra autoridad',
+  sin_dato: 'No se sabe',
+};
+
+/**
+ * Renglón «Quién actúa» de la ficha.
+ *
+ * @param authority Lo que dijo la IA, o `null`/ausente si falta clasificar.
+ * @returns «Quién actúa: Fiscalía estatal», o `null` si no hay dato que mostrar.
+ */
+export function authorityNote(authority: Authority | null | undefined): string | null {
+  if (!authority || authority === 'sin_dato') {
+    return null;
+  }
+  return `Quién actúa: ${AUTHORITY_LABEL[authority]}`;
 }
 
 /**

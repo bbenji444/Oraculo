@@ -16,6 +16,7 @@ from uuid import UUID
 
 from app.application.pagination import TimeCursor
 from app.domain.aggregates import NoteLocation
+from app.domain.authority import Authority
 from app.domain.enrichment import LLMUsage
 from app.domain.search import SearchStatus
 
@@ -246,6 +247,8 @@ class ArticleItem:
         category: El delito del que trata (ADR-0029), o ``None`` si falta
             clasificarla.
         category_raw: Etiqueta libre que propuso la IA.
+        authority: Quién actúa en el hecho (ADR-0030), o ``None`` si falta
+            clasificarla. Los juicios ya traen aplicada la regla de su concepto.
     """
 
     article_id: int
@@ -266,6 +269,7 @@ class ArticleItem:
     story_id: int | None = None
     category: CategoryView | None = None
     category_raw: str | None = None
+    authority: Authority | None = None
 
 
 @dataclass(frozen=True, slots=True)

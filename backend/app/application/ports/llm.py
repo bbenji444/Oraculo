@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.authority import Authority
 from app.domain.enrichment import ConceptBrief, Enrichment, LLMUsage
 from app.domain.entity_extraction import RawProposal
 
@@ -325,11 +326,15 @@ class ClassificationNote:
         article_id: Nota (la IA responde con este id).
         title: Título.
         summary: Resumen de la IA o fragmento del medio, si hay.
+        reading_notes: Lo que la IA anotó al leer la nota completa (sus razones
+            de relevancia por concepto), si la leyó. Dice, por ejemplo, que
+            participaron agentes de la FGR aunque el resumen no lo diga (F12.5).
     """
 
     article_id: int
     title: str
     summary: str | None
+    reading_notes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -368,11 +373,14 @@ class ClassificationLabel:
         article_id: Nota.
         category: Nombre de categoría que eligió (se valida contra el catálogo).
         raw_label: Etiqueta libre que propuso, o ``None``.
+        authority: Quién actúa en el hecho (F12.5, ADR-0030), o ``None`` si
+            la IA no lo dijo.
     """
 
     article_id: int
     category: str | None
     raw_label: str | None
+    authority: Authority | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,7 +391,7 @@ class ClassificationResult:
         labels: Una por nota que respondió la IA (puede faltar alguna).
         usage: Tokens gastados (suma de intentos, si hubo reintento).
         model: Modelo usado.
-        prompt_version: Versión del prompt (``classify_v1``).
+        prompt_version: Versión del prompt (``classify_v3``).
     """
 
     labels: tuple[ClassificationLabel, ...]

@@ -8,8 +8,13 @@ Uso:
     ``make clasificar``: toma 5 notas de la búsqueda más reciente (o de
     ``--busqueda <id>``), dice cuánto costaría, pide "si", las clasifica y
     las muestra **sin guardar nada** (CLAUDE.md §2.6).
+    ``make clasificar ARGS="--notas 1382,1463"``: prueba casos elegidos (las
+    que falten por clasificar con la versión vigente), sin guardar.
     ``make clasificar ARGS=--aplicar``: clasifica y guarda todas las notas
     pendientes; antes dice cuántas son y cuánto costaría, y pide "si".
+
+Además de la categoría muestra quién actúa en cada nota y si cuenta para el
+concepto FGR (F12.5, ADR-0030).
 
 No hace: no consulta proveedores de noticias (0 créditos) ni cambia el
 catálogo de categorías.
@@ -35,6 +40,7 @@ from app.application.use_cases.classify import (
 )
 from app.cli.buscar import CONFIRMATION
 from app.core.config import Settings, get_settings
+from app.domain.authority import AUTHORITY_LABEL, FGR_FEDERAL_EXCLUDED, Authority
 from app.domain.enrichment import LLMUsage
 from app.geodata.consola import configure_cli_logging, heading
 
@@ -64,24 +70,55 @@ def estimated_usage(notes: int) -> LLMUsage:
     )
 
 
-def show(report: ClassifyReport, prices: tuple[float, float], *, saved: bool) -> None:
-    """Muestra lo que se eligió, el reparto por categoría y el costo real.
+def authority_text(authority: Authority | None) -> str:
+    """Quién actúa, en palabras, y si la nota cuenta para el concepto FGR (ADR-0030).
+
+    Args:
+        authority: Lo que respondió la IA.
+
+    Returns:
+        Por ejemplo «Fiscalía estatal (no cuenta para la FGR)».
+    """
+    if authority is None:
+        return "quién actúa: sin respuesta"
+    suffix = " (no cuenta para la FGR)" if authority in FGR_FEDERAL_EXCLUDED else ""
+    return f"{AUTHORITY_LABEL[authority]}{suffix}"
+
+
+def show(
+    report: ClassifyReport,
+    prices: tuple[float, float],
+    *,
+    saved: bool,
+    shown: int = SAMPLE_SIZE,
+) -> None:
+    """Muestra lo que se eligió, el reparto por categoría y quién actúa, y el costo real.
 
     Args:
         report: Resultado de la clasificación.
         prices: Dólares por millón de tokens (entrada, salida).
         saved: Si se guardó.
+        shown: Cuántas notas mostrar una por una (las elegidas con ``--notas``
+            se muestran todas).
     """
     suffix = "" if saved else " (sin guardar)"
     heading(logger, f"{report.classified} notas clasificadas{suffix}")
-    for choice in report.choices[:SAMPLE_SIZE]:
+    for choice in report.choices[:shown]:
         note = report.notes.get(choice.article_id)
         title = note.title[:TITLE_CHARS] if note else f"nota {choice.article_id}"
-        logger.info(f"{title}\n   → {choice.category.name} · «{choice.raw_label or '—'}»")
-    if len(report.choices) > SAMPLE_SIZE:
+        logger.info(
+            f"[{choice.article_id}] {title}\n   → {choice.category.name} · "
+            f"«{choice.raw_label or '—'}» · {authority_text(choice.authority)}"
+        )
+    if len(report.choices) > shown:
         heading(logger, "Reparto por categoría")
         for name, count in Counter(c.category.name for c in report.choices).most_common():
             logger.info(f"{count:>4}  {name}")
+        heading(logger, "Quién actúa")
+        for authority, count in Counter(
+            authority_text(c.authority) for c in report.choices
+        ).most_common():
+            logger.info(f"{count:>4}  {authority}")
     cost = report.usage.cost_usd(*prices)
     logger.info(
         f"IA: {report.usage.tokens_in} tokens de entrada y {report.usage.tokens_out} de salida, "
@@ -101,9 +138,27 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Clasifica por categoría las notas guardadas.")
     parser.add_argument("--busqueda", type=UUID, help="de dónde tomar los 5 ejemplos")
     parser.add_argument(
+        "--notas",
+        type=_note_ids,
+        help=f"ids separados por coma para probar casos (máx. {BATCH_SIZE}); no guarda",
+    )
+    parser.add_argument(
         "--aplicar", action="store_true", help='clasificar y guardar todas (pide "si")'
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.aplicar and args.notas:
+        parser.error("--notas solo prueba, sin guardar; no se combina con --aplicar.")
+    return args
+
+
+def _note_ids(value: str) -> list[int]:
+    try:
+        ids = [int(part) for part in value.split(",") if part.strip()]
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("Escribe ids de notas separados por coma.") from error
+    if not ids or len(ids) > BATCH_SIZE:
+        raise argparse.ArgumentTypeError(f"Escribe de 1 a {BATCH_SIZE} ids de notas.")
+    return ids
 
 
 async def _sample_ids(
@@ -142,9 +197,14 @@ async def run(
         store = PostgresCategoryStore(engine)
         use_case = ClassifyArticles(store, llm.classifier)
         ids: list[int] | None = None
+        shown = SAMPLE_SIZE
         if args.aplicar:
             pending = await store.count_pending(use_case.version)
             what = f"{pending} notas pendientes; se guardan"
+        elif args.notas:
+            ids = args.notas
+            pending = shown = len(await store.pending_notes(ids, use_case.version))
+            what = f"{pending} de las {len(ids)} notas elegidas; no se guarda nada"
         else:
             ids, source = await _sample_ids(args, store, PostgresSearchStore(engine))
             available = (
@@ -166,7 +226,7 @@ async def run(
         if args.aplicar:
             show(await use_case.run_pending(), prices, saved=True)
         else:
-            show(await use_case.sample(ids), prices, saved=False)
+            show(await use_case.sample(ids, size=shown), prices, saved=False, shown=shown)
         return 0
     finally:
         await llm.llm.aclose()

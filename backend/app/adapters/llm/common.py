@@ -20,12 +20,14 @@ from pydantic import BaseModel, Field, StringConstraints
 from app.application.clock import MEXICO_CITY
 from app.application.ports.llm import (
     ClassificationLabel,
+    ClassificationNote,
     ClassificationRequest,
     EnrichmentRequest,
     EntityExtractionRequest,
     SummaryNote,
     SummaryRequest,
 )
+from app.domain.authority import parse_authority
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.entity_extraction import RawProposal
 from app.domain.geocoding import Mention, MentionRole
@@ -261,8 +263,11 @@ def to_raw_proposals(out: EntitiesOut) -> tuple[RawProposal, ...]:
     )
 
 
-# Clasificación por categoría (F12.4, ADR-0029): una llamada por lote.
-CLASSIFY_PROMPT_VERSION = "classify_v1"
+# Clasificación por categoría (F12.4, ADR-0029) y quién actúa (F12.5,
+# ADR-0030): una llamada por lote. v2 agrega ``authority``; v3 cuenta como FGR
+# sus nombramientos, a su titular y los juicios donde es parte. Cambiar la
+# versión hace que las notas se vuelvan a clasificar.
+CLASSIFY_PROMPT_VERSION = "classify_v3"
 CLASSIFY_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{CLASSIFY_PROMPT_VERSION}.md"
 # Notas por llamada: con título y resumen (~80 tokens cada una) el prompt
 # queda en ~2,600 tokens; más notas alargan la respuesta sin ahorrar mucho.
@@ -271,6 +276,9 @@ CLASSIFY_BATCH_SIZE = 25
 CLASSIFY_MAX_OUTPUT_TOKENS = 2048
 # Un resumen largo no ayuda a clasificar y encarece el lote.
 CLASSIFY_SUMMARY_CHARS = 400
+# Razones de la IA al leer la nota completa (una oración por concepto): con
+# 300 caracteres caben dos o tres, que es lo que suele haber.
+CLASSIFY_READING_NOTES_CHARS = 300
 
 
 class ClassifiedItemOut(BaseModel):
@@ -279,6 +287,9 @@ class ClassifiedItemOut(BaseModel):
     id: int
     category: str
     label: str | None = None
+    # Texto libre aquí; ``parse_authority`` toma lo que no reconoce como
+    # ``sin_dato`` (Gemini no garantiza la lista cerrada como OpenAI).
+    authority: str | None = None
 
 
 class ClassificationOut(BaseModel):
@@ -288,7 +299,7 @@ class ClassificationOut(BaseModel):
 
 
 def build_classify_prompt(request: ClassificationRequest) -> str:
-    """Llena la plantilla ``classify_v1.md`` con el catálogo y el lote.
+    """Llena la plantilla ``classify_v3.md`` con el catálogo y el lote.
 
     Args:
         request: Notas (título y resumen, nunca el texto, §8) y catálogo.
@@ -298,11 +309,18 @@ def build_classify_prompt(request: ClassificationRequest) -> str:
     """
     template = CLASSIFY_PROMPT_PATH.read_text(encoding="utf-8")
     categories = "\n".join(f"- {c.name}: {c.description}" for c in request.categories)
-    notes = "\n".join(
-        f"[{n.article_id}] {n.title} — {(n.summary or 'sin resumen')[:CLASSIFY_SUMMARY_CHARS]}"
-        for n in request.notes
-    )
+    notes = "\n".join(_classify_line(n) for n in request.notes)
     return template.format(other=request.other, categories=categories, notes=notes)
+
+
+def _classify_line(note: ClassificationNote) -> str:
+    summary = (note.summary or "sin resumen")[:CLASSIFY_SUMMARY_CHARS]
+    line = f"[{note.article_id}] {note.title} — {summary}"
+    if note.reading_notes:
+        # Lo que anotó la IA al leerla completa: dice quién actuó aunque el
+        # resumen no lo diga (F12.5, ADR-0030).
+        line += f" (Al leerla completa: {note.reading_notes[:CLASSIFY_READING_NOTES_CHARS]})"
+    return line
 
 
 def to_labels(
@@ -323,5 +341,9 @@ def to_labels(
     for item in out.items:
         if item.id in wanted and item.id not in seen:
             seen.add(item.id)
-            labels.append(ClassificationLabel(item.id, item.category, item.label))
+            labels.append(
+                ClassificationLabel(
+                    item.id, item.category, item.label, parse_authority(item.authority)
+                )
+            )
     return tuple(labels)
