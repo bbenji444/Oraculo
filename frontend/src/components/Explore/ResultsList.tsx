@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
+import { useTimelineStore } from '../../store/timeline';
 import { newsCount } from './format';
 import { groupByStory } from './stories';
 import { StoryCard } from './StoryCard';
@@ -62,6 +63,16 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
         <h2 className={PANEL_TITLE} title={count.hint}>
           {count.label}
         </h2>
+        <button
+          type="button"
+          onClick={() => {
+            useTimelineStore.getState().setListOpen(false);
+          }}
+          title="Volver a la cronología"
+          className="ml-auto mr-3 rounded-full border border-sky-400/20 px-2 py-0.5 text-[11px] text-sky-200 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          ◷ Cronología
+        </button>
         <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <input
             type="checkbox"

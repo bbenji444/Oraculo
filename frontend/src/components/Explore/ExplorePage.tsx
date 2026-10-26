@@ -10,8 +10,9 @@
  *   solo al elegir una noticia, para que se vea su ficha.
  * - Derecha: libre, para que el globo se vea completo (Benji quitó las
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
- * - Derecha: la cronología (F12.7): una línea vertical con cada hecho, del más
- *   reciente al más viejo, sin repetidos; sus filtros se aplican al globo.
+ * - Izquierda, debajo de la búsqueda: la cronología (F12.7), una línea vertical
+ *   con cada hecho, del más reciente al más viejo, sin repetidos; sus filtros
+ *   se aplican al globo. «☰ Lista» la cambia por la lista de noticias.
  * - Abajo a la derecha: giro, día/noche, velocidad y leyenda de precisión.
  * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
  * - Modo caso (9.6): con `#/explorar?caso=<id>` el globo muestra el muro del
@@ -120,7 +121,9 @@ export function ExplorePage() {
 
   return (
     // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
-    <div data-earth={earth} className="relative h-full overflow-hidden bg-[#02030a]">
+    // overflow-clip y no hidden: con hidden, scrollIntoView de una lista podía
+    // desplazar la pantalla entera y dejar una franja negra abajo.
+    <div data-earth={earth} className="relative h-full overflow-clip bg-[#02030a]">
       <SpaceBackground />
       <ExploreGlobe articles={inWall ? NO_ARTICLES : shown} colors={colors} onMap={setMap} />
       <CaseWall map={map} />
@@ -142,10 +145,14 @@ export function ExplorePage() {
           {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
           <SearchPanel key={searchId ?? 'nueva'} />
         </div>
-        {/* La línea del tiempo reemplaza a la lista; «☰ Lista» la vuelve a mostrar. */}
-        {hasResults && listOpen && (
+        {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
+        {hasResults && (
           <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
-            <ResultsList articles={shown} total={articles.length} colors={colors} />
+            {listOpen ? (
+              <ResultsList articles={shown} total={articles.length} colors={colors} />
+            ) : (
+              <Chronology articles={relevant} />
+            )}
           </div>
         )}
       </aside>
@@ -160,15 +167,6 @@ export function ExplorePage() {
         >
           › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
         </button>
-      )}
-
-      {hasResults && (
-        // Cronología a la derecha: el globo queda libre en el centro.
-        <div className="pointer-events-none absolute bottom-44 right-14 top-4 hidden w-[22rem] flex-col items-end sm:flex">
-          <div className="pointer-events-auto flex max-h-full w-full flex-col items-end">
-            <Chronology articles={relevant} />
-          </div>
-        </div>
       )}
 
       <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
