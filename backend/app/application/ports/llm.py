@@ -391,7 +391,7 @@ class ClassificationResult:
         labels: Una por nota que respondió la IA (puede faltar alguna).
         usage: Tokens gastados (suma de intentos, si hubo reintento).
         model: Modelo usado.
-        prompt_version: Versión del prompt (``classify_v3``).
+        prompt_version: Versión del prompt (``classify_v4``).
     """
 
     labels: tuple[ClassificationLabel, ...]

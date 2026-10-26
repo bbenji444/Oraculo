@@ -541,9 +541,11 @@ def test_por_defecto_searchapi_va_apagado_y_no_gasta(
 
 def test_el_catalogo_de_categorias(client: TestClient) -> None:
     # F12.4 (ADR-0029): la lista provisional, con «Otros» al final y sin colores aún.
+    # La 0029 agregó «Seguridad nacional (traición a la patria)» justo antes.
     items = client.get("/api/v1/categories").json()["items"]
 
-    assert len(items) == 14
+    assert len(items) == 15
+    assert items[-2]["name"] == "Seguridad nacional (traición a la patria)"
     assert items[-1]["name"] == "Otros"
     assert items[-1]["is_other"] is True
     assert all(i["color"] is None for i in items)

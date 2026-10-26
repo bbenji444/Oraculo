@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía del sistema · Monitor de Noticias FGR · Oráculo</title>
+<style>
+@font-face { font-family: "Noto"; src: url("NotoSans-Regular.ttf"); font-weight: 400; }
+@font-face { font-family: "Noto"; src: url("NotoSans-Bold.ttf"); font-weight: 700; }
+@font-face { font-family: "Orb"; src: url("orbitron-700.woff2"); font-weight: 700; }
+@font-face { font-family: "Orb"; src: url("orbitron-400.woff2"); font-weight: 400; }
+:root { --cyan: #00d2ff; --a2: #0090b8; --a1: #005f7f; --ink: #0f172a; --muted: #5b6b78; --line: #dbe4ea; --soft: #f2f7fa; }
+@page { size: A4; margin: 18mm 15mm 16mm;
+  @top-left { content: "ORÁCULO · Monitor de Noticias FGR · Guía del sistema"; font: 7pt "Noto"; color: #8a9aa3; }
+  @top-right { content: "USO INTERNO"; font: 700 6.5pt "Orb"; letter-spacing: .15em; color: #8a9aa3; }
+  @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 7pt "Noto"; color: #8a9aa3; } }
+@page :first { margin: 0; background: #050505; @top-left { content: none; } @top-right { content: none; } @bottom-right { content: none; } }
+html { font: 9pt/1.5 "Noto", sans-serif; color: #1e293b; }
+body { margin: 0; }
+h1, h2, h3 { margin: 0; color: var(--ink); }
+h2 { font: 700 12pt "Orb"; letter-spacing: .08em; text-transform: uppercase; border-bottom: 2pt solid var(--a2); padding-bottom: 4pt; margin: 14pt 0 8pt; break-after: avoid; }
+h3 { font-size: 10pt; margin: 10pt 0 4pt; break-after: avoid; }
+p { margin: 0 0 6pt; }
+ul, ol { margin: 0 0 6pt; padding-left: 14pt; }
+li { margin-bottom: 2pt; }
+table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 8.2pt; break-inside: avoid; }
+th { text-align: left; background: #050505; color: #fff; font: 700 6.5pt "Orb"; letter-spacing: .1em; padding: 4pt 5pt; }
+td { padding: 3.5pt 5pt; border-bottom: .6pt solid var(--line); vertical-align: top; }
+tr:nth-child(even) td { background: var(--soft); }
+b { color: var(--ink); }
+.cover { height: 297mm; background: #050505; color: #e0f7fa; position: relative; }
+.cover .in { position: absolute; left: 18mm; right: 18mm; top: 70mm; }
+.brand { font: 700 14pt "Orb"; letter-spacing: .3em; color: #fff; }
+.kick { font: 700 8pt "Orb"; letter-spacing: .22em; color: var(--cyan); margin: 40mm 0 6pt; }
+.cover h1 { font: 700 30pt/1.1 "Orb"; color: #fff; }
+.cover p.sub { font-size: 12pt; color: #a8c5cb; margin-top: 8pt; }
+.kpis { margin-top: 18mm; border-top: .75pt solid rgba(0,210,255,.4); padding-top: 10pt; }
+.kpis div { display: inline-block; width: 24%; vertical-align: top; }
+.kpis strong { display: block; font: 700 20pt "Orb"; color: var(--cyan); }
+.kpis span { font-size: 7.5pt; color: #a8c5cb; }
+.band { position: absolute; bottom: 0; left: 0; right: 0; background: var(--cyan); color: #021018; font: 700 7pt "Orb"; letter-spacing: .2em; padding: 5mm 18mm; }
+.box { border-left: 3pt solid var(--a2); background: var(--soft); padding: 6pt 9pt; margin: 4pt 0 8pt; break-inside: avoid; }
+.say { border-left-color: #1aa37a; }
+.flow { font-size: 0; margin: 6pt 0 10pt; }
+.flow div { display: inline-block; width: 18.4%; margin-right: 2%; vertical-align: top; font-size: 7.6pt; border: .75pt solid var(--line); border-top: 3pt solid var(--a2); border-radius: 3pt; padding: 5pt 6pt; box-sizing: border-box; min-height: 30mm; }
+.flow div:last-child { margin-right: 0; }
+.flow b { display: block; font: 700 7pt "Orb"; letter-spacing: .06em; color: var(--a1); margin-bottom: 2pt; }
+.q { font-weight: 700; color: var(--ink); margin: 7pt 0 1pt; break-after: avoid; }
+.q + p { margin-left: 10pt; }
+.new { break-before: page; }
+.small { font-size: 7.5pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="in">
+    <div class="brand">ORÁCULO</div>
+    <p class="kick">GUÍA DEL SISTEMA · PARA LA JUNTA</p>
+    <h1>Monitor de Noticias<br>FGR</h1>
+    <p class="sub">Cómo funciona, de dónde salen los datos, qué hace la IA y qué responder a cada pregunta.</p>
+    <div class="kpis">
+      <div><strong>3</strong><span>corridas automáticas al día<br>07:00 · 15:00 · 23:00</span></div>
+      <div><strong>~5,800</strong><span>notas nuevas al día<br>en la bodega (gratis)</span></div>
+      <div><strong>0</strong><span>créditos de pago<br>por corrida</span></div>
+      <div><strong>~0.01</strong><span>USD de IA<br>por corrida</span></div>
+    </div>
+  </div>
+  <div class="band">USO INTERNO · DATOS AL 26 OCT 2026</div>
+</section>
+
+<h2>1. Qué es, en 30 segundos</h2>
+<p>El Monitor de Noticias es el módulo de Oráculo que <b>busca solo, tres veces al día, todas las noticias de México donde actúa la Fiscalía General de la República (FGR)</b>. Las lee con inteligencia artificial, las ubica en el mapa, las clasifica por delito y arma un <b>reporte en PDF</b>. Todo queda guardado en la base de datos y se ve en un <b>globo 3D</b> con una <b>línea del tiempo</b>.</p>
+<div class="box say"><b>Para decirlo en la junta:</b> «Cada 8 horas el sistema revisa miles de noticias, se queda con las de la FGR federal, las pone en el mapa y nos deja el reporte listo, sin que nadie tenga que buscar.»</div>
+
+<h2>2. El recorrido de una noticia</h2>
+<div class="flow">
+  <div><b>1 · Se recolecta</b>Cada 15 minutos entran notas de GDELT y de los RSS de medios mexicanos a la «bodega» (índice local).</div>
+  <div><b>2 · Se busca</b>A la hora de la corrida se busca «FGR» en la bodega y en Google News RSS, en todo México.</div>
+  <div><b>3 · Se depura</b>Se quitan las repetidas (mismo link o misma nota con otro link) y se agrupan las del mismo hecho en «historias».</div>
+  <div><b>4 · La IA la lee</b>Resume, decide si es relevante, saca los lugares, la fecha del hecho, el delito y quién actúa.</div>
+  <div><b>5 · Se publica</b>Se ubica con el catálogo de INEGI y aparece en el globo, la línea del tiempo, el historial y el PDF.</div>
+</div>
+
+<h2>3. Fuentes: de dónde salen las notas y cada cuánto</h2>
+<table>
+  <tr><th>Fuente</th><th>Qué es</th><th>Cada cuánto</th><th>Costo</th></tr>
+  <tr><td><b>GDELT</b> (ngramas)</td><td>Proyecto mundial que registra noticias de miles de medios. Se guardan solo las de México en español.</td><td>Cada 15 min, solo, a la bodega</td><td>Gratis</td></tr>
+  <tr><td><b>RSS de medios</b></td><td>El Universal, Infobae México y La Jornada publican la lista de lo que van sacando.</td><td>Cada 15 min, a la bodega</td><td>Gratis</td></tr>
+  <tr><td><b>Google News RSS</b></td><td>Se le pregunta a Google «¿qué hay de la FGR?»; trae hasta ~100 notas.</td><td>En cada búsqueda o corrida</td><td>Gratis</td></tr>
+  <tr><td><b>SearchApi</b> (Google News)</td><td>Servicio de pago. Medido el 25/10: 27 de sus 30 notas ya venían en el RSS.</td><td>Solo si el analista lo enciende en una búsqueda manual</td><td>1 crédito/página; quedan 51 de un bono único</td></tr>
+  <tr><td><b>BrowserWork</b> (Bing, Google 2)</td><td>Motor del equipo con un Chrome real. Listo, pero oculto: Google 2 entrega links rotos (error ya reportado).</td><td>—</td><td>Gratis</td></tr>
+</table>
+<p><b>La bodega</b> (índice local) guarda <b>todo lo de México en español</b>, no solo lo relevante: hoy tiene <b>82,535 notas</b> (5,826 en las últimas 24 h). Se borra sola lo de más de 90 días. Lo relevante se decide después, en cada búsqueda.</p>
+
+<h2>4. El monitor automático</h2>
+<table>
+  <tr><th>Qué</th><th>Cómo está hoy</th></tr>
+  <tr><td>Horarios</td><td>07:00, 15:00 y 23:00 (hora de la Ciudad de México). Lo dispara el reloj del servidor (Celery beat).</td></tr>
+  <tr><td>Qué busca</td><td>Concepto «Fiscalía General de la República», <b>todo México</b>, notas de <b>hoy y ayer</b>.</td></tr>
+  <tr><td>Fuentes</td><td>Google News RSS + la bodega (GDELT y medios). <b>0 créditos de pago.</b></td></tr>
+  <tr><td>Qué guarda</td><td>La búsqueda (marcada «automática»), cada nota, su análisis, la bitácora y el <b>PDF</b> en <code>data/reportes/</code>.</td></tr>
+  <tr><td>Dónde se ve</td><td>Explorar (tarjeta «Monitor automático»), Historial (con borde cian) y el PDF.</td></tr>
+  <tr><td>Resultados reales</td><td>23:00 del 25/10: 162 notas, 104 relevantes, 0.047 USD. 07:00 del 26/10: 172 notas, 0.0075 USD (lo ya leído no se vuelve a pagar).</td></tr>
+  <tr><td>Configuración</td><td>Archivo <code>.env</code>: <code>AUTOMATIC_RUN_HOURS</code>, <code>AUTOMATIC_CONCEPT</code>, <code>AUTOMATIC_SOURCES</code>… Correr una al momento: <code>make corrida-fgr</code>.</td></tr>
+</table>
+<div class="box">Una búsqueda <b>nacional</b> por corrida (no 32, una por estado): la geolocalización reparte las notas por estado. Así gasta menos y no repite.</div>
+
+<h2 class="new">5. Qué hace la inteligencia artificial</h2>
+<table>
+  <tr><th>Tarea</th><th>Qué decide</th><th>Cómo se controla</th></tr>
+  <tr><td>Resumen</td><td>2 o 3 oraciones propias, neutrales.</td><td>Nunca se copia ni se publica el artículo completo; siempre va el link al medio.</td></tr>
+  <tr><td>Relevancia</td><td>Si la nota trata de verdad del tema (no sentido figurado, cursos, publicidad).</td><td>Puntaje de 0 a 1 con su razón escrita. Se ve en la ficha.</td></tr>
+  <tr><td>Lugares</td><td>Qué lugares menciona y dónde ocurrió el hecho.</td><td>La IA <b>no</b> da coordenadas: el punto sale del catálogo de INEGI y de OpenStreetMap.</td></tr>
+  <tr><td>Fecha del hecho</td><td>Si es un avance de un caso viejo, cuándo ocurrió el hecho original.</td><td>Por eso en la línea del tiempo pueden salir fechas de meses atrás.</td></tr>
+  <tr><td>Categoría</td><td>El delito: 13 categorías + «Otros» (provisionales).</td><td>Guarda además su etiqueta libre («robo de combustible») para afinar la lista.</td></tr>
+  <tr><td>Quién actúa</td><td>FGR federal, FGR solo mencionada, fiscalía estatal, otra autoridad o sin dato.</td><td>Alimenta la regla FGR federal (sección 6).</td></tr>
+</table>
+<p>Modelo: OpenAI (gpt-6-luna). Costo total de la IA en todas las búsquedas hechas hasta hoy: <b>0.43 USD</b>.</p>
+
+<h2>6. La regla «FGR federal»</h2>
+<p>Solo cuentan las notas donde <b>actúa la FGR federal</b>: detiene, catea, asegura, acusa, obtiene una orden o sentencia, nombra un delegado, o alguien queda «a disposición de la FGR». <b>No cuentan</b> las fiscalías estatales ni las notas que solo nombran a la FGR de pasada (protestas frente a sus oficinas, columnas, pleitos políticos).</p>
+<div class="box">Efecto medido en la búsqueda FGR del 24/10: <b>de 120 a 93 notas relevantes</b>. Salieron, por ejemplo, la fosa común de San Luis Potosí (Fiscalía del Estado) y las caravanas de apoyo frente a la FGR. Las notas no se borran: quedan en «No relevantes» con su razón.</div>
+
+<h2>7. Duplicados e historias</h2>
+<ul>
+  <li><b>Mismo link</b> con otra forma (<code>www</code>, <code>:443</code>): se guarda una vez.</li>
+  <li><b>Misma nota con otro link</b> (Google News y el del medio): se reutiliza la guardada, sin volver a pagar a la IA; se prefiere el link del medio.</li>
+  <li><b>Mismo hecho en varios medios</b>: no se borra nada; se agrupan en una «historia» con «+N medios» en la lista.</li>
+</ul>
+
+<h2>8. Las pantallas</h2>
+<table>
+  <tr><th>Pantalla</th><th>Para qué sirve</th></tr>
+  <tr><td><b>Explorar</b></td><td>El globo 3D. Búsqueda manual (región, concepto, fechas y switches de fuentes), lista de noticias, ficha de cada nota (resumen, categoría, quién actúa, ubicación) y la <b>línea del tiempo</b>. «‹ Volver» limpia el globo.</td></tr>
+  <tr><td><b>Línea del tiempo</b></td><td>Barras de notas <b>publicadas</b> por hora o por día (los 3 picos brillan). Clic en una barra = filtra esa hora. Filtros por categoría y por estado (solo aparecen los estados con notas). La tira de abajo ordena por <b>cuándo ocurrió</b> o <b>cuándo se publicó</b>. «▾ Ocultar» la reduce.</td></tr>
+  <tr><td><b>Historial</b></td><td>Todas las búsquedas; las automáticas las ven todos. Reabrirlas no gasta nada.</td></tr>
+  <tr><td><b>Casos</b></td><td>Expedientes de investigación: notas, entidades (personas, organizaciones, lugares, vehículos) con estatus legal y cita, vínculos. <b>«🌐 Ver en el globo»</b> dibuja el muro del caso; «Mis casos» los pone como marcadores.</td></tr>
+  <tr><td><b>Conceptos</b></td><td>Qué se busca (palabras clave y exclusiones). Hoy solo queda activo «FGR»; los demás se retiraron sin borrar el historial.</td></tr>
+  <tr><td><b>Estado del sistema</b></td><td>Si la base, Redis, el worker y las fuentes están funcionando.</td></tr>
+</table>
+
+<h2 class="new">9. El reporte en PDF</h2>
+<ol>
+  <li><b>Portada Oráculo</b>: número de expediente (EXP-FGR-fecha-hora), cifras y banda «USO INTERNO · CONFIDENCIAL».</li>
+  <li><b>Panorama</b>: resumen ejecutivo de la IA, datos clave y tarjetas por categoría.</li>
+  <li><b>Distribución geográfica</b>: el mapa de México con porcentajes por estado, la tabla y las barras de delitos por estado.</li>
+  <li><b>Línea del tiempo</b> con los 3 picos y la nota que explica cada uno; medios con más notas.</li>
+  <li><b>Noticias por Estado › Categoría › Nota</b>, numeradas, con insignias (categoría, quién actúa, confianza ALTA/MEDIA/BAJA). En el panel de marcadores del lector de PDF se despliegan y contraen.</li>
+  <li><b>Metodología y fuentes</b>: cómo se hizo, consultas por proveedor, créditos y costo.</li>
+</ol>
+
+<h2>10. Datos, seguridad y legal</h2>
+<ul>
+  <li><b>Base de datos</b>: PostgreSQL + PostGIS, hoy <b>905 MB</b>. 1,621 notas analizadas, 16 búsquedas (2 automáticas), 4 casos, 164 entidades.</li>
+  <li><b>Respaldos</b> con <code>make db-dump</code> antes de cada cambio masivo (carpeta <code>backups/</code>).</li>
+  <li><b>Llaves</b> de servicios solo en <code>.env</code>, nunca en el código ni en la pantalla.</li>
+  <li><b>Bitácora</b>: cada búsqueda guarda quién, cuándo, consultas y costo.</li>
+  <li><b>Legal</b>: se guarda resumen propio + link; nunca se reproduce el artículo completo. Se cita a The GDELT Project.</li>
+</ul>
+
+<h2>11. Preguntas que te pueden hacer</h2>
+<p class="q">¿Por qué sale tanto Chihuahua?</p>
+<p>Por el tema de la semana, no por un medio: de 72 notas de Chihuahua en la corrida de las 07:00, 57 son del caso del exfiscal César Jáuregui (traición a la patria, operativo de la CIA). Vienen de decenas de medios locales y nacionales.</p>
+<p class="q">¿Por qué aparecen notas de abril o de otros días?</p>
+<p>Todas se publicaron ayer u hoy; la tira las ordena por cuándo <b>ocurrió</b> el hecho que reportan (avances de casos viejos). Con «Orden: cuándo se publicó» se ven por fecha de publicación.</p>
+<p class="q">¿Por qué solo aparecen algunos estados en el filtro?</p>
+<p>El filtro lista solo los estados que tienen notas de la FGR en esa corrida; los demás no tuvieron ninguna.</p>
+<p class="q">¿Cuánto cuesta?</p>
+<p>Las corridas automáticas: 0 créditos de pago y centavos de IA (0.0075 a 0.05 USD por corrida). La bodega es gratis. SearchApi solo si alguien lo enciende.</p>
+<p class="q">¿Qué tan confiable es la IA?</p>
+<p>Todo lo de la IA va marcado como inferencia, con su razón y puntaje. Se validó con casos reales (12 de 12 bien en la regla FGR federal). La ubicación no la inventa la IA: sale del catálogo de INEGI. Siempre está el link al medio para verificar.</p>
+<p class="q">¿Qué pasa si se apaga la computadora?</p>
+<p>Esa corrida no ocurre; la siguiente cubre hoy y ayer. El plan es mudarlo a la VM de Proxmox (24/7); la guía está en <code>docs/migracion-proxmox.md</code>.</p>
+<p class="q">¿Se puede monitorear otro tema o un estado?</p>
+<p>Sí: la búsqueda manual acepta cualquier concepto y región; el automático se cambia en la configuración (concepto, región, horarios, fuentes).</p>
+<p class="q">¿Se repiten las noticias?</p>
+<p>No se guardan dos veces; las del mismo hecho en varios medios se agrupan en una historia sin perder ningún link.</p>
+<p class="q">¿Qué falta?</p>
+<p>Mudarlo a Proxmox, envío automático del reporte (WhatsApp o correo), colores definitivos por categoría y, cuando BrowserWork corrija sus links, encender Google 2.</p>
+
+<p class="small" style="margin-top:12pt">Documento de apoyo generado el 26/10/2026 con datos reales de la base. Detalle técnico: <code>docs/adr/</code> (decisiones 0029 a 0033), <code>docs/api.md</code> y <code>CHANGELOG.md</code>.</p>
+</body>
+</html>
