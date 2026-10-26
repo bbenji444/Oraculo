@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Article } from '../../services/searches';
 import {
   authorityNote,
+  automaticRunLabel,
   eventDateNote,
   finishNotice,
   formatDay,
@@ -177,5 +178,22 @@ describe('authorityNote', () => {
     expect(authorityNote('sin_dato')).toBeNull();
     expect(authorityNote(null)).toBeNull();
     expect(authorityNote(undefined)).toBeNull();
+  });
+});
+
+describe('automaticRunLabel', () => {
+  it('dice de qué corrida del monitor es, en hora de la CDMX (F12.8)', () => {
+    // 05:00 UTC = 23:00 del día anterior en la CDMX.
+    expect(automaticRunLabel({ trigger: 'automatic', scheduled_for: '2026-10-26T05:00:00Z' })).toBe(
+      'Monitor automático · corrida de las 23:00 del 25 oct',
+    );
+    expect(automaticRunLabel({ trigger: 'automatic', scheduled_for: '2026-10-26T13:00:00Z' })).toBe(
+      'Monitor automático · corrida de las 07:00 del 26 oct',
+    );
+  });
+
+  it('una búsqueda de una persona no lleva rótulo', () => {
+    expect(automaticRunLabel({ trigger: 'manual', scheduled_for: null })).toBeNull();
+    expect(automaticRunLabel({})).toBeNull();
   });
 });

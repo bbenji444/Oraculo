@@ -89,6 +89,13 @@ export interface Search {
    * que usaron todas las configuradas.
    */
   providers?: string[];
+  /**
+   * Quién la lanzó (F12.8): `manual` (una persona) o `automatic` (el monitor
+   * FGR a las 07:00, 15:00 y 23:00). Ausente en respuestas de antes de F12.8.
+   */
+  trigger?: 'manual' | 'automatic';
+  /** Hora programada de una corrida automática (UTC). */
+  scheduled_for?: string | null;
 }
 
 export interface Judgement {
