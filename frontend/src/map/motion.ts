@@ -40,7 +40,7 @@ export function spinFactor(preset: MotionPreset): number {
 // --- Entrada ------------------------------------------------------------------
 
 // La cámara arranca lejos (la Tierra pequeña en el espacio) y desplazada al
-// este, y llega a México girando: se ve el globo antes que el país.
+// este, y llega girando al Atlántico; de ahí sigue el giro normal (ExploreGlobe).
 export const INTRO_FROM_ZOOM = 0.2;
 export const INTRO_LNG_OFFSET_DEGREES = 80;
 // ~3.5 s se siente como una llegada, no como una espera.
