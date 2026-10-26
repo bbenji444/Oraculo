@@ -22,6 +22,7 @@ import { App } from './App';
 import type { Case } from './services/cases';
 import type { Article, Search } from './services/searches';
 import { useExplorerStore } from './store/explorer';
+import { useTimelineStore } from './store/timeline';
 import articles from './test/fixtures/explorar/articles.json';
 import concepts from './test/fixtures/explorar/concepts.json';
 import estimate from './test/fixtures/explorar/estimate.json';
@@ -166,6 +167,8 @@ function renderApp() {
 }
 
 beforeEach(() => {
+  // La lista de noticias empieza oculta: la reemplaza la línea del tiempo.
+  useTimelineStore.setState({ listOpen: false });
   searchPolls = 0;
   caseArticles.length = 0;
   startBodies.length = 0;
@@ -222,6 +225,9 @@ describe('flujo principal (H1)', () => {
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
     // Un aviso dice que ya terminó (la persona pudo irse a otra pestaña).
     expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
+    // La línea del tiempo reemplaza a la lista; «☰ Lista» la vuelve a mostrar.
+    expect(await screen.findByRole('region', { name: 'Línea del tiempo' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
     const list = await screen.findByRole('region', { name: 'Noticias' });
     expect(screen.queryByText(/Top 5 estados/)).toBeNull();
     expect(screen.queryByText('Tipos de noticias')).toBeNull();
@@ -303,7 +309,9 @@ describe('flujo principal (H1)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Abrir en el globo' }));
 
-    expect(await screen.findByRole('region', { name: 'Noticias' }, POLL_WAIT)).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Línea del tiempo' }, POLL_WAIT)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
+    expect(await screen.findByRole('region', { name: 'Noticias' })).toBeTruthy();
     expect(window.location.hash).toBe('#/explorar');
     expect(startBodies).toEqual([]);
     expect(useExplorerStore.getState()).toMatchObject({ regionId: 272, conceptIds: [3] });
