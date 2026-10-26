@@ -3,7 +3,8 @@
  * referencia de Benji): el globo domina, sobre el universo, con paneles
  * translúcidos a los lados.
  *
- * - Izquierda: búsqueda (al terminar, un renglón con sus descargas) y lista de
+ * - Izquierda: la última corrida del monitor FGR (si no hay búsqueda abierta),
+ *   la búsqueda (al terminar, un renglón con sus descargas) y la lista de
  *   noticias. La lista ocupa el espacio libre y el panel se puede ocultar
  *   ("Ocultar ‹") para ver el globo completo; en pantallas angostas se oculta
  *   solo al elegir una noticia, para que se vea su ficha.
@@ -28,6 +29,7 @@ import { useTimelineStore } from '../../store/timeline';
 import { SpaceBackground } from '../Space/SpaceBackground';
 import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
+import { LatestRunCard } from './LatestRunCard';
 import { visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
@@ -100,6 +102,12 @@ export function ExplorePage() {
           panelOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
       >
+        {searchId === null && (
+          // Acceso directo a la última corrida del monitor FGR (F12.8).
+          <div className="pointer-events-auto shrink-0">
+            <LatestRunCard />
+          </div>
+        )}
         <div className="pointer-events-auto shrink-0">
           {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
           <SearchPanel key={searchId ?? 'nueva'} />
