@@ -12,7 +12,13 @@ from dataclasses import dataclass
 
 from app.adapters.llm.gemini import GeminiEnricher, build_gemini
 from app.adapters.llm.openai import OpenAIEnricher, build_openai
-from app.application.ports.llm import EntityExtractorPort, LLMInfo, LLMPort, SummarizerPort
+from app.application.ports.llm import (
+    ClassifierPort,
+    EntityExtractorPort,
+    LLMInfo,
+    LLMPort,
+    SummarizerPort,
+)
 from app.core.config import Settings
 
 
@@ -25,12 +31,15 @@ class LLMSetup:
         llm: El adaptador.
         price_input_per_million: Dólares por millón de tokens de entrada.
         price_output_per_million: Dólares por millón de tokens de salida.
+        classifier: El mismo adaptador visto como clasificador (F12.4); ``None``
+            solo en pruebas que no clasifican.
     """
 
     provider: str
     llm: LLMPort
     price_input_per_million: float
     price_output_per_million: float
+    classifier: ClassifierPort | None = None
 
 
 class MissingLLMKeyError(RuntimeError):
@@ -87,7 +96,13 @@ def build_llm(settings: Settings) -> LLMSetup:
         MissingLLMKeyError: Si falta la llave del proveedor elegido.
     """
     info, llm = _adapter(settings)
-    return LLMSetup(info.provider, llm, info.price_input_per_million, info.price_output_per_million)
+    return LLMSetup(
+        info.provider,
+        llm,
+        info.price_input_per_million,
+        info.price_output_per_million,
+        classifier=llm,
+    )
 
 
 @dataclass(frozen=True, slots=True)

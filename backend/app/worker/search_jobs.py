@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.adapters.cache.redis_query_cache import RedisQueryCache
 from app.adapters.extraction.trafilatura_extractor import build_extractor
 from app.adapters.llm.factory import LLMSetup, build_llm
+from app.adapters.persistence.categories_repository import PostgresCategoryStore
 from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
@@ -31,6 +32,7 @@ from app.adapters.persistence.stories_repository import PostgresStoryStore
 from app.adapters.providers.factory import build_provider
 from app.adapters.text.similarity import title_similarity, title_token_similarity
 from app.application.ports.providers import NewsProviderPort
+from app.application.use_cases.classify import ClassifyArticles
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
@@ -115,6 +117,12 @@ async def search_pipeline(
             similarity=title_similarity,
             stories=GroupStories(
                 PostgresStoryStore(engine), title_similarity, title_token_similarity
+            ),
+            # La misma IA clasifica por categoría al cerrar (F12.4, ADR-0029).
+            classifier=(
+                ClassifyArticles(PostgresCategoryStore(engine), llm.classifier)
+                if llm.classifier is not None
+                else None
             ),
             limits=PipelineLimits(
                 settings.llm_max_articles_per_search,
