@@ -74,3 +74,15 @@ Benji pidió la cronología del lado izquierdo y con más información al elegir
   - al volar a una nota: localidad a 14.5 (se ven las calles), municipio a 11.5, estado a 7 y país a 5, con inclinación de 45°;
   - al elegir una región: el tope sube a 15 para localidad y a 12.5 para municipio;
   - un grupo de notas encimadas se abre 1.5 niveles más cerca.
+
+## Temas: un caso no tapa la cronología (26/10/2026)
+
+Incluso con las historias mejoradas (ADR-0026), la corrida FGR del 26/10 tenía 27 hechos distintos del caso Jáuregui: la carta, la caravana, las audiencias y las columnas. Eran 27 renglones seguidos.
+
+- **Tema:** un nombre propio que sale en al menos 5 hechos (`THEME_MIN_ITEMS`) se vuelve un bloque «TEMA · Jáuregui · 27 hechos · 61 notas · del 25 al 26 oct», con lo último que pasó. Un nombre propio es una palabra con mayúscula inicial que no abre el título. El bloque se despliega con sus hechos y el día y la hora de cada uno, y se abre solo si la nota elegida está adentro.
+- **No cuentan:**
+  - los lugares (estados y lugares de las notas), porque para eso está el filtro por estado;
+  - las palabras de oficio («Fiscalía», «Gobierno»…).
+- **Sin IA ni costo.** Se calcula en el navegador (`themes.ts`). Cada hecho va al tema más grande que nombra, aunque su título venga en mayúsculas.
+- **Resultado en esa corrida:** de 65 renglones a 31.
+- **Riesgo:** una persona que aparece en hechos sin relación, como la presidenta, puede formar un tema que mezcle asuntos. Se llama «tema» y no «caso» por eso. Si estorba, se agrega a `NOT_A_THEME`.

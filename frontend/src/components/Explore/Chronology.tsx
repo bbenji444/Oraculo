@@ -8,6 +8,8 @@
  * - **Arriba**: cuántos hechos hay y una curva pequeña de cuántas notas se
  *   publicaron por hora (o por día), con los picos resaltados; un clic en la
  *   curva filtra esa hora. Filtros por categoría y estado.
+ * - **Temas**: si un nombre propio sale en 5 hechos o más («Jáuregui»), esos
+ *   hechos se juntan en un bloque que se despliega (`themes.ts`).
  * - **La línea**: una línea vertical luminosa con la hora a la izquierda y
  *   cada hecho a la derecha, del más reciente al más viejo, agrupados por
  *   día. El mismo hecho en varios medios es una sola entrada («+7 medios»).
@@ -19,7 +21,7 @@
  *
  * No hace: no pide datos ni calcula los tramos (eso es `timelineData.ts`).
  */
-import { type Ref, useEffect, useMemo, useRef } from 'react';
+import { type Ref, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Article } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
@@ -35,6 +37,7 @@ import {
   type TimelineBucket,
   type TimelineUnit,
 } from './timelineData';
+import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
 
 const MEXICO_CITY = 'America/Mexico_City';
@@ -154,30 +157,38 @@ interface EntryProps {
   selected: boolean;
   selectedRef: Ref<HTMLButtonElement>;
   onSelect: (articleId: number) => void;
+  /** Dentro de un tema los hechos son de varios días: se dice el día. */
+  showDay?: boolean;
 }
 
-function Entry({ item, selected, selectedRef, onSelect }: EntryProps) {
+function Entry({ item, selected, selectedRef, onSelect, showDay = false }: EntryProps) {
   const article = item.lead;
   const others = item.articleIds.length - 1;
   const event = noteMoment(article);
   const place = article.primary_location?.place;
   return (
-    <li className="relative pl-[3.6rem]">
-      {/* La hora, a la izquierda de la línea. */}
-      <span className="absolute left-0 top-[0.55rem] w-10 text-right font-display text-[10px] tabular-nums text-sky-300/90">
-        {HOUR.format(new Date(item.at))}
-      </span>
-      {/* El nodo sobre la línea: más grande y brillante si lo publicaron varios medios. */}
-      <span
-        aria-hidden="true"
-        className={`absolute left-[2.95rem] top-[0.7rem] -translate-x-1/2 rounded-full ${
-          selected
-            ? 'size-3 bg-white shadow-[0_0_12px_rgb(255_255_255/0.9)]'
-            : others > 0
-              ? 'size-2.5 bg-sky-300 shadow-[0_0_10px_rgb(0_210_255/0.9)]'
-              : 'size-2 bg-sky-400/80 shadow-[0_0_6px_rgb(0_210_255/0.6)]'
-        }`}
-      />
+    // Dentro de un tema no hay columna de hora ni nodo (no cabrían dos
+    // sangrías en el panel): el día y la hora van en el renglón de datos.
+    <li className={showDay ? 'relative pl-1' : 'relative pl-[3.6rem]'}>
+      {!showDay && (
+        <>
+          {/* La hora, a la izquierda de la línea. */}
+          <span className="absolute left-0 top-[0.55rem] w-10 text-right font-display text-[10px] tabular-nums text-sky-300/90">
+            {HOUR.format(new Date(item.at))}
+          </span>
+          {/* El nodo sobre la línea: más grande y brillante si lo publicaron varios medios. */}
+          <span
+            aria-hidden="true"
+            className={`absolute left-[2.95rem] top-[0.7rem] -translate-x-1/2 rounded-full ${
+              selected
+                ? 'size-3 bg-white shadow-[0_0_12px_rgb(255_255_255/0.9)]'
+                : others > 0
+                  ? 'size-2.5 bg-sky-300 shadow-[0_0_10px_rgb(0_210_255/0.9)]'
+                  : 'size-2 bg-sky-400/80 shadow-[0_0_6px_rgb(0_210_255/0.6)]'
+            }`}
+          />
+        </>
+      )}
       <div
         className={`rounded-lg transition-colors ${selected ? 'bg-sky-400/[0.1] ring-1 ring-sky-400/30' : ''}`}
       >
@@ -196,6 +207,7 @@ function Entry({ item, selected, selectedRef, onSelect }: EntryProps) {
             {article.title}
           </span>
           <span className="mt-0.5 block truncate text-[10.5px] text-slate-400">
+            {showDay && `${shortDay(item.at)} ${HOUR.format(new Date(item.at))} · `}
             {others > 0 && (
               <span className="text-sky-300">
                 +{others} medio{others === 1 ? '' : 's'} ·{' '}
@@ -255,6 +267,80 @@ function Entry({ item, selected, selectedRef, onSelect }: EntryProps) {
   );
 }
 
+interface ThemeEntryProps {
+  block: ThemeBlock;
+  selectedId: number | null;
+  selectedRef: Ref<HTMLButtonElement>;
+  onSelect: (articleId: number) => void;
+}
+
+/**
+ * Un tema: los hechos que nombran a la misma persona o caso, en un solo
+ * renglón que se despliega (ver `themes.ts`). Se abre solo si la nota elegida
+ * está adentro, para que se vea en la lista.
+ */
+function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProps) {
+  const containsSelected =
+    selectedId !== null && block.items.some((item) => item.articleIds.includes(selectedId));
+  const [expanded, setExpanded] = useState(false);
+  const open = expanded || containsSelected;
+  const oldest = block.items[block.items.length - 1];
+  const span =
+    oldest && oldest.day !== block.day
+      ? `del ${shortDay(oldest.at)} al ${shortDay(block.at)}`
+      : shortDay(block.at);
+  return (
+    <li className="relative pl-[3.6rem]">
+      <span className="absolute left-0 top-[0.55rem] w-10 text-right font-display text-[10px] tabular-nums text-amber-200/90">
+        {HOUR.format(new Date(block.at))}
+      </span>
+      {/* Un rombo ámbar en la línea: aquí hay varios hechos juntos. */}
+      <span
+        aria-hidden="true"
+        className="absolute left-[2.95rem] top-[0.65rem] size-2.5 -translate-x-1/2 rotate-45 bg-amber-300 shadow-[0_0_10px_rgb(252_211_77/0.8)]"
+      />
+      <div className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04]">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => {
+            setExpanded(!open);
+          }}
+          className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-amber-300"
+        >
+          <span className="flex items-baseline gap-1.5 text-[12.5px] leading-snug text-slate-100">
+            <span className="font-display text-[9px] tracking-wider text-amber-200/90">TEMA</span>
+            <span className="font-semibold">{block.label}</span>
+            <span className="ml-auto text-[11px] text-slate-400">{open ? '▾' : '▸'}</span>
+          </span>
+          <span className="mt-0.5 block text-[10.5px] text-slate-400">
+            {block.items.length} hechos · {block.notes} notas · {span}
+          </span>
+          {!open && (
+            <span className="mt-0.5 block truncate text-[10.5px] text-slate-300">
+              Lo último: {block.items[0]?.lead.title}
+            </span>
+          )}
+        </button>
+        {open && (
+          <ol className="space-y-0.5 pb-1 pr-1" aria-label={`Hechos del tema ${block.label}`}>
+            {block.items.map((item) => (
+              <Entry
+                key={item.lead.article_id}
+                item={item}
+                selected={selectedId !== null && item.articleIds.includes(selectedId)}
+                selectedRef={selectedRef}
+                onSelect={onSelect}
+                showDay
+              />
+            ))}
+          </ol>
+        )}
+      </div>
+    </li>
+  );
+}
+
 interface ChronologyProps {
   /** Notas que se ven (ya sin las no relevantes si así lo pidió), antes de estos filtros. */
   articles: Article[];
@@ -289,12 +375,13 @@ export function Chronology({ articles }: ChronologyProps) {
     () => storyItems(applyTimeline(articles, { range, categoryId, stateCode })),
     [articles, range, categoryId, stateCode],
   );
+  // Los hechos de la misma persona o caso se juntan en un tema (themes.ts).
   const days = useMemo(() => {
-    const groups: { day: string; at: number; items: StoryItem[] }[] = [];
-    for (const item of items) {
+    const groups: { day: string; at: number; rows: ChronologyRow[] }[] = [];
+    for (const row of groupThemes(items)) {
       const last = groups[groups.length - 1];
-      if (last?.day === item.day) last.items.push(item);
-      else groups.push({ day: item.day, at: item.at, items: [item] });
+      if (last?.day === row.day) last.rows.push(row);
+      else groups.push({ day: row.day, at: row.at, rows: [row] });
     }
     return groups;
   }, [items]);
@@ -435,15 +522,25 @@ export function Chronology({ articles }: ChronologyProps) {
               className="absolute bottom-2 left-[2.95rem] top-9 w-px -translate-x-1/2 bg-gradient-to-b from-sky-400/70 via-sky-400/30 to-sky-400/0"
             />
             <ol className="space-y-0.5" aria-label={`Hechos del ${DAY.format(new Date(group.at))}`}>
-              {group.items.map((item) => (
-                <Entry
-                  key={item.lead.article_id}
-                  item={item}
-                  selected={selectedId !== null && item.articleIds.includes(selectedId)}
-                  selectedRef={selectedRef}
-                  onSelect={selectArticle}
-                />
-              ))}
+              {group.rows.map((row) =>
+                row.kind === 'theme' ? (
+                  <ThemeEntry
+                    key={`tema-${row.key}`}
+                    block={row}
+                    selectedId={selectedId}
+                    selectedRef={selectedRef}
+                    onSelect={selectArticle}
+                  />
+                ) : (
+                  <Entry
+                    key={row.lead.article_id}
+                    item={row}
+                    selected={selectedId !== null && row.articleIds.includes(selectedId)}
+                    selectedRef={selectedRef}
+                    onSelect={selectArticle}
+                  />
+                ),
+              )}
             </ol>
           </div>
         ))}
