@@ -480,13 +480,17 @@ class NumberedNote:
 
     Attributes:
         number: Número corrido en todo el reporte.
-        article: La nota.
+        article: La nota (la primera que se publicó de su historia).
         badges: Sus insignias.
+        also: Las demás notas del mismo hecho en otros medios (ADR-0026), de
+            la primera a la última. Se citan con su medio y link, sin repetir
+            el resumen.
     """
 
     number: int
     article: ArticleItem
     badges: tuple[Badge, ...]
+    also: tuple[ArticleItem, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -510,19 +514,48 @@ class StateGroup:
 
     Attributes:
         name: Estado.
-        count: Notas.
+        count: Notas (contando todos los medios, como el mapa).
         percent: Porcentaje de las notas relevantes.
         categories: Sus categorías, de la que tiene más notas a la que menos.
+        facts: Hechos distintos (las notas del mismo hecho cuentan una vez).
     """
 
     name: str
     count: int
     percent: int
     categories: tuple[CategoryGroup, ...]
+    facts: int = 0
+
+
+def _stories(articles: Sequence[ArticleItem]) -> list[tuple[ArticleItem, tuple[ArticleItem, ...]]]:
+    """Junta las notas del mismo hecho: la primera publicada y las demás.
+
+    Conserva el orden de ``articles`` (el de la nota más reciente de cada
+    historia). Una nota sin historia es un hecho de una sola nota.
+    """
+
+    def published(article: ArticleItem) -> tuple[datetime, int]:
+        return (article.published_at or datetime.max.replace(tzinfo=UTC), article.article_id)
+
+    by_story: dict[int, list[ArticleItem]] = {}
+    for article in articles:
+        key = article.story_id if article.story_id is not None else -article.article_id
+        by_story.setdefault(key, []).append(article)
+    stories = []
+    for members in by_story.values():
+        ordered = sorted(members, key=published)
+        stories.append((ordered[0], tuple(ordered[1:])))
+    return stories
 
 
 def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
-    """Estado ▸ Categoría ▸ Noticias, numeradas de corrido para citarlas.
+    """Estado ▸ Categoría ▸ Hechos, numerados de corrido para citarlos.
+
+    El mismo hecho publicado por varios medios es una sola ficha, con la nota
+    que se publicó primero y «También lo publicaron» (ADR-0026). En la corrida
+    FGR del 26/10/2026 el reporte traía 113 fichas con resúmenes casi iguales
+    («Estoy bien y muy fuerte» en varios medios). El estado y la categoría son
+    los de esa primera nota.
 
     Args:
         articles: Notas relevantes, de la más reciente a la más vieja.
@@ -530,29 +563,38 @@ def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
     Returns:
         Los estados de más a menos notas; las notas sin estado al final.
     """
-    by_state: dict[str, list[ArticleItem]] = defaultdict(list)
-    for article in articles:
-        by_state[state_name(article)].append(article)
+    by_state: dict[str, list[tuple[ArticleItem, tuple[ArticleItem, ...]]]] = defaultdict(list)
+    for lead, also in _stories(articles):
+        by_state[state_name(lead)].append((lead, also))
+
+    def size(stories: list[tuple[ArticleItem, tuple[ArticleItem, ...]]]) -> int:
+        return sum(1 + len(also) for _, also in stories)
+
     ranked = sorted(
-        by_state.items(), key=lambda item: (item[0] == NO_STATE, -len(item[1]), item[0])
+        by_state.items(), key=lambda item: (item[0] == NO_STATE, -size(item[1]), item[0])
     )
     number = 0
     groups = []
-    for name, members in ranked:
-        by_category: dict[str, list[ArticleItem]] = defaultdict(list)
-        for article in members:
-            by_category[category_name(article)].append(article)
+    for name, stories in ranked:
+        by_category: dict[str, list[tuple[ArticleItem, tuple[ArticleItem, ...]]]] = defaultdict(
+            list
+        )
+        for lead, also in stories:
+            by_category[category_name(lead)].append((lead, also))
         categories = []
-        for category, notes in sorted(
-            by_category.items(), key=lambda item: (-len(item[1]), item[0])
+        for category, members in sorted(
+            by_category.items(), key=lambda item: (-size(item[1]), item[0])
         ):
             numbered = []
-            for article in notes:
+            for lead, also in members:
                 number += 1
-                numbered.append(NumberedNote(number, article, badges(article)))
-            categories.append(CategoryGroup(category, category_color(notes[0]), tuple(numbered)))
+                numbered.append(NumberedNote(number, lead, badges(lead), also))
+            categories.append(
+                CategoryGroup(category, category_color(members[0][0]), tuple(numbered))
+            )
+        count = size(stories)
         groups.append(
-            StateGroup(name, len(members), _percent(len(members), len(articles)), tuple(categories))
+            StateGroup(name, count, _percent(count, len(articles)), tuple(categories), len(stories))
         )
     return tuple(groups)
 

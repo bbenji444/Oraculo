@@ -58,3 +58,9 @@ Los colores y tipografías salen de OSINT Oráculo (F12.7a).
 - **Pendiente:**
   - mapa por categoría dominante;
   - envío del reporte por WhatsApp o correo (F12.11).
+
+## Ajuste: una ficha por hecho (26/10/2026)
+
+El reporte de la corrida de las 15:00 del 26/10 traía 143 fichas en 33 páginas. Varias eran el mismo hecho contado por varios medios, con resúmenes casi iguales («Estoy bien y muy fuerte», de Jáuregui, en tres medios).
+
+Ahora cada hecho (historia, ADR-0026) es **una ficha**: la de la nota que se publicó primero, con una línea «También lo publicaron (N)» que da el medio, la hora y el link de las demás, sin repetir el resumen. El encabezado de cada estado dice «37 hechos · 76 notas · 54 %». El porcentaje sigue contando notas, igual que el mapa. Ese reporte quedó en 76 fichas y 22 páginas.

@@ -230,7 +230,7 @@
   <p class="muted small">En el panel de marcadores del lector de PDF cada estado › categoría se despliega o se contrae. Las insignias de cada nota son inferencias de la IA: verifique en la fuente antes de citar.</p>
   {% for state in o.groups %}
     <div class="state">
-      <h3 class="state-title">› {{ state.name }} <span>{{ state.count }} {{ "nota" if state.count == 1 else "notas" }} · {{ state.percent }} %</span></h3>
+      <h3 class="state-title">› {{ state.name }} <span>{{ state.facts }} {{ "hecho" if state.facts == 1 else "hechos" }} · {{ state.count }} {{ "nota" if state.count == 1 else "notas" }} · {{ state.percent }} %</span></h3>
       {% for category in state.categories %}
         <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
         {% for item in category.notes %}
@@ -249,6 +249,12 @@
               </p>
               {% if article.summary %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
               <p class="link">{{ article.url }}</p>
+              {% if item.also %}
+                {# El mismo hecho en otros medios: solo medio, hora y link (sin repetir el resumen). #}
+                <p class="also"><b>También lo {{ "publicó" if item.also | length == 1 else "publicaron" }} ({{ item.also | length }}):</b>
+                  {% for other in item.also %}<a href="{{ other.url }}">{{ other.source_name or other.source_domain or "Medio sin nombre" }}</a>{% if other.published_at %} {{ other.published_at | mx_time if article.published_at and (other.published_at | mx_date) == (article.published_at | mx_date) else other.published_at | mx_datetime }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
+                </p>
+              {% endif %}
             </div>
           </article>
         {% endfor %}
