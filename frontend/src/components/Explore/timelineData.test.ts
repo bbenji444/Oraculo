@@ -7,6 +7,8 @@ import {
   buildTimeline,
   categoriesIn,
   chronological,
+  layoutBeads,
+  MAX_BEADS_PER_BUCKET,
   NO_FILTERS,
   noteMoment,
   stateCodeOf,
@@ -170,5 +172,37 @@ describe('filtros', () => {
     const timeline = buildTimeline([note(1, '2026-10-25T21:10:00Z'), old]);
     expect(timeline.unit).toBe('hour');
     expect(timeline.buckets.map((b) => b.articleIds)).toEqual([[1, 5]]);
+  });
+});
+
+describe('layoutBeads', () => {
+  it('el mismo hecho en varios medios es un solo punto, apilado por tramo', () => {
+    const notes = [
+      note(1, '2026-10-25T21:10:00Z', { story_id: 1 }),
+      note(2, '2026-10-25T21:30:00Z', { story_id: 1 }),
+      note(3, '2026-10-25T21:40:00Z'),
+      note(4, '2026-10-25T23:05:00Z'),
+    ];
+    const timeline = buildTimeline(notes);
+
+    const { beads, overflow } = layoutBeads(notes, timeline);
+
+    expect(beads.map((b) => [b.lead.article_id, b.articleIds, b.bucket, b.row])).toEqual([
+      [1, [1, 2], 0, 0],
+      [3, [3], 0, 1],
+      [4, [4], 2, 0],
+    ]);
+    expect(overflow.size).toBe(0);
+  });
+
+  it('lo que no cabe en la pila se cuenta aparte', () => {
+    const notes = Array.from({ length: MAX_BEADS_PER_BUCKET + 2 }, (_, i) =>
+      note(i + 1, `2026-10-25T21:${String(10 + i)}:00Z`),
+    );
+
+    const { beads, overflow } = layoutBeads(notes, buildTimeline(notes));
+
+    expect(beads).toHaveLength(MAX_BEADS_PER_BUCKET);
+    expect(overflow.get(0)).toBe(2);
   });
 });

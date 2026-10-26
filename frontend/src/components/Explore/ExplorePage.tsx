@@ -89,6 +89,7 @@ export function ExplorePage() {
   const finishedNotice = useFinishNotice(search);
   const earth = useExplorerStore((s) => s.earth);
   const timelineOpen = useTimelineStore((s) => s.open);
+  const listOpen = useTimelineStore((s) => s.listOpen);
   const wallCaseId = useExplorerStore((s) => s.wallCaseId);
   const inWall = wallCaseId !== null;
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -143,7 +144,8 @@ export function ExplorePage() {
           {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
           <SearchPanel key={searchId ?? 'nueva'} />
         </div>
-        {hasResults && (
+        {/* La línea del tiempo reemplaza a la lista; «☰ Lista» la vuelve a mostrar. */}
+        {hasResults && listOpen && (
           <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
             <ResultsList articles={shown} total={articles.length} colors={colors} />
           </div>
@@ -164,8 +166,8 @@ export function ExplorePage() {
 
       {hasResults && (
         <div
-          className={`pointer-events-auto absolute bottom-4 right-4 hidden sm:block ${
-            panelOpen ? 'left-[25rem]' : 'left-4'
+          className={`pointer-events-none absolute bottom-4 right-4 hidden sm:block ${
+            panelOpen && listOpen ? 'left-[25rem]' : 'left-4'
           }`}
         >
           <Timeline articles={relevant} />
@@ -175,7 +177,7 @@ export function ExplorePage() {
       {/* Con la línea del tiempo abajo, los controles del globo suben a su lado. */}
       <div
         className={`pointer-events-none absolute right-4 hidden flex-col items-end gap-2 sm:flex ${
-          hasResults ? (timelineOpen ? 'bottom-[19.5rem]' : 'bottom-[5rem]') : 'bottom-8'
+          hasResults ? (timelineOpen ? 'bottom-[11rem]' : 'bottom-[4.5rem]') : 'bottom-8'
         }`}
       >
         <div className="pointer-events-auto">

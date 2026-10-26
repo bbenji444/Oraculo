@@ -31,3 +31,13 @@ En la corrida FGR del 26/10/2026 había notas publicadas ese día de hechos de n
 
 - **El PDF (F12.10) usa la misma lógica** para su gráfica de la línea del tiempo.
 - **Pendiente:** colores por categoría en las barras, cuando se definan los colores (ADR-0029).
+
+## Rediseño del 26/10/2026
+
+A pedido de Benji («más clara, menos estorbosa, que se lleve con el mundo, sin noticias duplicadas»):
+
+- **Sin caja de fondo:** solo un degradado para leerla sobre el globo, una curva de densidad que brilla y el número de cada pico.
+- **Un punto por historia, no por nota:** el mismo hecho en varios medios (`story_id`, ADR-0026) es un solo punto, más grande cuantos más medios lo publicaron. Se apilan hasta 4 por tramo y el resto se cuenta con «+N».
+- **La tira de tarjetas se reemplaza por una ficha flotante** al pasar el mouse (hora, título, medio, categoría, lugar y, si es de antes, cuándo ocurrió el hecho). Un clic vuela el globo hacia la nota.
+- **La lista de noticias del panel izquierdo empieza oculta**, porque la línea del tiempo la reemplaza. «☰ Lista» la vuelve a mostrar.
+- **Los puntos van por fecha de publicación**, igual que la curva, y la fecha del hecho se dice en la ficha. Se quitó el botón de orden, que confundía.
