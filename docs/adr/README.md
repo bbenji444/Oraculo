@@ -45,6 +45,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0029](0029-categorias-de-noticias.md) | Categoría de cada noticia (el delito), en un catálogo en la base y con una llamada aparte de la IA | Aceptado |
 | [0030](0030-relevancia-fgr-federal.md) | Relevancia FGR federal: la IA dice quién actúa y el concepto FGR lleva su regla | Aceptado |
 | [0031](0031-corridas-automaticas-fgr.md) | Corridas automáticas del monitor FGR: una búsqueda nacional a las 07:00, 15:00 y 23:00 con fuentes gratis | Aceptado |
+| [0032](0032-linea-del-tiempo.md) | Línea del tiempo: barras por fecha de publicación, orden por fecha del hecho | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |
