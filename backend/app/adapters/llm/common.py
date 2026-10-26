@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from app.application.clock import MEXICO_CITY
 from app.application.ports.llm import (
     ClassificationLabel,
+    ClassificationNote,
     ClassificationRequest,
     EnrichmentRequest,
     EntityExtractionRequest,
@@ -274,6 +275,9 @@ CLASSIFY_BATCH_SIZE = 25
 CLASSIFY_MAX_OUTPUT_TOKENS = 2048
 # Un resumen largo no ayuda a clasificar y encarece el lote.
 CLASSIFY_SUMMARY_CHARS = 400
+# Razones de la IA al leer la nota completa (una oración por concepto): con
+# 300 caracteres caben dos o tres, que es lo que suele haber.
+CLASSIFY_READING_NOTES_CHARS = 300
 
 
 class ClassifiedItemOut(BaseModel):
@@ -304,11 +308,18 @@ def build_classify_prompt(request: ClassificationRequest) -> str:
     """
     template = CLASSIFY_PROMPT_PATH.read_text(encoding="utf-8")
     categories = "\n".join(f"- {c.name}: {c.description}" for c in request.categories)
-    notes = "\n".join(
-        f"[{n.article_id}] {n.title} — {(n.summary or 'sin resumen')[:CLASSIFY_SUMMARY_CHARS]}"
-        for n in request.notes
-    )
+    notes = "\n".join(_classify_line(n) for n in request.notes)
     return template.format(other=request.other, categories=categories, notes=notes)
+
+
+def _classify_line(note: ClassificationNote) -> str:
+    summary = (note.summary or "sin resumen")[:CLASSIFY_SUMMARY_CHARS]
+    line = f"[{note.article_id}] {note.title} — {summary}"
+    if note.reading_notes:
+        # Lo que anotó la IA al leerla completa: dice quién actuó aunque el
+        # resumen no lo diga (F12.5, ADR-0030).
+        line += f" (Al leerla completa: {note.reading_notes[:CLASSIFY_READING_NOTES_CHARS]})"
+    return line
 
 
 def to_labels(

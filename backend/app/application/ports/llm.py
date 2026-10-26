@@ -326,11 +326,15 @@ class ClassificationNote:
         article_id: Nota (la IA responde con este id).
         title: Título.
         summary: Resumen de la IA o fragmento del medio, si hay.
+        reading_notes: Lo que la IA anotó al leer la nota completa (sus razones
+            de relevancia por concepto), si la leyó. Dice, por ejemplo, que
+            participaron agentes de la FGR aunque el resumen no lo diga (F12.5).
     """
 
     article_id: int
     title: str
     summary: str | None
+    reading_notes: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

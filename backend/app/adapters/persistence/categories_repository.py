@@ -21,7 +21,9 @@ from app.application.ports.llm import ClassificationNote
 from app.domain.categories import Category, CategoryChoice
 
 _PENDING = """
-    SELECT a.id, a.title, COALESCE(a.summary, a.snippet) AS summary
+    SELECT a.id, a.title, COALESCE(a.summary, a.snippet) AS summary,
+        (SELECT string_agg(ac.relevance_reason, ' ' ORDER BY ac.concept_id)
+         FROM article_concepts ac WHERE ac.article_id = a.id) AS reading_notes
     FROM articles a
     WHERE a.category_version IS DISTINCT FROM :version
 """
@@ -59,7 +61,7 @@ class PostgresCategoryStore:
                 text(f"{_PENDING} AND a.id = ANY(:ids) ORDER BY a.id"),
                 {"version": version, "ids": list(article_ids)},
             )
-            return [ClassificationNote(r.id, r.title, r.summary) for r in rows]
+            return [ClassificationNote(r.id, r.title, r.summary, r.reading_notes) for r in rows]
 
     async def pending_after(
         self, after_id: int, limit: int, version: str
@@ -70,7 +72,7 @@ class PostgresCategoryStore:
                 text(f"{_PENDING} AND a.id > :after ORDER BY a.id LIMIT :limit"),
                 {"version": version, "after": after_id, "limit": limit},
             )
-            return [ClassificationNote(r.id, r.title, r.summary) for r in rows]
+            return [ClassificationNote(r.id, r.title, r.summary, r.reading_notes) for r in rows]
 
     async def save(self, choices: Sequence[CategoryChoice], version: str) -> None:
         """Ver ``CategoryStorePort.save``."""

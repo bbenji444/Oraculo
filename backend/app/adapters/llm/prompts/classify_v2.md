@@ -13,10 +13,12 @@ Reglas:
    - "estatal": solo actúa una fiscalía o procuraduría de un estado («Fiscalía General del Estado», «Fiscalía de Jalisco», «Fiscalía de la CDMX»).
    - "otra": actúa otra autoridad (policía, Ejército, Guardia Nacional, un juez sin la FGR), no actúa ninguna, o es una fiscalía de otro país («Fiscalía General de la Nación» de Colombia).
    - "sin_dato": el título y el resumen no alcanzan para saberlo.
+   - Para saber quién actuó, usa también lo que dice entre paréntesis «Al leerla completa».
+   - Elige "estatal" solo si la nota nombra a una fiscalía o procuraduría estatal. El nombre de un estado («Estado de México», «Jalisco») no dice quién actuó. Si la nota habla de un «operativo conjunto» o de «autoridades» sin nombrarlas, usa "sin_dato".
 7. Responde una entrada por cada nota, con su mismo id. No inventes notas.
 
 Categorías:
 {categories}
 
-Notas (id · título — resumen):
+Notas (id · título — resumen; entre paréntesis, lo que se anotó al leer la nota completa):
 {notes}

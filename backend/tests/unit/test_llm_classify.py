@@ -56,6 +56,23 @@ def test_el_prompt_lleva_el_catalogo_y_solo_titulo_y_resumen() -> None:
     assert '"fgr_mencion": la FGR solo se nombra' in prompt
 
 
+def test_el_prompt_lleva_lo_que_la_ia_anoto_al_leer_la_nota() -> None:
+    # Nota 1401 del 24/10: el resumen no dice que participó la FGR; la razón sí.
+    note = ClassificationNote(
+        14, "EEUU imputa a capo de Jalisco", "Lo acusan en EEUU.", "Participaron agentes de la FGR."
+    )
+    prompt = build_classify_prompt(ClassificationRequest((note,), CATEGORIES, "Otros"))
+
+    assert (
+        "[14] EEUU imputa a capo de Jalisco — Lo acusan en EEUU. "
+        "(Al leerla completa: Participaron agentes de la FGR.)"
+    ) in prompt
+    # Sin razones, la línea queda como antes.
+    assert "[11] FGR asegura armas en Sinaloa — Aseguran 40 rifles en un cateo.\n" in (
+        build_classify_prompt(REQUEST) + "\n"
+    )
+
+
 async def test_openai_clasifica_con_lista_cerrada_e_ignora_ids_ajenos() -> None:
     seen: list[dict[str, Any]] = []
     reply = {
