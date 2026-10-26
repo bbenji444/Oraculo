@@ -57,3 +57,14 @@ La IA ya devuelve un `event_type`, pero en la búsqueda FGR del 24/10/2026 (189 
 
 - La IA vuelve a decir también quién actúa en cada nota. Esas reglas no cambian, pero la respuesta puede variar un poco, así que se miden las relevantes para la FGR antes y después.
 - Siguen pendientes las demás categorías definitivas y sus colores. Por ahora el color sale de la paleta provisional, por id.
+
+**Resultado al reclasificar las 1,689 notas (26/10/2026, 0.045 USD, respaldo `backups/monitor_noticias_20261026T2215Z.dump`):**
+
+| Corrida FGR | Relevantes antes → después | En «Otros» antes → después |
+|---|---|---|
+| 07:00 | 109 → 109 | 87 (80 %) → 4 (4 %) |
+| 15:00 | 142 → 143 | 106 (75 %) → 7 (5 %) |
+
+- En las relevantes, «Seguridad nacional» queda con 83 notas en la corrida de las 07:00 y 102 en la de las 15:00.
+- En todo el índice, «Otros» bajó a 834 de 1,689. Casi todas son notas que no son de la FGR (espectáculos, Día de Muertos).
+- Lo que queda en «Otros» dentro de la FGR es lo que no tiene categoría: piratería, una columna sobre el INE y caravanas cuyo título no nombra al acusado.
