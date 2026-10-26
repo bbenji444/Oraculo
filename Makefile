@@ -29,7 +29,7 @@ COVERAGE_MIN := 85
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
-        limpiar-duplicados agrupar-historias comparar-fuentes clasificar
+        limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -145,6 +145,9 @@ comparar-fuentes: ## Mide cuánto aporta SearchApi sobre Google News RSS: muestr
 clasificar: ## Clasifica por categoría las notas guardadas: sin ARGS 5 de ejemplo sin guardar; ARGS=--aplicar todas (pide "si")
 	$(UV_RUN) python -m app.cli.clasificar $(ARGS)
 
+retirar-conceptos: ## Deja vigente solo el concepto FGR (borrado lógico): sin ARGS solo muestra; ARGS=--aplicar lo hace (pide "si")
+	$(UV_RUN) python -m app.cli.retirar_conceptos $(ARGS)
+
 extraer-entidades: ## La IA lee notas de un caso y muestra las entidades que propone; pide "si" (ARGS="--caso <id> --muestra 5")
 	$(UV_RUN) python -m app.cli.extraer_entidades $(ARGS)
 
@@ -157,7 +160,7 @@ ingesta-historial: ## Historial de GDELT: vista previa con DIAS=N; baja todo sol
 ngramas-muestra: ## Prueba real de los ngramas de GDELT: consumo, espacio y 5 ejemplos (MINUTOS=60)
 	$(UV_RUN) python -m app.cli.muestra_ngramas --minutos $(or $(MINUTOS),60)
 
-seed: ## Carga los conceptos semilla que falten (nunca modifica los existentes)
+seed: ## Carga el concepto semilla de la FGR si falta, con su regla (nunca modifica los existentes)
 	$(UV_RUN) python -m app.seed.cargar_conceptos
 
 db-shell: ## Abre una consola SQL (psql) en la base de desarrollo

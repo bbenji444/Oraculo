@@ -13,6 +13,7 @@ from app.application.use_cases.concepts import (
     GetConcept,
     ListConcepts,
     PreviewConceptQueries,
+    RetireConcepts,
     UpdateConcept,
 )
 from app.domain.concept import ConceptChanges
@@ -313,3 +314,40 @@ async def test_probar_solo_muestra_los_proveedores_que_se_usarian(
     preview = await use.for_draft(concept_input(), IZTAPALAPA.id, 7)
 
     assert [q.provider for q in preview.queries] == [Provider.SEARCHAPI, Provider.LOCAL_INDEX]
+
+
+# --- Retirar conceptos (F12.6) ----------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_retirar_deja_solo_la_fgr_y_siempre_es_logico(repo: FakeConceptRepository) -> None:
+    fgr = await CreateConcept(repo).execute(
+        concept_input(name="Fiscalia General de la Republica"), ACTOR
+    )
+    # Sin búsquedas: DeleteConcept lo borraría en seco; retirar nunca.
+    otro = await CreateConcept(repo).execute(concept_input(name="Secuestro"), ACTOR)
+    tercero = await CreateConcept(repo).execute(concept_input(name="Extorsión"), ACTOR)
+    retire = RetireConcepts(repo)
+
+    kept, planned = await retire.plan(["Fiscalía General de la República"])
+    assert [c.id for c in kept] == [fgr.id]
+    assert {c.id for c in planned} == {otro.id, tercero.id}
+    assert repo.deleted == {}
+
+    retired = await retire.execute(["Fiscalía General de la República"], ACTOR, "F12.6")
+
+    assert {c.id for c in retired} == {otro.id, tercero.id}
+    assert set(repo.deleted) == {otro.id, tercero.id}
+    assert await repo.get(fgr.id) is not None
+    entries = [entry for _, entry in repo.audit if entry.action == CONCEPT_DELETED]
+    assert {(e.payload["logical"], e.payload["motivo"]) for e in entries} == {(True, "F12.6")}
+
+
+@pytest.mark.anyio
+async def test_retirar_recorre_todas_las_paginas(repo: FakeConceptRepository) -> None:
+    for i in range(RetireConcepts._PAGE + 3):
+        await CreateConcept(repo).execute(concept_input(name=f"Concepto {i:03d}"), ACTOR)
+
+    _, planned = await RetireConcepts(repo).plan(["Concepto 000"])
+
+    assert len(planned) == RetireConcepts._PAGE + 2

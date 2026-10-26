@@ -1,9 +1,15 @@
 """Comando ``make seed``: carga los conceptos semilla (especificación §7.1).
 
-Lee ``conceptos.json`` (los 5 conceptos validados por Benji) y crea **solo
-los que no existen**, comparando el nombre sin mayúsculas ni acentos. Nunca
-modifica un concepto existente: si alguien ya editó "Secuestro", sus
-cambios se respetan. Correrlo dos veces no hace nada la segunda vez.
+Lee ``conceptos.json`` y crea **solo los que no existen**, comparando el
+nombre sin mayúsculas ni acentos. Nunca modifica un concepto existente: si
+alguien ya editó sus palabras clave, sus cambios se respetan. Correrlo dos
+veces no hace nada la segunda vez.
+
+Desde la Fase 12 (F12.6) el archivo trae solo el concepto de la FGR, con
+su regla de relevancia ``fgr_federal`` (ADR-0030): los cinco conceptos de la
+especificación se retiraron con ``make retirar-conceptos`` y una instalación
+nueva (la VM de Proxmox) arranca ya enfocada en la FGR. La regla se pone solo
+si el concepto todavía tiene la ``general``.
 
 Usa el mismo caso de uso que la API (``CreateConcept``), así que aplica las
 mismas reglas y deja cada alta en la bitácora con el usuario ``semilla``.
@@ -21,13 +27,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.application.audit import Actor
 from app.application.use_cases.concepts import ConceptInput, CreateConcept
 from app.core.config import get_settings
+from app.domain.authority import RelevanceRule
 from app.domain.concept import ConceptDraft
+from app.domain.names import normalize_name
 from app.geodata.consola import configure_cli_logging, heading
 
 logger = logging.getLogger(__name__)
@@ -72,6 +81,42 @@ def read_seed(path: Path = SEED_PATH) -> list[ConceptInput]:
     ]
 
 
+def read_rules(path: Path = SEED_PATH) -> dict[str, RelevanceRule]:
+    """Regla de relevancia de cada concepto semilla que la pida.
+
+    Args:
+        path: Archivo JSON de la semilla.
+
+    Returns:
+        ``{nombre normalizado: regla}``; los que no traen ``relevance_rule``
+        no aparecen (se quedan con la ``general``).
+    """
+    items = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        normalize_name(item["name"]): RelevanceRule(item["relevance_rule"])
+        for item in items
+        if "relevance_rule" in item
+    }
+
+
+async def apply_rules(engine: AsyncEngine, rules: dict[str, RelevanceRule]) -> None:
+    """Pone la regla de relevancia a los conceptos que todavía tienen la general.
+
+    Args:
+        engine: Conexión a la base.
+        rules: Regla por nombre normalizado.
+    """
+    async with engine.begin() as conn:
+        for name_norm, rule in rules.items():
+            await conn.execute(
+                text(
+                    "UPDATE concepts SET relevance_rule = :rule WHERE name_norm = :norm "
+                    "AND deleted_at IS NULL AND relevance_rule = 'general'"
+                ),
+                {"rule": rule.value, "norm": name_norm},
+            )
+
+
 async def seed_concepts(engine: AsyncEngine, concepts: Sequence[ConceptInput]) -> SeedResult:
     """Crea los conceptos que falten.
 
@@ -102,7 +147,9 @@ async def seed_concepts(engine: AsyncEngine, concepts: Sequence[ConceptInput]) -
 async def _run() -> SeedResult:
     engine = create_async_engine(get_settings().database_url())
     try:
-        return await seed_concepts(engine, read_seed())
+        result = await seed_concepts(engine, read_seed())
+        await apply_rules(engine, read_rules())
+        return result
     finally:
         await engine.dispose()
 

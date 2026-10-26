@@ -13,7 +13,7 @@ Reglas que viven aquí (las del concepto en sí están en ``app.domain.concept``
 No hace: no sabe de HTTP ni de SQL.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from app.application.audit import (
@@ -35,6 +35,7 @@ from app.domain.errors import (
     InvalidRequestError,
     RegionNotFoundError,
 )
+from app.domain.names import normalize_name
 from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
 from app.domain.query_builder import ConceptTerms, build_queries
 from app.domain.region import RegionDetail
@@ -288,6 +289,70 @@ class DeleteConcept:
         )
         await self._repository.delete(concept_id, logical=logical, audit=audit)
         return DeleteResult(logical=logical)
+
+
+class RetireConcepts:
+    """Deja vigentes solo los conceptos indicados y retira el resto (F12.6).
+
+    Benji pidió «borrar todos los conceptos actuales» para enfocar el monitor
+    en la FGR. El plan (§4.8) pide hacerlo **sin borrar en seco**: aquí el
+    borrado siempre es lógico (``deleted_at``), aunque el concepto no tenga
+    búsquedas. Así el historial, los casos y los reportes siguen intactos y
+    cualquiera se puede recuperar. Cada retiro queda en la bitácora.
+    """
+
+    # Conceptos por página al recorrer la lista (paginación por cursor).
+    _PAGE = 100
+
+    def __init__(self, repository: ConceptRepositoryPort) -> None:
+        """Recibe el repositorio.
+
+        Args:
+            repository: Acceso a los conceptos.
+        """
+        self._repository = repository
+
+    async def plan(self, keep: Iterable[str]) -> tuple[list[Concept], list[Concept]]:
+        """Qué se queda y qué se retiraría, sin cambiar nada.
+
+        Args:
+            keep: Nombres de los conceptos que se quedan (se comparan sin
+                mayúsculas ni acentos).
+
+        Returns:
+            ``(se quedan, se retiran)``, en orden alfabético.
+        """
+        wanted = {normalize_name(name) for name in keep}
+        kept: list[Concept] = []
+        retired: list[Concept] = []
+        after: NameCursor | None = None
+        while page := await self._repository.list_concepts(None, after, self._PAGE):
+            for concept in page:
+                (kept if concept.data.name_norm in wanted else retired).append(concept)
+            last = page[-1]
+            after = NameCursor(last.data.name_norm, last.id)
+        return kept, retired
+
+    async def execute(self, keep: Iterable[str], actor: Actor, reason: str) -> list[Concept]:
+        """Retira (borrado lógico) todos los conceptos que no están en ``keep``.
+
+        Args:
+            keep: Nombres de los que se quedan.
+            actor: Quién lo hace.
+            reason: Motivo, para la bitácora.
+
+        Returns:
+            Los conceptos retirados.
+        """
+        _, retired = await self.plan(keep)
+        for concept in retired:
+            audit = AuditEntry(
+                actor,
+                CONCEPT_DELETED,
+                {"before": concept_snapshot(concept.data), "logical": True, "motivo": reason},
+            )
+            await self._repository.delete(concept.id, logical=True, audit=audit)
+        return retired
 
 
 @dataclass(frozen=True, slots=True)
