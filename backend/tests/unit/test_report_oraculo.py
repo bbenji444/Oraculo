@@ -113,6 +113,21 @@ def test_noticias_por_estado_y_categoria_numeradas_de_corrido() -> None:
     assert numbers == [1, 2, 3, 4]
 
 
+def test_el_mismo_hecho_en_varios_medios_es_una_sola_ficha() -> None:
+    # Corrida FGR del 26/10/2026: «Estoy bien y muy fuerte» salía en varias
+    # fichas con resúmenes casi iguales.
+    first = note(10, "08019", OTROS, AT_15, story_id=10, source_name="La Opción")
+    second = note(11, "08019", OTROS, AT_15.replace(minute=50), story_id=10, source_name="Calibre")
+    alone = note(12, "08019", OTROS, AT_15.replace(minute=55))
+
+    groups = state_groups((alone, second, first))
+
+    notes = groups[0].categories[0].notes
+    assert [n.article.article_id for n in notes] == [12, 10]
+    assert notes[1].also == (second,)
+    assert (groups[0].count, groups[0].facts, groups[0].percent) == (3, 2, 100)
+
+
 def test_insignias_de_confianza() -> None:
     sure = replace(NOTES[0], judgements=(JudgementView(1, "FGR", True, 0.95, "Actúa la FGR."),))
     doubtful = replace(NOTES[1], judgements=(JudgementView(1, "FGR", True, 0.35, None),))

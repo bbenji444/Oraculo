@@ -541,6 +541,18 @@ table.totals .total td {
   word-break: break-all;
 }
 
+/* El mismo hecho en otros medios: una línea con medio, hora y link (ADR-0026). */
+.item .also {
+  margin: 2pt 0 0;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.item .also a {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .badge {
   padding: 0 3pt;
   border-radius: 2pt;
