@@ -12,7 +12,7 @@ No hace: no arma consultas completas ni decide qué notas se piden (eso es
 cada repositorio); nunca lee el texto de la nota (CLAUDE.md §8).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import RowMapping
@@ -23,11 +23,18 @@ from app.application.ports.search_reads import (
     JudgementView,
     LocationView,
 )
+from app.domain.authority import (
+    FGR_FEDERAL_EXCLUDED,
+    Authority,
+    RelevanceRule,
+    effective_relevance,
+    parse_authority,
+)
 
 ARTICLE_COLUMNS = """
     a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
     a.summary, a.event_type, a.event_date, a.extraction_status, a.enrichment_status,
-    a.story_id, a.category_raw,
+    a.story_id, a.category_raw, a.authority,
     (SELECT json_build_object('id', c.id, 'name', c.name, 'color', c.color, 'symbol', c.symbol)
      FROM categories c WHERE c.id = a.category_id) AS category
 """
@@ -47,14 +54,25 @@ PRIMARY_COLUMNS = """
     p.place_name AS p_place_name, ST_X(p.point) AS p_lon, ST_Y(p.point) AS p_lat
 """
 # Juicios de la IA en todas las búsquedas donde salió la nota, con el nombre
-# actual de cada concepto (fuera de una búsqueda concreta).
+# actual de cada concepto (fuera de una búsqueda concreta). Llevan la regla
+# del concepto para aplicar la de «FGR federal» al armarlos (ADR-0030).
 ALL_JUDGEMENTS = """
     COALESCE((SELECT json_agg(json_build_array(ac.concept_id, c.name,
-        ac.is_relevant, ac.relevance_score, ac.relevance_reason)
+        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule)
         ORDER BY ac.concept_id)
         FROM article_concepts ac JOIN concepts c ON c.id = ac.concept_id
         WHERE ac.article_id = a.id), '[]')
 """
+# Condición SQL de la regla «FGR federal» (ADR-0030), para filtrar en la base
+# lo mismo que ``effective_relevance``: con ``ac`` (juicio), ``c`` (concepto)
+# y ``a`` (nota) a la mano, la nota sigue siendo relevante salvo que el
+# concepto pida la FGR federal y la FGR no actúe. Se arma con los valores del
+# dominio para que el SQL y Python nunca digan cosas distintas.
+_EXCLUDED_SQL = ", ".join(f"'{authority.value}'" for authority in FGR_FEDERAL_EXCLUDED)
+KEEPS_RELEVANCE = (
+    f"NOT (c.relevance_rule = '{RelevanceRule.FGR_FEDERAL.value}' "
+    f"AND a.authority IN ({_EXCLUDED_SQL}))"
+)
 # Proveedores que la encontraron en cualquier búsqueda.
 ALL_PROVIDERS = """
     ARRAY(SELECT DISTINCT provider FROM search_results WHERE article_id = a.id
@@ -115,6 +133,8 @@ def article_item(row: RowMapping) -> ArticleItem:
     """Una nota leída con ``ARTICLE_COLUMNS`` y ``PRIMARY_COLUMNS``.
 
     La fila trae además ``judgements`` (JSON), ``in_region`` y ``providers``.
+    La relevancia de cada juicio ya sale con la regla de su concepto aplicada
+    (``effective_relevance``, ADR-0030).
 
     Args:
         row: Fila de la consulta.
@@ -122,6 +142,7 @@ def article_item(row: RowMapping) -> ArticleItem:
     Returns:
         La nota como la muestra Explorar.
     """
+    authority = parse_authority(row["authority"])
     return ArticleItem(
         article_id=row["id"],
         title=row["title"],
@@ -134,16 +155,30 @@ def article_item(row: RowMapping) -> ArticleItem:
         event_date=row["event_date"],
         extraction_status=row["extraction_status"],
         enrichment_status=row["enrichment_status"],
-        judgements=tuple(
-            JudgementView(j[0], j[1], j[2], float(j[3]), j[4]) for j in row["judgements"]
-        ),
+        judgements=tuple(judgement_view(j, authority) for j in row["judgements"]),
         primary=location_view(row, "p_") if row["p_id"] is not None else None,
         in_region=row["in_region"],
         providers=tuple(row["providers"]),
         story_id=row["story_id"],
         category=category_view(row["category"]),
         category_raw=row["category_raw"],
+        authority=authority,
     )
+
+
+def judgement_view(value: Sequence[Any], authority: Authority | None) -> JudgementView:
+    """Un juicio leído del JSON de los juicios, con la regla de su concepto aplicada.
+
+    Args:
+        value: ``[concept_id, nombre, relevante, puntaje, razón, regla]``.
+        authority: Quién actúa en la nota.
+
+    Returns:
+        El juicio con la relevancia final (ADR-0030).
+    """
+    concept_id, name, relevant, score, reason, rule = value
+    relevant, reason = effective_relevance(relevant, reason, RelevanceRule(rule), authority)
+    return JudgementView(concept_id, name, relevant, float(score), reason)
 
 
 def category_view(value: Mapping[str, Any] | None) -> CategoryView | None:

@@ -247,7 +247,8 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
       "providers": ["indice_local"],
       "story_id": null,
       "category": { "id": 11, "name": "Extorsión", "color": null, "symbol": null },
-      "category_raw": "cobro de piso"
+      "category_raw": "cobro de piso",
+      "authority": "estatal"
     }
   ],
   "next_cursor": "WyJ0IiwgIjIwMjYtMTAtMTdUMDY6MzI6MDAtMDY6MDAiLCAiMTEiXQ"
@@ -255,6 +256,8 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
 ```
 
 `category` (F12.4, ADR-0029) es el **delito** del que trata la nota, de las categorías de `GET /categories`; `null` si todavía no se clasifica. `category_raw` es la etiqueta libre que propuso la IA. No confundir con `event_type`, que es lo que hizo la autoridad (detención, cateo).
+
+`authority` (F12.5, ADR-0030) es **quién actúa** en el hecho según la IA: `fgr` (la FGR federal), `fgr_mencion` (la FGR solo se nombra), `estatal` (una fiscalía estatal), `otra` u `sin_dato`; `null` si todavía no se clasifica. En los conceptos con la regla «FGR federal» (el concepto «Fiscalia General de la Republica»), `concepts[].is_relevant` ya lo toma en cuenta: una nota `fgr_mencion`, `estatal` u `otra` sale no relevante, con una razón fija en `relevance_reason`. El filtro de relevantes, la vista previa, el CSV y el PDF usan la misma regla.
 
 `story_id` (F12.1c, ADR-0026) agrupa las notas del **mismo hecho** publicadas por varios medios: es el id de la primera nota de la historia y es igual en todas sus notas. `null` = la nota está sola. El monitor junta en una tarjeta las notas visibles con el mismo `story_id` («▸ +N medios»).
 
