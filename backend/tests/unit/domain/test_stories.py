@@ -1,5 +1,6 @@
 """Historias (F12.1c, ADR-0026), con títulos reales del 23 y 24/10/2026."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -115,6 +116,70 @@ def test_palabras_poco_comunes_juntan_sin_lugar() -> None:
     ]
 
     assert group([], notes) == {10: 10, 11: 10}
+
+
+def test_un_caso_que_domina_la_ventana_no_parte_el_mismo_hecho() -> None:
+    # Corrida FGR del 26/10/2026: con «JAUREGUI», «PROCESO» o «EXFISCAL» en
+    # decenas de títulos ya no eran palabras poco comunes, y la misma
+    # vinculación a proceso quedaba en historias separadas.
+    lead = note(
+        90,
+        "César Jáuregui seguirá en el Altiplano: juez lo vincula a proceso por traición"
+        " a la patria en el caso CIA",
+        0,
+    )
+    same = note(91, "Vinculan a Jáuregui por traición a la patria", 2)
+    other = note(92, "Protestan por Jáuregui frente a la FGR", 6)
+    # Muchas notas del mismo caso, lejos en el tiempo: solo cuentan para que
+    # sus palabras sean comunes en la ventana.
+    crowd = [
+        note(
+            100 + i,
+            f"Día {i}: vinculan a proceso al exfiscal César Jáuregui de Chihuahua por traición",
+            100 + i,
+        )
+        for i in range(10)
+    ]
+
+    changes = group([], [lead, same, other, *crowd])
+
+    assert changes[91] == 90
+    assert 92 not in changes
+
+
+def test_el_mismo_lugar_con_una_sola_palabra_en_comun_no_junta() -> None:
+    cdmx = "09"
+    notes = [
+        note(110, "CDMX espera más de 500 mil visitantes por Día de Muertos", 0, place=cdmx),
+        note(
+            111,
+            "Coparmex estima que Día de Muertos dejé derrama de 12 mil 396 mdp en CDMX",
+            3,
+            place=cdmx,
+        ),
+    ]
+    # Como en la ventana real, «MUERTOS» sale en muchos títulos (no es rara).
+    crowd = [note(200 + i, f"Ofrenda número {i} por Día de Muertos", 200 + i) for i in range(10)]
+
+    changes = group([], [*notes, *crowd])
+
+    assert 110 not in changes
+    assert 111 not in changes
+
+
+def test_la_nota_entra_a_la_historia_que_mas_se_le_parece() -> None:
+    # Las dos historias la aceptan; antes ganaba la más antigua.
+    older = note(120, "Coparmex estima derrama de 12 mil mdp por Día de Muertos en CDMX", 0)
+    closer = note(121, "Prevén derrama de 12 mil mdp en CDMX por Día de Muertos", 1)
+    lonely = note(122, "Cempasúchil dejará ventas por 100 millones durante Día de Muertos", 1.5)
+    new = note(123, "Prevén derrama de 12 mil mdp en la CDMX por el Día de Muertos", 2)
+    existing = [
+        replace(older, story_id=120),
+        replace(closer, story_id=121),
+        replace(lonely, story_id=122),
+    ]
+
+    assert group(existing, [new]) == {123: 121}
 
 
 def test_temas_parecidos_pero_hechos_distintos_no_se_juntan() -> None:
