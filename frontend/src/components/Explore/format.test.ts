@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
+  authorityNote,
   eventDateNote,
   finishNotice,
   formatDay,
@@ -162,5 +163,19 @@ describe('nombre de las fuentes (F12.2)', () => {
     expect(providersLabel(['searchapi', 'browserwork_bing'])).toBe('SearchApi · Bing');
     expect(providersLabel(['otra_fuente'])).toBe('otra_fuente');
     expect(providersLabel([])).toBe('');
+  });
+});
+
+describe('authorityNote', () => {
+  it('dice quién actúa (F12.5)', () => {
+    expect(authorityNote('estatal')).toBe('Quién actúa: Fiscalía estatal');
+    expect(authorityNote('fgr')).toBe('Quién actúa: FGR federal');
+    expect(authorityNote('fgr_mencion')).toBe('Quién actúa: FGR solo mencionada');
+  });
+
+  it('sin dato o sin clasificar no muestra el renglón', () => {
+    expect(authorityNote('sin_dato')).toBeNull();
+    expect(authorityNote(null)).toBeNull();
+    expect(authorityNote(undefined)).toBeNull();
   });
 });
