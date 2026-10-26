@@ -172,12 +172,24 @@ function HidePanelButton() {
 /** La búsqueda terminada en un renglón con sus descargas, para dejarle espacio a la lista. */
 function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => void }) {
   const search = useSearch(searchId).data;
+  const openSearch = useExplorerStore((s) => s.openSearch);
   if (!search) return null;
   return (
     <section aria-label="Búsqueda" className={`${GLASS} space-y-2 p-3`}>
       <div className="flex items-center justify-between gap-2">
         <h2 className={PANEL_TITLE}>Búsqueda</h2>
         <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              // Cierra la búsqueda: vuelve al inicio de Explorar (con el acceso al monitor).
+              openSearch(null);
+            }}
+            title="Cerrar esta búsqueda y volver al inicio"
+            className={`${SMALL_BUTTON} px-2 py-1 text-[11px]`}
+          >
+            ‹ Volver
+          </button>
           <button
             type="button"
             onClick={onEdit}
