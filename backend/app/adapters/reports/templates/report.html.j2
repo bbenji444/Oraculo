@@ -1,23 +1,30 @@
 {#
-  Plantilla única del reporte (especificación §15, ADR-0018). La usan la
-  vista HTML (con el CSS incrustado) y el PDF (WeasyPrint, con el CSS aparte
-  para cargar la fuente).
+  Plantilla única del reporte (especificación §15, ADR-0018; rediseño Oráculo
+  F12.10, ADR-0033). La usan la vista HTML (con el CSS incrustado) y el PDF
+  (WeasyPrint, con el CSS aparte para cargar las fuentes).
 
   Estructura:
-  1. Portada: título, cifras clave, resumen ejecutivo y datos clave.
-  2. Análisis: mapa y tabla por subregión, notas por día y medios.
-  3. Noticias agrupadas (en la región, fuera, sin ubicación) y numeradas.
-  4. Anexo: metodología, fuentes y costo.
+  1. Portada Oráculo: red de nodos, expediente, cifras y banda de
+     confidencialidad.
+  2. Panorama: cifras, resumen ejecutivo (IA), datos clave y tarjetas por
+     categoría.
+  3. Distribución geográfica: mapa con porcentajes, tabla por estado y
+     barras apiladas por categoría.
+  4. Línea del tiempo con sus picos, y medios con más notas.
+  5. Noticias: Estado ▸ Categoría ▸ Noticias, con marcadores plegables en el
+     lector de PDF (los «chevrons») e insignias de confianza.
+  6. Anexo: metodología, fuentes y costo.
 
-  Todo el texto se escapa; solo el SVG del mapa va tal cual. Nunca lleva el
-  texto completo de una nota (§8).
+  Todo el texto se escapa; solo los SVG (mapa y red) van tal cual. Nunca
+  lleva el texto completo de una nota (§8).
 #}
+{% set o = view.oraculo %}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>{{ view.title }} · {{ data.breadcrumb }} · Reporte</title>
-  <meta name="author" content="Monitor de Noticias">
+  <title>{{ o.code }} · {{ view.title }} · {{ data.breadcrumb }}</title>
+  <meta name="author" content="Oráculo · Monitor de Noticias">
   <meta name="description" content="Reporte de noticias: {{ view.title }} en {{ data.breadcrumb }}, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.">
   {% if css %}<style>{{ css }}</style>{% endif %}
 </head>
@@ -25,17 +32,37 @@
 
 {# ------------------------------------------------------------------ Portada #}
 <section class="cover">
-  <div class="band">
-    <p class="kicker">Monitor de Noticias · Reporte de análisis</p>
+  <div class="cover-art">{{ network_svg }}</div>
+  <div class="cover-top">
+    <span class="cover-brand">ORÁCULO</span>
+    <span class="cover-code">{{ o.code }}</span>
+  </div>
+  <div class="cover-body">
+    <p class="kicker">{% if o.automatic %}Monitor automático · Reporte de corrida{% else %}Monitor de noticias · Reporte de análisis{% endif %}</p>
     <h1 class="doc-title">{{ view.title }}</h1>
     <p class="region doc-region">{{ data.breadcrumb }}</p>
-    <div class="band-meta">
-      <span><b>Periodo</b> {{ data.search.date_from | mx_date }} – {{ data.search.date_to | mx_date }}</span>
-      <span class="generated"><b>Generado</b> {{ data.generated_at | mx_datetime }} (Ciudad de México)</span>
-      <span><b>Solicitó</b> {{ data.generated_by }}</span>
+    <table class="cover-meta">
+      <tr><th>Periodo</th><td>{{ data.search.date_from | mx_date }} – {{ data.search.date_to | mx_date }}</td></tr>
+      <tr><th>Emitido</th><td class="generated">{{ data.generated_at | mx_datetime }} (Ciudad de México)</td></tr>
+      <tr><th>Origen</th><td>{% if o.automatic %}Corrida programada de las {{ data.search.scheduled_for | mx_time }}{% else %}Búsqueda de {{ data.generated_by }}{% endif %}</td></tr>
+      <tr><th>Fuentes</th><td>{{ data.search.providers | map("provider_name") | join(" · ") or "todas las configuradas" }}</td></tr>
+    </table>
+    <div class="cover-kpis">
+      <div><strong>{{ view.total }}</strong><span>notas relevantes</span></div>
+      <div><strong>{{ o.states_with_notes }}</strong><span>estados con notas</span></div>
+      <div><strong>{{ o.cards | length }}</strong><span>categorías</span></div>
+      <div><strong>{{ o.timeline.peaks[0].count if o.timeline.peaks else 0 }}</strong><span>notas en el pico</span></div>
     </div>
   </div>
+  <div class="cover-band">USO INTERNO · CONFIDENCIAL · {{ o.code }} · EMITIDO {{ o.issued }}</div>
+</section>
 
+{# ---------------------------------------------------------------- Panorama #}
+<section class="panorama">
+  {# Datos del encabezado y pie de cada página (string-set). Van aquí, en el
+     flujo normal, porque WeasyPrint no los toma de la portada posicionada. #}
+  <div class="doc-strings" aria-hidden="true"><span class="s-code">{{ o.code }}</span><span class="s-title">{{ view.title }}</span><span class="s-region">{{ data.breadcrumb }}</span><span class="s-date">Emitido {{ data.generated_at | mx_datetime }}</span></div>
+  <h2 class="section">Panorama</h2>
   <div class="kpis">
     <div class="kpi kpi-main"><strong>{{ view.total }}</strong><span>notas relevantes</span></div>
     <div class="kpi kpi-inside"><strong>{{ view.inside }}</strong><span>en {{ data.region.name }} · {{ view.inside_percent }} %</span></div>
@@ -43,7 +70,7 @@
     <div class="kpi kpi-unlocated"><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></div>
   </div>
 
-  <h2>Resumen ejecutivo</h2>
+  <h2>Resumen ejecutivo <span class="badge-ai">IA · INFERENCIA</span></h2>
   <div class="summary">
     {% if data.summary %}
       <p class="tag">Generado por IA · {{ data.summary_model }} · verifique en las fuentes antes de citar</p>
@@ -64,7 +91,28 @@
         <span class="fact-note">{{ fact.note }}</span>
       </div>
     {% endfor %}
+    {% if o.top_category %}
+      <div class="fact">
+        <span class="fact-label">Delito más frecuente</span>
+        <strong class="fact-value">{{ o.top_category }}</strong>
+        <span class="fact-note">según la clasificación de la IA</span>
+      </div>
+    {% endif %}
   </div>
+
+  {% if o.cards %}
+    <h2>Notas por categoría <span class="badge-ai">IA · INFERENCIA</span></h2>
+    <div class="cards">
+      {% for card in o.cards %}
+        <div class="card" style="border-top-color: {{ card.color }}">
+          <span class="card-count">{{ card.count }}<small> · {{ card.percent }} %</small></span>
+          <span class="card-name">{{ card.name }}</span>
+          {% if card.top_state %}<span class="card-note">Más en {{ card.top_state }}</span>{% endif %}
+          {% if card.labels %}<span class="card-labels">«{{ card.labels | join("» · «") }}»</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 </section>
 
 {# ----------------------------------------------------------------- Análisis #}
@@ -91,7 +139,7 @@
             <tr>
               <td class="name">{{ bar.label }}</td>
               <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
-              <td class="num">{{ bar.count }}</td>
+              <td class="num">{{ bar.count }} <small class="pct">{{ bar.percent }} %</small></td>
             </tr>
           {% else %}
             <tr><td colspan="3" class="muted">Ninguna nota ubicada en un {{ view.level_label | lower }} de la región.</td></tr>
@@ -108,70 +156,102 @@
     </div>
   </div>
 
-  <div class="charts">
-    <div class="chart">
-      <h3>Notas por {{ view.days_unit }}</h3>
-      {# Barras en SVG (WeasyPrint no maneja alturas en % dentro de flex).
-         Lienzo de 400 × 140: base en y = 110 y barra más alta de 90. Con
-         muchos días, solo se rotula uno de cada pocos para que no se encimen. #}
-      {% set n = view.days | length %}
-      {% set slot = 400 / n %}
-      {% set every = (n // 10) + 1 %}
-      <svg class="day-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 140" width="400" height="140" font-family="Noto Sans Reporte, sans-serif">
-        {% for bar in view.days %}
-          {% set x = slot * loop.index0 %}
-          {% set h = 90 * bar.share %}
-          {% if bar.count %}
-            <rect x="{{ '%.1f' | format(x + slot * 0.18) }}" y="{{ '%.1f' | format(110 - h) }}" width="{{ '%.1f' | format(slot * 0.64) }}" height="{{ '%.1f' | format(h) }}" rx="1.5" fill="#0b1f3a"/>
-            <text x="{{ '%.1f' | format(x + slot / 2) }}" y="{{ '%.1f' | format(106 - h) }}" text-anchor="middle" font-size="9" font-weight="700" fill="#0f172a">{{ bar.count }}</text>
-          {% endif %}
-          {% if loop.index0 % every == 0 %}
-            <text x="{{ '%.1f' | format(x + slot / 2) }}" y="123" text-anchor="middle" font-size="7.5" fill="#475569">{{ bar.label }}</text>
-            {% if n <= 14 %}<text x="{{ '%.1f' | format(x + slot / 2) }}" y="133" text-anchor="middle" font-size="7" fill="#94a3b8">{{ bar.detail }}</text>{% endif %}
-          {% endif %}
+  {% if o.stacks %}
+    <h3 class="stack-title">Delitos por estado</h3>
+    <table class="stacks">
+      <tbody>
+        {% for stack in o.stacks %}
+          <tr>
+            <td class="name">{{ stack.name }}</td>
+            <td class="stack">{% for segment in stack.segments %}<span style="width: {{ (segment.share * 100) | round(2) }}%; background: {{ segment.color }}" title="{{ segment.category }}: {{ segment.count }}"></span>{% endfor %}</td>
+            <td class="num">{{ stack.count }} <small class="pct">{{ stack.percent }} %</small></td>
+          </tr>
         {% endfor %}
-        <line x1="0" y1="110.5" x2="400" y2="110.5" stroke="#0f172a" stroke-width="0.8"/>
-      </svg>
-      {% if view.undated %}<p class="muted small">{{ view.undated }} nota(s) sin fecha de publicación no aparecen en la gráfica.</p>{% endif %}
+      </tbody>
+    </table>
+    <p class="stack-legend">
+      {% for card in o.cards %}<span class="legend-item"><i style="background: {{ card.color }}"></i>{{ card.name }}</span>{% endfor %}
+    </p>
+  {% endif %}
+</section>
+
+{# -------------------------------------------------------- Línea del tiempo #}
+<section class="chrono">
+  <h2 class="section">Línea del tiempo</h2>
+  {% set bars = o.timeline.bars %}
+  {% if bars %}
+    <p class="muted small">Notas por {{ o.timeline.unit }} de publicación (hora de la Ciudad de México). Los picos van resaltados.</p>
+    {# Lienzo de 520 × 150: base en y = 120, barra más alta de 100. #}
+    {% set n = bars | length %}
+    {% set slot = 520 / n %}
+    <svg class="time-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" width="520" height="150" font-family="Noto Sans Reporte, sans-serif">
+      {% for bar in bars %}
+        {% set x = slot * loop.index0 %}
+        {% set h = 100 * bar.share %}
+        {% if bar.count %}
+          <rect x="{{ '%.2f' | format(x + slot * 0.12) }}" y="{{ '%.2f' | format(120 - h) }}" width="{{ '%.2f' | format(slot * 0.76) }}" height="{{ '%.2f' | format(h) }}" rx="1" fill="{{ '#00a8d4' if bar.peak else '#9fd8e6' }}"/>
+          {% if bar.peak %}<text x="{{ '%.2f' | format(x + slot / 2) }}" y="{{ '%.2f' | format(116 - h) }}" text-anchor="middle" font-size="8" font-weight="700" fill="#005f7f">{{ bar.count }}</text>{% endif %}
+        {% endif %}
+        {% if bar.label %}<text x="{{ '%.2f' | format(x) }}" y="134" font-size="7" fill="#475569">{{ bar.label }}</text>{% endif %}
+      {% endfor %}
+      <line x1="0" y1="120.5" x2="520" y2="120.5" stroke="#0f172a" stroke-width="0.8"/>
+    </svg>
+    <div class="peaks">
+      {% for peak in o.timeline.peaks %}
+        <div class="peak">
+          <span class="peak-rank">PICO {{ loop.index }}</span>
+          <strong>{{ peak.when }}</strong>
+          <span class="peak-count">{{ peak.count }} notas</span>
+          <span class="peak-lead">{{ peak.lead }}</span>
+        </div>
+      {% endfor %}
     </div>
-    <div class="chart">
-      <h3>Medios con más notas</h3>
-      <table class="bars">
-        <tbody>
-          {% for bar in view.sources %}
-            <tr>
-              <td class="name">{{ bar.label }}</td>
-              <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
-              <td class="num">{{ bar.count }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {% else %}
+    <p class="muted">Las notas no traen fecha de publicación.</p>
+  {% endif %}
+
+  <h3>Medios con más notas</h3>
+  <table class="bars media">
+    <tbody>
+      {% for bar in view.sources %}
+        <tr>
+          <td class="name">{{ bar.label }}</td>
+          <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
+          <td class="num">{{ bar.count }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 
 {# ----------------------------------------------------------------- Noticias #}
 <section class="news">
-  <h2 class="section">Noticias</h2>
-  {% for group in view.groups %}
-    <div class="group group-{{ group.key }}">
-      <h3 class="group-title">{{ group.title }} <span>{{ group.articles | length }} {{ "nota" if group.articles | length == 1 else "notas" }}</span></h3>
-      {% for item in group.articles %}
-        {% set article = item.article %}
-        <article class="item">
-          <span class="number">{{ item.number }}</span>
-          <div class="body">
-            <h4><a href="{{ article.url }}">{{ article.title }}</a></h4>
-            <p class="meta">
-              <b>{{ article.source_name or article.source_domain or "Medio sin nombre" }}</b>
-              · {{ article.published_at | mx_datetime }}
-              {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
-            </p>
-            {% if article.summary %}<p class="text">{{ article.summary }}</p>{% endif %}
-            <p class="link">{{ article.url }}</p>
-          </div>
-        </article>
+  <h2 class="section">Noticias por estado</h2>
+  <p class="muted small">En el panel de marcadores del lector de PDF cada estado › categoría se despliega o se contrae. Las insignias de cada nota son inferencias de la IA: verifique en la fuente antes de citar.</p>
+  {% for state in o.groups %}
+    <div class="state">
+      <h3 class="state-title">› {{ state.name }} <span>{{ state.count }} {{ "nota" if state.count == 1 else "notas" }} · {{ state.percent }} %</span></h3>
+      {% for category in state.categories %}
+        <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
+        {% for item in category.notes %}
+          {% set article = item.article %}
+          <article class="item">
+            <span class="number">{{ item.number }}</span>
+            <div class="body">
+              <h5><a href="{{ article.url }}">{{ article.title | clean }}</a></h5>
+              <p class="meta">
+                <b>{{ article.source_name or article.source_domain or "Medio sin nombre" }}</b>
+                · {{ article.published_at | mx_datetime }}
+                {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
+              </p>
+              <p class="insignias">
+                {% for badge in item.badges %}<span class="ins ins-{{ badge.kind }}"{% if badge.color %} style="border-color: {{ badge.color }}; color: {{ badge.color }}"{% endif %}>{{ badge.text }}</span>{% endfor %}
+              </p>
+              {% if article.summary %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
+              <p class="link">{{ article.url }}</p>
+            </div>
+          </article>
+        {% endfor %}
       {% endfor %}
     </div>
   {% else %}
@@ -186,17 +266,19 @@
     <div>
       <h3>Cómo se hizo</h3>
       <ol>
-        <li>Se consultaron los proveedores de noticias con las palabras clave de {{ view.title }} y el nombre de la región, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.</li>
-        <li>Una IA leyó cada nota, decidió si es relevante para el concepto y escribió un resumen propio. Este reporte solo incluye las relevantes.</li>
-        <li>Los lugares que menciona cada nota se ubicaron en el catálogo geográfico de INEGI. La ubicación principal decide si la nota está dentro o fuera de la región.</li>
+        <li>{% if o.automatic %}El monitor automático consultó{% else %}Se consultaron{% endif %} los proveedores de noticias con las palabras clave de {{ view.title }} y el nombre de la región, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.</li>
+        <li>Una IA leyó cada nota, decidió si es relevante para el concepto y escribió un resumen propio. En la FGR solo cuentan las notas donde actúa la FGR federal, no las fiscalías estatales. Este reporte solo incluye las relevantes.</li>
+        <li>La IA clasificó cada nota por delito (categoría) y dijo quién actúa en el hecho. Ambas son inferencias.</li>
+        <li>Los lugares que menciona cada nota se ubicaron en el catálogo geográfico de INEGI. La ubicación principal decide el estado de la nota.</li>
       </ol>
     </div>
     <div>
-      <h3>Precisión de la ubicación</h3>
+      <h3>Insignias</h3>
       <ul class="precision">
-        <li><span class="badge badge-locality">Localidad</span> o <span class="badge badge-municipality">Municipio</span>: el lugar exacto que nombra la nota.</li>
+        <li><span class="ins ins-category">CATEGORÍA</span>: el delito del que trata la nota, según la IA.</li>
+        <li><span class="ins ins-authority">FGR FEDERAL</span>: quién actúa en el hecho, según la IA.</li>
+        <li><span class="ins ins-confidence">CONFIANZA ALTA</span>, media o baja: qué tan segura está la IA de que la nota es relevante.</li>
         <li><span class="badge badge-state">Solo estado</span> o <span class="badge badge-country">Solo país</span>: la nota no da más detalle; en el mapa se dibuja en el centro con anillo punteado.</li>
-        <li><span class="badge badge-unknown">Sin ubicación</span>: la nota no nombra un lugar reconocible.</li>
       </ul>
     </div>
   </div>
@@ -215,7 +297,7 @@
     </tbody>
   </table>
   <p class="small">Créditos de SearchApi: <b>{{ data.search.credits_used }}</b> · Costo estimado de la IA en la búsqueda: <b>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</b>{% if view.uses_gdelt %} · Incluye datos de The GDELT Project (gdeltproject.org){% endif %}.</p>
-  <p class="small muted">Los resúmenes y las ubicaciones se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link. Documento de uso interno.</p>
+  <p class="small muted">Los resúmenes, las categorías, quién actúa y las ubicaciones se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link. Documento de uso interno · {{ o.code }}.</p>
 </section>
 
 </body>

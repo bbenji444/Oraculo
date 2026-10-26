@@ -8,7 +8,25 @@
  * Paleta: azul marino del encabezado, azul de la región (mismo tono que el
  * globo), ámbar para lo de fuera y gris para lo sin ubicación. Se lee bien
  * impreso en blanco y negro.
+ *
+ * Rediseño Oráculo (F12.10, ADR-0033): portada oscura con red de nodos y
+ * banda de confidencialidad, número de expediente en cada página, títulos en
+ * Orbitron, insignias de confianza y marcadores plegables (Estado ▸
+ * Categoría ▸ Nota) en el panel del lector de PDF. Las páginas interiores
+ * siguen en blanco para que se impriman bien.
  */
+
+@font-face {
+  font-family: "Orbitron Reporte";
+  src: url("orbitron-400.woff2") format("woff2");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Orbitron Reporte";
+  src: url("orbitron-700.woff2") format("woff2");
+  font-weight: 700;
+}
 
 @font-face {
   font-family: "Noto Sans Reporte";
@@ -35,6 +53,13 @@
   --outside-soft: #fef3c7;
   --unlocated: #64748b;
   --alert: #be123c;
+  /* Oráculo: fondo, cian y sus tonos para impresión (OSINT --a1/--a2/--a3). */
+  --oraculo-bg: #050505;
+  --oraculo-cyan: #00d2ff;
+  --oraculo-a2: #0090b8;
+  --oraculo-a1: #005f7f;
+  --oraculo-text: #e0f7fa;
+  --tech: "Orbitron Reporte", "Noto Sans Reporte", sans-serif;
 }
 
 /* ---------------------------------------------------------------- Páginas */
@@ -44,7 +69,7 @@
   margin: 22mm 16mm 18mm;
 
   @top-left {
-    content: "Monitor de Noticias · " string(doctitle) " · " string(docregion);
+    content: string(doccode) " · " string(doctitle) " · " string(docregion);
     font: 7.5pt "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
@@ -52,7 +77,8 @@
   }
 
   @top-right {
-    content: "Uso interno";
+    content: "USO INTERNO · CONFIDENCIAL";
+    letter-spacing: 0.08em;
     font: 7.5pt "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
@@ -72,15 +98,24 @@
   }
 }
 
-/* La portada no lleva encabezado: la franja azul llega al borde superior. */
+/* La portada Oráculo ocupa la hoja entera, sin márgenes ni encabezados. */
 @page :first {
-  margin-top: 0;
+  margin: 0;
+  background: #050505;
 
   @top-left {
     content: none;
   }
 
   @top-right {
+    content: none;
+  }
+
+  @bottom-left {
+    content: none;
+  }
+
+  @bottom-right {
     content: none;
   }
 }
@@ -166,14 +201,12 @@ a {
 .band h1 {
   font-size: 26pt;
   color: #ffffff;
-  string-set: doctitle content();
 }
 
 .band .region {
   margin: 4pt 0 12pt;
   font-size: 13pt;
   color: #bfdbfe;
-  string-set: docregion content();
 }
 
 .band-meta {
@@ -182,10 +215,6 @@ a {
   border-top: 0.5pt solid #33507a;
   font-size: 8pt;
   color: #cbd5e1;
-}
-
-.band-meta .generated {
-  string-set: docdate content();
 }
 
 .band-meta span {
@@ -483,9 +512,11 @@ table.totals .total td {
   flex: 1;
 }
 
-.item h4 {
+.item h5 {
+  margin: 0 0 2pt;
   font-size: 9.5pt;
-  margin-bottom: 2pt;
+  line-height: 1.3;
+  color: var(--ink);
 }
 
 .item .meta {
@@ -604,4 +635,419 @@ table.grid td.num {
   .annex {
     margin-top: 32px;
   }
+}
+
+/* ================================================================ Oráculo */
+
+/* -------------------------------------------------------------- Portada */
+
+.cover {
+  position: relative;
+  height: 297mm;
+  overflow: hidden;
+  background: var(--oraculo-bg);
+  color: var(--oraculo-text);
+}
+
+.cover-art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 210mm;
+  height: 150mm;
+}
+
+.cover-art svg {
+  width: 210mm;
+  height: 150mm;
+}
+
+.cover-top {
+  position: absolute;
+  top: 14mm;
+  left: 16mm;
+  right: 16mm;
+}
+
+.cover-brand {
+  font: 700 15pt var(--tech);
+  letter-spacing: 0.3em;
+  color: #ffffff;
+}
+
+.cover-code {
+  float: right;
+  font: 700 8pt var(--tech);
+  letter-spacing: 0.14em;
+  color: var(--oraculo-cyan);
+}
+
+.cover-body {
+  position: absolute;
+  top: 118mm;
+  left: 16mm;
+  right: 16mm;
+}
+
+.cover .kicker {
+  margin: 0 0 6pt;
+  font: 700 7.5pt var(--tech);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--oraculo-cyan);
+}
+
+.cover h1 {
+  font: 700 30pt/1.1 var(--tech);
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.cover .region {
+  margin: 6pt 0 14pt;
+  font-size: 13pt;
+  color: #a8c5cb;
+}
+
+.cover-meta {
+  border-collapse: collapse;
+  font-size: 8.5pt;
+}
+
+.cover-meta th {
+  padding: 2pt 12pt 2pt 0;
+  font: 700 6.5pt var(--tech);
+  letter-spacing: 0.16em;
+  text-align: left;
+  text-transform: uppercase;
+  color: #809699;
+}
+
+.cover-meta td {
+  padding: 2pt 0;
+  color: #e0f7fa;
+}
+
+
+.cover-kpis {
+  margin-top: 16pt;
+  border-top: 0.75pt solid rgba(0, 210, 255, 0.35);
+  padding-top: 12pt;
+}
+
+.cover-kpis div {
+  display: inline-block;
+  width: 24%;
+  vertical-align: top;
+}
+
+.cover-kpis strong {
+  display: block;
+  font: 700 24pt/1.05 var(--tech);
+  color: var(--oraculo-cyan);
+}
+
+.cover-kpis span {
+  font-size: 7.5pt;
+  color: #a8c5cb;
+}
+
+.cover-band {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 5mm 16mm;
+  background: var(--oraculo-cyan);
+  font: 700 7pt var(--tech);
+  letter-spacing: 0.2em;
+  color: #021018;
+}
+
+/* ------------------------------------------------------------ Secciones */
+
+h2.section {
+  font-family: var(--tech);
+  font-size: 13pt;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom-color: var(--oraculo-a2);
+  bookmark-level: 1;
+}
+
+.panorama,
+.chrono,
+.news {
+  break-before: page;
+}
+
+.kpi-main {
+  border-top-color: var(--oraculo-a2);
+}
+
+.kpi strong,
+.fact-value,
+.card-count,
+.peak strong {
+  font-family: var(--tech);
+}
+
+.badge-ai {
+  margin-left: 4pt;
+  padding: 1pt 4pt;
+  border: 0.6pt solid var(--oraculo-a2);
+  border-radius: 2pt;
+  font: 700 5.5pt var(--tech);
+  letter-spacing: 0.12em;
+  vertical-align: middle;
+  color: var(--oraculo-a1);
+}
+
+.summary {
+  border-left-color: var(--oraculo-a2);
+}
+
+/* Tarjetas por categoría: 3 por renglón. */
+.cards {
+  font-size: 0;
+}
+
+.card {
+  box-sizing: border-box;
+  display: inline-block;
+  width: 31.5%;
+  margin: 0 2.5% 6pt 0;
+  padding: 6pt 8pt;
+  border: 0.75pt solid var(--line);
+  border-top: 3pt solid var(--line);
+  border-radius: 3pt;
+  vertical-align: top;
+  font-size: 8pt;
+  break-inside: avoid;
+}
+
+.card:nth-child(3n) {
+  margin-right: 0;
+}
+
+.card-count {
+  display: block;
+  font-size: 15pt;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.card-count small {
+  font-size: 8pt;
+  color: var(--muted);
+}
+
+.card-name {
+  display: block;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.card-note,
+.card-labels {
+  display: block;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.pct {
+  font-size: 6.5pt;
+  color: var(--muted);
+}
+
+/* Barras apiladas por categoría. */
+.stack-title {
+  margin-top: 12pt;
+}
+
+table.stacks {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+}
+
+table.stacks td {
+  padding: 2pt 0;
+}
+
+table.stacks td.name {
+  width: 28%;
+  padding-right: 6pt;
+}
+
+table.stacks td.stack {
+  font-size: 0;
+}
+
+table.stacks td.stack span {
+  display: inline-block;
+  height: 9pt;
+}
+
+table.stacks td.num {
+  width: 14%;
+}
+
+.stack-legend {
+  margin-top: 4pt;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+/* Línea del tiempo. */
+.time-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 4pt 0 8pt;
+}
+
+.peaks {
+  font-size: 0;
+  margin-bottom: 12pt;
+}
+
+.peak {
+  box-sizing: border-box;
+  display: inline-block;
+  width: 31.5%;
+  margin-right: 2.5%;
+  padding: 6pt 8pt;
+  border: 0.75pt solid var(--line);
+  border-left: 3pt solid var(--oraculo-a2);
+  border-radius: 3pt;
+  vertical-align: top;
+  font-size: 8pt;
+}
+
+.peak:last-child {
+  margin-right: 0;
+}
+
+.peak-rank {
+  display: block;
+  font: 700 6pt var(--tech);
+  letter-spacing: 0.16em;
+  color: var(--oraculo-a2);
+}
+
+.peak strong {
+  display: block;
+  font-size: 9pt;
+  color: var(--ink);
+}
+
+.peak-count,
+.peak-lead {
+  display: block;
+  font-size: 7.5pt;
+  color: var(--muted);
+}
+
+/* Noticias: Estado ▸ Categoría ▸ Nota, con marcadores plegables. */
+.state-title {
+  margin: 12pt 0 6pt;
+  padding: 4pt 8pt;
+  background: var(--oraculo-bg);
+  color: #ffffff;
+  font: 700 10pt var(--tech);
+  letter-spacing: 0.06em;
+  border-radius: 2pt;
+  break-after: avoid;
+  bookmark-level: 2;
+  bookmark-state: closed;
+}
+
+.state-title span {
+  float: right;
+  font: 400 7.5pt "Noto Sans Reporte", sans-serif;
+  color: #a8c5cb;
+}
+
+.category-title {
+  margin: 6pt 0 4pt;
+  font-size: 9pt;
+  color: var(--ink);
+  break-after: avoid;
+  bookmark-level: 3;
+  bookmark-state: closed;
+}
+
+.category-title i {
+  display: inline-block;
+  width: 7pt;
+  height: 7pt;
+  margin-right: 4pt;
+  border-radius: 1.5pt;
+}
+
+.category-title span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.item h5 {
+  bookmark-level: 4;
+}
+
+.insignias {
+  margin: 0 0 3pt;
+}
+
+.ins {
+  display: inline-block;
+  margin-right: 3pt;
+  padding: 0.5pt 3pt;
+  border: 0.6pt solid var(--line);
+  border-radius: 2pt;
+  font: 700 5.5pt var(--tech);
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.ins-authority {
+  border-color: var(--oraculo-a1);
+  color: var(--oraculo-a1);
+}
+
+.ins-confidence {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+
+@media screen {
+  .cover {
+    height: auto;
+    min-height: 260mm;
+    margin: 0 -16px;
+  }
+}
+
+/* Datos del encabezado y el pie (string-set), invisibles en la hoja. */
+.doc-strings {
+  height: 0;
+  overflow: hidden;
+  font-size: 1pt;
+  color: transparent;
+}
+
+.s-code {
+  string-set: doccode content();
+}
+
+.s-title {
+  string-set: doctitle content();
+}
+
+.s-region {
+  string-set: docregion content();
+}
+
+.s-date {
+  string-set: docdate content();
 }

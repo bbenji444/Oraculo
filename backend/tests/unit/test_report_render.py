@@ -64,19 +64,26 @@ async def test_el_html_lleva_todas_las_secciones_y_escapa_lo_de_la_web(
     page = ReportRenderer().html(report)
 
     for section in (
+        "Panorama",
         "Resumen ejecutivo",
         "Datos clave",
+        "Notas por categoría",
         "Distribución geográfica",
         "Notas por municipio",
-        "Notas por día",
+        "Línea del tiempo",
         "Medios con más notas",
-        "Noticias",
+        "Noticias por estado",
         "Metodología y fuentes",
     ):
         assert section in page
-    # Notas agrupadas como las pestañas de la pantalla, numeradas.
-    assert "En Ciudad de México" in page
-    assert "Sin ubicación" in page
+    # Rediseño Oráculo (F12.10): expediente, confidencialidad e insignias.
+    assert "EXP-20261017-1400" in page
+    assert "USO INTERNO · CONFIDENCIAL" in page
+    assert "IA · INFERENCIA" in page
+    assert 'class="ins ins-confidence"' in page
+    # Noticias por Estado ▸ Categoría, numeradas de corrido.
+    assert "› Ciudad de México" in page
+    assert "› Sin estado identificado" in page
     assert '<span class="number">3</span>' in page
     assert "México › Ciudad de México" in page
     assert "<p>Predomina el cobro de piso.</p>" in page
@@ -112,7 +119,13 @@ async def test_el_pdf_trae_la_n_y_los_acentos_con_la_fuente_incluida(report: Rep
     assert "Peñón" in text
     assert "México › Ciudad de México" in text
     assert "Resumen ejecutivo" in text
-    assert "Página 1 de" in text
+    # La portada no lleva número; las demás, expediente y confidencialidad.
+    assert "Página 2 de" in text
+    assert "USO INTERNO · CONFIDENCIAL" in text
+    assert "EXP-20261017-1400" in text
+    # Marcadores plegables Estado ▸ Categoría ▸ Nota en el lector de PDF.
+    titles = [item.title for item in reader.outline if not isinstance(item, list)]
+    assert "Noticias por estado" in titles
     fonts = set()
     for page in reader.pages:
         # pypdf tipa cada valor como PdfObject; aquí son diccionarios del PDF.
@@ -121,6 +134,7 @@ async def test_el_pdf_trae_la_n_y_los_acentos_con_la_fuente_incluida(report: Rep
             fonts.add(str(cast(DictionaryObject, font.get_object())["/BaseFont"]))
     # WeasyPrint nombra la fuente con la familia del @font-face (report.css).
     assert any("Noto-Sans-Reporte" in name for name in fonts)
+    assert any("Orbitron-Reporte" in name for name in fonts)
     assert not any("DejaVu" in name for name in fonts)
 
 
