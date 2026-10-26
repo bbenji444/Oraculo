@@ -42,3 +42,18 @@ La IA ya devuelve un `event_type`, pero en la búsqueda FGR del 24/10/2026 (189 
 - **Pendiente, con datos reales:**
   - qué categorías se quedan, se juntan o se agregan, según `category_raw` y las frecuencias;
   - sus colores y símbolos.
+
+## Ajuste: «Seguridad nacional (traición a la patria)» (26/10/2026)
+
+**Contexto.** En las corridas FGR del 26/10, el 72 % de las notas quedaba en «Otros» (169 de 235 a las 15:00), y así el filtro por categoría casi no servía. La etiqueta libre que más repetía la IA era «traición a la patria»: 90 notas del caso Jáuregui y de los agentes extranjeros en Chihuahua.
+
+**Decisión** (aprobada por Benji):
+
+- La migración 0029 agrega «Seguridad nacional (traición a la patria)» justo antes de «Otros».
+- El prompt `classify_v4` añade una regla: lo que rodea a un caso penal (protestas, cartas, audiencias, caravanas o declaraciones sobre un acusado) va en la categoría del delito, no en «Otros».
+- Al cambiar la versión del prompt se vuelven a clasificar todas las notas, con respaldo previo.
+
+**Consecuencias.**
+
+- La IA vuelve a decir también quién actúa en cada nota. Esas reglas no cambian, pero la respuesta puede variar un poco, así que se miden las relevantes para la FGR antes y después.
+- Siguen pendientes las demás categorías definitivas y sus colores. Por ahora el color sale de la paleta provisional, por id.

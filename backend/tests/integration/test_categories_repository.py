@@ -53,15 +53,29 @@ def _article(
         )
 
 
-async def test_el_catalogo_sembrado_tiene_14_y_un_solo_otros(
+async def test_el_catalogo_sembrado_tiene_15_y_un_solo_otros(
     sync_engine: Engine, test_engine: AsyncEngine
 ) -> None:
     categories = await PostgresCategoryStore(test_engine).active_categories()
 
-    assert len(categories) == 14
+    # 14 de la migración 0026 más «Seguridad nacional» de la 0029.
+    assert len(categories) == 15
     assert categories[0].name == "Narcotráfico y delitos contra la salud"
     assert other_category(categories).name == "Otros"
     assert all(c.color is None and c.symbol is None for c in categories)
+
+
+async def test_seguridad_nacional_va_justo_antes_de_otros(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    categories = await PostgresCategoryStore(test_engine).active_categories()
+
+    assert [c.name for c in categories[-2:]] == [
+        "Seguridad nacional (traición a la patria)",
+        "Otros",
+    ]
+    assert "traición a la patria" in categories[-2].description.lower()
+    assert not categories[-2].is_other
 
 
 async def test_pendientes_guardar_y_volver_a_pedir(
