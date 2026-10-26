@@ -43,6 +43,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0027](0027-fuentes-por-busqueda.md) | Cada búsqueda manual elige sus fuentes con switches y las guarda | Aceptado |
 | [0028](0028-browserwork-como-fuente.md) | BrowserWork como fuente de la búsqueda manual (Bing y Google 2) | Aceptado (switches ocultos) |
 | [0029](0029-categorias-de-noticias.md) | Categoría de cada noticia (el delito), en un catálogo en la base y con una llamada aparte de la IA | Aceptado |
+| [0030](0030-relevancia-fgr-federal.md) | Relevancia FGR federal: la IA dice quién actúa y el concepto FGR lleva su regla | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |
