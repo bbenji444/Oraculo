@@ -1,4 +1,4 @@
-"""Clasificación por categoría con la IA (F12.4, ADR-0029), con respuestas simuladas."""
+"""Clasificación por categoría y quién actúa (F12.4–F12.5), con respuestas simuladas."""
 
 import json
 from typing import Any
@@ -18,6 +18,7 @@ from app.application.ports.llm import (
     ClassificationNote,
     ClassificationRequest,
 )
+from app.domain.authority import Authority
 from app.domain.enrichment import LLMUsage
 from tests.unit.test_gemini import FakeModels, reply
 from tests.unit.test_openai_llm import api_reply, enricher
@@ -50,31 +51,53 @@ def test_el_prompt_lleva_el_catalogo_y_solo_titulo_y_resumen() -> None:
     assert "[12] Investigan a exfiscal por casinos — sin resumen" in prompt
     assert "x" * (CLASSIFY_SUMMARY_CHARS + 1) not in prompt
     assert "usa «Otros»" in prompt
+    # Quién actúa (F12.5): la fiscalía estatal y la simple mención no son la FGR.
+    assert '"estatal": solo actúa una fiscalía o procuraduría de un estado' in prompt
+    assert '"fgr_mencion": la FGR solo se nombra' in prompt
 
 
 async def test_openai_clasifica_con_lista_cerrada_e_ignora_ids_ajenos() -> None:
     seen: list[dict[str, Any]] = []
     reply = {
         "items": [
-            {"id": 11, "category": "Armas y explosivos", "label": "tráfico de armas"},
-            {"id": 12, "category": "Corrupción", "label": "enriquecimiento ilícito"},
+            {
+                "id": 11,
+                "category": "Armas y explosivos",
+                "label": "tráfico de armas",
+                "authority": "fgr",
+            },
+            {
+                "id": 12,
+                "category": "Corrupción",
+                "label": "enriquecimiento ilícito",
+                "authority": "estatal",
+            },
             # Id que no estaba en el lote y repetido: se ignoran.
-            {"id": 99, "category": "Otros", "label": None},
-            {"id": 11, "category": "Otros", "label": None},
+            {"id": 99, "category": "Otros", "label": None, "authority": "otra"},
+            {"id": 11, "category": "Otros", "label": None, "authority": "otra"},
         ]
     }
     llm = enricher(httpx2.Response(200, json=api_reply(json.dumps(reply), 900, 80)), seen=seen)
 
     result = await llm.classify(REQUEST)
 
-    assert [(x.article_id, x.category, x.raw_label) for x in result.labels] == [
-        (11, "Armas y explosivos", "tráfico de armas"),
-        (12, "Corrupción", "enriquecimiento ilícito"),
+    assert [(x.article_id, x.category, x.raw_label, x.authority) for x in result.labels] == [
+        (11, "Armas y explosivos", "tráfico de armas", Authority.FGR),
+        (12, "Corrupción", "enriquecimiento ilícito", Authority.STATE),
     ]
     assert (result.usage, result.prompt_version) == (LLMUsage(900, 80), CLASSIFY_PROMPT_VERSION)
+    assert CLASSIFY_PROMPT_VERSION == "classify_v2"
     schema = seen[0]["body"]["text"]["format"]["schema"]
     item = schema["properties"]["items"]["items"]
     assert item["properties"]["category"]["enum"] == [c.name for c in CATEGORIES]
+    assert item["properties"]["authority"]["enum"] == [
+        "fgr",
+        "fgr_mencion",
+        "estatal",
+        "otra",
+        "sin_dato",
+    ]
+    assert "authority" in item["required"]
     await llm.aclose()
 
 
@@ -95,14 +118,23 @@ async def test_respuesta_invalida_se_reintenta_y_luego_es_error() -> None:
 
 async def test_gemini_clasifica_con_el_mismo_prompt() -> None:
     models = FakeModels(
-        reply({"items": [{"id": 12, "category": "Corrupción", "label": "casinos"}]})
+        reply(
+            {
+                "items": [
+                    # Gemini no garantiza la lista cerrada: lo desconocido es sin_dato.
+                    {"id": 11, "category": "Armas y explosivos", "authority": "policía"},
+                    {"id": 12, "category": "Corrupción", "label": "casinos"},
+                ]
+            }
+        )
     )
     llm = GeminiEnricher(models, "gemini-2.5-flash")
 
     result = await llm.classify(REQUEST)
     await llm.aclose()
 
-    assert [(x.article_id, x.category, x.raw_label) for x in result.labels] == [
-        (12, "Corrupción", "casinos")
+    assert [(x.article_id, x.category, x.raw_label, x.authority) for x in result.labels] == [
+        (11, "Armas y explosivos", None, Authority.UNKNOWN),
+        (12, "Corrupción", "casinos", None),
     ]
     assert models.calls[0]["contents"] == build_classify_prompt(REQUEST)

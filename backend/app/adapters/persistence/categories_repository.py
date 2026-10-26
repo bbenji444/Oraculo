@@ -1,7 +1,10 @@
 """Catálogo de categorías y categoría de cada nota sobre PostgreSQL (F12.4, ADR-0029).
 
-Implementa ``CategoryStorePort``. Las notas pendientes son las que no tienen
-categoría de la versión vigente del prompt (``category_version``). Se leen
+Implementa ``CategoryStorePort``. Al guardar la categoría guarda también
+quién actúa en la nota (``articles.authority``, F12.5, ADR-0030).
+
+Las notas pendientes son las que no tienen categoría de la versión vigente
+del prompt (``category_version``). Se leen
 por cursor (``WHERE id > :after ORDER BY id``, nunca ``OFFSET``) y se manda a
 la IA solo título y resumen (o el fragmento del medio si no hay resumen).
 
@@ -78,9 +81,11 @@ class PostgresCategoryStore:
                 text(
                     """
                     UPDATE articles a SET category_id = v.category_id, category_raw = v.raw,
-                        category_version = :version, updated_at = now()
+                        authority = v.authority, category_version = :version,
+                        updated_at = now()
                     FROM unnest(CAST(:ids AS bigint[]), CAST(:categories AS bigint[]),
-                        CAST(:raws AS text[])) AS v(id, category_id, raw)
+                        CAST(:raws AS text[]), CAST(:authorities AS text[]))
+                        AS v(id, category_id, raw, authority)
                     WHERE a.id = v.id
                     """
                 ),
@@ -88,6 +93,7 @@ class PostgresCategoryStore:
                     "ids": [c.article_id for c in choices],
                     "categories": [c.category.category_id for c in choices],
                     "raws": [c.raw_label for c in choices],
+                    "authorities": [c.authority.value if c.authority else None for c in choices],
                     "version": version,
                 },
             )

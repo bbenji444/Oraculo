@@ -26,6 +26,7 @@ from app.application.ports.llm import (
     SummaryNote,
     SummaryRequest,
 )
+from app.domain.authority import parse_authority
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.entity_extraction import RawProposal
 from app.domain.geocoding import Mention, MentionRole
@@ -261,8 +262,10 @@ def to_raw_proposals(out: EntitiesOut) -> tuple[RawProposal, ...]:
     )
 
 
-# Clasificación por categoría (F12.4, ADR-0029): una llamada por lote.
-CLASSIFY_PROMPT_VERSION = "classify_v1"
+# Clasificación por categoría (F12.4, ADR-0029) y quién actúa (F12.5,
+# ADR-0030): una llamada por lote. v2 agrega ``authority``; cambiar la
+# versión hace que las notas se vuelvan a clasificar.
+CLASSIFY_PROMPT_VERSION = "classify_v2"
 CLASSIFY_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{CLASSIFY_PROMPT_VERSION}.md"
 # Notas por llamada: con título y resumen (~80 tokens cada una) el prompt
 # queda en ~2,600 tokens; más notas alargan la respuesta sin ahorrar mucho.
@@ -279,6 +282,9 @@ class ClassifiedItemOut(BaseModel):
     id: int
     category: str
     label: str | None = None
+    # Texto libre aquí; ``parse_authority`` toma lo que no reconoce como
+    # ``sin_dato`` (Gemini no garantiza la lista cerrada como OpenAI).
+    authority: str | None = None
 
 
 class ClassificationOut(BaseModel):
@@ -288,7 +294,7 @@ class ClassificationOut(BaseModel):
 
 
 def build_classify_prompt(request: ClassificationRequest) -> str:
-    """Llena la plantilla ``classify_v1.md`` con el catálogo y el lote.
+    """Llena la plantilla ``classify_v2.md`` con el catálogo y el lote.
 
     Args:
         request: Notas (título y resumen, nunca el texto, §8) y catálogo.
@@ -323,5 +329,9 @@ def to_labels(
     for item in out.items:
         if item.id in wanted and item.id not in seen:
             seen.add(item.id)
-            labels.append(ClassificationLabel(item.id, item.category, item.label))
+            labels.append(
+                ClassificationLabel(
+                    item.id, item.category, item.label, parse_authority(item.authority)
+                )
+            )
     return tuple(labels)

@@ -14,6 +14,7 @@ No hace: no llama a la IA ni lee la base.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from app.domain.authority import Authority
 from app.domain.errors import DomainError
 from app.domain.names import normalize_name
 
@@ -60,11 +61,13 @@ class CategoryChoice:
         article_id: Nota.
         category: Categoría del catálogo (nunca ``None``: lo que no encaja es «Otros»).
         raw_label: Etiqueta libre que propuso la IA, recortada, o ``None``.
+        authority: Quién actúa en el hecho (F12.5, ADR-0030), o ``None``.
     """
 
     article_id: int
     category: Category
     raw_label: str | None
+    authority: Authority | None = None
 
 
 def other_category(categories: Sequence[Category]) -> Category:
@@ -86,7 +89,11 @@ def other_category(categories: Sequence[Category]) -> Category:
 
 
 def choose_category(
-    article_id: int, label: str | None, raw_label: str | None, categories: Sequence[Category]
+    article_id: int,
+    label: str | None,
+    raw_label: str | None,
+    categories: Sequence[Category],
+    authority: Authority | None = None,
 ) -> CategoryChoice:
     """Convierte la respuesta de la IA en una categoría del catálogo.
 
@@ -99,9 +106,10 @@ def choose_category(
         label: Nombre de categoría que respondió la IA.
         raw_label: Etiqueta libre que propuso la IA.
         categories: Catálogo activo.
+        authority: Quién actúa según la IA; se guarda tal cual.
 
     Returns:
-        La categoría elegida y la etiqueta recortada.
+        La categoría elegida, la etiqueta recortada y quién actúa.
 
     Raises:
         MissingOtherCategoryError: Si el catálogo no tiene «Otros».
@@ -113,4 +121,4 @@ def choose_category(
     wanted = normalize_name(label or "")
     match = next((c for c in categories if normalize_name(c.name) == wanted), None)
     clean_raw = " ".join((raw_label or "").split())[:MAX_RAW_LABEL_CHARS] or None
-    return CategoryChoice(article_id, match or other_category(categories), clean_raw)
+    return CategoryChoice(article_id, match or other_category(categories), clean_raw, authority)
