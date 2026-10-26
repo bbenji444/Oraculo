@@ -16,6 +16,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
+from app.domain.schedule import parse_run_hours
 from app.domain.sources import parse_sources
 
 # backend/app/core/config.py → la raíz del repositorio está 3 niveles arriba.
@@ -75,6 +76,16 @@ _DEFAULT_NEWS_BODY_RETENTION_DAYS = 30
 #   siguiente: GDELT recomienda pedir el archivo de hace unos minutos.
 _DEFAULT_NGRAMS_LOOKBACK_MINUTES = 35
 _DEFAULT_NGRAMS_DELAY_MINUTES = 3
+
+# Monitor automático FGR (F12.8): horarios de Benji, el concepto que creó el
+# 24/10/2026, el país completo (clave ISO-A3 del catálogo) y la firma de las
+# corridas en la bitácora.
+_DEFAULT_AUTOMATIC_RUN_HOURS = "7,15,23"
+_DEFAULT_AUTOMATIC_CONCEPT = "Fiscalia General de la Republica"
+_DEFAULT_AUTOMATIC_REGION_CODE = "MEX"
+_DEFAULT_AUTOMATIC_WINDOW_DAYS = 1
+_DEFAULT_AUTOMATIC_USER = "monitor-automatico"
+_DEFAULT_REPORTS_DIR = _REPO_ROOT / "data" / "reportes"
 
 # Pipeline de búsqueda (F4, ADR-0015):
 # - 15 s por página: en la muestra real del 16/10/2026 la más lenta tardó 1.6 s.
@@ -227,11 +238,35 @@ class Settings(BaseSettings):
     llm_max_articles_per_search: int = Field(default=_DEFAULT_LLM_MAX_ARTICLES, ge=1)
     geo_min_confidence: float = Field(default=_DEFAULT_GEO_MIN_CONFIDENCE, ge=0, le=1)
 
-    @field_validator("manual_default_sources")
+    # --- Monitor automático FGR (F12.8, ADR-0031) ---
+    # Una búsqueda nacional por corrida, a las 07:00, 15:00 y 23:00 de la CDMX
+    # (decisión de Benji, plan F12 §9.1), solo con fuentes gratis: el RSS de
+    # Google News y el índice local (GDELT y RSS de medios). 0 créditos.
+    automatic_runs_enabled: bool = True
+    automatic_run_hours: str = _DEFAULT_AUTOMATIC_RUN_HOURS
+    automatic_concept: str = _DEFAULT_AUTOMATIC_CONCEPT
+    automatic_region_code: str = _DEFAULT_AUTOMATIC_REGION_CODE
+    automatic_sources: str = "google_news_rss,indice_local"
+    # 1 = hoy y ayer (``DateWindow.last_days`` incluye ambos extremos): la
+    # corrida de las 07:00 alcanza lo de la noche anterior. Lo
+    # que ya se vio en otra corrida se reutiliza sin volver a pagar a la IA.
+    automatic_window_days: int = Field(default=_DEFAULT_AUTOMATIC_WINDOW_DAYS, ge=1, le=7)
+    automatic_user: str = Field(default=_DEFAULT_AUTOMATIC_USER, min_length=1)
+    # Carpeta donde cada corrida deja su reporte en PDF (en el disco del servidor).
+    reports_dir: Path = _DEFAULT_REPORTS_DIR
+
+    @field_validator("manual_default_sources", "automatic_sources")
     @classmethod
     def _known_sources(cls, value: str) -> str:
-        """Falla al arrancar si ``MANUAL_DEFAULT_SOURCES`` nombra una fuente que no existe."""
+        """Falla al arrancar si las fuentes nombran una que no existe."""
         parse_sources(value)
+        return value
+
+    @field_validator("automatic_run_hours")
+    @classmethod
+    def _valid_hours(cls, value: str) -> str:
+        """Falla al arrancar si ``AUTOMATIC_RUN_HOURS`` no son horas de 0 a 23."""
+        parse_run_hours(value)
         return value
 
     def database_url(self, *, test: bool = False) -> URL:

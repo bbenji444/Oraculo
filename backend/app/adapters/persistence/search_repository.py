@@ -71,7 +71,7 @@ from app.domain.extraction import ProcessingText
 from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
 from app.domain.queries import Provider
 from app.domain.region import RegionLevel
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, SearchTrigger
 
 AUDIT_ENTITY = "search"
 # Texto máximo de un mensaje de error guardado: lo útil cabe y una respuesta
@@ -127,12 +127,15 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO searches (user_id, region_id, date_from, date_to, "
-                        "queries_planned, credits_estimated, providers) VALUES (:user_id, "
-                        ":region_id, :date_from, :date_to, :queries, :credits, :providers) "
+                        "queries_planned, credits_estimated, providers, trigger, "
+                        "scheduled_for) VALUES (:user_id, :region_id, :date_from, :date_to, "
+                        ":queries, :credits, :providers, :trigger, :scheduled_for) "
                         "RETURNING id"
                     ),
                     {
                         "providers": [p.value for p in search.providers],
+                        "trigger": search.trigger.value,
+                        "scheduled_for": search.scheduled_for,
                         "user_id": search.user_id,
                         "region_id": search.region_id,
                         "date_from": search.date_from,
@@ -311,7 +314,8 @@ class PostgresSearchStore:
         self, user_id: str, after: TimeCursor | None, limit: int
     ) -> list[SearchDetail]:
         """Ver ``SearchReaderPort.history``."""
-        where = "s.user_id = :user"
+        # Las corridas automáticas del monitor FGR son de todos (F12.8).
+        where = f"(s.user_id = :user OR s.trigger = '{SearchTrigger.AUTOMATIC.value}')"
         params: dict[str, object] = {"user": user_id}
         if after is not None:
             where += " AND (s.created_at, s.id) < (:moment, CAST(:after_id AS uuid))"
@@ -367,6 +371,8 @@ class PostgresSearchStore:
                 started_at=row["started_at"],
                 finished_at=row["finished_at"],
                 providers=tuple(row["providers"]),
+                trigger=SearchTrigger(row["trigger"]),
+                scheduled_for=row["scheduled_for"],
             )
             for row in rows
         ]

@@ -27,7 +27,7 @@ from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import Mention, Resolution
 from app.domain.queries import Provider
-from app.domain.search import SearchStatus, Stage
+from app.domain.search import SearchStatus, SearchTrigger, Stage
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +64,8 @@ class NewSearch:
         queries_planned: Consultas planeadas.
         credits_estimated: Créditos estimados.
         providers: Fuentes con las que corre (switches, ADR-0027).
+        trigger: Quién la lanzó: una persona o el reloj (F12.8, ADR-0031).
+        scheduled_for: Hora programada de una corrida automática, o ``None``.
     """
 
     user_id: str
@@ -74,6 +76,8 @@ class NewSearch:
     queries_planned: int
     credits_estimated: int
     providers: tuple[Provider, ...] = ()
+    trigger: SearchTrigger = SearchTrigger.MANUAL
+    scheduled_for: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

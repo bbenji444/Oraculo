@@ -8,7 +8,7 @@ import argparse
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
@@ -37,7 +37,7 @@ from app.domain.authority import Authority
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.queries import Provider
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, SearchTrigger
 from tests.integration.geo_fixture import load_fixture_catalog
 from tests.unit.application.test_execute_queries import FakeCache, FakeLog
 from tests.unit.application.test_run_search import (
@@ -580,3 +580,40 @@ async def test_la_regla_fgr_federal_saca_lo_que_hace_una_fiscalia_estatal(
             {"id": concept_id},
         )
     assert await _izta(articles, search_id, relevant_only=True) is not None
+
+
+async def test_las_corridas_automaticas_aparecen_en_el_historial_de_todos(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # F12.8, ADR-0031: la corrida la firma el monitor, pero la ven todos.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        mexico = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    slot = datetime(2026, 10, 26, 13, 0, tzinfo=UTC)
+    automatic = await searches.create(
+        NewSearch(
+            user_id="monitor-automatico",
+            region_id=mexico,
+            date_from=date(2026, 10, 25),
+            date_to=date(2026, 10, 26),
+            concepts=(SearchConcept(concept_id, CONCEPT_NAME, "", ("FGR",)),),
+            queries_planned=2,
+            credits_estimated=0,
+            providers=(Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX),
+            trigger=SearchTrigger.AUTOMATIC,
+            scheduled_for=slot,
+        )
+    )
+    other_manual = await new_search(searches, test_engine, concept_id)
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE searches SET user_id = 'otra-persona' WHERE id = :id"),
+            {"id": other_manual},
+        )
+
+    history = await searches.history("prueba", None, 10)
+
+    assert [s.search_id for s in history] == [automatic]
+    assert (history[0].trigger, history[0].scheduled_for) == (SearchTrigger.AUTOMATIC, slot)

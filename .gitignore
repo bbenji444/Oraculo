@@ -26,6 +26,9 @@ frontend/coverage/
 # Respaldos de la base de datos (`make db-dump`): pesados y con datos.
 backups/
 
+# Reportes en PDF que arman las corridas automáticas (F12.8): datos, no código.
+data/reportes/
+
 # Geodatos pesados: se descargan y generan con `make geo-load`.
 geodata/raw/
 geodata/output/

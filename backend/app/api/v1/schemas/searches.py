@@ -17,6 +17,7 @@ from app.application.ports.search_reads import SearchDetail
 from app.application.use_cases.plan_search import SearchEstimate
 from app.domain.errors import InvalidRequestError
 from app.domain.queries import DateWindow, Provider
+from app.domain.search import SearchTrigger
 
 # Tope de transporte: una búsqueda con más conceptos no cabría en el
 # presupuesto de consultas de todos modos (MAX_QUERIES_PER_SEARCH).
@@ -182,6 +183,16 @@ class SearchOut(BaseModel):
         ),
         examples=[["google_news_rss", "indice_local"]],
     )
+    trigger: SearchTrigger = Field(
+        default=SearchTrigger.MANUAL,
+        description=(
+            "Quién la lanzó: manual (una persona) o automatic (el monitor FGR a las "
+            "07:00, 15:00 o 23:00, ADR-0031). Las automáticas las ven todos."
+        ),
+    )
+    scheduled_for: datetime | None = Field(
+        default=None, description="Hora programada de una corrida automática (UTC)."
+    )
 
     @classmethod
     def from_detail(cls, detail: SearchDetail) -> "SearchOut":
@@ -215,6 +226,8 @@ class SearchOut(BaseModel):
             started_at=detail.started_at,
             finished_at=detail.finished_at,
             providers=list(detail.providers),
+            trigger=detail.trigger,
+            scheduled_for=detail.scheduled_for,
         )
 
 

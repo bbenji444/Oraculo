@@ -36,6 +36,15 @@ class SearchStatus(StrEnum):
         return self in (SearchStatus.COMPLETED, SearchStatus.PARTIAL, SearchStatus.FAILED)
 
 
+class SearchTrigger(StrEnum):
+    """Columna ``searches.trigger``: quién lanzó la búsqueda (F12.8, ADR-0031)."""
+
+    MANUAL = "manual"
+    """Una persona, desde Explorar o con ``make buscar``."""
+    AUTOMATIC = "automatic"
+    """El reloj, en un horario fijo del monitor FGR (07:00, 15:00, 23:00)."""
+
+
 class Stage(StrEnum):
     """Etapas del pipeline (§9), para ``progress`` y ``processing_errors``."""
 
