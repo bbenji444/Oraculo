@@ -73,7 +73,10 @@ async def test_pendientes_guardar_y_volver_a_pedir(
     weapons = next(c for c in categories if c.name == "Armas y explosivos")
 
     pending = await store.pending_notes([armas, sin_resumen], "classify_v1")
+    count_before = await store.count_pending("classify_v1")
     await store.save([CategoryChoice(armas, weapons, "tráfico de armas")], "classify_v1")
+    # La base de pruebas puede tener otras notas: se mide la diferencia.
+    assert await store.count_pending("classify_v1") == count_before - 1
     again = await store.pending_notes([armas, sin_resumen], "classify_v1")
     newer = await store.pending_notes([armas, sin_resumen], "classify_v2")
 

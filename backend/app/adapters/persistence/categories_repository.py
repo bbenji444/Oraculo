@@ -110,3 +110,21 @@ class PostgresCategoryStore:
                 {"id": search_id},
             )
             return [int(r.article_id) for r in rows]
+
+    async def count_pending(self, version: str) -> int:
+        """Cuántas notas faltan por clasificar con esta versión (para ``make clasificar``).
+
+        Args:
+            version: Versión vigente del prompt de clasificación.
+
+        Returns:
+            El número de notas pendientes.
+        """
+        async with self._engine.connect() as conn:
+            result = await conn.execute(
+                text(
+                    "SELECT count(*) FROM articles WHERE category_version IS DISTINCT FROM :version"
+                ),
+                {"version": version},
+            )
+            return int(result.scalar_one())
