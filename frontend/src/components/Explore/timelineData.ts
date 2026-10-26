@@ -267,6 +267,8 @@ export interface StoryItem {
   lead: Article;
   /** Todas sus notas (medios), incluida la principal. */
   articleIds: number[];
+  /** Las notas mismas, en orden de publicación (para el desglose de medios). */
+  notes: Article[];
   /** Cuándo se publicó la principal (milisegundos UTC). */
   at: number;
   /** Día en la Ciudad de México (`2026-10-25`), para agrupar. */
@@ -299,7 +301,13 @@ export function storyItems(articles: readonly Article[]): StoryItem[] {
     const lead = notes[0];
     const at = lead ? publishedAt(lead) : null;
     if (!lead || at === null) continue;
-    items.push({ lead, articleIds: notes.map((n) => n.article_id), at, day: mexicoDay(at) });
+    items.push({
+      lead,
+      articleIds: notes.map((n) => n.article_id),
+      notes,
+      at,
+      day: mexicoDay(at),
+    });
   }
   return items.sort((a, b) => b.at - a.at || b.lead.article_id - a.lead.article_id);
 }

@@ -56,3 +56,21 @@ Benji no se convenció con la línea horizontal y eligió, entre tres propuestas
 - La lista del panel izquierdo sigue oculta y vuelve con «☰ Lista».
 
 **Globo:** se quitó la luz del Sol en su posición real, porque marcaba demasiado la división entre el día y la noche. El día y la noche los elige el analista con su botón. Se conservan los ajustes de color de las imágenes de la NASA.
+
+## Ajuste: a la izquierda, con desglose y sin repetir (26/10/2026)
+
+Benji pidió la cronología del lado izquierdo y con más información al elegir un hecho, sin repetir lo que ya se ve.
+
+- **Va en el panel izquierdo**, debajo de la búsqueda, en el lugar de la lista de noticias. «☰ Lista» y «◷ Cronología» cambian entre las dos. El lado derecho queda libre para el globo.
+- **Desglose al elegir un hecho:** qué medios lo publicaron, a qué hora y entre qué horas («Lo publicaron 8 medios entre 08:32 y 13:46»), con el titular de cada medio cuando es distinto y su link.
+- **No repite lo que dice la ficha del globo.** Un primer intento ponía también el resumen, la categoría y quién actúa, pero eso ya sale en la ficha que se abre al mismo tiempo: era leer lo mismo dos veces.
+- Al elegir una nota desde el globo, solo se desplaza la cronología. Antes, `scrollIntoView` también movía la pantalla entera y dejaba una franja negra abajo; el contenedor de Explorar ahora usa `overflow: clip`.
+
+**Globo:**
+
+- **Aureola cian muy tenue y un brillo del Sol** asomándose por el borde, arriba a la izquierda. Son dos capas CSS detrás del mapa, sin luz en el globo ni división entre el día y la noche, y se apagan al acercarse (zoom 3 a 4.5).
+- MapLibre no da el contorno del globo en pantalla. Se calcula proyectando anillos de puntos alrededor del centro, porque con la cámara inclinada el borde ya no queda donde dice la fórmula del radio.
+- **Acercamiento al lugar de los hechos:**
+  - al volar a una nota: localidad a 14.5 (se ven las calles), municipio a 11.5, estado a 7 y país a 5, con inclinación de 45°;
+  - al elegir una región: el tope sube a 15 para localidad y a 12.5 para municipio;
+  - un grupo de notas encimadas se abre 1.5 niveles más cerca.

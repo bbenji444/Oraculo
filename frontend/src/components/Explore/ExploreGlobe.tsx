@@ -61,6 +61,8 @@ import { collapseAttributionOnStart } from '../../map/attribution';
 import { smoothFlights } from '../../map/flight';
 import {
   articleOffset,
+  auraOpacity,
+  ringAround,
   articleZoom,
   calloutWidth,
   flyPadding,
@@ -125,6 +127,9 @@ interface Callout {
 // Vista inicial: México con el eje inclinado (map/spin.ts).
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
 const INITIAL_ZOOM = 1.8;
+// «Acercar» un grupo: 1.5 niveles más que donde se separa, sin pasar de 15.
+const STACK_EXTRA_ZOOM = 1.5;
+const MAX_STACK_ZOOM = 15;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
@@ -149,8 +154,80 @@ const LEVEL_ORDER: RegionLevel[] = ['country', 'state', 'municipality', 'localit
 
 type FlyFn = ReturnType<typeof smoothFlights>;
 
+// Aureola: 1.4 veces el diámetro del globo (el degradado empieza en su borde).
+const AURA_SCALE = 2.8;
+// Brillo del Sol: tamaño respecto al radio, distancia al centro (justo fuera
+// del borde) y ángulo (arriba a la izquierda, en radianes).
+const SUN_GLARE_SCALE = 1.25;
+const SUN_DISTANCE = 1.02;
+const SUN_ANGLE = (-140 * Math.PI) / 180;
+// Búsqueda del borde: 16 direcciones y anillos de 60° a 90° del centro cada 2°
+// (con la cámara inclinada el borde visible queda antes de los 90°). Son ~250
+// proyecciones por cuadro: medido, no se nota.
+const LIMB_DIRECTIONS = 16;
+const LIMB_FROM_DEG = 60;
+const LIMB_TO_DEG = 90;
+const LIMB_STEP_DEG = 2;
+
+/**
+ * Dónde se ve el globo en pantalla: centro y radio de su silueta.
+ *
+ * MapLibre no lo expone. Se proyectan anillos de puntos cada vez más lejos del
+ * centro y, en cada dirección, se queda el más lejano (ese es el borde).
+ */
+function globeOutline(map: MapLibreMap): { x: number; y: number; radius: number } {
+  const center = map.getCenter();
+  const origin = map.project(center);
+  const edge = Array.from({ length: LIMB_DIRECTIONS }, () => ({ d: 0, x: origin.x, y: origin.y }));
+  for (let distance = LIMB_FROM_DEG; distance <= LIMB_TO_DEG; distance += LIMB_STEP_DEG) {
+    ringAround([center.lng, center.lat], distance, LIMB_DIRECTIONS).forEach((point, i) => {
+      const p = map.project(point);
+      const d = Math.hypot(p.x - origin.x, p.y - origin.y);
+      const best = edge[i];
+      if (best && Number.isFinite(d) && d > best.d) edge[i] = { d, x: p.x, y: p.y };
+    });
+  }
+  const x = edge.reduce((sum, p) => sum + p.x, 0) / edge.length;
+  const y = edge.reduce((sum, p) => sum + p.y, 0) / edge.length;
+  const radius = edge.reduce((sum, p) => sum + Math.hypot(p.x - x, p.y - y), 0) / edge.length;
+  return { x, y, radius };
+}
+
+/**
+ * Pone la aureola y el brillo del Sol alrededor del globo, donde esté y del
+ * tamaño que tenga; se apagan al acercarse (ya no se ve el borde).
+ */
+function placeAura(map: MapLibreMap, aura: HTMLElement | null, sun: HTMLElement | null): void {
+  if (!aura || !sun) return;
+  const opacity = auraOpacity(map.getZoom());
+  aura.style.opacity = String(opacity);
+  sun.style.opacity = String(opacity);
+  // Apagadas no hace falta buscar el borde (y de cerca ni se ve).
+  if (opacity === 0) return;
+  const { x, y, radius } = globeOutline(map);
+  const size = radius * AURA_SCALE;
+  Object.assign(aura.style, {
+    left: `${String(x - size / 2)}px`,
+    top: `${String(y - size / 2)}px`,
+    width: `${String(size)}px`,
+    height: `${String(size)}px`,
+  });
+  // El Sol se asoma arriba a la izquierda del borde, como al amanecer.
+  const glare = radius * SUN_GLARE_SCALE;
+  const sunX = x + Math.cos(SUN_ANGLE) * radius * SUN_DISTANCE;
+  const sunY = y + Math.sin(SUN_ANGLE) * radius * SUN_DISTANCE;
+  Object.assign(sun.style, {
+    left: `${String(sunX - glare / 2)}px`,
+    top: `${String(sunY - glare / 2)}px`,
+    width: `${String(glare)}px`,
+    height: `${String(glare)}px`,
+  });
+}
+
 export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const auraRef = useRef<HTMLDivElement>(null);
+  const sunRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
   // La entrada desde el espacio terminó: hasta entonces nadie más mueve la cámara
@@ -291,6 +368,9 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
         bearing: map.getBearing(),
         pitch: map.getPitch(),
       });
+      // La aureola va en el mismo cuadro que el globo: si esperara al siguiente
+      // se quedaría atrás (o quieta) mientras la cámara se mueve sin parar.
+      placeAura(map, auraRef.current, sunRef.current);
       cancelAnimationFrame(calloutFrame);
       calloutFrame = requestAnimationFrame(() => {
         setStack((current) => {
@@ -723,7 +803,9 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
   const zoomIntoStack = () => {
     const map = mapRef.current;
     if (!map || stack?.expandZoom == null) return;
-    const { lng, lat, expandZoom: zoom } = stack;
+    const { lng, lat } = stack;
+    // Un poco más allá de donde el grupo se separa: se llega al lugar.
+    const zoom = Math.min(MAX_STACK_ZOOM, stack.expandZoom + STACK_EXTRA_ZOOM);
     setStack(null);
     const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
     flyRef.current(duration, () => {
@@ -733,6 +815,27 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
 
   return (
     <div className="absolute inset-0">
+      {/* Detrás del globo: una aureola cian muy tenue y el brillo del Sol que se
+          asoma por el borde. El globo tapa lo de en medio; solo se ve el borde. */}
+      <div
+        ref={auraRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute rounded-full"
+        style={{
+          background:
+            // closest-side: los % son del radio del cuadro (el globo llega al 71 %).
+            'radial-gradient(circle closest-side, transparent 0 70.5%, rgb(90 220 255 / 0.42) 72%, rgb(0 180 255 / 0.16) 77%, rgb(0 120 255 / 0.05) 87%, transparent 100%)',
+        }}
+      />
+      <div
+        ref={sunRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute rounded-full mix-blend-screen"
+        style={{
+          background:
+            'radial-gradient(circle, rgb(255 255 255 / 0.95) 0, rgb(255 238 205 / 0.5) 5%, rgb(255 205 150 / 0.18) 20%, rgb(120 200 255 / 0.06) 42%, transparent 62%)',
+        }}
+      />
       <div ref={containerRef} className="h-full w-full" aria-label="Globo interactivo" />
       {tooltip?.label && (
         <div

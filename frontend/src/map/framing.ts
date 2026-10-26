@@ -42,13 +42,16 @@ export const DESKTOP_ARTICLE_OFFSET: [number, number] = [-120, 70];
 export const NARROW_ARTICLE_DROP = 0.22;
 // Zoom al volar a una nota, según qué tan preciso es su lugar: siempre el
 // mismo para la misma precisión (antes era "el mayor entre el actual y este" y,
-// ya de cerca, elegir otra nota no acercaba nada). Municipio a 9 y localidad a
-// 11 dejan ver el lugar y sus vecinos; estado 5 y país 4, todo el territorio.
+// ya de cerca, elegir otra nota no acercaba nada). Benji pidió el 26/10/2026
+// acercarse «casi casi al lugar de los hechos»: localidad o colonia a 14.5
+// (se ven las calles), municipio a 11.5 (la ciudad y sus alrededores: el
+// centro del municipio suele caer en el campo y a 12.5 no se veía nada),
+// estado a 7 y país a 5.
 export const ARTICLE_ZOOM: Record<'country' | 'state' | 'municipality' | 'locality', number> = {
-  country: 4,
-  state: 5,
-  municipality: 9,
-  locality: 11,
+  country: 5,
+  state: 7,
+  municipality: 11.5,
+  locality: 14.5,
 };
 // Ancho preferido de la ficha de una nota.
 export const CALLOUT_WIDTH = 330;
@@ -213,7 +216,55 @@ function extent(points: [number, number][], center: [number, number]) {
   };
 }
 
-/** Radio del globo en píxeles a ese zoom, con el centro en esa latitud. */
+/**
+ * Puntos del globo a `distance` grados del centro, en `count` direcciones
+ * parejas (la primera hacia el norte, luego en el sentido del reloj).
+ *
+ * Sirve para encontrar el borde del globo en pantalla: con la cámara inclinada
+ * y en perspectiva ya no está a 90° del centro, así que se proyectan varios
+ * anillos y se queda el más lejano de cada dirección.
+ *
+ * @param center Centro de la cámara `[lng, lat]`.
+ * @param distance Distancia en grados sobre la esfera (0 a 180).
+ * @param count Cuántos puntos.
+ * @returns Los puntos `[lng, lat]`.
+ */
+export function ringAround(
+  center: [number, number],
+  distance: number,
+  count: number,
+): [number, number][] {
+  const phi1 = center[1] * DEGREES;
+  const delta = distance * DEGREES;
+  return Array.from({ length: count }, (_, i) => {
+    const theta = (2 * Math.PI * i) / count;
+    const phi2 = Math.asin(
+      Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(theta),
+    );
+    const lambda = Math.atan2(
+      Math.sin(theta) * Math.sin(delta) * Math.cos(phi1),
+      Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2),
+    );
+    return [normalizeLng(center[0] + lambda / DEGREES), phi2 / DEGREES];
+  });
+}
+
+/**
+ * Cuánto se ven la aureola y el brillo del Sol alrededor del globo: completos
+ * con el globo entero en pantalla y se apagan al acercarse (ya no hay borde).
+ *
+ * @param zoom Zoom de MapLibre.
+ * @returns De 0 (no se ven) a 1.
+ */
+export function auraOpacity(zoom: number): number {
+  if (zoom <= AURA_FULL_ZOOM) return 1;
+  if (zoom >= AURA_GONE_ZOOM) return 0;
+  return (AURA_GONE_ZOOM - zoom) / (AURA_GONE_ZOOM - AURA_FULL_ZOOM);
+}
+// La aureola se ve completa hasta zoom 3 (el globo cabe) y se apaga en 4.5.
+export const AURA_FULL_ZOOM = 3;
+export const AURA_GONE_ZOOM = 4.5;
+
 function radiusAt(zoom: number, lat: number): number {
   return (TILE_SIZE * 2 ** zoom) / (2 * Math.PI * Math.cos(lat * DEGREES));
 }

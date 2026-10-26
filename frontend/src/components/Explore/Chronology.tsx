@@ -1,6 +1,9 @@
 /**
  * Cronología de Explorar (F12.7, ADR-0032; rediseño elegido por Benji el
- * 26/10/2026): un panel delgado a la derecha, como un feed en vivo.
+ * 26/10/2026): en el panel izquierdo, debajo de la búsqueda, como un feed en
+ * vivo. Al elegir un hecho se despliega su desglose: qué medios lo publicaron,
+ * a qué hora, con qué titular y su link (el resumen, la categoría y quién
+ * actúa los da la ficha que se abre en el globo; aquí no se repiten).
  *
  * - **Arriba**: cuántos hechos hay y una curva pequeña de cuántas notas se
  *   publicaron por hora (o por día), con los picos resaltados; un clic en la
@@ -55,6 +58,8 @@ const SHORT_DAY = new Intl.DateTimeFormat('es-MX', {
 /** Lienzo de la curva pequeña (se estira al ancho del panel). */
 const SPARK_WIDTH = 300;
 const SPARK_HEIGHT = 38;
+/** Aire arriba del hecho elegido al desplazar la lista (deja ver el encabezado del día). */
+const SCROLL_MARGIN_PX = 36;
 /** Vidrio homologado con OSINT (`--vidrio`, `--borde`, desenfoque de 14 px). */
 const GLASS_OSINT =
   'rounded-2xl border border-sky-400/15 bg-[#050505]/70 shadow-[0_26px_60px_-22px_rgb(0_0_0/0.9)] backdrop-blur-[14px]';
@@ -63,6 +68,17 @@ const PILL =
 
 function shortDay(ms: number): string {
   return SHORT_DAY.format(new Date(ms)).replace('.', '');
+}
+
+/** « ENTRE 05:17 Y 09:40» si las notas del hecho salieron a distintas horas. */
+function spanLabel(notes: readonly Article[]): string {
+  const times = notes
+    .map((note) => (note.published_at ? Date.parse(note.published_at) : Number.NaN))
+    .filter((ms) => Number.isFinite(ms));
+  if (times.length < 2) return '';
+  const first = HOUR.format(new Date(Math.min(...times)));
+  const last = HOUR.format(new Date(Math.max(...times)));
+  return first === last ? '' : ` ENTRE ${first} Y ${last}`;
 }
 
 function bucketLabel(bucket: TimelineBucket, unit: TimelineUnit): string {
@@ -162,35 +178,79 @@ function Entry({ item, selected, selectedRef, onSelect }: EntryProps) {
               : 'size-2 bg-sky-400/80 shadow-[0_0_6px_rgb(0_210_255/0.6)]'
         }`}
       />
-      <button
-        ref={selected ? selectedRef : undefined}
-        type="button"
-        aria-current={selected}
-        onClick={() => {
-          onSelect(article.article_id);
-        }}
-        className={`w-full rounded-lg px-2 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-          selected ? 'bg-sky-400/15' : 'hover:bg-white/[0.05]'
-        }`}
+      <div
+        className={`rounded-lg transition-colors ${selected ? 'bg-sky-400/[0.1] ring-1 ring-sky-400/30' : ''}`}
       >
-        <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-100">
-          {article.title}
-        </span>
-        <span className="mt-0.5 block truncate text-[10.5px] text-slate-400">
-          {others > 0 && (
-            <span className="text-sky-300">
-              +{others} medio{others === 1 ? '' : 's'} ·{' '}
+        <button
+          ref={selected ? selectedRef : undefined}
+          type="button"
+          aria-expanded={selected}
+          onClick={() => {
+            onSelect(article.article_id);
+          }}
+          className={`w-full rounded-lg px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-sky-400 ${
+            selected ? '' : 'hover:bg-white/[0.05]'
+          }`}
+        >
+          <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-100">
+            {article.title}
+          </span>
+          <span className="mt-0.5 block truncate text-[10.5px] text-slate-400">
+            {others > 0 && (
+              <span className="text-sky-300">
+                +{others} medio{others === 1 ? '' : 's'} ·{' '}
+              </span>
+            )}
+            {place ?? article.source_name ?? article.source_domain ?? ''}
+            {article.category ? ` · ${article.category.name}` : ''}
+          </span>
+          {event?.kind === 'event' && (
+            <span className="mt-0.5 block text-[10.5px] text-amber-200/80">
+              ◆ El hecho ocurrió el {shortDay(event.at)}
             </span>
           )}
-          {place ?? article.source_name ?? article.source_domain ?? ''}
-          {article.category ? ` · ${article.category.name}` : ''}
-        </span>
-        {event?.kind === 'event' && (
-          <span className="mt-0.5 block text-[10.5px] text-amber-200/80">
-            ◆ El hecho ocurrió el {shortDay(event.at)}
-          </span>
+        </button>
+        {selected && (
+          // Desglose: solo lo que la ficha del globo no dice. El resumen, la
+          // categoría y quién actúa ya salen en la ficha; repetirlos era leer lo
+          // mismo dos veces (Benji, 26/10). Aquí va cómo se contó: qué medios lo
+          // publicaron, a qué hora y con qué titular (si es otro).
+          <div className="px-2 pb-2.5 pt-0.5 text-[11.5px]">
+            <p className="font-display text-[9px] tracking-wider text-slate-400">
+              {item.notes.length === 1
+                ? 'SOLO LO PUBLICÓ UN MEDIO'
+                : `LO PUBLICARON ${String(item.notes.length)} MEDIOS${spanLabel(item.notes)}`}
+            </p>
+            <ul className="mt-1 space-y-1">
+              {item.notes.map((note) => (
+                <li key={note.article_id} className="flex items-baseline gap-1.5">
+                  <span className="w-8 shrink-0 tabular-nums text-[10px] text-slate-500">
+                    {note.published_at ? HOUR.format(new Date(note.published_at)) : '—'}
+                  </span>
+                  <span className="min-w-0">
+                    <a
+                      href={note.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-sky-300 hover:text-sky-100 hover:underline"
+                    >
+                      {note.source_name ?? note.source_domain ?? 'Medio sin nombre'} ↗
+                    </a>
+                    {note.title !== article.title && (
+                      <span
+                        className="block truncate text-[10.5px] text-slate-400"
+                        title={note.title}
+                      >
+                        {note.title}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-      </button>
+      </div>
     </li>
   );
 }
@@ -217,6 +277,7 @@ export function Chronology({ articles }: ChronologyProps) {
   const selectedId = useExplorerStore((s) => s.articleId);
   const selectArticle = useExplorerStore((s) => s.selectArticle);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // La curva respeta categoría y estado; la lista, además, el tramo elegido.
   const forSpark = useMemo(
@@ -242,8 +303,17 @@ export function Chronology({ articles }: ChronologyProps) {
   const filtered = range !== null || categoryId !== null || stateCode !== null;
   const notes = items.reduce((total, item) => total + item.articleIds.length, 0);
 
+  // Solo se desplaza la lista: `scrollIntoView` también movía la página entera
+  // (el globo se subía y quedaba una franja negra abajo).
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const list = listRef.current;
+    const row = selectedRef.current;
+    if (!list || !row) return;
+    const box = list.getBoundingClientRect();
+    const target = row.getBoundingClientRect();
+    if (target.top < box.top || target.bottom > box.bottom) {
+      list.scrollBy({ top: target.top - box.top - SCROLL_MARGIN_PX, behavior: 'smooth' });
+    }
   }, [selectedId]);
 
   if (!open) {
@@ -350,7 +420,7 @@ export function Chronology({ articles }: ChronologyProps) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {days.length === 0 && (
           <p className="px-1 py-4 text-xs text-slate-400">No hay notas con estos filtros.</p>
         )}
