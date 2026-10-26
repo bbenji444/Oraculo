@@ -86,6 +86,24 @@ class PostgresReportStore:
             cost_usd=float(row["llm_cost_usd"]),
         )
 
+    async def set_pdf_path(self, search_id: UUID, path: str) -> bool:
+        """Anota dónde quedó el PDF que armó una corrida automática (F12.8).
+
+        Args:
+            search_id: Búsqueda.
+            path: Ruta del archivo en el servidor.
+
+        Returns:
+            ``True`` si la búsqueda ya tenía su fila de reporte (la crea el
+            resumen ejecutivo); sin resumen no hay dónde anotarlo.
+        """
+        async with self._engine.begin() as conn:
+            result = await conn.execute(
+                text("UPDATE reports SET pdf_path = :path WHERE search_id = :id"),
+                {"path": path, "id": search_id},
+            )
+        return result.rowcount > 0
+
     async def save_summary(self, search_id: UUID, summary: StoredSummary, actor: Actor) -> None:
         """Ver ``ReportStorePort.save_summary``."""
         async with self._engine.begin() as conn:

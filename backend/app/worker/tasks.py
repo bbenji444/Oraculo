@@ -1,4 +1,7 @@
-"""Tareas de Celery: ingesta, limpieza (ADR-0013), búsquedas (§9) y entidades (9.4).
+"""Tareas de Celery: ingesta, limpieza, búsquedas, entidades y corridas automáticas.
+
+Ingesta y limpieza (ADR-0013), búsquedas (§9), entidades (9.4) y las corridas
+automáticas del monitor FGR (F12.8, ADR-0031).
 
 ``celery beat`` (el reloj que arranca ``make up``) las encola según
 ``beat_schedule`` en ``celery_app.py``; el worker las ejecuta. Cada tarea es
@@ -17,7 +20,8 @@ from uuid import UUID
 from app.adapters.queue.celery_queue import ENTITIES_TASK, SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
-from app.worker.celery_app import celery_app
+from app.worker.automatic_jobs import run_automatic_job
+from app.worker.celery_app import AUTOMATIC_RUN_TASK, celery_app
 from app.worker.entity_jobs import run_entity_extraction
 from app.worker.ingest_jobs import run_ingest, run_purge
 from app.worker.search_jobs import purge_article_texts, run_search_job
@@ -127,4 +131,25 @@ def extract_case_entities(case_id: str, article_id: int, requested_by: str) -> d
         "Entidades de una nota del caso",
         extra={"case_id": case_id, "article_id": article_id, **result},
     )
+    return result
+
+
+@celery_app.task(name=AUTOMATIC_RUN_TASK)
+def automatic_run() -> dict[str, object]:
+    """Corrida automática del monitor FGR (la lanza el reloj a las 07:00, 15:00 y 23:00).
+
+    Returns:
+        La búsqueda creada, su estado, notas, costo y la ruta del PDF.
+    """
+    summary = asyncio.run(run_automatic_job(get_settings()))
+    result: dict[str, object] = {
+        "search_id": str(summary.search_id),
+        "corrida": summary.scheduled_for.isoformat(),
+        "status": summary.report.status.value,
+        "articles": summary.report.articles,
+        "credits_used": summary.report.credits_used,
+        "llm_cost_usd": round(summary.report.llm_cost_usd, 4),
+        "pdf": str(summary.pdf_path) if summary.pdf_path else None,
+    }
+    logger.info("Corrida automática terminada", extra=result)
     return result

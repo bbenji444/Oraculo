@@ -29,7 +29,8 @@ COVERAGE_MIN := 85
         format frontend-build geo-download geo-inspect geo-load geo-validate geo-tiles \
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
-        limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos
+        limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos \
+        corrida-fgr
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -147,6 +148,9 @@ clasificar: ## Clasifica por categoría las notas guardadas: sin ARGS 5 de ejemp
 
 retirar-conceptos: ## Deja vigente solo el concepto FGR (borrado lógico): sin ARGS solo muestra; ARGS=--aplicar lo hace (pide "si")
 	$(UV_RUN) python -m app.cli.retirar_conceptos $(ARGS)
+
+corrida-fgr: ## Corre ahora una corrida del monitor FGR (la misma de las 07:00, 15:00 y 23:00): pide "si" y muestra 5 notas
+	$(UV_RUN) python -m app.cli.corrida_fgr
 
 extraer-entidades: ## La IA lee notas de un caso y muestra las entidades que propone; pide "si" (ARGS="--caso <id> --muestra 5")
 	$(UV_RUN) python -m app.cli.extraer_entidades $(ARGS)

@@ -18,7 +18,7 @@ from app.application.pagination import TimeCursor
 from app.domain.aggregates import NoteLocation
 from app.domain.authority import Authority
 from app.domain.enrichment import LLMUsage
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, SearchTrigger
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +61,8 @@ class SearchDetail:
         finished_at: Cuándo terminó.
         providers: Fuentes con las que se hizo (ADR-0027); vacío en las de
             antes de F12.2, que usaron todas las configuradas.
+        trigger: Quién la lanzó (F12.8): una persona o el reloj.
+        scheduled_for: Hora programada de una corrida automática.
     """
 
     search_id: UUID
@@ -84,6 +86,8 @@ class SearchDetail:
     started_at: datetime | None
     finished_at: datetime | None
     providers: tuple[str, ...] = ()
+    trigger: SearchTrigger = SearchTrigger.MANUAL
+    scheduled_for: datetime | None = None
 
 
 class SearchReaderPort(Protocol):

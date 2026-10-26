@@ -109,6 +109,8 @@ curl -s -X POST http://localhost:8080/api/v1/searches/estimate -H 'Content-Type:
 
 `providers` dice con qué fuentes se buscaría; `GET /searches/{id}` y el historial devuelven el mismo campo con las fuentes con que se hizo (vacío en las búsquedas de antes de F12.2, que usaron todas).
 
+`GET /searches/{id}` y el historial traen además `trigger`, que es `manual` (la pidió una persona) o `automatic` (la lanzó el monitor FGR, ADR-0031), y `scheduled_for`, la hora programada de una corrida automática, en UTC. El historial de cada persona incluye sus búsquedas y **todas** las corridas automáticas.
+
 `max_cost_usd` es el máximo: las notas ya procesadas en búsquedas anteriores no se vuelven a pagar.
 
 ## Lanzar una búsqueda (gasta)
