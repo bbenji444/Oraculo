@@ -12,8 +12,12 @@ Regla, calibrada con las 1,450 notas reales del 24/10/2026:
 2. Una nota entra a una historia si se parece a **su primera nota** (no a
    cualquiera: unir en cadena juntaba temas enteros, grupos de 61 notas):
    - títulos con parecido ≥ ``SAME_STORY_SIMILARITY``, o
+   - parecido por palabras ≥ ``SAME_STORY_STRONG_TOKEN_SIMILARITY`` con al
+     menos ``STRONG_SHARED_TOKENS`` palabras en común (aunque sean comunes:
+     cuando un caso domina la ventana, sus palabras ya no son raras), o
    - parecido por palabras ≥ ``SAME_STORY_TOKEN_SIMILARITY`` **y** una señal:
-     el mismo lugar principal (clave INEGI), dos palabras poco comunes en
+     el mismo lugar principal (clave INEGI) con dos palabras en común, dos
+     palabras poco comunes en
      común, o el mismo estado y una palabra poco común.
 3. A ≤ ``STORY_GAP`` de la última nota de la historia y a ≤ ``STORY_SPAN``
    de la primera.
@@ -37,6 +41,17 @@ from app.domain.names import normalize_name
 SAME_STORY_SIMILARITY = 0.70
 # Parecido por palabras (fuzz.token_set_ratio) que necesita además una señal.
 SAME_STORY_TOKEN_SIMILARITY = 0.60
+# Parecido por palabras alto que basta con compartir varias palabras, aunque
+# sean comunes. Cuando un caso domina la ventana sus palabras dejan de ser
+# «poco comunes» («JAUREGUI», «TRAICION», «PATRIA» en 100 títulos) y la
+# vinculación a proceso de Jáuregui quedaba partida en 12 historias. Medido el
+# 26/10/2026 en la corrida FGR: los pares del mismo hecho daban 0.75 a 0.91
+# con 3 a 6 palabras en común; los de hechos distintos, menos.
+SAME_STORY_STRONG_TOKEN_SIMILARITY = 0.75
+STRONG_SHARED_TOKENS = 3
+# Palabras en común que pide la señal de «mismo lugar» (medido el 26/10/2026:
+# con una sola, las notas de Día de Muertos en CDMX se juntaban entre sí).
+PLACE_SHARED_TOKENS = 2
 # Una palabra es «poco común» si aparece en a lo más tantos títulos de la
 # ventana (calibrado: «Micky», «Cromo», «Janitzio»; no «balacera» ni «FGR»).
 RARE_TOKEN_MAX_TITLES = 8
@@ -211,16 +226,40 @@ class _Rule:
         self._similarity = similarity
         self._token_similarity = token_similarity
 
-    def same(self, leader: _Prepared, note: _Prepared) -> bool:
-        if self._similarity(leader.clean, note.clean) >= SAME_STORY_SIMILARITY:
-            return True
-        if self._token_similarity(leader.clean, note.clean) < SAME_STORY_TOKEN_SIMILARITY:
-            return False
-        rare = {t for t in leader.tokens & note.tokens if self._counts[t] <= RARE_TOKEN_MAX_TITLES}
-        same_place = leader.place is not None and leader.place == note.place
+    def closeness(self, leader: _Prepared, note: _Prepared) -> float | None:
+        """Qué tanto se parece ``note`` a la primera nota de una historia.
+
+        Returns:
+            El mayor de los dos parecidos (0 a 1) si la regla dice que es el
+            mismo hecho; ``None`` si no lo es.
+        """
+        ratio = self._similarity(leader.clean, note.clean)
+        token_similarity = self._token_similarity(leader.clean, note.clean)
+        closeness = max(ratio, token_similarity)
+        if ratio >= SAME_STORY_SIMILARITY:
+            return closeness
+        if token_similarity < SAME_STORY_TOKEN_SIMILARITY:
+            return None
+        shared = leader.tokens & note.tokens
+        if (
+            token_similarity >= SAME_STORY_STRONG_TOKEN_SIMILARITY
+            and len(shared) >= STRONG_SHARED_TOKENS
+        ):
+            return closeness
+        rare = {t for t in shared if self._counts[t] <= RARE_TOKEN_MAX_TITLES}
+        # El mismo lugar pide además dos palabras en común: con una sola,
+        # «CDMX espera 500 mil visitantes por Día de Muertos» se tragaba la
+        # derrama de Coparmex y los establecimientos (solo «MUERTOS»).
+        same_place = (
+            leader.place is not None
+            and leader.place == note.place
+            and len(shared) >= PLACE_SHARED_TOKENS
+        )
         state = _state_of(leader.place)
         same_state = state is not None and state == _state_of(note.place)
-        return same_place or len(rare) >= RARE_TOKENS_ALONE or (same_state and len(rare) >= 1)
+        if same_place or len(rare) >= RARE_TOKENS_ALONE or (same_state and len(rare) >= 1):
+            return closeness
+        return None
 
 
 def _fits(story: _Story, note: _Prepared) -> bool:
@@ -254,7 +293,7 @@ def assign_stories(
     """Decide a qué historia va cada nota nueva.
 
     Las nuevas se revisan en orden cronológico. Cada una entra a la historia
-    más antigua cuya primera nota se le parezca según la regla; si ninguna,
+    que la regla acepta y cuya primera nota más se le parece; si ninguna,
     abre la suya. Las notas de ``existing`` conservan su historia.
 
     Args:
@@ -283,7 +322,13 @@ def assign_stories(
             (s for s in stories if _fits(s, note)),
             key=lambda s: (s.leader.note.published_at, s.leader.note.article_id),
         )
-        story = next((s for s in candidates if rule.same(s.leader, note)), None)
+        # Entre las historias que aceptan la nota gana la que más se le parece,
+        # no la más antigua: con la regla fuerte, la derrama de Coparmex por
+        # Día de Muertos caía en «CDMX espera 500 mil visitantes». En empate,
+        # la más antigua (max se queda con la primera).
+        scored = [(rule.closeness(s.leader, note), s) for s in candidates]
+        matches = [(score, s) for score, s in scored if score is not None]
+        story = max(matches, key=lambda m: m[0])[1] if matches else None
         if story is None:
             stories.append(_Story(note, [note]))
         else:

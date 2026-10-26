@@ -46,3 +46,23 @@ Calibración con las 1,450 notas reales de `articles` (24/10/2026):
 - **El error esperado:** un mismo hecho partido en dos historias (la balacera tiene una segunda historia de 5 notas). Es preferible a juntar hechos distintos.
 - **Notas que llegan tarde:** se comparan con las historias de su fecha. `make agrupar-historias --aplicar` lo recalcula todo si hiciera falta.
 - **Reporte:** el reporte (F12.10) podrá contar hechos, no solo notas, con `story_id`.
+
+## Ajuste: casos que dominan la ventana (26/10/2026)
+
+En la corrida FGR de las 07:00 del 26/10 había 162 notas en 94 hechos, y 41 de esos hechos eran del caso Jáuregui. La misma vinculación a proceso quedaba partida en unas 12 historias. La causa: cuando un caso domina, sus palabras («JAUREGUI», «TRAICION», «PATRIA») aparecen en decenas de títulos y dejan de contar como «poco comunes», así que la regla no encontraba señal.
+
+Cambios:
+
+1. **Regla fuerte.** Basta un parecido por palabras de 0.75 o más (`SAME_STORY_STRONG_TOKEN_SIMILARITY`) con 3 palabras en común o más, aunque sean comunes. Medido: los pares del mismo hecho daban de 0.75 a 0.91, con 3 a 6 palabras.
+2. **Gana la historia más parecida, no la más antigua.** Con la regla fuerte, la derrama de Coparmex caía en «CDMX espera 500 mil visitantes».
+3. **El mismo lugar pide dos palabras en común** (`PLACE_SHARED_TOKENS`). Con una sola («MUERTOS»), las notas de Día de Muertos en CDMX se juntaban entre sí.
+
+Resultado al reagrupar las 1,660 notas:
+
+- **Todas las notas:** de 1,242 a 1,232 tarjetas.
+- **La corrida FGR:** de 94 a 87 hechos.
+- **El caso Jáuregui:** de 41 a 34 hechos.
+- **Mejoras:** la vinculación de Axe Ceremonia queda en una historia de 10 notas, y el choque del Metrobús, el desfile y la derrama de Día de Muertos también quedan juntos.
+- **Retroceso conocido:** la muerte del actor Carlos Miguel queda en 3 o 4 historias en lugar de una de 5. Sus títulos se parecen poco entre sí.
+
+Los 34 hechos del caso Jáuregui que quedan son, en buena parte, hechos distintos (la carta, la caravana, las protestas, las columnas). Esa saturación se atiende en la pantalla, agrupando por caso (ADR-0032).
