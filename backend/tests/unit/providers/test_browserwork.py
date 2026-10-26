@@ -8,6 +8,7 @@ respuestas grabadas de una llamada real en cuanto Benji la autorice.
 import json
 from collections.abc import Callable
 from datetime import date
+from pathlib import Path
 
 import httpx2
 import pytest
@@ -231,3 +232,40 @@ async def test_sin_direccion_no_esta_configurado() -> None:
         await bw.search(query())
     assert sent == []
     await http.aclose()
+
+
+# --- Respuestas reales grabadas el 25/10/2026 (FGR, México, 2 días; ADR-0028) ---
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "providers"
+
+
+def recorded(name: str) -> dict[str, object]:
+    data: dict[str, object] = json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
+    return data
+
+
+def test_bing_real_trae_paginas_institucionales_no_noticias() -> None:
+    # Medido: la búsqueda web sin fecha devuelve los sitios oficiales.
+    articles, discarded = parse_results(
+        recorded("browserwork_bing_fgr_mexico_2d"), Provider.BROWSERWORK_BING
+    )
+
+    assert (len(articles), discarded) == (10, 0)
+    assert {a.source_domain for a in articles} <= {
+        "fiscalia.com",
+        "fgr.org.mx",
+        "fiscanet.fgr.org.mx",
+        "gob.mx",
+        "fgjcdmx.gob.mx",
+    }
+
+
+def test_google2_real_trae_links_reconstruidos_por_browserwork() -> None:
+    # Medido: BrowserWork arma la URL con el texto que Google muestra arriba
+    # del título (engines.py, _prefer_google_url), no con el link real.
+    articles, _ = parse_results(
+        recorded("browserwork_google2_fgr_mexico_2d"), Provider.BROWSERWORK_GOOGLE2
+    )
+
+    assert "https://3reacciones/" in [a.url for a in articles]
+    assert "https://hace6horas/" in [a.url for a in articles]

@@ -57,3 +57,20 @@ Lo que importa para integrarlo:
 - **Riesgos aceptados por Benji (ADR-0023):** la contraseña de `apis` sigue sin rotar (no se usa aquí), y la API de BrowserWork no tiene llave.
 - **Criterio para el perfil automático:** una semana de uso manual sin bloqueos y que aporte notas que el RSS y el índice local no traen. Se decide con otro ADR.
 - **`# VERIFICAR` con la primera llamada real** (con permiso de Benji): que Google 2 respete `after:`/`before:` y que la cancelación responda como se leyó en el código.
+
+## Primera medición real (25/10/2026)
+
+Con permiso de Benji: una búsqueda por motor de «Fiscalia General de la Republica», México, últimos 2 días, con 1 página. Respuestas grabadas en `backend/tests/fixtures/providers/browserwork_*_fgr_mexico_2d.json`.
+
+| | Bing | Google 2 |
+|---|---|---|
+| Tiempo total (crear → resultados) | ~5 s (1.8 s en su navegador) | ~5 s (1.4 s en su navegador) |
+| Resultados | 10 | 6 |
+| ¿Son noticias? | **No**: los 10 son sitios oficiales (fgr.org.mx, gob.mx, fgjcdmx.gob.mx, fiscalia.com) | Sí: notas recientes (El Economista: vinculación de César Jáuregui; Capital 21; la FGR en Chiapas en X) |
+| ¿Links usables? | Sí (páginas de inicio) | **No** |
+| Captcha | No | No |
+
+- **`after:`/`before:` en Google 2:** sí acotan el periodo; todo lo que trajo era de las últimas horas. Queda verificado.
+- **Bing web no sirve para noticias** con el texto de consulta actual: sin operador de fecha, el buscador prioriza los sitios oficiales del término.
+- **Google 2 devuelve links reconstruidos.** Es un error de BrowserWork. En `app/engines.py`, `_prefer_google_url`, cuando Google da su link de redirección (`google.com/url?q=<link real>`), BrowserWork no lee el parámetro `q` y arma la URL con el texto que Google muestra arriba del título. Así, «3 reacciones · hace 6 horas» se vuelve `https://3reacciones/` y la nota de El Economista queda como `https://www.eleconomista.com.mx/Politica`. El link real ya no llega a este sistema, así que no se puede corregir aquí.
+- **La cancelación** no se probó: no hubo captcha.

@@ -71,6 +71,8 @@ _EXTENSION = {
     Provider.SEARCHAPI: "json",
     Provider.GDELT: "json",
     Provider.GOOGLE_NEWS_RSS: "xml",
+    Provider.BROWSERWORK_BING: "json",
+    Provider.BROWSERWORK_GOOGLE2: "json",
 }
 _MS_PER_SECOND = 1000
 # Por qué un proveedor no se puede consultar.
