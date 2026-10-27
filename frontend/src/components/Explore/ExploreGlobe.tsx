@@ -27,17 +27,19 @@ import { useEffect, useRef, useState } from 'react';
 import { useRegionDetail } from '../../hooks/useRegions';
 import {
   easeInOutCubic,
-  easeOutQuint,
+  easeOutCubic,
   flyDurationMs,
   flyPitch,
   IDLE_RESUME_MS,
   INTRO_DURATION_MS,
   INTRO_FROM_ZOOM,
   INTRO_LNG_OFFSET_DEGREES,
+  introSpin,
   type MotionPreset,
   pulsePhase,
   spinFactor,
   spinRamp,
+  SPIN_RAMP_MS,
   staggerDelayMs,
 } from '../../map/motion';
 import {
@@ -162,6 +164,7 @@ const IDLE_CHECK_MS = 1000;
 const PULSE_FRAME_MS = 1000 / 30;
 // Rampa mínima: con 0 el paso no se movería y la cadena de giro se cortaría.
 const MIN_SPIN_RAMP = 0.05;
+const MS_PER_SECOND = 1000;
 // Eventos de la persona que detienen el giro.
 const USER_EVENTS = ['mousedown', 'touchstart', 'wheel', 'dragstart'] as const;
 const NEWS_LAYERS = ['news-point', 'news-coarse', 'news-cluster'];
@@ -313,6 +316,14 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     flyRef.current = fly;
 
     let introDone = !intro;
+    let introFrame = 0;
+    // Termina la entrada: desde aquí el globo es de la persona (o del giro).
+    const finishIntro = () => {
+      if (introDone) return;
+      introDone = true;
+      cancelAnimationFrame(introFrame);
+      setIntroFinished(true);
+    };
     const spinStep = () => {
       if (!spinningRef.current || !introDone || !activeRef.current) return;
       const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(performance.now() - spinStartRef.current));
@@ -330,6 +341,8 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     for (const type of USER_EVENTS) {
       map.on(type, () => {
         lastInteractionRef.current = performance.now();
+        // Si toca el globo durante la entrada, la entrada se detiene ahí.
+        finishIntro();
         useExplorerStore.getState().setSpinning(false);
       });
     }
@@ -367,20 +380,38 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       for (const layer of newsLayers()) map.addLayer(layer);
       setReady(true);
       if (intro) {
-        map.once('moveend', () => {
-          introDone = true;
-          setIntroFinished(true);
-          spinStartRef.current = performance.now();
-          spinStep();
-        });
-        fly(INTRO_DURATION_MS, () => {
-          map.easeTo({
-            center: INTRO_CENTER,
-            zoom: INITIAL_ZOOM,
-            duration: INTRO_DURATION_MS,
-            easing: easeOutQuint,
+        // La entrada gira desde el espacio y entrega su velocidad al giro
+        // normal: frena parejo hasta llevar justo esa velocidad (introSpin) y
+        // el giro sigue sin pausa y sin rampa (Benji, 27/10/2026).
+        const from = map.getCenter();
+        const fromZoom = map.getZoom();
+        const distance = from.lng - INTRO_CENTER[0];
+        const spinPerSecond =
+          (spinDegrees(INITIAL_ZOOM) * spinFactor(motionRef.current) * MS_PER_SECOND) /
+          SPIN_STEP_MS;
+        const endSlope = (spinPerSecond * INTRO_DURATION_MS) / MS_PER_SECOND / distance;
+        const startMs = performance.now();
+        const stepIntro = (now: number) => {
+          if (introDone) return;
+          const t = Math.min(1, (now - startMs) / INTRO_DURATION_MS);
+          const settle = easeOutCubic(t);
+          map.jumpTo({
+            center: [
+              from.lng - distance * introSpin(t, endSlope),
+              from.lat + (INTRO_CENTER[1] - from.lat) * settle,
+            ],
+            zoom: fromZoom + (INITIAL_ZOOM - fromZoom) * settle,
           });
-        });
+          if (t < 1) {
+            introFrame = requestAnimationFrame(stepIntro);
+            return;
+          }
+          finishIntro();
+          // Ya va a toda velocidad: el giro empieza sin su rampa.
+          spinStartRef.current = performance.now() - SPIN_RAMP_MS;
+          spinStep();
+        };
+        introFrame = requestAnimationFrame(stepIntro);
       } else {
         setIntroFinished(true);
       }
@@ -560,6 +591,7 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       observer.disconnect();
       stopAttribution();
       cancelAnimationFrame(calloutFrame);
+      cancelAnimationFrame(introFrame);
       window.clearTimeout(lostTimer);
       map.remove();
       mapRef.current = null;

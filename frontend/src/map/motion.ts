@@ -144,6 +144,35 @@ export function easeOutQuint(t: number): number {
   return 1 - (1 - t) ** 5;
 }
 
+/** Curva que frena al final (cúbica), más suave que la quíntica: para el zoom de la entrada. */
+export function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+/**
+ * Avance del giro durante la entrada: arranca rápido y frena parejo hasta
+ * llevar justo la velocidad del giro normal, así el giro sigue sin pausa.
+ *
+ * Antes la entrada frenaba casi a cero (quíntica) y el giro arrancaba desde el
+ * 5 %: unos 4 s con el mundo casi quieto al abrir, que se sentían como si el
+ * sistema se trabara (Benji, 27/10/2026). Es una parábola (frenado constante)
+ * con pendiente final `endSlope`.
+ *
+ * @param t Avance del tiempo, de 0 a 1.
+ * @param endSlope Velocidad al final, en «recorrido total por duración total»:
+ *   la del giro × la duración ÷ los grados recorridos. Entre 0 y 2.
+ * @returns Avance del recorrido, de 0 a 1.
+ *
+ * @example
+ *   introSpin(1, 0.1) // 1: llega
+ *   // y su pendiente en 1 es 0.1: sigue a la velocidad del giro.
+ */
+export function introSpin(t: number, endSlope: number): number {
+  const slope = Math.min(2, Math.max(0, endSlope));
+  const u = Math.min(1, Math.max(0, t));
+  return (slope - 1) * u * u + (2 - slope) * u;
+}
+
 // --- Rotación -----------------------------------------------------------------
 
 // Tras este tiempo sin tocar el mapa, el globo vuelve a girar solo.

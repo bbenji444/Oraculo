@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   durationFactor,
   easeInOutCubic,
+  easeOutCubic,
   easeOutQuint,
+  introSpin,
   FLY_MAX_MS,
   FLY_MIN_MS,
   flyDurationMs,
@@ -68,6 +70,23 @@ describe('curvas y rotación', () => {
     }
     // La de entrada frena al final: a la mitad ya recorrió casi todo.
     expect(easeOutQuint(0.5)).toBeGreaterThan(0.9);
+  });
+
+  it('la entrada llega con la velocidad del giro, sin quedarse quieta', () => {
+    const endSlope = 0.13;
+    const step = 1e-4;
+
+    expect(introSpin(0, endSlope)).toBe(0);
+    expect(introSpin(1, endSlope)).toBeCloseTo(1);
+    // Al final va justo a la velocidad del giro (no a cero, como la quíntica).
+    const endSpeed = (introSpin(1, endSlope) - introSpin(1 - step, endSlope)) / step;
+    expect(endSpeed).toBeCloseTo(endSlope, 3);
+    // Frena parejo: siempre avanza y nunca se pasa.
+    for (let t = 0.05; t <= 1; t += 0.05) {
+      expect(introSpin(t, endSlope)).toBeGreaterThan(introSpin(t - 0.05, endSlope));
+      expect(introSpin(t, endSlope)).toBeLessThanOrEqual(1 + 1e-9);
+    }
+    expect(easeOutCubic(1)).toBe(1);
   });
 
   it('la rotación arranca acelerando, sin saltos', () => {
