@@ -1033,21 +1033,6 @@ table.stacks td.num {
 }
 
 /* Novedades de una corrida automática frente a la anterior (ADR-0034). */
-.ins-new {
-  border-color: var(--inside);
-  background: var(--inside-soft);
-  color: var(--inside);
-}
-
-.ins-known {
-  border-color: var(--line);
-  color: var(--muted);
-}
-
-.item-known h5 a {
-  color: var(--muted);
-}
-
 .novelty {
   margin: 8pt 0 4pt;
   padding: 8pt 10pt;

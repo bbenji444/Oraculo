@@ -31,7 +31,12 @@ Una sonda con 4 consultas gratis (nombre y sigla, cada día) juntó **281 notas 
    Solo se parte por día una ventana de fechas fijas de hasta 3 días: `when:Nd` («últimos N días») cuenta horas hacia atrás y no equivale a días de calendario. Con 4 consultas, un concepto y los otros 5 proveedores caben en el máximo de 10 por búsqueda. El texto de cada consulta lleva su día, pero el adaptador filtra con la ventana completa, porque Google no siempre respeta `after:`/`before:`.
 3. **El concepto FGR lleva acentos** (migración 0031). Solo se cambia si sigue como lo dejó la semilla; `name_norm` no cambia, así que la corrida automática lo sigue encontrando. Lo que la IA ya juzgó se reutiliza: la caché de la IA depende de la versión del prompt y del concepto, no de sus palabras clave.
 4. **El índice local devuelve hasta 500 notas.** Antes eran 250. El límite real es lo que la IA lee por búsqueda (150); lo que no alcanza a leer queda pendiente y lo lee la corrida siguiente.
-5. **El PDF de una corrida automática separa lo nuevo de lo ya reportado** en la corrida automática anterior. Ver la sección «Novedades» del reporte.
+5. **El PDF de una corrida automática lista solo los hechos nuevos** frente a la corrida automática anterior (Benji, 27/10/2026: «solo hechos nuevos cada corrida, para no saturarnos de información repetitiva»).
+   - Un hecho ya reportado no se lista, aunque lo publique un medio más.
+   - La sección «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten.
+   - El panorama, las gráficas y el mapa siguen cubriendo toda la ventana de la corrida.
+
+   En la corrida de las 23:00 del 26/10, el PDF bajó de 26 a 14 páginas.
 
 ## Alternativas consideradas
 

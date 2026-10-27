@@ -485,17 +485,12 @@ class NumberedNote:
         also: Las demás notas del mismo hecho en otros medios (ADR-0026), de
             la primera a la última. Se citan con su medio y link, sin repetir
             el resumen.
-        known: Si el hecho ya venía en la corrida automática anterior
-            (ADR-0034): la ficha sale corta, sin resumen.
-        new_outlets: En un hecho ya reportado, cuántas de sus notas son nuevas.
     """
 
     number: int
     article: ArticleItem
     badges: tuple[Badge, ...]
     also: tuple[ArticleItem, ...] = ()
-    known: bool = False
-    new_outlets: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,9 +561,30 @@ def _is_known(story: Story, known: frozenset[int]) -> bool:
     return any(a.article_id in known for a in _members(story))
 
 
-def state_groups(
-    articles: Sequence[ArticleItem], known: frozenset[int] = frozenset()
-) -> tuple[StateGroup, ...]:
+def new_facts_only(articles: Sequence[ArticleItem], known: frozenset[int]) -> list[ArticleItem]:
+    """Las notas de los hechos que no traía la corrida anterior.
+
+    Benji, 27/10/2026: «solo hechos nuevos cada corrida, para no saturarnos de
+    información repetitiva». Un hecho ya reportado se queda fuera completo,
+    aunque hoy lo publique un medio más: no es un hecho nuevo.
+
+    Args:
+        articles: Notas relevantes de la corrida.
+        known: Notas de la corrida anterior.
+
+    Returns:
+        Las notas de los hechos nuevos, en el orden de ``articles``.
+    """
+    fresh = {
+        a.article_id
+        for story in _stories(articles)
+        if not _is_known(story, known)
+        for a in _members(story)
+    }
+    return [a for a in articles if a.article_id in fresh]
+
+
+def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
     """Estado ▸ Categoría ▸ Hechos, numerados de corrido para citarlos.
 
     El mismo hecho publicado por varios medios es una sola ficha, con la nota
@@ -577,12 +593,8 @@ def state_groups(
     («Estoy bien y muy fuerte» en varios medios). El estado y la categoría son
     los de esa primera nota.
 
-    En una corrida automática, dentro de cada categoría van primero los
-    hechos nuevos y al final los que ya traía la corrida anterior (``known``).
-
     Args:
         articles: Notas relevantes, de la más reciente a la más vieja.
-        known: Notas de la corrida anterior (vacío: todo cuenta como nuevo).
 
     Returns:
         Los estados de más a menos notas; las notas sin estado al final.
@@ -610,21 +622,9 @@ def state_groups(
             by_category.items(), key=lambda item: (-size(item[1]), item[0])
         ):
             numbered = []
-            # sorted es estable: los nuevos primero, cada grupo en su orden.
-            for lead, also in sorted(members, key=lambda story: _is_known(story, known)):
+            for lead, also in members:
                 number += 1
-                was_known = _is_known((lead, also), known)
-                fresh = sum(1 for a in (lead, *also) if a.article_id not in known)
-                numbered.append(
-                    NumberedNote(
-                        number,
-                        lead,
-                        badges(lead),
-                        also,
-                        known=was_known,
-                        new_outlets=fresh if was_known else 0,
-                    )
-                )
+                numbered.append(NumberedNote(number, lead, badges(lead), also))
             categories.append(
                 CategoryGroup(category, category_color(members[0][0]), tuple(numbered))
             )
@@ -731,7 +731,8 @@ class OraculoView:
         cards: Tarjetas por categoría.
         stacks: Barras apiladas por estado.
         timeline: Línea del tiempo.
-        groups: Estado ▸ Categoría ▸ Noticias.
+        groups: Estado ▸ Categoría ▸ Noticias. En una corrida automática,
+            solo los hechos nuevos frente a la anterior.
         network: La red de nodos de la portada (SVG).
         novelty: Lo nuevo frente a la corrida anterior, o ``None`` si no hay
             con qué comparar.
@@ -779,7 +780,9 @@ def build_oraculo(
         cards=cards,
         stacks=state_stacks(articles),
         timeline=timeline(articles),
-        groups=state_groups(articles, previous.article_ids if previous else frozenset()),
+        groups=state_groups(
+            new_facts_only(articles, previous.article_ids) if previous else articles
+        ),
         network=network_svg(code),
         novelty=novelty(articles, previous) if previous else None,
     )

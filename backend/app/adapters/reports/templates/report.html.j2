@@ -77,8 +77,8 @@
     {# Cada corrida cubre hoy y ayer: casi todo ya venía en la anterior (ADR-0034). #}
     <div class="novelty">
       <p class="novelty-title">Novedades desde la corrida {% if o.novelty.previous_at %}de las {{ o.novelty.previous_at | mx_time }} del {{ o.novelty.previous_at | mx_date }}{% else %}anterior{% endif %}</p>
-      <p class="novelty-count"><strong>{{ o.novelty.new_facts }}</strong> {{ "hecho nuevo" if o.novelty.new_facts == 1 else "hechos nuevos" }} · <strong>{{ o.novelty.known_facts }}</strong> ya se {{ "había" if o.novelty.known_facts == 1 else "habían" }} reportado{% if o.novelty.known_with_news %} ({{ o.novelty.known_with_news }} con medios nuevos){% endif %}.</p>
-      <p class="muted small">En cada categoría van primero los hechos nuevos, marcados <span class="ins ins-new">NUEVO</span>. Los ya reportados van al final y sin resumen, porque el resumen salió en el reporte anterior.</p>
+      <p class="novelty-count"><strong>{{ o.novelty.new_facts }}</strong> {{ "hecho nuevo" if o.novelty.new_facts == 1 else "hechos nuevos" }} · <strong>{{ o.novelty.known_facts }}</strong> ya se {{ "había" if o.novelty.known_facts == 1 else "habían" }} reportado y no se repite{{ "" if o.novelty.known_facts == 1 else "n" }}{% if o.novelty.known_with_news %} ({{ o.novelty.known_with_news }} con algún medio más){% endif %}.</p>
+      <p class="muted small">«Noticias por estado» trae solo los hechos nuevos. Los ya reportados están en el reporte de la corrida anterior. El panorama, las gráficas y el mapa cubren toda la ventana de la corrida.</p>
     </div>
   {% endif %}
 
@@ -247,7 +247,7 @@
         <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
         {% for item in category.notes %}
           {% set article = item.article %}
-          <article class="item{% if item.known %} item-known{% endif %}">
+          <article class="item">
             <span class="number">{{ item.number }}</span>
             <div class="body">
               <h5><a href="{{ article.url }}">{{ article.title | clean }}</a></h5>
@@ -257,10 +257,9 @@
                 {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
               </p>
               <p class="insignias">
-                {% if item.known %}<span class="ins ins-known">YA REPORTADO{% if item.new_outlets %} · +{{ item.new_outlets }} {{ "MEDIO NUEVO" if item.new_outlets == 1 else "MEDIOS NUEVOS" }}{% endif %}</span>{% elif o.novelty %}<span class="ins ins-new">NUEVO</span>{% endif %}
                 {% for badge in item.badges %}<span class="ins ins-{{ badge.kind }}"{% if badge.color %} style="border-color: {{ badge.color }}; color: {{ badge.color }}"{% endif %}>{{ badge.text }}</span>{% endfor %}
               </p>
-              {% if article.summary and not item.known %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
+              {% if article.summary %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
               <p class="link">{{ article.url }}</p>
               {% if item.also %}
                 {# El mismo hecho en otros medios: solo medio, hora y link (sin repetir el resumen). #}
@@ -274,7 +273,7 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="muted">La búsqueda no encontró notas relevantes.</p>
+    <p class="muted">{% if o.novelty %}Sin hechos nuevos desde la corrida anterior: todo lo de esta ventana ya se había reportado.{% else %}La búsqueda no encontró notas relevantes.{% endif %}</p>
   {% endfor %}
 </section>
 
