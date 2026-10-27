@@ -4,6 +4,8 @@
  * Recuerda la alternativa más segura: desactivar lo oculta del panel de
  * búsqueda sin borrarlo.
  */
+import { HudButton } from '../ui/HudButton';
+
 interface DeleteConfirmProps {
   name: string;
   pending: boolean;
@@ -17,7 +19,7 @@ export function DeleteConfirm({ name, pending, error, onConfirm, onCancel }: Del
     <div
       role="alertdialog"
       aria-label={`Borrar «${name}»`}
-      className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3"
+      className="hud-reveal rounded-xl border border-rose-500/40 bg-rose-500/[0.07] p-4 shadow-[0_0_24px_rgb(255_77_109/0.12)]"
     >
       <p className="text-sm text-rose-100">
         ¿Borrar «{name}»? Si solo quieres que deje de aparecer en las búsquedas, desmarca «Activo» y
@@ -25,21 +27,12 @@ export function DeleteConfirm({ name, pending, error, onConfirm, onCancel }: Del
       </p>
       {error && <p className="mt-2 text-sm text-rose-200">{error}</p>}
       <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onConfirm}
-          className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-rose-300 disabled:opacity-50"
-        >
+        <HudButton variant="danger" size="sm" disabled={pending} onClick={onConfirm}>
           {pending ? 'Borrando…' : 'Sí, borrar'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400"
-        >
+        </HudButton>
+        <HudButton variant="ghost" size="sm" onClick={onCancel}>
           No
-        </button>
+        </HudButton>
       </div>
     </div>
   );

@@ -45,7 +45,6 @@ import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
 import { Chronology } from './Chronology';
 import { applyTimeline } from './timelineData';
-import { GLASS } from './ui';
 import { useFinishNotice } from './useFinishNotice';
 
 // Lista vacía estable: un arreglo nuevo en cada render haría redibujar el globo.
@@ -129,7 +128,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   }, [searchId, clearTimeline]);
 
   return (
-    // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
+    // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS en ui.ts).
     // overflow-clip y no hidden: con hidden, scrollIntoView de una lista podía
     // desplazar la pantalla entera y dejar una franja negra abajo.
     // Sin fondo propio: detrás va el universo que dibuja App.
@@ -185,7 +184,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
             onClick={() => {
               setPanelOpen(true);
             }}
-            className={`${GLASS} absolute left-4 top-4 flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+            className="hud-btn hud-btn--sm absolute left-4 top-4 bg-[#050d12]/90"
           >
             › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
           </button>
@@ -203,8 +202,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
                 useExplorerStore.getState().setShowCases(!showCases);
               }}
               title="Ver mis casos abiertos sobre el globo; clic en uno abre su muro"
-              className={`${GLASS} px-3 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 ${
-                showCases ? 'text-amber-200' : 'text-slate-200 hover:bg-slate-900/80'
+              className={`hud-btn hud-btn--sm bg-[#050d12]/90 ${
+                showCases ? 'border-amber-300/60 text-amber-200' : ''
               }`}
             >
               {showCases ? '● Mis casos' : '○ Mis casos'}
@@ -220,7 +219,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
               useExplorerStore.getState().clearGlobe();
             }}
             title="Quita los resultados del globo y deja listo para otra búsqueda (esta queda en Historial)"
-            className={`${GLASS} absolute left-1/2 top-3 z-10 -translate-x-1/2 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+            className="hud-btn hud-btn--sm absolute left-1/2 top-3 z-10 -translate-x-1/2 bg-[#050d12]/90"
           >
             ✕ Limpiar globo
           </button>

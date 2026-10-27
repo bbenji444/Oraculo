@@ -11,7 +11,7 @@
  *
  * No hace: no dibuja el muro sobre el globo (9.6).
  */
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 
 import { useCaseEntities } from '../../hooks/useEntities';
 import {
@@ -32,8 +32,8 @@ const TABS: { value: ReviewStatus; label: string }[] = [
   { value: 'discarded', label: 'Descartados' },
 ];
 
-const BUTTON =
-  'rounded-lg px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
+// Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
+const BUTTON = 'hud-btn hud-btn--sm';
 
 interface CaseRelationshipsProps {
   caseId: string;
@@ -68,7 +68,7 @@ function RelationshipItem({
   const notes = relationship.shared_articles.length;
 
   return (
-    <li className="px-4 py-3">
+    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1 text-sm">
           <p>
@@ -111,7 +111,7 @@ function RelationshipItem({
                 onClick={() => {
                   onReview('confirm');
                 }}
-                className={`${BUTTON} bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}
+                className={`${BUTTON} border-emerald-400/50 text-emerald-100`}
               >
                 Confirmar
               </button>
@@ -123,7 +123,7 @@ function RelationshipItem({
                 onClick={() => {
                   onReview('discard');
                 }}
-                className={`${BUTTON} text-rose-300 hover:bg-rose-500/10`}
+                className={`${BUTTON} hud-btn--danger`}
               >
                 Descartar
               </button>
@@ -132,7 +132,7 @@ function RelationshipItem({
         )}
       </div>
       {open && (
-        <ul className="mt-2 space-y-1 border-l border-slate-700 pl-3 text-xs">
+        <ul className="mt-2 space-y-1 border-l-2 border-sky-400/30 pl-3 text-xs">
           {relationship.shared_articles.map((a) => (
             <li key={a.article_id}>
               <ExternalLink href={a.url} className="text-sky-300 hover:underline">
@@ -161,16 +161,19 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
   const error = relationships.error ?? review.error ?? create.error;
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-100">Vínculos</h3>
+    <div
+      className="hud-panel hud-spot hud-reveal overflow-hidden"
+      style={{ '--i': 3 } as CSSProperties}
+    >
+      <div className="hud-section-head">
+        <h3 className="hud-section-title">Vínculos</h3>
         {canEdit && !drawing && confirmed.length >= 2 && (
           <button
             type="button"
             onClick={() => {
               setDrawing(true);
             }}
-            className="rounded-lg bg-sky-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sky-500"
+            className="hud-btn hud-btn--solid hud-btn--sm"
           >
             Nuevo vínculo
           </button>
@@ -193,7 +196,11 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
           }}
         />
       )}
-      <div role="tablist" aria-label="Estado de los vínculos" className="flex gap-1 px-3 pt-2">
+      <div
+        role="tablist"
+        aria-label="Estado de los vínculos"
+        className="flex gap-1 border-b border-sky-400/10 px-3"
+      >
         {TABS.map((t) => (
           <button
             key={t.value}
@@ -203,9 +210,7 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
             onClick={() => {
               setTab(t.value);
             }}
-            className={`rounded-t-lg px-3 py-1.5 text-xs ${
-              tab === t.value ? 'bg-slate-800 text-slate-50' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className="hud-subtab focus-visible:outline-2 focus-visible:outline-sky-400"
           >
             {t.label} ({data?.counts[t.value] ?? 0})
           </button>
@@ -224,7 +229,7 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
             : 'Nada por aquí todavía.'}
         </p>
       )}
-      <ul className="divide-y divide-slate-800">
+      <ul className="divide-y divide-sky-400/10">
         {data?.items.map((r) => (
           <RelationshipItem
             key={`${String(r.entity_a.id)}-${String(r.entity_b.id)}-${r.type}`}

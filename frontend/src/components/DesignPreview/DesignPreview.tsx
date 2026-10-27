@@ -12,6 +12,7 @@
 import { type CSSProperties, type ReactNode, useState } from 'react';
 
 import { CountUp } from '../ui/CountUp';
+import { Heartbeat } from '../ui/Heartbeat';
 import { ArrowIcon, HudButton } from '../ui/HudButton';
 import { HudChip, type ChipTone } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
@@ -72,9 +73,6 @@ const SERVICES = [
   { name: 'Cola y caché', detail: 'Redis 8.0', ok: true },
   { name: 'Worker', detail: '1 proceso · corridas 07 · 15 · 23 h', ok: true },
 ];
-
-// Trazo de latido: plano, un pico y plano otra vez.
-const HEARTBEAT = 'M0 14h48l6-9 8 18 7-14 5 5h86';
 
 const RANGES = [
   { value: 'hoy', label: 'Hoy' },
@@ -338,31 +336,7 @@ function StatusMock() {
               OK
             </HudChip>
           </div>
-          <svg
-            viewBox="0 0 160 28"
-            preserveAspectRatio="none"
-            className="mt-3 h-7 w-full"
-            aria-hidden="true"
-          >
-            {/* La línea base, tenue, y encima el pulso que la recorre. */}
-            <path
-              d={HEARTBEAT}
-              fill="none"
-              stroke="#2cf5a0"
-              strokeOpacity="0.2"
-              strokeWidth="1.2"
-            />
-            <path
-              d={HEARTBEAT}
-              fill="none"
-              stroke="#2cf5a0"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              pathLength={100}
-              className="hud-pulse-line"
-              style={{ animationDelay: `${String(i * 0.35)}s` }}
-            />
-          </svg>
+          <Heartbeat ok delaySeconds={i * 0.35} className="mt-3" />
           <p className="mt-2 text-xs text-slate-400">{service.detail}</p>
         </HudPanel>
       ))}

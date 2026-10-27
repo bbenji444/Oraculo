@@ -8,6 +8,8 @@
  */
 import { useEffect } from 'react';
 
+import { HudButton } from './ui/HudButton';
+
 // Tiempo para alcanzar a deshacer sin que el aviso estorbe.
 export const UNDO_TOAST_MS = 8000;
 
@@ -30,25 +32,27 @@ export function UndoToast({ message, onUndo, onClose, busy = false }: UndoToastP
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
       <div
         role="status"
-        className="pointer-events-auto flex animate-[fadeIn_200ms_ease-out] items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/95 px-4 py-2.5 text-sm text-slate-100 shadow-lg shadow-black/40 backdrop-blur"
+        className="hud-panel hud-reveal pointer-events-auto relative flex items-center gap-3 overflow-hidden px-4 py-3 text-sm text-slate-100"
       >
+        <span aria-hidden="true" className="hud-dot hud-dot--live" />
         <span>{message}</span>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onUndo}
-          className="rounded-lg bg-sky-500/20 px-3 py-1 text-xs font-semibold text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50"
-        >
+        <HudButton size="sm" disabled={busy} onClick={onUndo}>
           Deshacer
-        </button>
+        </HudButton>
         <button
           type="button"
           aria-label="Cerrar aviso"
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-100"
+          className="hud-icon-btn size-8"
         >
           ✕
         </button>
+        {/* Cuánto tiempo queda para deshacer: la barra se vacía en UNDO_TOAST_MS. */}
+        <span
+          aria-hidden="true"
+          className="hud-countdown absolute inset-x-0 bottom-0 h-[2px]"
+          style={{ animationDuration: `${String(UNDO_TOAST_MS)}ms` }}
+        />
       </div>
     </div>
   );

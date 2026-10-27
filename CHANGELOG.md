@@ -8,13 +8,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
-- **Muestra del diseño «consola táctica» (27/10/2026, ADR-0036, propuesto).** El jefe de Benji vio la interfaz genérica y sin animación. Con `?diseno` en la URL (`#/diseno`) se ve cómo quedaría cada pantalla, con datos reales:
-  - paneles con borde de luz que sigue al mouse;
-  - botones con destello y onda al hacer clic;
-  - insignias con pulso, cifras que corren y títulos que se descifran;
-  - selector de periodo con pastilla deslizante e interruptores con brillo.
+- **Diseño «consola táctica» en todo el monitor (27/10/2026, ADR-0036).** El jefe de Benji vio la interfaz genérica y sin animación. Ahora Explorar, Casos, Conceptos, Historial y Estado del sistema usan las mismas piezas:
+  - **paneles:** borde de luz y halo que siguen al mouse, y esquinas de mira;
+  - **botones:** destello, onda al hacer clic y texto que se abre al pasar el mouse;
+  - **animaciones:** insignias con pulso de radar, cifras que corren, títulos y pestañas que se descifran;
+  - **selectores e interruptores:** pastilla deslizante e interruptores con brillo;
+  - **filas de lista:** se iluminan con una barra de luz;
+  - **cada pantalla:**
+    - Estado del sistema: latido por servicio;
+    - Historial: radar en las corridas automáticas;
+    - campos: aro de enfoque;
+    - aviso «Deshacer»: barra de tiempo.
 
-  Las pestañas del encabezado ya usan la barra de luz deslizante. Falta aplicarlo a las demás pantallas cuando Benji lo apruebe.
+  La muestra de todas las piezas sigue en `?diseno#/diseno`.
 - **El PDF de cada corrida automática trae solo hechos nuevos (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
   - «Noticias por estado» lista solo los hechos que no traía esa corrida;
   - en la página 2, «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten;
@@ -104,6 +110,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El globo deja de cargar la tarjeta de video con desenfoques** (27/10/2026): trece paneles y avisos usaban `backdrop-blur`, que obliga a volver a dibujar lo de atrás cada cuadro. Ahora son paneles oscuros sin desenfoque.
+- **La tarjeta de Historial ya no se desarma en pantallas angostas** (27/10/2026): el título se partía en una palabra por renglón.
 - **Google News llegaba viejo e incompleto a las corridas (27/10/2026, ADR-0034):**
   - **caché:** las corridas de las 07:00 y de las 15:00 reusaban la respuesta de horas antes (caché de 6 h). Google News es gratis y ya no pasa por la caché;
   - **tope:** cada consulta trae a lo más 100 notas. Ahora se parte por palabra clave y por día, hasta 4 consultas por concepto;

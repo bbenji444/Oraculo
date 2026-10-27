@@ -35,24 +35,24 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
   return (
     <aside
       aria-label={`Ficha de ${node.label}`}
-      className={`${GLASS} absolute inset-x-2 bottom-2 z-20 max-h-[55%] animate-[fadeIn_250ms_ease-out] overflow-y-auto p-4 text-sm text-slate-200 md:inset-x-auto md:bottom-4 md:right-4 md:top-20 md:max-h-none md:w-96`}
+      className={`${GLASS} hud-reveal absolute inset-x-2 bottom-2 z-20 max-h-[55%] overflow-y-auto p-5 text-sm text-slate-200 md:inset-x-auto md:top-20 md:right-4 md:bottom-4 md:max-h-none md:w-96`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">{node.type_label}</p>
-          <h3 className="text-lg font-semibold text-slate-50">{node.label}</h3>
+          <p className="hud-kicker">{node.type_label}</p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-50">{node.label}</h3>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar ficha"
-          className="rounded-md px-2 py-1 text-slate-300 hover:bg-slate-800"
+          className="hud-icon-btn size-8"
         >
           ✕
         </button>
       </div>
       {node.type === 'person' && (
-        <p className="mt-2 rounded-lg bg-amber-500/15 px-3 py-2 text-sm font-semibold text-amber-100">
+        <p className="mt-3 rounded-lg border border-amber-300/40 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-100 shadow-[0_0_16px_rgb(255_181_71/0.15)]">
           Estatus legal: {node.legal_status_label ?? 'la nota no lo dice'}
         </p>
       )}
@@ -76,9 +76,7 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
         </p>
       )}
 
-      <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Vínculos ({links.length})
-      </h4>
+      <h4 className="hud-label mt-5">Vínculos ({links.length})</h4>
       {links.length === 0 && (
         <p className="mt-1 text-xs text-slate-500">
           Sin vínculos todavía. Se sugieren al confirmar entidades que salen en las mismas notas.
@@ -94,7 +92,7 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
                 onClick={() => {
                   useExplorerStore.getState().selectWallNode(other.id);
                 }}
-                className="w-full rounded-md px-2 py-1 text-left text-xs hover:bg-slate-800"
+                className="w-full rounded-md px-2 py-1.5 text-left text-xs transition-all duration-300 hover:translate-x-0.5 hover:bg-sky-400/[0.08]"
               >
                 <span className="text-slate-400">{relationshipPhrase(link)}</span>{' '}
                 <span className="text-slate-100">{other.label}</span>
@@ -111,9 +109,7 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
         })}
       </ul>
 
-      <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Menciones
-      </h4>
+      <h4 className="hud-label mt-5">Menciones</h4>
       {!entity && <p className="mt-1 text-xs text-slate-500">Cargando citas…</p>}
       <ul className="mt-1 space-y-2">
         {entity?.mentions.map((m) => (

@@ -998,7 +998,7 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       {tooltip?.label && (
         <div
           role="tooltip"
-          className="pointer-events-none absolute z-10 max-w-xs -translate-x-1/2 -translate-y-[calc(100%+14px)] rounded-lg border border-white/10 bg-slate-950/90 px-3 py-1.5 text-sm shadow-xl shadow-black/50 backdrop-blur"
+          className="hud-panel pointer-events-none absolute z-10 max-w-xs -translate-x-1/2 -translate-y-[calc(100%+14px)] bg-[#050d12]/95 px-3 py-1.5 text-sm"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           <span className="font-medium text-slate-100">{tooltip.label}</span>

@@ -48,11 +48,21 @@ export function CountUp({ value, format, className }: CountUpProps) {
     };
   }, [value, reduced]);
 
-  const current = reduced ? value : shown;
-  const text = format ? format(current) : INTEGER.format(Math.round(current));
+  const write = (n: number) => (format ? format(n) : INTEGER.format(Math.round(n)));
+  const final = write(value);
+  const text = write(reduced ? value : shown);
   return (
-    <span className={className} aria-label={format ? format(value) : INTEGER.format(value)}>
-      <span aria-hidden="true">{text}</span>
+    <span className={className}>
+      {text === final ? (
+        final
+      ) : (
+        // Mientras corre: la cifra final para lectores de pantalla y la que
+        // corre solo a la vista. Al terminar queda una sola.
+        <>
+          <span className="sr-only">{final}</span>
+          <span aria-hidden="true">{text}</span>
+        </>
+      )}
     </span>
   );
 }

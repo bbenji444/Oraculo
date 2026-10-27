@@ -14,7 +14,7 @@
  * renglón; la cronología se pliega aparte con su propio botón (Benji,
  * 26/10/2026).
  */
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useEstimate, useSearch, useStartSearch } from '../../hooks/useSearches';
@@ -52,16 +52,16 @@ function ConceptChips() {
             onClick={() => {
               toggle(concept.id);
             }}
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all duration-300 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-sky-400 ${
               on
-                ? 'border-white/30 bg-white/15 text-white'
-                : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                ? 'border-sky-300/60 bg-sky-400/15 text-white shadow-[0_0_16px_rgb(0_210_255/0.3)]'
+                : 'border-sky-400/15 bg-white/[0.03] text-slate-300 hover:border-sky-400/45 hover:bg-sky-400/[0.07]'
             }`}
           >
             <span
               aria-hidden="true"
               className="size-2 rounded-full"
-              style={{ backgroundColor: concept.color }}
+              style={{ backgroundColor: concept.color, boxShadow: `0 0 8px ${concept.color}` }}
             />
             {concept.name}
           </button>
@@ -76,7 +76,20 @@ function DateRange() {
   const setRange = useExplorerStore((s) => s.setRange);
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-4 gap-1" role="group" aria-label="Rango de fechas">
+      <div
+        className="hud-seg"
+        role="group"
+        aria-label="Rango de fechas"
+        style={
+          {
+            '--seg-i': Math.max(
+              0,
+              RANGES.findIndex((item) => item.kind === range.kind),
+            ),
+            '--seg-n': RANGES.length,
+          } as CSSProperties
+        }
+      >
         {RANGES.map((item) => (
           <button
             key={item.kind}
@@ -85,20 +98,16 @@ function DateRange() {
             onClick={() => {
               setRange(item.kind === 'custom' ? { ...range, kind: 'custom' } : { kind: item.kind });
             }}
-            className={`rounded-lg px-2 py-1.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-              range.kind === item.kind
-                ? 'bg-sky-500/25 text-sky-100'
-                : 'bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
+            className="focus-visible:outline-2 focus-visible:outline-sky-400"
           >
             {item.label}
           </button>
         ))}
       </div>
       {range.kind === 'custom' && (
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+        <div className="hud-reveal grid grid-cols-2 gap-2">
           {(['from', 'to'] as const).map((field) => (
-            <label key={field}>
+            <label key={field} className="hud-label mb-0">
               {field === 'from' ? 'Desde' : 'Hasta'}
               <input
                 type="date"
@@ -106,7 +115,7 @@ function DateRange() {
                 onChange={(event) => {
                   setRange({ ...range, [field]: event.target.value });
                 }}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1 text-sm text-slate-100 [color-scheme:dark]"
+                className="hud-input mt-1.5 px-2 py-1.5 font-sans tracking-normal normal-case [color-scheme:dark]"
               />
             </label>
           ))}
@@ -128,7 +137,7 @@ function Progress({ searchId }: { searchId: string }) {
         <span className="tabular-nums text-slate-400">{percent}%</span>
       </div>
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-white/10"
+        className="h-1.5 overflow-hidden rounded-full bg-sky-400/10"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
@@ -137,7 +146,11 @@ function Progress({ searchId }: { searchId: string }) {
       >
         <div
           className={`h-full rounded-full transition-[width] duration-700 ${
-            failed ? 'bg-rose-400' : 'bg-gradient-to-r from-sky-400 to-cyan-300'
+            failed
+              ? 'bg-rose-400'
+              : `bg-gradient-to-r from-sky-600 to-cyan-300 shadow-[0_0_10px_rgb(0_210_255/0.6)] ${
+                  isFinished(search.status) ? '' : 'hud-progress'
+                }`
           }`}
           style={{ width: `${String(percent)}%` }}
         />
@@ -184,7 +197,7 @@ function CollapsedSearch({ label }: { label: string }) {
         setSearchCollapsed(false);
       }}
       title="Mostrar la búsqueda"
-      className={`${GLASS} flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+      className={`${GLASS} hud-panel--interactive flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400`}
     >
       <span className={PANEL_TITLE}>Búsqueda</span>
       <span className="min-w-0 flex-1 truncate text-slate-400">{label}</span>
@@ -206,7 +219,7 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
   return (
     <section aria-label="Búsqueda" className={`${GLASS} space-y-1.5 px-3 py-2`}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="min-w-0 truncate text-[13px] font-semibold text-slate-100">
+        <h2 className="min-w-0 truncate text-[13px] font-semibold text-slate-50">
           {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
         </h2>
         <CollapseSearchButton />
@@ -310,7 +323,7 @@ export function SearchPanel() {
       </div>
       <RegionPicker />
       <div className="space-y-2">
-        <p className="text-xs text-slate-400">Conceptos</p>
+        <p className="hud-label">Conceptos</p>
         <ConceptChips />
       </div>
       <DateRange />
@@ -355,7 +368,7 @@ export function SearchPanel() {
         onClick={() => {
           if (input) start.mutate(input);
         }}
-        className="w-full rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/20 transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 disabled:cursor-not-allowed disabled:from-slate-600 disabled:to-slate-600 disabled:text-slate-300 disabled:shadow-none"
+        className="hud-btn hud-btn--solid w-full py-3 text-xs"
       >
         {busy ? 'Buscando…' : 'Buscar'}
       </button>

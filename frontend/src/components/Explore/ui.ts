@@ -1,23 +1,24 @@
 /**
- * Clases compartidas de los paneles translúcidos de Explorar (estilo de las
- * imágenes de referencia de Benji): el globo se ve detrás.
+ * Clases compartidas de los paneles de Explorar, con el diseño «consola
+ * táctica» (ADR-0036, styles/hud.css): el globo se ve detrás.
  */
 
 /**
- * Panel de vidrio oscuro sobre el universo.
+ * Panel de la consola sobre el universo: vidrio oscuro con esquinas de mira y
+ * un halo que sigue al mouse.
+ *
+ * Sin `backdrop-blur` (27/10/2026): desenfocar lo que hay detrás obligaba a la
+ * tarjeta Intel a volver a dibujar el globo cada cuadro, y se reiniciaba.
  *
  * En modo día (`data-earth="day"` en Explorar) el vidrio se oscurece: sobre el
  * mapa claro de calles, al 60 % quedaba gris y el texto secundario medía
- * 1.6 : 1 de contraste (prueba operativa del 20/10/2026; se pide 4.5 : 1). De
- * noche se queda translúcido, como en las imágenes de referencia.
+ * 1.6 : 1 de contraste (prueba operativa del 20/10/2026; se pide 4.5 : 1).
  */
-export const GLASS =
-  'rounded-2xl border border-white/10 bg-slate-950/60 shadow-2xl shadow-black/50 backdrop-blur-md [[data-earth=day]_&]:bg-slate-950/85';
+export const GLASS = 'hud-panel hud-spot [[data-earth=day]_&]:bg-slate-950/90';
 
 /** Título de panel. */
 export const PANEL_TITLE =
-  'font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/80';
+  'font-display text-[10.5px] font-semibold uppercase tracking-[0.24em] text-sky-300 [text-shadow:0_0_10px_rgb(0_210_255/0.45)]';
 
-/** Botón secundario pequeño. */
-export const SMALL_BUTTON =
-  'rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:opacity-40';
+/** Botón secundario pequeño (con destello y onda, `.hud-btn`). */
+export const SMALL_BUTTON = 'hud-btn hud-btn--sm';

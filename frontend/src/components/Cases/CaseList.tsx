@@ -3,12 +3,19 @@
  * tiene y cuándo cambió. Dos pestañas: activos (abiertos y cerrados) y
  * archivados.
  *
+ * Diseño «consola táctica» (ADR-0036): las pestañas son un selector con
+ * pastilla deslizante y cada caso una fila que se ilumina, con insignias y una
+ * flecha que se adelanta.
+ *
  * No hace: no abre el caso (avisa con `onSelect`).
  */
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 
 import { useCases } from '../../hooks/useCases';
 import { caseSummary, SENSITIVITY_TONE, STATUS_TONE } from './labels';
+import { ArrowIcon } from '../ui/HudButton';
+import { HudChip } from '../ui/HudChip';
+import { HudPanel } from '../ui/HudPanel';
 
 interface CaseListProps {
   selectedId: string | null;
@@ -21,8 +28,12 @@ export function CaseList({ selectedId, onSelect }: CaseListProps) {
   const items = cases.data ?? [];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
-      <div className="flex gap-1 border-b border-slate-800 p-2" role="tablist">
+    <HudPanel className="overflow-hidden p-2">
+      <div
+        className="hud-seg mb-2"
+        role="tablist"
+        style={{ '--seg-i': archived ? 1 : 0, '--seg-n': 2 } as CSSProperties}
+      >
         {[
           { key: false, label: 'Activos' },
           { key: true, label: 'Archivados' },
@@ -35,11 +46,7 @@ export function CaseList({ selectedId, onSelect }: CaseListProps) {
             onClick={() => {
               setArchived(tab.key);
             }}
-            className={`rounded-lg px-3 py-1.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-              archived === tab.key
-                ? 'bg-sky-500/20 text-sky-100'
-                : 'text-slate-400 hover:bg-slate-800'
-            }`}
+            className="focus-visible:outline-2 focus-visible:outline-sky-400"
           >
             {tab.label}
           </button>
@@ -58,37 +65,36 @@ export function CaseList({ selectedId, onSelect }: CaseListProps) {
             : 'Todavía no tienes casos. Crea uno y agrega noticias desde Explorar.'}
         </p>
       )}
-      <ul className="divide-y divide-slate-800">
-        {items.map((item) => (
-          <li key={item.id}>
+      <ul>
+        {items.map((item, index) => (
+          <li key={item.id} className="hud-reveal" style={{ '--i': index } as CSSProperties}>
             <button
               type="button"
               aria-current={item.id === selectedId}
               onClick={() => {
                 onSelect(item.id);
               }}
-              className={`w-full px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-                item.id === selectedId ? 'bg-sky-500/10' : 'hover:bg-slate-800/60'
-              }`}
+              className="hud-row w-full text-left focus-visible:outline-2 focus-visible:outline-sky-400"
             >
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-slate-100">{item.name}</span>
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-[11px] ${STATUS_TONE[item.status]}`}
-                >
-                  {item.status_label}
-                </span>
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-[11px] ${SENSITIVITY_TONE[item.sensitivity]}`}
-                >
-                  {item.sensitivity_label}
-                </span>
+              <span className="min-w-0 flex-1">
+                <span className="line-clamp-2 block font-medium text-slate-50">{item.name}</span>
+                <span className="mt-1 block text-xs text-slate-400">{caseSummary(item)}</span>
               </span>
-              <span className="mt-0.5 block text-xs text-slate-400">{caseSummary(item)}</span>
+              <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                <HudChip tone={STATUS_TONE[item.status]} dot>
+                  {item.status_label}
+                </HudChip>
+                <HudChip tone={SENSITIVITY_TONE[item.sensitivity]}>
+                  {item.sensitivity_label}
+                </HudChip>
+              </span>
+              <span className="hud-row-arrow">
+                <ArrowIcon />
+              </span>
             </button>
           </li>
         ))}
       </ul>
-    </div>
+    </HudPanel>
   );
 }

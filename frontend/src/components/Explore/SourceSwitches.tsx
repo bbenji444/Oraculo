@@ -32,7 +32,7 @@ export function SourceSwitches({ options, chosen, onChange }: SourceSwitchesProp
   };
   return (
     <fieldset className="space-y-1.5">
-      <legend className="text-xs text-slate-400">Fuentes</legend>
+      <legend className="hud-label">Fuentes</legend>
       {options.map((option) => {
         const on = option.configured && chosen.includes(option.id);
         return (
@@ -46,7 +46,7 @@ export function SourceSwitches({ options, chosen, onChange }: SourceSwitchesProp
             onClick={() => {
               toggle(option.id);
             }}
-            className="flex w-full items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-white/[0.07] focus-visible:outline-2 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="hud-row w-full justify-between gap-2 py-2 pr-2.5 pl-3 text-left text-xs focus-visible:outline-2 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="min-w-0">
               <span className="block truncate text-slate-100">{option.label}</span>
@@ -56,18 +56,8 @@ export function SourceSwitches({ options, chosen, onChange }: SourceSwitchesProp
                 {sourceNote(option)}
               </span>
             </span>
-            <span
-              aria-hidden="true"
-              className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-                on ? 'bg-sky-400' : 'bg-slate-600'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 size-3 rounded-full bg-white transition-transform ${
-                  on ? 'translate-x-3.5' : 'translate-x-0.5'
-                }`}
-              />
-            </span>
+            {/* Solo la imagen del interruptor: el botón entero ya es el switch. */}
+            <span aria-hidden="true" data-on={on} className="hud-switch" />
           </button>
         );
       })}

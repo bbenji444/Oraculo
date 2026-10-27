@@ -4,8 +4,13 @@
  * la vuelve a mostrar en Explorar sin gastar nada (las notas ya están
  * guardadas). «Eliminar» la quita del historial con confirmación y se puede
  * deshacer (27/10/2026): sus notas siguen en el sistema.
+ *
+ * Diseño «consola táctica» (ADR-0036): cifras arriba, y cada búsqueda en un
+ * panel con borde de luz; las corridas automáticas llevan un radar. El texto
+ * ocupa al menos 16 rem y los botones bajan de renglón si no caben: antes, en
+ * pantallas angostas, el título se partía en una palabra por renglón.
  */
-import { useCallback, useState } from 'react';
+import { type CSSProperties, useCallback, useState } from 'react';
 
 import { useDeleteSearch, useRestoreSearch, useSearchHistory } from '../../hooks/useSearches';
 import type { Search } from '../../services/searches';
@@ -19,14 +24,23 @@ import {
 } from '../Explore/format';
 import { ConfirmDelete } from '../ConfirmDelete';
 import { UndoToast } from '../UndoToast';
+import { CountUp } from '../ui/CountUp';
+import { ArrowIcon, HudButton } from '../ui/HudButton';
+import { type ChipTone, HudChip } from '../ui/HudChip';
+import { HudPanel } from '../ui/HudPanel';
+import { SectionHeading } from '../ui/SectionHeading';
 
-const STATUS_LABEL: Record<Search['status'], { text: string; className: string }> = {
-  pending: { text: 'En cola', className: 'bg-slate-700 text-slate-200' },
-  running: { text: 'Corriendo', className: 'bg-sky-500/20 text-sky-200' },
-  completed: { text: 'Terminada', className: 'bg-emerald-500/20 text-emerald-200' },
-  partial: { text: 'Parcial', className: 'bg-amber-500/20 text-amber-200' },
-  failed: { text: 'Falló', className: 'bg-rose-500/20 text-rose-200' },
+const STATUS_LABEL: Record<Search['status'], { text: string; tone: ChipTone; live?: boolean }> = {
+  pending: { text: 'En cola', tone: 'slate' },
+  running: { text: 'Corriendo', tone: 'cyan', live: true },
+  completed: { text: 'Terminada', tone: 'green' },
+  partial: { text: 'Parcial', tone: 'amber' },
+  failed: { text: 'Falló', tone: 'rose' },
 };
+
+// Las entradas escalonadas se cortan aquí: una lista larga no debe tardar en aparecer.
+const MAX_STAGGER = 12;
+const COUNT = new Intl.NumberFormat('es-MX');
 
 function reopen(search: Search) {
   useExplorerStore.getState().restoreSearch({
@@ -38,6 +52,93 @@ function reopen(search: Search) {
     providers: search.providers,
   });
   window.location.hash = '#/explorar';
+}
+
+/** Lupa de una búsqueda hecha por una persona (las automáticas llevan radar). */
+function SearchGlyph() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-10 flex-none place-items-center rounded-full border border-sky-400/30 text-sky-300"
+    >
+      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor">
+        <circle cx="9" cy="9" r="5.5" strokeWidth="1.6" />
+        <path d="m13.5 13.5 3.5 3.5" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    </span>
+  );
+}
+
+interface SearchItemProps {
+  search: Search;
+  index: number;
+  deleting: boolean;
+  onDelete: (search: Search) => void;
+}
+
+function SearchItem({ search, index, deleting, onDelete }: SearchItemProps) {
+  const status = STATUS_LABEL[search.status];
+  const automatic = automaticRunLabel(search);
+  return (
+    <li className="hud-reveal" style={{ '--i': Math.min(index, MAX_STAGGER) } as CSSProperties}>
+      <HudPanel
+        className={`flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 ${
+          automatic ? 'border-sky-400/35' : ''
+        }`}
+      >
+        {automatic ? <span aria-hidden="true" className="hud-radar" /> : <SearchGlyph />}
+        <div className="min-w-0 flex-1 basis-64">
+          {automatic && (
+            // Corrida del reloj (F12.8): la ven todos los analistas.
+            <p className="mb-1 font-display text-[10px] tracking-[0.24em] text-sky-300 uppercase">
+              {automatic}
+            </p>
+          )}
+          <p className="font-medium text-slate-50">
+            {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            {formatRange(search.date_from, search.date_to)} · pedida el{' '}
+            {formatMexicoCity(search.created_at)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {/* Antes de F12.2 las búsquedas no guardaban con qué fuentes se hicieron. */}
+            Fuentes:{' '}
+            {search.providers && search.providers.length > 0
+              ? providersLabel(search.providers)
+              : 'no se registraban en búsquedas anteriores'}
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <HudChip tone={status.tone} dot live={status.live}>
+            {status.text}
+          </HudChip>
+          <span className="text-xs tabular-nums text-slate-400">
+            <span className="font-display text-sm text-slate-100">{search.results_count}</span>{' '}
+            notas · {search.credits_used} crédito(s) · {formatUsd(search.llm_cost_usd)}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <HudButton
+            size="sm"
+            icon={<ArrowIcon />}
+            onClick={() => {
+              reopen(search);
+            }}
+          >
+            Abrir en el globo
+          </HudButton>
+          <ConfirmDelete
+            what="la búsqueda del historial"
+            busy={deleting}
+            onConfirm={() => {
+              onDelete(search);
+            }}
+          />
+        </div>
+      </HudPanel>
+    </li>
+  );
 }
 
 export function HistoryPage() {
@@ -61,81 +162,54 @@ export function HistoryPage() {
       },
     });
   };
+  const kpis = [
+    { label: 'Búsquedas', value: searches.length },
+    { label: 'Corridas automáticas', value: searches.filter((s) => automaticRunLabel(s)).length },
+    { label: 'Notas encontradas', value: searches.reduce((sum, s) => sum + s.results_count, 0) },
+  ];
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-6 sm:px-8">
+    <div className="h-full overflow-y-auto px-4 py-8 sm:px-8">
       <div className="mx-auto max-w-5xl">
-        <h2 className="titulo-oraculo text-base font-bold text-sky-50">Historial de búsquedas</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Reabrir una búsqueda no gasta créditos: sus notas ya están guardadas.
-        </p>
+        <SectionHeading
+          kicker="Bitácora de búsquedas"
+          title="Historial de búsquedas"
+          description="Reabrir una búsqueda no gasta créditos: sus notas ya están guardadas."
+        />
+        {searches.length > 0 && (
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {kpis.map((kpi, i) => (
+              <HudPanel
+                key={kpi.label}
+                className="hud-reveal px-5 py-4"
+                style={{ '--i': i } as CSSProperties}
+              >
+                <p className="hud-kpi-label">{kpi.label}</p>
+                <CountUp
+                  value={kpi.value}
+                  // Con más páginas por cargar, la cifra es «al menos»: lleva «+».
+                  format={(n) => `${COUNT.format(Math.round(n))}${history.hasNextPage ? '+' : ''}`}
+                  className="hud-kpi-value mt-3 block text-[1.6rem]"
+                />
+              </HudPanel>
+            ))}
+          </div>
+        )}
         {history.isPending && <p className="mt-6 text-sm text-slate-400">Cargando…</p>}
         {history.error && <p className="mt-6 text-sm text-rose-300">{history.error.message}</p>}
         {history.isSuccess && searches.length === 0 && (
           <p className="mt-6 text-sm text-slate-400">Todavía no hay búsquedas.</p>
         )}
         <ul className="mt-6 space-y-3">
-          {searches.map((search) => {
-            const status = STATUS_LABEL[search.status];
-            const automatic = automaticRunLabel(search);
-            return (
-              <li
-                key={search.search_id}
-                className={`flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-3 ${
-                  automatic
-                    ? 'border-sky-400/30 bg-sky-400/[0.04] shadow-[0_0_18px_rgb(0_210_255/0.06)]'
-                    : 'border-slate-800 bg-slate-900/70'
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  {automatic && (
-                    // Corrida del reloj (F12.8): la ven todos los analistas.
-                    <p className="titulo-oraculo mb-1 text-[10px] font-bold text-sky-300">
-                      <span aria-hidden="true">◉ </span>
-                      {automatic}
-                    </p>
-                  )}
-                  <p className="font-medium text-slate-100">
-                    {search.concepts.map((c) => c.name).join(', ')} · {search.region_name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {formatRange(search.date_from, search.date_to)} · pedida el{' '}
-                    {formatMexicoCity(search.created_at)}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    {/* Antes de F12.2 las búsquedas no guardaban con qué fuentes se hicieron. */}
-                    Fuentes:{' '}
-                    {search.providers && search.providers.length > 0
-                      ? providersLabel(search.providers)
-                      : 'no se registraban en búsquedas anteriores'}
-                  </p>
-                </div>
-                <span className={`rounded-md px-2 py-0.5 text-xs ${status.className}`}>
-                  {status.text}
-                </span>
-                <span className="text-xs tabular-nums text-slate-400">
-                  {search.results_count} notas · {search.credits_used} crédito(s) ·{' '}
-                  {formatUsd(search.llm_cost_usd)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    reopen(search);
-                  }}
-                  className="rounded-lg bg-sky-500/20 px-3 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400"
-                >
-                  Abrir en el globo
-                </button>
-                <ConfirmDelete
-                  what="la búsqueda del historial"
-                  busy={remove.isPending && remove.variables === search.search_id}
-                  onConfirm={() => {
-                    removeSearch(search);
-                  }}
-                />
-              </li>
-            );
-          })}
+          {searches.map((search, index) => (
+            <SearchItem
+              key={search.search_id}
+              search={search}
+              index={index}
+              deleting={remove.isPending && remove.variables === search.search_id}
+              onDelete={removeSearch}
+            />
+          ))}
         </ul>
         {remove.error && (
           <p role="alert" className="mt-3 text-sm text-rose-300">
@@ -143,16 +217,15 @@ export function HistoryPage() {
           </p>
         )}
         {history.hasNextPage && (
-          <button
-            type="button"
+          <HudButton
+            className="mt-5"
             disabled={history.isFetchingNextPage}
             onClick={() => {
               void history.fetchNextPage();
             }}
-            className="mt-4 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
           >
             {history.isFetchingNextPage ? 'Cargando…' : 'Ver más'}
-          </button>
+          </HudButton>
         )}
       </div>
       {removed && (

@@ -31,8 +31,8 @@ interface EntityCardProps {
   onResolve: (action: ResolutionAction) => void;
 }
 
-const BUTTON =
-  'rounded-lg px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
+// Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
+const BUTTON = 'hud-btn hud-btn--sm';
 
 export function EntityCard({
   entity,
@@ -55,11 +55,11 @@ export function EntityCard({
   const status = entity.legal_status_label ?? entity.suggested_legal_status_label;
 
   return (
-    <li className="px-4 py-3">
+    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-100">
-            <span className="mr-2 rounded-md bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">
+            <span className="mr-2 rounded-md border border-sky-400/20 bg-sky-400/5 px-1.5 py-0.5 text-[11px] text-slate-200">
               {entity.type_label}
             </span>
             {entity.label}
@@ -121,7 +121,7 @@ export function EntityCard({
                 onChange={(event) => {
                   setTarget(Number(event.target.value));
                 }}
-                className="max-w-[16rem] rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-100"
+                className="max-w-[16rem] hud-input w-auto px-2 py-1 text-xs"
               >
                 <option value={0}>elige…</option>
                 {mergeTargets.map((t) => (
@@ -139,7 +139,7 @@ export function EntityCard({
                     if (chosen) onResolve(mergeAction(entity, chosen));
                     setTarget(0);
                   }}
-                  className={`${BUTTON} bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}
+                  className={`${BUTTON} border-emerald-400/50 text-emerald-100`}
                 >
                   Unir
                 </button>
@@ -156,7 +156,7 @@ export function EntityCard({
                 onChange={(event) => {
                   setLegal(event.target.value as LegalStatus);
                 }}
-                className="rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-100"
+                className="hud-input w-auto px-2 py-1 text-xs"
               >
                 {LEGAL_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -172,7 +172,7 @@ export function EntityCard({
                 onClick={() => {
                   onConfirm(isPerson ? legal : undefined);
                 }}
-                className={`${BUTTON} bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}
+                className={`${BUTTON} border-emerald-400/50 text-emerald-100`}
               >
                 Confirmar
               </button>
@@ -182,7 +182,7 @@ export function EntityCard({
                 type="button"
                 disabled={busy}
                 onClick={onDiscard}
-                className={`${BUTTON} text-rose-300 hover:bg-rose-500/10`}
+                className={`${BUTTON} hud-btn--danger`}
               >
                 Descartar
               </button>
@@ -191,7 +191,7 @@ export function EntityCard({
         )}
       </div>
       {open && (
-        <ul className="mt-2 space-y-2 border-l border-slate-700 pl-3">
+        <ul className="mt-2 space-y-2 border-l-2 border-sky-400/30 pl-3">
           {entity.mentions.map((m) => (
             <li key={m.id} className="text-xs">
               <blockquote className="text-slate-200">

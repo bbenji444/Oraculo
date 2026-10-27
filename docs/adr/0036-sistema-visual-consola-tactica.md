@@ -1,6 +1,6 @@
 # ADR-0036: Sistema visual «consola táctica» para todo el monitor
 
-- **Estado:** Propuesto (27/10/2026). Falta que Benji apruebe la muestra (`?diseno#/diseno`) antes de aplicarlo a todas las pantallas.
+- **Estado:** Aceptado (27/10/2026). Benji aprobó la muestra («Me gusta la muestra. Aplícalo a todas las pantallas») y se aplicó a Explorar, Casos, Conceptos, Historial y Estado del sistema.
 - **Fecha:** 27 de octubre de 2026
 - **Fase:** F12
 - **Decide:** Benji (27/10/2026: su jefe vio el monitor «como un Tsuru, no un Tesla»: genérico, sin animación. «Algo que le interesa mucho son los botones, el texto, que cuando pasas el mouse encima de un componente haga algo… enfócate 100 % en un diseño súper futurista y pro»)
@@ -39,5 +39,8 @@ Una restricción técnica: la computadora de Benji tiene una tarjeta Intel integ
 
 ## Consecuencias
 
-- Todas las pantallas se reescriben con las mismas piezas, así que el estilo queda en un solo lugar.
-- Pendiente tras la aprobación: aplicarlo a Explorar (panel de búsqueda, ficha, cronología, controles), Casos, Conceptos, Historial y Estado del sistema. También corregir de paso la tarjeta de Historial que se desarma en pantallas angostas.
+- Todas las pantallas usan las mismas piezas, así que el estilo queda en un solo lugar: `hud.css` y `components/ui`. Las constantes de Explorar (`GLASS`, `PANEL_TITLE`, `SMALL_BUTTON` en `Explore/ui.ts`) ya apuntan a ellas.
+- `hud.css` entra en la capa `components` de Tailwind, así que una utilidad (`p-5`, `border-rose-500/40`) puede ajustar cualquier pieza.
+- Se quitaron los 13 `backdrop-blur` de la interfaz (paneles de Explorar, cronología, controles del globo, buscador de regiones, avisos). Desenfocar lo de atrás obligaba a volver a dibujar el globo cada cuadro.
+- Se corrigió de paso la tarjeta de Historial, que en pantallas angostas partía el título en una palabra por renglón.
+- Los textos que se descifran y las cifras que corren dejan un solo texto al terminar. Mientras se animan, el lector de pantalla recibe el texto real.

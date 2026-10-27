@@ -65,10 +65,11 @@ const SPARK_HEIGHT = 38;
 /** Aire arriba del hecho elegido al desplazar la lista (deja ver el encabezado del día). */
 const SCROLL_MARGIN_PX = 36;
 /** Vidrio homologado con OSINT (`--vidrio`, `--borde`, desenfoque de 14 px). */
-const GLASS_OSINT =
-  'rounded-2xl border border-sky-400/15 bg-[#050505]/70 shadow-[0_26px_60px_-22px_rgb(0_0_0/0.9)] backdrop-blur-[14px]';
+// Panel de la consola táctica (ADR-0036). Sin backdrop-blur: desenfocar el
+// globo de atrás cada cuadro costaba en la tarjeta integrada.
+const GLASS_OSINT = 'hud-panel hud-spot bg-[#050505]/90';
 const PILL =
-  'rounded-full border border-sky-400/15 bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-200 transition-colors hover:border-sky-400/40 focus-visible:outline-2 focus-visible:outline-sky-400';
+  'rounded-full border border-sky-400/15 bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-200 transition-all duration-300 hover:-translate-y-px hover:border-sky-400/50 hover:shadow-[0_0_12px_rgb(0_210_255/0.25)] focus-visible:outline-2 focus-visible:outline-sky-400';
 
 function shortDay(ms: number): string {
   return SHORT_DAY.format(new Date(ms)).replace('.', '');
@@ -202,8 +203,8 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
           onClick={() => {
             onSelect(article.article_id);
           }}
-          className={`w-full rounded-lg px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-sky-400 ${
-            selected ? '' : 'hover:bg-white/[0.05]'
+          className={`w-full rounded-lg px-2 py-1.5 text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
+            selected ? '' : 'hover:translate-x-0.5 hover:bg-sky-400/[0.07]'
           }`}
         >
           <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-100">
@@ -305,7 +306,7 @@ function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProp
           onClick={() => {
             setExpanded(!open);
           }}
-          className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-amber-300"
+          className="w-full rounded-lg px-2 py-1.5 text-left transition-colors duration-300 hover:bg-amber-300/[0.07] focus-visible:outline-2 focus-visible:outline-amber-300"
         >
           <span className="flex items-baseline gap-1.5 text-[12.5px] leading-snug text-slate-100">
             <span className="font-display text-[9px] tracking-wider text-amber-200/90">TEMA</span>
@@ -436,7 +437,7 @@ export function Chronology({ articles }: ChronologyProps) {
               setOpen(false);
             }}
             title="Ocultar la cronología"
-            className="ml-auto rounded-md px-1.5 text-sm text-slate-400 hover:text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="hud-icon-btn ml-auto size-7 text-sm"
           >
             ›
           </button>
@@ -512,7 +513,7 @@ export function Chronology({ articles }: ChronologyProps) {
         )}
         {days.map((group) => (
           <div key={group.day} className="relative">
-            <p className="sticky top-0 z-10 -mx-3 bg-[#050505]/85 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90 backdrop-blur">
+            <p className="sticky top-0 z-10 -mx-3 border-b border-sky-400/10 bg-[#050505]/95 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90">
               {DAY.format(new Date(group.at))}
             </p>
             {/* La línea vertical luminosa que une los hechos del día. */}

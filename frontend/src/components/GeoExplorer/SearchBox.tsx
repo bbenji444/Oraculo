@@ -5,6 +5,10 @@
  * cerrar. Cada resultado dice su estado, para distinguir homónimos ("San Pedro"
  * de Coahuila o de Nuevo León). Los datos llegan con useRegionSearch y
  * useRegionsByLevel (nunca fetch directo).
+ *
+ * Diseño «consola táctica» (ADR-0036): campo con haz de enfoque y lista que
+ * se despliega con la opción activa iluminada. Sin desenfoque de fondo: el
+ * globo ya usa la tarjeta de video.
  */
 import { useId, useState } from 'react';
 
@@ -54,8 +58,8 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
       <label htmlFor={`${listId}-input`} className="sr-only">
         Buscar estado, municipio o localidad
       </label>
-      <div className="flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 shadow-lg shadow-black/30 backdrop-blur focus-within:border-sky-500/70">
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-slate-500">
+      <div className="hud-field shadow-lg shadow-black/30">
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-sky-300/70">
           <path d="M8.5 3a5.5 5.5 0 0 1 4.38 8.82l3.65 3.65-1.06 1.06-3.65-3.65A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
         </svg>
         <input
@@ -97,7 +101,7 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-slate-700/80 bg-slate-900/95 py-1 shadow-2xl shadow-black/50 backdrop-blur"
+          className="hud-reveal absolute z-20 mt-2 max-h-80 w-full overflow-auto rounded-xl border border-sky-400/30 bg-[#050d12]/[0.97] py-1 shadow-2xl shadow-black/60"
         >
           {search.error && (
             <li className="px-3 py-2 text-sm text-rose-300">{search.error.message}</li>
@@ -119,8 +123,10 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
                 onMouseEnter={() => {
                   setActive(index);
                 }}
-                className={`cursor-pointer px-3 py-2 text-sm ${
-                  index === active ? 'bg-sky-500/15 text-slate-50' : 'text-slate-200'
+                className={`cursor-pointer border-l-2 px-3 py-2 text-sm transition-colors duration-200 ${
+                  index === active
+                    ? 'border-sky-400 bg-sky-400/10 text-slate-50'
+                    : 'border-transparent text-slate-200'
                 }`}
               >
                 <span className="block truncate">{region.display_name}</span>

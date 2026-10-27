@@ -21,8 +21,8 @@ interface RelationshipFormProps {
   onCancel: () => void;
 }
 
-const FIELD =
-  'rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-xs text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400';
+// Campo chico de la consola táctica (ADR-0036).
+const FIELD = 'hud-input w-auto px-2 py-1.5 text-xs';
 
 const EMPTY: RelationshipDraft = {
   entityA: 0,
@@ -68,7 +68,10 @@ export function RelationshipForm({ entities, busy, onCreate, onCancel }: Relatio
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2 border-b border-slate-800 px-4 py-3 text-xs">
+    <form
+      onSubmit={submit}
+      className="hud-reveal space-y-3 border-b border-sky-400/10 bg-sky-400/[0.03] px-5 py-4 text-xs"
+    >
       <p className="text-slate-400">
         Lo que dibujas queda confirmado con tu nombre. Solo se vinculan entidades confirmadas.
       </p>
@@ -121,18 +124,10 @@ export function RelationshipForm({ entities, busy, onCreate, onCancel }: Relatio
         </p>
       )}
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-lg bg-sky-600 px-2.5 py-1 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
-        >
+        <button type="submit" disabled={busy} className="hud-btn hud-btn--solid hud-btn--sm">
           Guardar vínculo
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-2.5 py-1 text-slate-300 hover:bg-slate-800"
-        >
+        <button type="button" onClick={onCancel} className="hud-btn hud-btn--ghost hud-btn--sm">
           Cancelar
         </button>
       </div>
