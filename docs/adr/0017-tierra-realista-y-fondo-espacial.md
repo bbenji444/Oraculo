@@ -71,3 +71,22 @@ Verificado el 17/10/2026:
   - A 144 Hz, un cuadro que tarda entre 14 y 21 ms se muestra a 20.8 ms. En un monitor de 60 Hz ese mismo cuadro cabe en 16.7 ms, pero no se midió.
   - Si los analistas notan tirones, lo siguiente a probar es reducir la resolución del lienzo del mapa (`pixelRatio`) durante los vuelos.
 - **Licencias:** la NASA pide crédito y se muestra en el mapa. El paquete de estrellas acredita además a Gaia/ESA solo en su versión 2020, que no se usa.
+
+## Ajuste: fondo sin pixelear (26/10/2026)
+
+Benji vio el fondo «muy pixeleado». Había tres causas:
+
+1. **La cámara del cielo veía una franja angosta (37°).** Con la textura 4K, cada pixel de la foto ocupaba unos 2.2 pixeles de pantalla. Medido en un lienzo de 1,917 px de ancho: 887 pixeles de la textura repartidos en 1,917.
+2. **La 8K solo cargaba en pantallas de 2,560 px reales o más**, así que casi nadie la veía.
+3. **Toda la textura se multiplicaba por 1.9.** La mitad de sus pixeles valen 8 de 255, y eso volvía el negro una bruma granulada con el ruido del JPEG.
+
+Cambios:
+
+- **Campo de visión de 60°** (`SKY_FIELD_OF_VIEW`). Las estrellas se desplazan un poco más lento que el globo al girar, lo que se lee como que están más lejos.
+- **8K desde 1,600 px reales.** Una laptop de 1366 px al 125 % ya la carga. Con eso, en el mismo lienzo hay unos 2,480 pixeles de la textura en 1,917 de pantalla (0.77, sin ampliar). Cuesta 7 MB de descarga, una sola vez, y unos 180 MB de memoria de video.
+- **Punto negro y ganancia en luz lineal** (`STARMAP_BLACK_POINT` y `STARMAP_GAIN`) en lugar de multiplicar todo. El fondo queda negro y la Vía Láctea y las estrellas se aclaran.
+- **Estrellas propias más reales:**
+  - de 1 a 3.2 px, porque las de menos de 1 px parpadeaban como cuadritos;
+  - un núcleo con un halo corto;
+  - colores azulados, blancos y cálidos, y las más chicas más tenues;
+  - un titileo casi nulo (85–100 %), porque en el espacio las estrellas no titilan.
