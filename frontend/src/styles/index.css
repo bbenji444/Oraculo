@@ -384,13 +384,14 @@ body {
 .velo-universo::before {
   top: -35vmax;
   left: -10vmax;
-  background: radial-gradient(circle, rgb(0 210 255 / 0.16), transparent 65%);
+  /* Auroras más tenues desde el 27/10 (Benji: que resalte el universo). */
+  background: radial-gradient(circle, rgb(0 210 255 / 0.09), transparent 65%);
   animation: aurora-a 38s ease-in-out infinite alternate;
 }
 .velo-universo::after {
   bottom: -40vmax;
   right: -15vmax;
-  background: radial-gradient(circle, rgb(0 95 127 / 0.28), transparent 65%);
+  background: radial-gradient(circle, rgb(0 95 127 / 0.16), transparent 65%);
   animation: aurora-b 46s ease-in-out infinite alternate;
 }
 @keyframes aurora-a {
