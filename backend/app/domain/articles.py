@@ -23,7 +23,10 @@ from app.domain.queries import Provider
 from app.domain.text_repair import clean_text
 
 _WEB_SCHEMES = frozenset({"http", "https"})
-_WWW = "www."
+# Prefijos que no cambian de medio: «www.» y la versión AMP («amp.milenio.com»).
+# En la auditoría del 27/10/2026, Google News daba Milenio con los dos
+# dominios y el mismo medio contaba como dos.
+_SAME_OUTLET_PREFIXES = ("www.", "amp.")
 
 
 class InvalidArticleError(ValueError):
@@ -35,7 +38,7 @@ class InvalidArticleError(ValueError):
 
 
 def domain_of(url: str) -> str | None:
-    """Dominio de una URL, sin ``www.`` y en minúsculas.
+    """Dominio de una URL, sin ``www.`` ni ``amp.`` y en minúsculas.
 
     Args:
         url: URL absoluta.
@@ -48,8 +51,9 @@ def domain_of(url: str) -> str | None:
         'eluniversal.com.mx'
     """
     host = (urlsplit(url).hostname or "").lower()
-    if host.startswith(_WWW):
-        host = host[len(_WWW) :]
+    for prefix in _SAME_OUTLET_PREFIXES:
+        if host.startswith(prefix):
+            host = host[len(prefix) :]
     return host or None
 
 
