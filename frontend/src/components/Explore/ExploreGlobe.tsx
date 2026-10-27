@@ -22,7 +22,7 @@ import {
   Map as MapLibreMap,
   NavigationControl,
 } from 'maplibre-gl';
-import { useEffect, useRef, useState } from 'react';
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 
 import { useRegionDetail } from '../../hooks/useRegions';
 import {
@@ -165,6 +165,25 @@ const PULSE_FRAME_MS = 1000 / 30;
 // Rampa mínima: con 0 el paso no se movería y la cadena de giro se cortaría.
 const MIN_SPIN_RAMP = 0.05;
 const MS_PER_SECOND = 1000;
+// Aire mínimo entre la ficha arrastrada y la orilla del mapa.
+const CARD_DRAG_MARGIN = 12;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+/**
+ * Lo que tapa el encabezado arriba del mapa, en pixeles (`--header-h`): el
+ * mapa se dibuja también detrás de él y la ficha no debe subir ahí.
+ */
+function headerInsetPx(): number {
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue('--header-h').trim();
+  const rem = Number.parseFloat(getComputedStyle(root).fontSize) || 16;
+  if (value.endsWith('rem')) return Number.parseFloat(value) * rem;
+  if (value.endsWith('px')) return Number.parseFloat(value);
+  return 0;
+}
 // Eventos de la persona que detienen el giro.
 const USER_EVENTS = ['mousedown', 'touchstart', 'wheel', 'dragstart'] as const;
 const NEWS_LAYERS = ['news-point', 'news-coarse', 'news-cluster'];
@@ -254,7 +273,11 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
   const [stack, setStack] = useState<Stack | null>(null);
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [viewport, setViewport] = useState({ width: 0, height: 0, top: 0 });
+  // Cuánto se movió a mano la ficha de la nota (arrastrándola). Va con su
+  // nota: al elegir otra, la ficha vuelve a su lugar.
+  const [drag, setDrag] = useState({ articleId: null as number | null, dx: 0, dy: 0 });
+  const dragStartRef = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null);
   const [cardHeight, setCardHeight] = useState(CALLOUT_INITIAL_HEIGHT);
   const [graphicsLost, setGraphicsLost] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -583,7 +606,11 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     // Si el contenedor no tenía tamaño al crear el mapa, se reajusta después.
     const observer = new ResizeObserver(() => {
       map.resize();
-      setViewport({ width: container.clientWidth, height: container.clientHeight });
+      setViewport({
+        width: container.clientWidth,
+        height: container.clientHeight,
+        top: headerInsetPx(),
+      });
     });
     observer.observe(container);
     mapRef.current = map;
@@ -854,10 +881,52 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     };
   }, [articleId]);
 
-  // Lugar de la ficha: nunca se sale del mapa (map/newsLayers.ts).
+  // Lugar de la ficha: nunca se sale del mapa ni sube al encabezado
+  // (map/newsLayers.ts). Si se arrastró, se suma lo que se movió, sin salirse.
   const cardWidth = calloutWidth(viewport);
-  const placement = (point: { x: number; y: number }) =>
-    calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
+  const placement = (point: { x: number; y: number }) => {
+    const base = calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
+    if (drag.articleId !== articleId) return base;
+    const left = clamp(
+      base.left + drag.dx,
+      CARD_DRAG_MARGIN,
+      viewport.width - cardWidth - CARD_DRAG_MARGIN,
+    );
+    const top = clamp(
+      base.top + drag.dy,
+      viewport.top + CARD_DRAG_MARGIN,
+      viewport.height - cardHeight - CARD_DRAG_MARGIN,
+    );
+    return {
+      left,
+      top,
+      lineX: base.lineX + (left - base.left),
+      lineY: base.lineY + (top - base.top),
+    };
+  };
+  // Arrastrar la ficha con el mouse (Benji, 27/10/2026): desde cualquier parte
+  // que no sea un link ni un botón.
+  const startCardDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    if (event.target.closest('a, button, input, select, textarea')) return;
+    const current = drag.articleId === articleId ? drag : { dx: 0, dy: 0 };
+    dragStartRef.current = { x: event.clientX, y: event.clientY, dx: current.dx, dy: current.dy };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    // Sin esto, arrastrar seleccionaba el texto de la ficha.
+    event.preventDefault();
+  };
+  const moveCardDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current;
+    if (!start) return;
+    setDrag({
+      articleId,
+      dx: start.dx + event.clientX - start.x,
+      dy: start.dy + event.clientY - start.y,
+    });
+  };
+  const endCardDrag = () => {
+    dragStartRef.current = null;
+  };
 
   // Lista de un grupo: las notas más recientes primero, junto al punto.
   const stackArticles = articles
@@ -950,7 +1019,12 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
           {/* Capa exterior: posición. Capa interior: animación de entrada. */}
           <div
             ref={cardRef}
-            className="absolute z-20"
+            className="absolute z-20 cursor-grab touch-none active:cursor-grabbing"
+            title="Arrastra la ficha para moverla"
+            onPointerDown={startCardDrag}
+            onPointerMove={moveCardDrag}
+            onPointerUp={endCardDrag}
+            onPointerCancel={endCardDrag}
             style={{
               left: placement(callout).left,
               top: placement(callout).top,

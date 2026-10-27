@@ -293,16 +293,19 @@ export interface CalloutPlacement {
  *
  * @param point Punto de la nota en pantalla.
  * @param card Ancho y alto de la ficha.
- * @param viewport Ancho y alto del mapa.
+ * @param viewport Ancho y alto del mapa, y `top`: lo que tapa el encabezado
+ *   arriba (el mapa se dibuja también detrás de él). La ficha nunca sube ahí:
+ *   chocaba con Casos, Conceptos, Historial… (Benji, 27/10/2026).
  */
 export function calloutPlacement(
   point: { x: number; y: number },
   card: { width: number; height: number },
-  viewport: { width: number; height: number },
+  viewport: { width: number; height: number; top?: number },
 ): CalloutPlacement {
+  const minTop = (viewport.top ?? 0) + CALLOUT_MARGIN;
   const preferredTop = point.y - CALLOUT_RISE_Y - card.height;
-  const maxTop = Math.max(CALLOUT_MARGIN, viewport.height - card.height - CALLOUT_MARGIN);
-  const top = Math.min(maxTop, Math.max(CALLOUT_MARGIN, preferredTop));
+  const maxTop = Math.max(minTop, viewport.height - card.height - CALLOUT_MARGIN);
+  const top = Math.min(maxTop, Math.max(minTop, preferredTop));
   const fitsRight = point.x + CALLOUT_GAP_X + card.width <= viewport.width - CALLOUT_MARGIN;
   const fitsLeft = point.x - CALLOUT_GAP_X - card.width >= CALLOUT_MARGIN;
   if (!fitsRight && !fitsLeft) {

@@ -170,6 +170,16 @@ describe('acomodo de la ficha', () => {
     expect(placed.lineY).toBe(placed.top + 260);
   });
 
+  it('nunca sube a donde está el encabezado', () => {
+    // Nota del 26/10 en Toluca: la ficha quedaba encima de «Casos» y «Conceptos».
+    const header = 72;
+    const high = calloutPlacement({ x: 600, y: 100 }, card, { ...viewport, top: header });
+
+    expect(high.top).toBe(header + 12);
+    // Sin encabezado, igual que antes.
+    expect(calloutPlacement({ x: 600, y: 100 }, card, viewport).top).toBe(12);
+  });
+
   it('en un mapa más chico que la ficha queda pegada arriba', () => {
     expect(calloutPlacement({ x: 100, y: 100 }, card, { width: 600, height: 200 }).top).toBe(12);
   });
