@@ -1,6 +1,6 @@
 # ADR-0035: God's Eye View como módulo aparte, tal cual, para evaluarlo
 
-- **Estado:** Aceptado (temporal: hasta que Benji decida cómo integrarlo)
+- **Estado:** Retirado el 27/10/2026. Benji lo evaluó y lo quitó: «no le veo utilidad, no me sirve y está medio lento y feo». Se quitaron la pestaña, el servicio de `make up`, `scripts/dev/gods_eye.sh` y la excepción de la CSP. Lo de abajo queda como registro de lo que se probó.
 - **Fecha:** 27 de octubre de 2026
 - **Fase:** fuera de fase (antecede a la F10)
 - **Decide:** Benji (27/10/2026: «implementa todo el proyecto de God's Eye View… pon una sección en el header antes de Estado del sistema… de momento solo quiero que lo copies tal cual como aparece en el proyecto de GitHub, si tiene otro mundo no importa… que la sección me lleve a ese módulo exacto… mañana lo voy a analizar»)

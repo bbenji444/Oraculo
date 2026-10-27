@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Arranca, detiene y muestra el estado de los servicios de desarrollo en WSL:
-# PostgreSQL, Redis, la API (uvicorn), el worker y el reloj de Celery, nginx
-# y, si está instalado, el módulo aparte God's Eye View (scripts/dev/gods_eye.sh).
+# PostgreSQL, Redis, la API (uvicorn), el worker y el reloj de Celery, y nginx.
 #
 # Quién lo usa: `make up`, `make down`, `make status` y `make logs`.
 # Uso directo: bash scripts/dev/servicios.sh {up|down|status|logs}
@@ -39,12 +38,6 @@ readonly WORKER_CONCURRENCY=2
 readonly APP_READY_TIMEOUT_SECONDS=90
 # Segundos que se espera a que un proceso termine con SIGTERM antes de forzarlo.
 readonly STOP_GRACE_SECONDS=10
-# God's Eye View (módulo aparte, scripts/dev/gods_eye.sh): su servidor de Vite
-# usa el puerto 4173, el de su README. Solo escucha en localhost; la pestaña
-# «God's Eye» del monitor lo muestra en un iframe.
-readonly GEV_DIR="${GEV_DIR:-${HOME}/gods-eye-view}"
-readonly GEV_NODE_BIN="${HOME}/.local/node24/bin"
-readonly GEV_PORT=4173
 
 # --- Procesos propios (API, worker y reloj) ------------------------------------
 
@@ -153,16 +146,6 @@ cmd_up() {
   arrancar_proceso beat "${UV_BIN}" run --frozen celery -A app.worker.celery_app beat \
     --loglevel=INFO --schedule="${RUN_DIR}/celerybeat-schedule"
 
-  paso "God's Eye View (módulo aparte, sin integrar)"
-  if [[ -d "${GEV_DIR}/node_modules" && -x "${GEV_NODE_BIN}/node" ]]; then
-    arrancar_proceso godseye env PATH="${GEV_NODE_BIN}:/usr/local/bin:/usr/bin:/bin"       bash -c 'cd "$0" && exec npm run dev -- --host 127.0.0.1 --port "$1" --strictPort'       "${GEV_DIR}" "${GEV_PORT}"
-    # La primera vez Vite prepara Cesium y tarda más.
-    LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "God's Eye View"       curl -fsS -o /dev/null "http://127.0.0.1:${GEV_PORT}/"
-    ok "God's Eye View en http://localhost:${GEV_PORT}"
-  else
-    aviso "God's Eye View no está instalado (wsl make gev-instalar): se omite."
-  fi
-
   paso "nginx"
   if [[ ! -f "${ROOT_DIR}/frontend/dist/index.html" ]]; then
     aviso "No existe frontend/dist: se compila el frontend con el npm de Windows."
@@ -183,7 +166,6 @@ cmd_up() {
 
 cmd_down() {
   paso "Deteniendo servicios"
-  detener_proceso godseye
   detener_proceso beat
   detener_proceso worker
   detener_proceso api
@@ -210,10 +192,9 @@ cmd_status() {
   linea_estado "Worker" "$(pid_vivo "${RUN_DIR}/worker.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/worker.pid" 2>/dev/null || echo -))"
   linea_estado "Reloj (beat)" "$(pid_vivo "${RUN_DIR}/beat.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/beat.pid" 2>/dev/null || echo -), ingesta cada ${INGEST_INTERVAL_MINUTES:-15} min)"
   linea_estado "nginx" "$(como_root service nginx status >/dev/null 2>&1 && echo si || echo no)" "(puerto ${NGINX_PORT})"
-  linea_estado "God's Eye View" "$(pid_vivo "${RUN_DIR}/godseye.pid" && echo si || echo no)" "(PID $(cat "${RUN_DIR}/godseye.pid" 2>/dev/null || echo -), puerto ${GEV_PORT})"
 
   paso "Puertos escuchando"
-  ss -ltnH "( sport = :5432 or sport = :6379 or sport = :${API_PORT} or sport = :${NGINX_PORT} or sport = :${GEV_PORT} )" \
+  ss -ltnH "( sport = :5432 or sport = :6379 or sport = :${API_PORT} or sport = :${NGINX_PORT} )" \
     | awk '{print "    " $4}' | sort -u
 
   paso "GET /api/v1/health (a través de nginx)"

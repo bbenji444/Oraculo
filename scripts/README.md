@@ -7,7 +7,6 @@ Scripts de apoyo al desarrollo. Corren en Ubuntu dentro de WSL (ver [ADR-0006](.
 | `dev/instalar_wsl.sh` | Instala PostgreSQL 16 + PostGIS, Redis, nginx, uv y Python 3.12; crea el usuario y las bases de datos. Se puede repetir sin romper nada. | `wsl make bootstrap` |
 | `dev/servicios.sh` | Arranca, detiene y muestra el estado de todos los servicios (base de datos, Redis, API, worker y nginx). | `wsl make up`, `wsl make down`, `wsl make status`, `wsl make logs` |
 | `dev/base_datos.sh` | Consola SQL y respaldos de la base de desarrollo ([guía](../docs/base-de-datos.md)). | `wsl make db-shell`, `wsl make db-dump` |
-| `dev/gods_eye.sh` | Copia God's Eye View tal cual de GitHub, con su Node 24 propio, y corre sus pruebas ([ADR-0035](../docs/adr/0035-gods-eye-view-modulo-aparte.md)). `make up` lo arranca si está instalado. | `wsl make gev-instalar`, `wsl make gev-probar` |
 | `dev/comun.sh` | Funciones compartidas por los dos anteriores (mensajes, espera de servicios, carga de `.env`). No se ejecuta solo. | — |
 
 Los PIDs y logs de la API y el worker se guardan en `~/.local/state/monitor-noticias/` dentro de Ubuntu (no en `D:`), porque leer un archivo de `/mnt/d` justo después de escribirlo llegó a devolver datos equivocados.
