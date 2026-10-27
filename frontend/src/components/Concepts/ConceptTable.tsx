@@ -3,6 +3,9 @@
  *
  * El interruptor de "Activo" cambia el estado al instante, sin abrir el
  * formulario. Clic en una fila la abre para editar.
+ *
+ * Diseño «consola táctica» (ADR-0036): la fila se ilumina con una barra de luz
+ * a la izquierda; las palabras clave son insignias y el interruptor brilla.
  */
 import type { Concept } from '../../services/concepts';
 
@@ -28,7 +31,7 @@ export function ConceptTable({
   return (
     <table className="w-full table-fixed text-left text-sm">
       <caption className="sr-only">Conceptos de búsqueda</caption>
-      <thead className="text-xs uppercase tracking-wide text-slate-500">
+      <thead className="font-display text-[9.5px] tracking-[0.22em] text-sky-300/70 uppercase">
         <tr>
           <th scope="col" className="px-3 py-2 font-medium">
             Concepto
@@ -41,7 +44,7 @@ export function ConceptTable({
           </th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-800/80">
+      <tbody className="divide-y divide-sky-400/10">
         {concepts.map((concept) => {
           const hidden = concept.keywords.length - VISIBLE_KEYWORDS;
           return (
@@ -50,9 +53,8 @@ export function ConceptTable({
               onClick={() => {
                 onSelect(concept);
               }}
-              className={`cursor-pointer transition-colors ${
-                selectedId === concept.id ? 'bg-sky-500/10' : 'hover:bg-slate-900'
-              } ${concept.is_active ? '' : 'opacity-60'}`}
+              aria-current={selectedId === concept.id}
+              className={`hud-trow ${concept.is_active ? '' : 'opacity-60'}`}
             >
               <td className="px-3 py-3">
                 <button
@@ -66,7 +68,7 @@ export function ConceptTable({
                   <span
                     aria-hidden="true"
                     style={{ backgroundColor: concept.color }}
-                    className="mt-1 size-3 shrink-0 rounded-full"
+                    className="mt-1 size-3 shrink-0 rounded-full shadow-[0_0_10px_currentColor]"
                   />
                   <span className="min-w-0">
                     <span className="block truncate font-medium text-slate-100">
@@ -83,7 +85,7 @@ export function ConceptTable({
                   {concept.keywords.slice(0, VISIBLE_KEYWORDS).map((keyword) => (
                     <span
                       key={keyword}
-                      className="truncate rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300"
+                      className="truncate rounded-md border border-sky-400/20 bg-sky-400/5 px-1.5 py-0.5 text-xs text-slate-200"
                     >
                       {keyword}
                     </span>
@@ -104,16 +106,8 @@ export function ConceptTable({
                     event.stopPropagation();
                     onToggleActive(concept);
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50 ${
-                    concept.is_active ? 'bg-emerald-500' : 'bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
-                      concept.is_active ? 'translate-x-4' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
+                  className="hud-switch inline-block align-middle focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50"
+                />
               </td>
             </tr>
           );

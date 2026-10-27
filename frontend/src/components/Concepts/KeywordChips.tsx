@@ -4,6 +4,9 @@
  * Enter o coma agregan lo escrito; pegar una lista separada por comas o
  * renglones agrega varias de una vez; Retroceso con la caja vacía quita la
  * última. Cada chip avisa si el backend lo rechazaría (comillas, OR...).
+ *
+ * Diseño «consola táctica» (ADR-0036): la caja se enciende al escribir y cada
+ * chip entra con un pequeño salto y brilla al pasar el mouse.
  */
 import { useId, useState } from 'react';
 
@@ -21,8 +24,10 @@ interface KeywordChipsProps {
 }
 
 const TONES = {
-  keyword: 'border-sky-500/30 bg-sky-500/10 text-sky-100',
-  exclude: 'border-rose-500/30 bg-rose-500/10 text-rose-100',
+  keyword:
+    'border-sky-400/35 bg-sky-400/10 text-sky-100 hover:shadow-[0_0_12px_rgb(0_210_255/0.35)]',
+  exclude:
+    'border-rose-400/35 bg-rose-500/10 text-rose-100 hover:shadow-[0_0_12px_rgb(255_77_109/0.35)]',
 };
 
 export function KeywordChips({ label, hint, terms, onChange, errors, tone }: KeywordChipsProps) {
@@ -38,13 +43,11 @@ export function KeywordChips({ label, hint, terms, onChange, errors, tone }: Key
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-300">
+      <label htmlFor={id} className="hud-label">
         {label}
       </label>
       <div
-        className={`flex flex-wrap gap-1.5 rounded-lg border bg-slate-950/60 p-2 focus-within:border-sky-500/70 ${
-          hasErrors ? 'border-rose-500/70' : 'border-slate-700'
-        }`}
+        className={`hud-input flex flex-wrap gap-1.5 p-2 ${hasErrors ? 'border-rose-500/70' : ''}`}
       >
         {terms.map((term) => {
           const warning = termWarning(term);
@@ -52,7 +55,7 @@ export function KeywordChips({ label, hint, terms, onChange, errors, tone }: Key
             <span
               key={term}
               title={warning ?? undefined}
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs ${
+              className={`hud-reveal inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs transition-shadow duration-300 ${
                 warning ? 'border-amber-400/60 bg-amber-400/10 text-amber-100' : TONES[tone]
               }`}
             >
