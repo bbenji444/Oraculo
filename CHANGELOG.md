@@ -13,12 +13,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - `make up` lo arranca en http://localhost:4173;
   - la pestaña, antes de «Estado del sistema», dice si está corriendo y lo abre completo en su propia pestaña (no se deja mostrar dentro de otra página);
   - verificado: sus 8,809 pruebas (0 fallan) y sus fuentes sin llave, entre ellas vuelos, satélites, misiones, cámaras, clima, incendios, ciclones y sismos.
-- **«Novedades» en el PDF de cada corrida automática (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
-  - en la página 2 dice cuántos hechos son nuevos y cuántos ya se habían reportado;
-  - en cada categoría van primero los nuevos, marcados NUEVO;
-  - los ya reportados van al final, sin resumen.
+- **El PDF de cada corrida automática trae solo hechos nuevos (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
+  - «Noticias por estado» lista solo los hechos que no traía esa corrida;
+  - en la página 2, «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten;
+  - el panorama, las gráficas y el mapa siguen cubriendo toda la ventana.
 
-  En la corrida de las 23:00 del 26/10 fueron 33 hechos nuevos y 65 ya reportados, y el PDF bajó de 26 a 22 páginas. La auditoría completa está en `docs/analisis-2026-10-27.md`.
+  En la corrida de las 23:00 del 26/10 fueron 33 hechos nuevos y 65 que no se repiten. El PDF bajó de 26 a 14 páginas. La auditoría completa está en `docs/analisis-2026-10-27.md`.
 - **Eliminar casos y búsquedas del historial (27/10/2026).** Se borran de forma reversible:
   - el primer clic pide confirmar («¿Eliminar? · Sí, eliminar · Cancelar») y luego aparece un aviso con «Deshacer» durante 8 segundos;
   - un caso solo lo elimina su dueño; del historial se pueden quitar las búsquedas propias y las corridas automáticas;

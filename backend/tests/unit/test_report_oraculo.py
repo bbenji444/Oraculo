@@ -17,6 +17,7 @@ from app.adapters.reports.oraculo import (
     confidence,
     expediente,
     network_svg,
+    new_facts_only,
     novelty,
     state_groups,
     state_stacks,
@@ -168,9 +169,9 @@ def test_todo_junto() -> None:
     )
 
 
-def test_corrida_automatica_pone_primero_lo_nuevo_y_cuenta_lo_ya_reportado() -> None:
-    # Auditoría del 27/10/2026: el 88 al 94 % de cada corrida ya venía en la
-    # anterior. El hecho 20 ya salió; el 30 es nuevo; el 20 suma un medio.
+def test_corrida_automatica_lista_solo_los_hechos_nuevos() -> None:
+    # Benji, 27/10/2026: «solo hechos nuevos cada corrida». El hecho 20 ya
+    # salió en la corrida anterior: no se lista, ni con el medio nuevo (21).
     known = note(20, "08019", OTROS, AT_15, story_id=20, source_name="La Opción")
     known_new_outlet = note(21, "08019", OTROS, AT_15.replace(minute=30), story_id=20)
     fresh = note(30, "08019", OTROS, AT_15.replace(minute=50))
@@ -178,23 +179,25 @@ def test_corrida_automatica_pone_primero_lo_nuevo_y_cuenta_lo_ya_reportado() -> 
 
     view = build_oraculo(search(), (known, known_new_outlet, fresh), AT_15, previous)
 
-    notes = view.groups[0].categories[0].notes
-    assert [(n.article.article_id, n.known, n.new_outlets) for n in notes] == [
-        (30, False, 0),
-        (20, True, 1),
-    ]
-    assert [n.number for n in notes] == [1, 2]
+    listed = [n.article.article_id for g in view.groups for c in g.categories for n in c.notes]
+    assert listed == [30]
+    assert view.groups[0].count == 1
     assert view.novelty == Novelty(previous.scheduled_for, 1, 1, 1)
+    # Las gráficas siguen cubriendo toda la ventana.
+    assert sum(c.count for c in view.cards) == 3
 
 
-def test_sin_corrida_anterior_no_hay_novedades_ni_marcas() -> None:
+def test_sin_corrida_anterior_se_listan_todas() -> None:
     view = build_oraculo(search(), NOTES, AT_15)
 
     assert view.novelty is None
-    assert not any(n.known for g in view.groups for c in g.categories for n in c.notes)
+    listed = [n.article.article_id for g in view.groups for c in g.categories for n in c.notes]
+    assert sorted(listed) == [1, 2, 3, 4]
 
 
-def test_novedades_sin_nada_nuevo() -> None:
+def test_sin_nada_nuevo_no_se_lista_nada() -> None:
     previous = PreviousRun(uuid4(), None, frozenset(n.article_id for n in NOTES))
 
     assert novelty(NOTES, previous) == Novelty(None, 0, 4, 0)
+    assert new_facts_only(NOTES, previous.article_ids) == []
+    assert build_oraculo(search(), NOTES, AT_15, previous).groups == ()
