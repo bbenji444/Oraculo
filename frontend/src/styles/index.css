@@ -104,6 +104,18 @@ body {
     radial-gradient(ellipse 80% 50% at 50% -10%, rgb(0 210 255 / 0.08), transparent 70%), #050505;
 }
 
+/* Menús desplegables oscuros. La lista que abre el navegador salía blanca con
+   el texto cian claro casi ilegible (filtros de la cronología, 27/10/2026): se
+   le dan el fondo y el texto de Oráculo a cada opción. */
+select {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: #0a1218;
+  color: #e0f7fa;
+}
+
 /* Títulos de sección: Orbitron con el espaciado de OSINT. */
 .titulo-oraculo {
   font-family: var(--font-display);
