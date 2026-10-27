@@ -124,10 +124,10 @@ describe('aviso al terminar', () => {
 describe('fecha del hecho', () => {
   it('se avisa cuando la nota es un avance de un hecho de otro momento', () => {
     expect(eventDateNote('2025-09-29', '2026-10-16T14:00:00Z')).toBe(
-      'Fecha del hecho: 29 sep 2025',
+      'Se refiere a hechos del 29 sep 2025',
     );
     expect(eventDateNote('2026-10-30', '2026-10-15T14:00:00Z')).toBe(
-      'Fecha del hecho: 30 oct 2026',
+      'Se refiere a hechos del 30 oct 2026',
     );
   });
 
