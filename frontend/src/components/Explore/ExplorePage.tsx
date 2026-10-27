@@ -33,9 +33,13 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
+import { useMandoStore } from '../../store/mando';
 import { useTimelineStore } from '../../store/timeline';
 import { NARROW_MAX_WIDTH } from '../../map/framing';
 import { wallCaseFromHash } from '../../map/muro/orbit';
+import { DOSSIER_RESERVE_PX, MandoPanels } from '../Mando/MandoPanels';
+import { isMandoMode } from '../Mando/mission';
+import { ScanOverlay } from '../Mando/ScanOverlay';
 import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
 import { FinishToast, GlobeControls, MyCasesToggle, PrecisionLegend } from './Controls';
@@ -56,6 +60,10 @@ const COLUMN_WIDTH_PX = 384;
 // Por debajo de este ancho el panel tapa el globo (Tailwind `md`): al elegir una
 // noticia se oculta para que se vea su ficha.
 const NARROW_SCREEN = '(max-width: 767px)';
+
+// Diseño «Centro de mando» (diseño 3, 27/10/2026): con `?mando` en la URL. Se
+// lee una vez: cambiarlo es abrir otra dirección.
+const MANDO = isMandoMode();
 
 function isNarrowScreen(): boolean {
   // Sin matchMedia (pruebas, navegadores viejos) se trata como pantalla ancha.
@@ -117,6 +125,17 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     panelOpen &&
     !inWall &&
     (!searchCollapsed || (hasResults && (timelineOpen || listOpen)));
+  // En el Centro de mando el globo flota encima de la consola de abajo y se
+  // corre a la izquierda cuando el expediente está abierto a la derecha.
+  const dossierOpen = useMandoStore((s) => s.dossierOpen);
+  const dockHeight = useMandoStore((s) => s.dockHeight);
+  const insets = MANDO
+    ? {
+        left: 0,
+        right: wide && hasResults && dossierOpen && !inWall ? DOSSIER_RESERVE_PX : 0,
+        bottom: wide && !inWall ? dockHeight : 0,
+      }
+    : { left: columnShown ? COLUMN_WIDTH_PX : 0, right: 0, bottom: 0 };
 
   // La URL manda: `#/explorar?caso=<id>` abre el muro (se puede compartir y recargar).
   useEffect(() => {
@@ -147,7 +166,13 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     // overflow-clip y no hidden: con hidden, scrollIntoView de una lista podía
     // desplazar la pantalla entera y dejar una franja negra abajo.
     // Sin fondo propio: detrás va el universo que dibuja App.
-    <div data-earth={earth} className="relative h-full overflow-clip">
+    // data-dossier: en el Centro de mando, los controles del mapa se recorren
+    // a la izquierda del expediente (styles/mando.css).
+    <div
+      data-earth={earth}
+      data-dossier={MANDO && insets.right > 0 ? 'open' : undefined}
+      className="relative h-full overflow-clip"
+    >
       {/* El universo de atrás lo dibuja App para todas las pestañas. El globo
           tiene su red: si la tarjeta de video falla, el resto sigue
           funcionando en lugar de quedar la pantalla en blanco. */}
@@ -157,66 +182,94 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           colors={colors}
           onMap={setMap}
           active={active}
-          insetLeft={columnShown ? COLUMN_WIDTH_PX : 0}
+          insetLeft={insets.left}
+          insetRight={insets.right}
+          insetBottom={insets.bottom}
+          clearHeader={MANDO}
         />
       </GraphicsBoundary>
+      {MANDO && !inWall && (
+        <ScanOverlay
+          search={search}
+          notice={finishedNotice.notice}
+          right={insets.right}
+          bottom={insets.bottom}
+        />
+      )}
       {/* Los paneles van debajo del encabezado; el universo y el globo, detrás
           de todo (también del encabezado, que no tiene fondo). */}
       <div className="capa-paneles absolute inset-x-0 bottom-0 top-[var(--header-h)]">
         <CaseWall map={map} />
         <CasesOnGlobe map={map} />
 
-        <aside
-          aria-label="Búsqueda y noticias"
-          className={`pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 transition-[transform,visibility] duration-300 sm:w-[24rem] ${
-            panelOpen && !inWall ? 'visible translate-x-0' : 'invisible -translate-x-full'
-          }`}
-        >
-          {searchId === null && (
-            // Acceso directo a la última corrida del monitor FGR (F12.8).
-            <div className="pointer-events-auto shrink-0">
-              <LatestRunCard />
-            </div>
-          )}
-          <div className="pointer-events-auto shrink-0">
-            {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
-            <SearchPanel key={searchId ?? 'nueva'} />
-          </div>
-          {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
-          {hasResults && (
-            <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
-              {listOpen ? (
-                <ResultsList articles={shown} total={articles.length} colors={colors} />
-              ) : (
-                <Chronology articles={relevant} />
+        {MANDO && !inWall && (
+          <MandoPanels
+            active={active}
+            search={search}
+            hasResults={hasResults}
+            articles={articles}
+            relevant={relevant}
+            shown={shown}
+            colors={colors}
+            rightReserve={insets.right}
+          />
+        )}
+        {!MANDO && (
+          <>
+            <aside
+              aria-label="Búsqueda y noticias"
+              className={`pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 transition-[transform,visibility] duration-300 sm:w-[24rem] ${
+                panelOpen && !inWall ? 'visible translate-x-0' : 'invisible -translate-x-full'
+              }`}
+            >
+              {searchId === null && (
+                // Acceso directo a la última corrida del monitor FGR (F12.8).
+                <div className="pointer-events-auto shrink-0">
+                  <LatestRunCard />
+                </div>
               )}
-            </div>
-          )}
-        </aside>
+              <div className="pointer-events-auto shrink-0">
+                {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
+                <SearchPanel key={searchId ?? 'nueva'} />
+              </div>
+              {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
+              {hasResults && (
+                <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
+                  {listOpen ? (
+                    <ResultsList articles={shown} total={articles.length} colors={colors} />
+                  ) : (
+                    <Chronology articles={relevant} />
+                  )}
+                </div>
+              )}
+            </aside>
 
-        {!panelOpen && !inWall && (
-          <button
-            type="button"
-            onClick={() => {
-              setPanelOpen(true);
-            }}
-            className="hud-btn hud-btn--sm absolute left-4 top-4 bg-[#050d12]/90"
-          >
-            › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
-          </button>
+            {!panelOpen && !inWall && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPanelOpen(true);
+                }}
+                className="hud-btn hud-btn--sm absolute left-4 top-4 bg-[#050d12]/90"
+              >
+                › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
+              </button>
+            )}
+
+            <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
+              <div className="pointer-events-auto">
+                <PrecisionLegend />
+              </div>
+              <div className="pointer-events-auto flex gap-2">
+                <MyCasesToggle />
+                <GlobeControls />
+              </div>
+            </div>
+          </>
         )}
 
-        <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
-          <div className="pointer-events-auto">
-            <PrecisionLegend />
-          </div>
-          <div className="pointer-events-auto flex gap-2">
-            <MyCasesToggle />
-            <GlobeControls />
-          </div>
-        </div>
-
-        {somethingOnGlobe && !inWall && (
+        {/* En el Centro de mando lo hace «Nueva misión», en la consola. */}
+        {somethingOnGlobe && !inWall && !MANDO && (
           <button
             type="button"
             onClick={() => {
@@ -229,7 +282,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           </button>
         )}
 
-        <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />
+        {/* En el Centro de mando el aviso es el letrero grande sobre el globo. */}
+        {!MANDO && <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />}
       </div>
     </div>
   );
