@@ -165,6 +165,8 @@ const PULSE_FRAME_MS = 1000 / 30;
 // Rampa mínima: con 0 el paso no se movería y la cadena de giro se cortaría.
 const MIN_SPIN_RAMP = 0.05;
 const MS_PER_SECOND = 1000;
+// Desvanecido de los nombres del mapa al aparecer (MapLibre usa 300 ms).
+const LABEL_FADE_MS = 120;
 // Aire mínimo entre la ficha arrastrada y la orilla del mapa.
 const CARD_DRAG_MARGIN = 12;
 
@@ -331,6 +333,9 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       zoom: intro ? INTRO_FROM_ZOOM : INITIAL_ZOOM,
       bearing: GLOBE_BEARING,
       attributionControl: { compact: true },
+      // Los nombres aparecen casi de inmediato al llegar a una nota (MapLibre
+      // los desvanece en 300 ms por defecto y se sentía que cargaba lento).
+      fadeDuration: LABEL_FADE_MS,
     });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
