@@ -252,3 +252,41 @@ async def test_miembros_sin_tocar_nunca_al_dueno(
     assert await repo.remove_member(case.id, "lectora", removed) is True
     assert await repo.get_view(case.id, "lectora") is None
     assert audit_actions(sync_engine, case.id).count("case.member_added") == 2
+
+
+async def test_eliminar_oculta_el_caso_y_restaurar_lo_devuelve(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # 27/10/2026: eliminar es reversible; la fila se queda con quién y cuándo.
+    repo = PostgresCaseRepository(test_engine)
+    case = await repo.create(
+        CaseDraft.validated("Caso a eliminar", "", "normal"), "benji", created()
+    )
+
+    await repo.set_deleted(
+        case.id,
+        deleted=True,
+        user_id="benji",
+        audit=AuditEntry(BENJI, InvestigationAction.CASE_DELETED, {"name": case.name}),
+    )
+
+    assert await repo.get_view(case.id, "benji") is None
+    assert await repo.list_for_user("benji", OPEN, None, None, 10) == []
+    hidden = await repo.get_view(case.id, "benji", include_deleted=True)
+    assert hidden is not None and hidden.case.deleted_at is not None
+    with sync_engine.connect() as conn:
+        by = conn.execute(
+            text("SELECT deleted_by FROM cases WHERE id = :id"), {"id": case.id}
+        ).scalar_one()
+    assert by == "benji"
+
+    await repo.set_deleted(
+        case.id,
+        deleted=False,
+        user_id="benji",
+        audit=AuditEntry(BENJI, InvestigationAction.CASE_RESTORED, {"name": case.name}),
+    )
+
+    back = await repo.get_view(case.id, "benji")
+    assert back is not None and back.case.deleted_at is None
+    assert audit_actions(sync_engine, case.id) == ["case.created", "case.deleted", "case.restored"]

@@ -38,7 +38,7 @@ ENTITY_TYPE = "case"
 
 _COLUMNS = """
     c.id, c.name, c.description, c.status, c.sensitivity, c.created_by, c.closed_at,
-    c.created_at, c.updated_at,
+    c.created_at, c.updated_at, c.deleted_at,
     (SELECT count(*) FROM case_articles ca WHERE ca.case_id = c.id) AS article_count
 """
 
@@ -55,6 +55,7 @@ def _to_case(row: RowMapping) -> Case:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         article_count=int(row["article_count"]),
+        deleted_at=row["deleted_at"],
     )
 
 
@@ -154,14 +155,17 @@ class PostgresCaseRepository:
             await write_audit(conn, case_id, audit)
             return await self._one_case(conn, case_id)
 
-    async def get_view(self, case_id: UUID, user_id: str) -> CaseView | None:
+    async def get_view(
+        self, case_id: UUID, user_id: str, *, include_deleted: bool = False
+    ) -> CaseView | None:
         """Ver ``CaseRepositoryPort.get_view``."""
+        live = "" if include_deleted else "AND c.deleted_at IS NULL"
         sql = f"""
             SELECT {_COLUMNS}, m.role
             FROM cases c
             JOIN case_members m ON m.case_id = c.id AND m.user_id = :user
-            WHERE c.id = :id
-        """  # noqa: S608 — columnas fijas del módulo
+            WHERE c.id = :id {live}
+        """  # noqa: S608 — columnas y condición fijas del módulo
         async with self._engine.connect() as conn:
             row = (
                 (await conn.execute(text(sql), {"id": case_id, "user": user_id})).mappings().first()
@@ -197,13 +201,28 @@ class PostgresCaseRepository:
             SELECT {_COLUMNS}, m.role, {has_article} AS has_article
             FROM case_members m
             JOIN cases c ON c.id = m.case_id
-            WHERE m.user_id = :user AND c.status = ANY(:statuses) {page}
+            WHERE m.user_id = :user AND c.status = ANY(:statuses) AND c.deleted_at IS NULL
+                {page}
             ORDER BY c.updated_at DESC, c.id DESC
             LIMIT :limit
         """  # noqa: S608 — columnas y condiciones son texto fijo de este módulo
         async with self._engine.connect() as conn:
             rows = (await conn.execute(text(sql), params)).mappings().all()
         return [_to_view(row) for row in rows]
+
+    async def set_deleted(
+        self, case_id: UUID, *, deleted: bool, user_id: str, audit: AuditEntry
+    ) -> None:
+        """Ver ``CaseRepositoryPort.set_deleted``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE cases SET deleted_at = CASE WHEN :deleted THEN now() END, "
+                    "deleted_by = CASE WHEN :deleted THEN :user END WHERE id = :id"
+                ),
+                {"id": case_id, "deleted": deleted, "user": user_id},
+            )
+            await write_audit(conn, case_id, audit)
 
     async def update(
         self,

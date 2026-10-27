@@ -39,16 +39,33 @@ class CaseRepositoryPort(Protocol):
         """
         ...
 
-    async def get_view(self, case_id: UUID, user_id: str) -> CaseView | None:
+    async def get_view(
+        self, case_id: UUID, user_id: str, *, include_deleted: bool = False
+    ) -> CaseView | None:
         """El caso como lo ve una persona.
 
         Args:
             case_id: Caso.
             user_id: Quién pregunta.
+            include_deleted: También si está eliminado (solo para restaurarlo).
+                Por defecto un caso eliminado no existe para nadie.
 
         Returns:
-            El caso con el rol de la persona, o ``None`` si no existe o no es
-            miembro (las dos cosas se ven igual a propósito).
+            El caso con el rol de la persona, o ``None`` si no existe, no es
+            miembro o está eliminado (se ven igual a propósito).
+        """
+        ...
+
+    async def set_deleted(
+        self, case_id: UUID, *, deleted: bool, user_id: str, audit: AuditEntry
+    ) -> None:
+        """Elimina (de forma reversible) o restaura un caso y lo registra.
+
+        Args:
+            case_id: Caso.
+            deleted: ``True`` para eliminar, ``False`` para restaurar.
+            user_id: Quién lo hace (``deleted_by``).
+            audit: Registro para la bitácora, en la misma transacción.
         """
         ...
 

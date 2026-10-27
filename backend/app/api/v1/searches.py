@@ -16,7 +16,7 @@ No hace: no valida reglas de negocio; sus errores los traduce
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, Request, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.articles import Articles
@@ -32,7 +32,12 @@ from app.api.v1.schemas.searches import (
 from app.application.audit import Actor
 from app.application.clock import mexico_city_today
 from app.application.ports.search_queue import SearchQueuePort
-from app.application.ports.search_reads import ArticleFilters, InRegion, SearchReaderPort
+from app.application.ports.search_reads import (
+    ArticleFilters,
+    InRegion,
+    SearchReaderPort,
+    SearchTrashPort,
+)
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
 from app.application.use_cases.search_reads import (
@@ -44,6 +49,7 @@ from app.application.use_cases.search_reads import (
     ListSearches,
 )
 from app.application.use_cases.start_search import StartSearch
+from app.application.use_cases.trash import DeleteSearch, RestoreSearch
 from app.domain.aggregates import AggregateLevel
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
@@ -196,6 +202,46 @@ async def list_searches(
 async def get_search(reader: Reader, search_id: SearchId) -> SearchOut:
     """Estado, etapa actual, conteos, créditos y costo. Consúltala cada 2 s mientras corre."""
     return SearchOut.from_detail(await GetSearch(reader).execute(search_id))
+
+
+def get_search_trash(request: Request) -> SearchTrashPort:
+    """Eliminar y restaurar búsquedas (el mismo repositorio de búsquedas).
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        La papelera compartida.
+    """
+    trash: SearchTrashPort = request.app.state.search_store
+    return trash
+
+
+Trash = Annotated[SearchTrashPort, Depends(get_search_trash)]
+
+
+@router.delete(
+    "/{search_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Quitar una búsqueda del historial",
+    responses=error_responses(403, 404),
+)
+async def delete_search(trash: Trash, actor: CurrentActor, search_id: SearchId) -> Response:
+    """La quita del historial de forma reversible; sus notas siguen en el sistema."""
+    await DeleteSearch(trash).execute(search_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{search_id}/restore",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Devolver una búsqueda al historial (deshacer)",
+    responses=error_responses(403, 404),
+)
+async def restore_search(trash: Trash, actor: CurrentActor, search_id: SearchId) -> Response:
+    """La devuelve tal como estaba. Si no estaba eliminada, no cambia nada."""
+    await RestoreSearch(trash).execute(search_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

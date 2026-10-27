@@ -50,6 +50,7 @@ from app.application.use_cases.cases import (
     UpdateCase,
 )
 from app.application.use_cases.search_reads import DEFAULT_ARTICLE_PAGE_SIZE
+from app.application.use_cases.trash import DeleteCase, RestoreCase
 from app.domain.investigation import CaseStatus
 
 router = APIRouter(prefix="/cases", tags=["casos"], responses=ERROR_RESPONSES)
@@ -139,6 +140,29 @@ async def update_case(
 ) -> CaseOut:
     """Cambia solo los campos enviados. Un caso cerrado solo cambia de estado."""
     return CaseOut.from_view(await UpdateCase(cases).execute(case_id, body.to_changes(), actor))
+
+
+@router.delete(
+    "/{case_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un caso (reversible)",
+    responses=error_responses(403, 404),
+)
+async def delete_case(cases: Cases, actor: CurrentActor, case_id: CaseId) -> Response:
+    """Solo el dueño. Deja de verse para todos sus miembros; se puede restaurar."""
+    await DeleteCase(cases).execute(case_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{case_id}/restore",
+    response_model=CaseOut,
+    summary="Restaurar un caso eliminado (deshacer)",
+    responses=error_responses(403, 404),
+)
+async def restore_case(cases: Cases, actor: CurrentActor, case_id: CaseId) -> CaseOut:
+    """Solo el dueño. Lo devuelve tal como estaba."""
+    return CaseOut.from_view(await RestoreCase(cases).execute(case_id, actor))
 
 
 @router.get(

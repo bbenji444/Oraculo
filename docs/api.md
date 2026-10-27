@@ -193,6 +193,12 @@ curl -s 'http://localhost:8080/api/v1/searches?limit=1'
 { "items": [{ "search_id": "b01afb0d-…", "status": "completed", "…": "igual que GET /searches/{id}" }], "next_cursor": null }
 ```
 
+**Quitar del historial (27/10/2026).** `DELETE /searches/{id}` responde `204` y es reversible: `POST /searches/{id}/restore` la devuelve, también con `204`.
+
+- **Quién:** quien la lanzó. Las corridas automáticas son de todos, así que cualquiera puede quitarlas. La búsqueda manual de otra persona responde `403` `search_forbidden`.
+- **Después:** una búsqueda eliminada ya no sale en el historial y `GET /searches/{id}` responde `404`. Sus notas siguen en el índice y en los casos donde se agregaron.
+- **Bitácora:** `search.deleted` y `search.restored`.
+
 ## Notas de una búsqueda
 
 `GET /searches/{id}/articles`. Van de la más reciente a la más vieja (las que no tienen fecha, al final).
@@ -456,6 +462,12 @@ Con datos inválidos responde `422` `invalid_case`, con un problema por campo en
 ```json
 { "error": { "code": "case_not_found", "message": "No existe el caso o no tienes acceso.", "details": { "id": "00000000-0000-0000-0000-000000000000" } } }
 ```
+
+**Eliminar (27/10/2026).** `DELETE /cases/{id}` responde `204` y es reversible: `POST /cases/{id}/restore` devuelve el caso tal como estaba (`200`, igual que `GET /cases/{id}`).
+
+- **Quién:** solo el dueño. Cualquier otro rol recibe `403` `case_forbidden`.
+- **Después:** un caso eliminado no existe para nadie (lista, detalle, muro y «Mis casos» en el globo responden como si no existiera). Sus notas siguen en el sistema.
+- **Bitácora:** `case.deleted` y `case.restored`.
 
 **Editar.** `PATCH /cases/{id}` cambia solo los campos enviados. Con `status`:
 - `closed` cierra el caso y guarda `closed_at`;

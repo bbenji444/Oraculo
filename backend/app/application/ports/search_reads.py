@@ -90,8 +90,52 @@ class SearchDetail:
     scheduled_for: datetime | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class SearchOwnership:
+    """De quién es una búsqueda, para decidir si se puede eliminar.
+
+    Attributes:
+        user_id: Quién la lanzó.
+        trigger: Manual o automática.
+        deleted: Si ya está eliminada.
+    """
+
+    user_id: str
+    trigger: SearchTrigger
+    deleted: bool
+
+
+class SearchTrashPort(Protocol):
+    """Quitar búsquedas del historial sin perderlas (reversible)."""
+
+    async def ownership(self, search_id: UUID) -> SearchOwnership | None:
+        """De quién es la búsqueda, aunque esté eliminada.
+
+        Args:
+            search_id: Id.
+
+        Returns:
+            Dueño, origen y si está eliminada; ``None`` si no existe.
+        """
+        ...
+
+    async def set_deleted(
+        self, search_id: UUID, *, deleted: bool, actor_id: str, ip: str | None, action: str
+    ) -> None:
+        """Elimina o restaura la búsqueda y deja la bitácora en la misma transacción.
+
+        Args:
+            search_id: Id.
+            deleted: ``True`` para eliminar, ``False`` para restaurar.
+            actor_id: Quién lo hace.
+            ip: Desde dónde, si vino por HTTP.
+            action: ``search.deleted`` o ``search.restored``.
+        """
+        ...
+
+
 class SearchReaderPort(Protocol):
-    """Lecturas de búsquedas para la API."""
+    """Lecturas de búsquedas para la API. Una búsqueda eliminada no se lee."""
 
     async def search_detail(self, search_id: UUID) -> SearchDetail | None:
         """Una búsqueda.
