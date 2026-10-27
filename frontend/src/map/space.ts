@@ -155,6 +155,35 @@ export const STARMAP_GAIN = 2.2;
 // (meta de 60 fps, §14.2).
 export const SPACE_FPS = 30;
 
+// Fuera de Explorar (Casos, Conceptos, Historial…) el cielo deriva solo, muy
+// despacio: una vuelta cada 10 minutos, con un vaivén suave de latitud. A 24
+// cuadros por segundo se ve fluido y casi no ocupa la tarjeta (26/10/2026).
+export const DRIFT_DEGREES_PER_SECOND = 0.6;
+export const DRIFT_FPS = 24;
+const DRIFT_LAT = 12;
+const DRIFT_LAT_SWAY = 8;
+// Un vaivén completo de latitud cada 3 minutos.
+const DRIFT_SWAY_SECONDS = 180;
+const DRIFT_ZOOM = 2;
+
+/**
+ * La vista del cielo cuando deriva solo, a partir de dónde estaba.
+ *
+ * @param startLng Longitud de la cámara al empezar a derivar (para que no salte).
+ * @param elapsedMs Tiempo desde que empezó a derivar.
+ * @returns Una vista como la del mapa, para `starCameraRotation`.
+ */
+export function driftView(startLng: number, elapsedMs: number): CameraView {
+  const seconds = elapsedMs / 1000;
+  return {
+    lng: startLng - DRIFT_DEGREES_PER_SECOND * seconds,
+    lat: DRIFT_LAT + DRIFT_LAT_SWAY * Math.sin((2 * Math.PI * seconds) / DRIFT_SWAY_SECONDS),
+    zoom: DRIFT_ZOOM,
+    bearing: 0,
+    pitch: 0,
+  };
+}
+
 // Piezas de la textura: 2048 × 2048. Subir la 8K (8192 × 4096) de un solo
 // golpe a una Intel UHD tardaba tanto que Windows creía colgada la tarjeta y
 // la reiniciaba, y Chrome le quitaba el 3D a la página (26/10/2026). En piezas,
