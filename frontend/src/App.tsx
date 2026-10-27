@@ -61,6 +61,22 @@ function Screen({ tab }: { tab: Tab }) {
   return null;
 }
 
+/**
+ * El globo de la marca: un aro, el ecuador, dos paralelos y un meridiano que
+ * se angosta y se ensancha (`marca-meridiano`) para que parezca que gira.
+ */
+function BrandGlobe() {
+  return (
+    <span className="marca-simbolo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor">
+        <circle cx="16" cy="16" r="13" strokeWidth="1.8" />
+        <path d="M3 16h26M5.5 9h21M5.5 23h21" strokeWidth="1.2" opacity="0.7" />
+        <ellipse className="marca-meridiano" cx="16" cy="16" rx="6" ry="13" strokeWidth="1.6" />
+      </svg>
+    </span>
+  );
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash);
   // Explorar se monta la primera vez que se visita y ya no se desmonta: cada
@@ -81,39 +97,40 @@ export function App() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col font-sans text-slate-100">
-      <header className="z-30 border-b border-sky-400/20 bg-slate-950/85 shadow-[0_1px_18px_rgb(0_210_255/0.08)] backdrop-blur-md">
-        {/* En celular las pestañas bajan a su propio renglón y se deslizan si no caben. */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 sm:flex-nowrap sm:px-6 sm:py-3">
-          <div className="flex shrink-0 items-center gap-3">
-            <img
-              src="/globo.svg"
-              alt=""
-              className="size-7 drop-shadow-[0_0_10px_rgb(0_210_255/0.45)]"
-            />
-            <div>
-              {/* Marca homologada con OSINT Oráculo (F12.7a): Orbitron con brillo cian. */}
-              <h1 className="marca-oraculo text-[15px] font-bold leading-tight text-sky-50">
-                Monitor de Noticias
-              </h1>
-              <p className="hidden text-[11px] tracking-wide text-slate-400 sm:block">
-                Oráculo · Noticias geolocalizadas sobre México
-              </p>
-            </div>
-          </div>
-          <nav
-            aria-label="Secciones"
-            className="flex w-full min-w-0 gap-0.5 overflow-x-auto sm:w-auto sm:gap-1"
+    <div className="relative h-dvh font-sans text-slate-100">
+      {/* Encabezado sin fondo y centrado, sobre las estrellas (Benji, 26/10/2026):
+          la marca de OSINT Oráculo y las pestañas en un solo grupo al centro.
+          En celular las pestañas bajan a su propio renglón y se deslizan. */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center justify-center px-4">
+        <div className="pointer-events-auto flex min-w-0 max-w-full flex-col items-center gap-2.5 sm:flex-row sm:gap-7">
+          <a
+            href="#/explorar"
+            className="marca-signal shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400"
           >
+            <BrandGlobe />
+            <span className="flex flex-col items-start">
+              <h1 className="marca-nombre">Monitor de Noticias</h1>
+              <span className="marca-linea">
+                <span className="marca-linea-texto">Oráculo · Noticias geolocalizadas</span>
+                <span className="marca-scan" aria-hidden="true" />
+              </span>
+            </span>
+          </a>
+          {/* Separador vertical que se desvanece arriba y abajo. */}
+          <span
+            aria-hidden="true"
+            className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
+          />
+          <nav aria-label="Secciones" className="flex max-w-full min-w-0 gap-1 overflow-x-auto">
             {TABS.map((item) => (
               <a
                 key={item.id}
                 href={`#/${item.id}`}
                 aria-current={tab === item.id ? 'page' : undefined}
-                className={`shrink-0 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] sm:px-3 sm:text-sm transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
+                className={`pestana shrink-0 whitespace-nowrap rounded-md px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
                   tab === item.id
-                    ? 'bg-sky-400/10 text-sky-100 shadow-glow'
-                    : 'text-slate-400 hover:bg-sky-400/5 hover:text-slate-100'
+                    ? 'text-sky-100 [text-shadow:0_0_12px_rgb(0_210_255/0.55)]'
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {item.label}
@@ -122,7 +139,14 @@ export function App() {
           </nav>
         </div>
       </header>
-      <main className="min-h-0 flex-1 overflow-auto">
+      {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás
+          del encabezado. Las demás pestañas empiezan debajo de él, para que su
+          contenido no pase por detrás del texto al desplazarse. */}
+      <main
+        className={`absolute inset-x-0 bottom-0 overflow-auto ${
+          tab === 'explorar' ? 'top-0' : 'top-[var(--header-h)]'
+        }`}
+      >
         {exploreVisited && (
           <div hidden={tab !== 'explorar'} className="h-full">
             <ExplorePage active={tab === 'explorar'} />

@@ -882,7 +882,12 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
             'radial-gradient(circle, rgb(255 255 255 / 0.95) 0, rgb(255 238 205 / 0.5) 5%, rgb(255 205 150 / 0.18) 20%, rgb(120 200 255 / 0.06) 42%, transparent 62%)',
         }}
       />
-      <div ref={containerRef} className="h-full w-full" aria-label="Globo interactivo" />
+      {/* globo-bajo-encabezado: los botones del mapa bajan al hueco del encabezado. */}
+      <div
+        ref={containerRef}
+        className="globo-bajo-encabezado h-full w-full"
+        aria-label="Globo interactivo"
+      />
       {graphicsLost && <GlobeUnavailable />}
       {tooltip?.label && (
         <div
