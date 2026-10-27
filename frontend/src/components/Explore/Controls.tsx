@@ -92,6 +92,12 @@ const DOWNLOADS: { kind: DownloadKind; short: string; label: string; hint: strin
   },
   { kind: 'print', short: 'Imprimir', label: 'Imprimir', hint: 'Abre el reporte en otra pestaña' },
 ];
+// Por ahora solo el PDF, que se va a corregir (Benji, 26/10/2026). CSV, GeoJSON
+// e imprimir siguen funcionando en la API y en `useDownloads`: para volver a
+// mostrarlos basta agregarlos aquí.
+const VISIBLE_DOWNLOADS: readonly DownloadKind[] = ['pdf'];
+// Con un solo botón, el texto completo cabe y se entiende mejor que «PDF».
+const SINGLE_DOWNLOAD_TEXT = 'Descargar reporte (PDF)';
 
 /**
  * Descargas de una búsqueda terminada (§15, ADR-0018), en una fila de botones
@@ -103,10 +109,15 @@ const DOWNLOADS: { kind: DownloadKind; short: string; label: string; hint: strin
  */
 export function DownloadButtons({ searchId }: { searchId: string }) {
   const downloads = useDownloads(searchId);
+  const visible = DOWNLOADS.filter((d) => VISIBLE_DOWNLOADS.includes(d.kind));
+  const single = visible.length === 1;
   return (
     <div aria-label="Descargas" role="group" className="space-y-1">
-      <div className="grid grid-cols-4 gap-1">
-        {DOWNLOADS.map(({ kind, short, label, hint }) => (
+      <div
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${String(visible.length)}, minmax(0, 1fr))` }}
+      >
+        {visible.map(({ kind, short, label, hint }) => (
           <button
             key={kind}
             type="button"
@@ -125,6 +136,8 @@ export function DownloadButtons({ searchId }: { searchId: string }) {
                 aria-hidden="true"
                 className="size-3 animate-spin rounded-full border-2 border-slate-500 border-t-sky-300"
               />
+            ) : single ? (
+              SINGLE_DOWNLOAD_TEXT
             ) : (
               short
             )}

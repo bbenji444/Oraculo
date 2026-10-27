@@ -39,6 +39,7 @@ import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
 import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
+import { GlobeUnavailable, GraphicsBoundary } from './GraphicsBoundary';
 import { LatestRunCard } from './LatestRunCard';
 import { visibleArticles } from './format';
 import { ResultsList } from './ResultsList';
@@ -125,8 +126,14 @@ export function ExplorePage() {
     // overflow-clip y no hidden: con hidden, scrollIntoView de una lista podía
     // desplazar la pantalla entera y dejar una franja negra abajo.
     <div data-earth={earth} className="relative h-full overflow-clip bg-[#02030a]">
-      <SpaceBackground />
-      <ExploreGlobe articles={inWall ? NO_ARTICLES : shown} colors={colors} onMap={setMap} />
+      {/* Cada uno con su red: si la tarjeta de video falla, el resto sigue
+          funcionando en lugar de quedar la pantalla en blanco. */}
+      <GraphicsBoundary fallback={null}>
+        <SpaceBackground />
+      </GraphicsBoundary>
+      <GraphicsBoundary fallback={<GlobeUnavailable />}>
+        <ExploreGlobe articles={inWall ? NO_ARTICLES : shown} colors={colors} onMap={setMap} />
+      </GraphicsBoundary>
       <CaseWall map={map} />
       <CasesOnGlobe map={map} />
 

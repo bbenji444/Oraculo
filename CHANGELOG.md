@@ -64,6 +64,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Solo la descarga del PDF, por ahora** (26/10/2026): de la búsqueda se quitaron los botones de CSV, GeoJSON e Imprimir; queda un botón «Descargar reporte (PDF)». Las rutas de la API siguen, y para volver a mostrarlos basta agregarlos a `VISIBLE_DOWNLOADS`.
 - **Google News RSS activo también en producción** (ADR-0021, sustituye al ADR-0011): por dictamen de la Dirección del 24/10/2026, las búsquedas vuelven a consultar el RSS de Google News, gratis, además de SearchApi y el índice local. Antes estaba apagado por los términos del feed. `NEWS_RSS_ENABLED=false` lo apaga sin tocar código, y se quitó la advertencia de «solo desarrollo».
 - Historial: el periodo de cada búsqueda se lee como en Explorar ("13 – 20 oct 2026") y no como fechas técnicas ("2026-10-13 a 2026-10-20").
 - La lista de Explorar dice cuántas notas se ven de cuántas trajo la búsqueda ("Noticias (24 de 43)"); antes decía "Noticias (24)" mientras arriba decía "43 notas" y parecía que faltaban. La ayuda del encabezado y de los botones PDF, CSV y GeoJSON aclara que las descargas incluyen solo las notas relevantes.
@@ -78,6 +79,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Descargar el PDF ya no deja la pantalla en blanco** (26/10/2026): si la tarjeta de video se reinicia y Chrome bloquea los gráficos 3D de la página, el globo muestra un aviso con «Recargar». La búsqueda, la cronología y el PDF siguen funcionando. Antes, el error al crear el globo desmontaba toda la aplicación.
 - **El mismo hecho ya no se parte cuando un caso domina** (ADR-0026): la vinculación a proceso de Jáuregui quedaba en unas 12 historias, porque sus palabras salían en decenas de títulos y dejaban de contar como poco comunes. Ahora basta un parecido por palabras de 0.75 o más con 3 palabras en común, y la nota entra a la historia más parecida, no a la más antigua. La corrida FGR pasa de 94 a 87 hechos. Se reagrupó el 26/10/2026, con respaldo previo.
 - **Elegir una nota ya no desplaza la pantalla de Explorar** ni deja una franja negra abajo.
 - **Google News RSS no se usaba en las búsquedas** (F12.2): el ADR-0021 lo encendió por defecto, pero la lista de proveedores de las búsquedas (`SEARCH_PROVIDERS`, del 17/10/2026, cuando el RSS estaba apagado) nunca lo incluyó; solo `make probar-proveedor` lo consultaba. Ahora cada búsqueda lo consulta (gratis) salvo que el analista lo apague o `NEWS_RSS_ENABLED=false`.

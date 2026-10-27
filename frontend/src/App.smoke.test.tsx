@@ -242,7 +242,7 @@ describe('flujo principal (H1)', () => {
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label'))
         .filter(Boolean),
-    ).toEqual(['Reporte (PDF)', 'Datos (CSV)', 'Puntos (GeoJSON)', 'Imprimir']);
+    ).toEqual(['Reporte (PDF)']);
     fireEvent.click(within(searchSection).getByRole('button', { name: 'Editar' }));
     expect(
       screen.getByRole('combobox', { name: 'Buscar estado, municipio o localidad' }),
