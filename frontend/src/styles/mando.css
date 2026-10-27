@@ -1,0 +1,650 @@
+/*
+ * Diseño «Centro de mando» (diseño 3, 27/10/2026): la búsqueda como una
+ * consola de misión abajo, el globo flotando encima, un radar que barre el
+ * globo mientras se busca y un expediente de resultados a la derecha.
+ *
+ * Usa los colores, letras y piezas de la consola táctica (hud.css) y sigue
+ * sus reglas: solo se anima `transform`, `opacity` y sombras pequeñas; nada
+ * de `backdrop-filter`; con «reducir animaciones» del sistema, todo queda
+ * quieto.
+ *
+ * Quién lo usa: src/components/Mando/. No hace: no cambia el diseño 2; estas
+ * clases solo aparecen con `?mando` en la URL.
+ */
+
+/* --- Consola de misión -------------------------------------------------------- */
+
+.mando-dock {
+  border-radius: 18px;
+  animation: mando-rise 0.9s var(--hud-ease) both;
+}
+
+/* Haz de luz que recorre el borde de arriba de la consola. */
+.mando-beam {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  z-index: 3;
+  width: 30%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent);
+  pointer-events: none;
+  animation: mando-glide 5.5s ease-in-out infinite;
+}
+
+.mando-kicker {
+  color: var(--hud-cyan);
+  font: 600 10px/1 var(--font-display);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgb(0 210 255 / 0.45);
+}
+
+.mando-clock {
+  color: var(--hud-ink);
+  font: 600 12px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.16em;
+}
+
+/* La frase de la misión: los verbos tenues y las partes tocables brillantes. */
+.mando-sentence {
+  color: var(--hud-muted);
+  font-size: 1.12rem;
+  line-height: 2.4;
+}
+
+.mando-token {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45em;
+  margin: 0 0.12em;
+  padding: 0.05em 0.6em 0.12em;
+  border: 1px solid rgb(0 210 255 / 0.22);
+  border-radius: 9px;
+  background: rgb(0 210 255 / 0.06);
+  box-shadow: inset 0 -2px 0 rgb(0 210 255 / 0.55);
+  color: var(--hud-ink);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 0.3s var(--hud-ease),
+    background-color 0.3s var(--hud-ease),
+    border-color 0.3s var(--hud-ease),
+    box-shadow 0.3s var(--hud-ease);
+}
+.mando-token::after {
+  content: '';
+  position: absolute;
+  right: 12%;
+  bottom: -2px;
+  left: 12%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fff, transparent);
+  opacity: 0;
+  transform: scaleX(0.2);
+  transition:
+    opacity 0.3s var(--hud-ease),
+    transform 0.45s var(--hud-ease);
+}
+.mando-token:hover,
+.mando-token:focus-visible {
+  border-color: rgb(0 210 255 / 0.55);
+  background: rgb(0 210 255 / 0.12);
+  box-shadow:
+    inset 0 -2px 0 var(--hud-cyan),
+    0 10px 24px -12px rgb(0 210 255 / 0.8);
+  transform: translateY(-2px);
+  outline: none;
+}
+.mando-token:hover::after,
+.mando-token:focus-visible::after,
+.mando-token[aria-expanded='true']::after {
+  opacity: 0.9;
+  transform: scaleX(1);
+}
+.mando-token[aria-expanded='true'] {
+  border-color: var(--hud-cyan);
+  background: rgb(0 210 255 / 0.18);
+  box-shadow:
+    inset 0 -2px 0 var(--hud-cyan),
+    0 0 22px rgb(0 210 255 / 0.45);
+}
+/* Falta elegir esta parte: ámbar y con un latido suave. */
+.mando-token[data-empty] {
+  border-color: rgb(255 181 71 / 0.45);
+  box-shadow: inset 0 -2px 0 rgb(255 181 71 / 0.7);
+  color: var(--hud-amber);
+  animation: mando-attn 1.8s ease-in-out infinite;
+}
+/* El número de la parte («01»), como en un tablero. */
+.mando-token-index {
+  color: rgb(0 210 255 / 0.7);
+  font: 600 0.52em/1 var(--font-display);
+  letter-spacing: 0.14em;
+}
+/* Al cambiar, el valor nuevo entra con un destello. */
+.mando-token-value {
+  display: inline-block;
+  animation: mando-flash 0.7s var(--hud-ease);
+}
+
+/* La tarjeta que sube de la consola para ajustar una parte de la misión. */
+.mando-editor {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  z-index: 20;
+  width: min(36rem, 100%);
+  transform-origin: bottom left;
+  /* backwards y no both: al terminar se quita el recorte (clip-path), que si no
+     cortaba la lista del buscador de regiones. */
+  animation: mando-editor-in 0.5s var(--hud-ease) backwards;
+}
+.mando-editor-body {
+  max-height: min(52vh, 28rem);
+  overflow: hidden auto;
+  padding: 2px;
+}
+/* La región deja salir la lista del buscador (va encima de la consola). */
+.mando-editor-body[data-slot='region'] {
+  max-height: none;
+  overflow: visible;
+}
+
+.mando-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5em;
+  padding: 0.1em 0.4em;
+  border: 1px solid rgb(0 210 255 / 0.35);
+  border-radius: 5px;
+  color: var(--hud-ink);
+  font: 600 10px/1.4 var(--font-display);
+  box-shadow: inset 0 -1px 0 rgb(0 210 255 / 0.35);
+}
+
+/* --- Botón de lanzar ----------------------------------------------------------- */
+
+/* El botón va dentro de un marco: .hud-btn recorta lo que se sale (su
+   destello), y el aro y la onda tienen que verse por fuera. */
+.mando-launch-wrap {
+  position: relative;
+  isolation: isolate;
+}
+.mando-launch-wrap > .hud-btn {
+  position: relative;
+  z-index: 1;
+  min-width: 12rem;
+}
+/* Aro de carga: gira alrededor del botón al pasar el mouse. */
+.mando-launch-ring {
+  position: absolute;
+  inset: -2px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: conic-gradient(from 0deg, transparent 0 60%, var(--hud-cyan) 78%, transparent 92%);
+  opacity: 0;
+  transition: opacity 0.4s var(--hud-ease);
+  animation: hud-spin 2.4s linear infinite;
+  pointer-events: none;
+}
+.mando-launch-wrap:has(.hud-btn:hover:not(:disabled)) .mando-launch-ring,
+.mando-launch-wrap:has(.hud-btn:focus-visible) .mando-launch-ring {
+  opacity: 1;
+}
+/* Onda expansiva al lanzar. */
+.mando-shock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid var(--hud-cyan);
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: mando-shock 0.9s var(--hud-ease) forwards;
+}
+
+/* --- Misiones recientes -------------------------------------------------------- */
+
+/* Si no caben, las últimas fichas se desvanecen en el borde en lugar de
+   aplastarse (una máscara fija: no se vuelve a calcular al moverse nada). */
+.mando-recents {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, #000 calc(100% - 3rem), transparent);
+}
+.mando-recent {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 15rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgb(0 210 255 / 0.18);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.02);
+  color: rgb(203 213 225);
+  font-size: 11.5px;
+  transition:
+    transform 0.3s var(--hud-ease),
+    border-color 0.3s var(--hud-ease),
+    background-color 0.3s var(--hud-ease),
+    box-shadow 0.3s var(--hud-ease);
+}
+.mando-recent:hover,
+.mando-recent:focus-visible {
+  border-color: rgb(0 210 255 / 0.5);
+  background: rgb(0 210 255 / 0.08);
+  box-shadow: 0 8px 20px -12px rgb(0 210 255 / 0.8);
+  color: #fff;
+  transform: translateY(-2px);
+  outline: none;
+}
+
+/* --- Riel de avance del barrido ---------------------------------------------- */
+
+.mando-rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--rail-n, 8), minmax(0, 1fr));
+}
+.mando-rail-track {
+  position: absolute;
+  top: 9px;
+  right: calc(50% / var(--rail-n, 8));
+  left: calc(50% / var(--rail-n, 8));
+  height: 2px;
+  background: rgb(0 210 255 / 0.12);
+}
+.mando-rail-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #0891b2, var(--hud-cyan));
+  box-shadow: 0 0 10px var(--hud-cyan);
+  transform: scaleX(var(--rail-progress, 0));
+  transform-origin: left;
+  transition: transform 0.8s var(--hud-ease);
+}
+.mando-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: var(--hud-muted);
+  font: 600 8.5px/1.1 var(--font-display);
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+  transition: color 0.4s var(--hud-ease);
+}
+.mando-node-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgb(0 210 255 / 0.3);
+  border-radius: 50%;
+  background: #04121a;
+  transition:
+    background-color 0.4s var(--hud-ease),
+    border-color 0.4s var(--hud-ease),
+    box-shadow 0.4s var(--hud-ease);
+}
+.mando-node[data-state='done'] {
+  color: var(--hud-ink);
+}
+.mando-node[data-state='done'] .mando-node-dot {
+  border-color: var(--hud-cyan);
+  background: radial-gradient(circle, #fff 0 2px, var(--hud-cyan) 3px);
+  box-shadow: 0 0 12px var(--hud-cyan);
+}
+.mando-node[data-state='active'] {
+  color: var(--hud-cyan);
+}
+.mando-node[data-state='active'] .mando-node-dot {
+  border-color: var(--hud-cyan);
+  box-shadow:
+    0 0 0 4px rgb(0 210 255 / 0.15),
+    0 0 16px rgb(0 210 255 / 0.7);
+}
+.mando-node[data-state='active'] .mando-node-dot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--hud-cyan);
+  border-radius: 50%;
+  animation: hud-ping 1.6s var(--hud-ease) infinite;
+}
+.mando-node[data-state='failed'] {
+  color: var(--hud-rose);
+}
+.mando-node[data-state='failed'] .mando-node-dot {
+  border-color: var(--hud-rose);
+  box-shadow: 0 0 12px var(--hud-rose);
+}
+
+/* Renglón nuevo de la bitácora. */
+.mando-log-line {
+  animation: mando-type 0.5s var(--hud-ease) both;
+}
+
+/* --- Radar sobre el globo ------------------------------------------------------ */
+
+.mando-scan {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: mando-scan-in 0.9s var(--hud-ease) both;
+}
+.mando-scan-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgb(0 210 255 / 0.32),
+    rgb(0 210 255 / 0.06) 10%,
+    transparent 22%
+  );
+  animation: hud-spin 3.4s linear infinite;
+}
+.mando-scan-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgb(0 210 255 / 0.55);
+  border-radius: 50%;
+  animation: mando-ring 3.3s var(--hud-ease) infinite;
+}
+/* Anillo exterior de mira, con marcas cada 10°, girando muy lento. */
+.mando-scan-frame {
+  position: absolute;
+  inset: -5%;
+  border: 1px dashed rgb(0 210 255 / 0.3);
+  border-radius: 50%;
+  animation: hud-spin 48s linear infinite reverse;
+}
+.mando-scan-cross {
+  position: absolute;
+  inset: -9%;
+  background:
+    linear-gradient(rgb(0 210 255 / 0.5), rgb(0 210 255 / 0.5)) center top / 1px 7% no-repeat,
+    linear-gradient(rgb(0 210 255 / 0.5), rgb(0 210 255 / 0.5)) center bottom / 1px 7% no-repeat,
+    linear-gradient(rgb(0 210 255 / 0.5), rgb(0 210 255 / 0.5)) left center / 7% 1px no-repeat,
+    linear-gradient(rgb(0 210 255 / 0.5), rgb(0 210 255 / 0.5)) right center / 7% 1px no-repeat;
+}
+.mando-scan-label {
+  position: absolute;
+  top: -9%;
+  left: 50%;
+  translate: -50% -100%;
+  color: var(--hud-cyan);
+  font: 600 10px/1 var(--font-display);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 10px rgb(0 210 255 / 0.6);
+  white-space: nowrap;
+}
+
+/* Letrero grande al terminar el barrido. */
+.mando-banner {
+  position: absolute;
+  translate: -50% -50%;
+  text-align: center;
+  pointer-events: none;
+  animation: mando-banner 4.6s var(--hud-ease) both;
+}
+.mando-banner-title {
+  color: #fff;
+  font: 700 clamp(1.4rem, 3.2vw, 2.6rem) / 1.1 var(--font-display);
+  letter-spacing: 0.3em;
+  text-shadow:
+    0 0 24px var(--hud-cyan),
+    0 0 4px rgb(0 210 255 / 0.9);
+}
+.mando-banner-line {
+  height: 1px;
+  margin: 0.9rem auto;
+  background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent);
+  animation: hud-draw 0.9s var(--hud-ease) 0.2s both;
+}
+
+/* --- Expediente ---------------------------------------------------------------- */
+
+.mando-dossier {
+  animation: mando-slide-in 0.7s var(--hud-ease) both;
+}
+.mando-kpi {
+  position: relative;
+  overflow: hidden;
+  padding: 0.7rem 0.75rem 0.65rem;
+  border: 1px solid rgb(0 210 255 / 0.16);
+  border-radius: 11px;
+  background: rgb(0 210 255 / 0.04);
+  transition:
+    border-color 0.3s var(--hud-ease),
+    transform 0.3s var(--hud-ease);
+}
+.mando-kpi::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 18%;
+  left: 18%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent);
+}
+.mando-kpi:hover {
+  border-color: rgb(0 210 255 / 0.45);
+  transform: translateY(-2px);
+}
+.mando-kpi .hud-kpi-value {
+  font-size: 1.35rem;
+}
+
+/* Barra de categorías: cada tramo crece desde la izquierda. */
+.mando-meter {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(0 210 255 / 0.06);
+}
+.mando-meter > span {
+  transform-origin: left;
+  animation: hud-draw 0.9s var(--hud-ease) both;
+}
+
+/* Pestaña en el borde para volver a abrir el expediente. */
+.mando-edge-tab {
+  writing-mode: vertical-rl;
+  border-radius: 12px 0 0 12px;
+  border-right: 0;
+}
+
+/* Los controles del mapa (acercar, alejar, brújula) se recorren junto con el
+   expediente para no quedar encima de su esquina. */
+.maplibregl-ctrl-top-right {
+  transition: translate 0.7s var(--hud-ease);
+}
+[data-dossier='open'] .maplibregl-ctrl-top-right {
+  translate: calc(-26rem - 1rem) 0;
+}
+
+/* --- Movimientos --------------------------------------------------------------- */
+
+@keyframes mando-rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mando-glide {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(330%);
+    opacity: 0;
+  }
+}
+
+@keyframes mando-attn {
+  50% {
+    box-shadow:
+      inset 0 -2px 0 rgb(255 181 71 / 0.9),
+      0 0 18px rgb(255 181 71 / 0.35);
+  }
+}
+
+@keyframes mando-flash {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+    text-shadow: 0 0 18px #fff;
+  }
+  60% {
+    opacity: 1;
+    text-shadow: 0 0 12px var(--hud-cyan);
+  }
+  100% {
+    transform: none;
+    text-shadow: none;
+  }
+}
+
+@keyframes mando-editor-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scaleY(0.9);
+    clip-path: inset(100% 0 0 0 round 14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0 round 14px);
+  }
+}
+
+@keyframes mando-shock {
+  from {
+    opacity: 1;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes mando-type {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes mando-scan-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mando-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes mando-banner {
+  0% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+  12% {
+    opacity: 1;
+    transform: none;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes mando-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Con «reducir animaciones» del sistema, nada se mueve solo. */
+@media (prefers-reduced-motion: reduce) {
+  .mando-token,
+  .mando-token::after,
+  .mando-recent,
+  .mando-node,
+  .mando-node-dot,
+  .mando-rail-fill,
+  .mando-kpi,
+  .maplibregl-ctrl-top-right {
+    transition: none;
+  }
+  .mando-dock,
+  .mando-beam,
+  .mando-token[data-empty],
+  .mando-token-value,
+  .mando-editor,
+  .mando-launch-ring,
+  .mando-shock,
+  .mando-node[data-state='active'] .mando-node-dot::after,
+  .mando-log-line,
+  .mando-scan,
+  .mando-scan-sweep,
+  .mando-scan-ring,
+  .mando-scan-frame,
+  .mando-banner-line,
+  .mando-dossier,
+  .mando-meter > span,
+  .mando-banner {
+    animation: none;
+  }
+}

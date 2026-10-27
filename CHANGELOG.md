@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
+  - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;
+  - **«Iniciar barrido»:** botón con aro de carga y onda expansiva; antes de lanzar, el costo se ve con cifras que corren;
+  - **mientras busca:** un radar barre el globo, un riel enciende las 8 etapas, corren el porcentaje y el cronómetro, y una bitácora dice lo que ya se sabe;
+  - **al terminar:** el letrero «BARRIDO COMPLETO» y un expediente a la derecha con relevantes, estados, créditos, costo de la IA, las categorías que más salen, y la cronología o la lista;
+  - **el globo:** flota entre el encabezado y la consola, siempre completo, y se corre a la izquierda con el expediente;
+  - **personalizada:** las misiones recientes y la última corrida automática se reabren sin costo; hay un reloj de la Ciudad de México con la cuenta regresiva a la próxima corrida automática, y el atajo «/» abre la región.
 - **El globo se acomoda a la búsqueda (27/10/2026).** En Explorar, con la columna de búsqueda a la vista, el mundo se corre a la parte libre de la derecha. Al ocultarla (o al ocultar el panel), se desliza al centro y crece un poco sin dejar de girar. Al volver a abrirla, regresa. Los vuelos a un estado o municipio encuadran la región en la parte libre. En celular la columna tapa todo y el globo se queda centrado.
 - **Diseño «consola táctica» en todo el monitor (27/10/2026, ADR-0036).** El jefe de Benji vio la interfaz genérica y sin animación. Ahora Explorar, Casos, Conceptos, Historial y Estado del sistema usan las mismas piezas:
   - **paneles:** borde de luz y halo que siguen al mouse, y esquinas de mira;

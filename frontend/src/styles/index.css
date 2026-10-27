@@ -18,6 +18,8 @@
 /* En la capa de componentes: las utilidades de Tailwind (p-5, border-rose-…)
    pueden ajustar cada pieza de la consola táctica. */
 @import './hud.css' layer(components);
+/* El diseño «Centro de mando» (?mando), con las mismas piezas. */
+@import './mando.css' layer(components);
 
 @custom-variant dark (&:where(.dark, .dark *));
 

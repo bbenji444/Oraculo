@@ -49,7 +49,8 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0033](0033-reporte-oraculo.md) | Reporte PDF con el lenguaje visual de Oráculo: expediente, categorías, línea del tiempo y Estado ▸ Categoría ▸ Noticias | Aceptado |
 | [0034](0034-auditoria-de-corridas.md) | Correcciones de la auditoría de las corridas FGR: Google News sin caché y partido, FGR con acentos, novedades en el PDF | Aceptado |
 | [0035](0035-gods-eye-view-modulo-aparte.md) | God's Eye View como módulo aparte, tal cual, para evaluarlo (pestaña «God's Eye») | Retirado (27/10/2026) |
-| [0036](0036-sistema-visual-consola-tactica.md) | Sistema visual «consola táctica»: paneles, botones y textos con animación al pasar el mouse | Propuesto |
+| [0036](0036-sistema-visual-consola-tactica.md) | Sistema visual «consola táctica»: paneles, botones y textos con animación al pasar el mouse | Aceptado |
+| [0037](0037-diseno-centro-de-mando.md) | Diseño «Centro de mando» (`?mando`): la búsqueda como una orden en una consola de misión, radar sobre el globo y expediente a la derecha | Propuesto |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

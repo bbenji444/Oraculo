@@ -11,7 +11,10 @@ import {
   calloutWidth,
   DESKTOP_ARTICLE_OFFSET,
   flyPadding,
+  fitZoom,
   frameZoom,
+  GLOBE_FIT_MAX_ZOOM,
+  GLOBE_FIT_MIN_ZOOM,
   GLOBE_EXPAND_ZOOM,
   GLOBE_FRAME_MAX_ZOOM,
   globeCamera,
@@ -256,5 +259,24 @@ describe('frameZoom (encuadre según los paneles)', () => {
       zoom: GLOBE_FRAME_MAX_ZOOM + 2,
       expanded: false,
     });
+  });
+});
+
+describe('fitZoom (globo entero en el espacio libre, diseño 3)', () => {
+  it('achica el globo si no cabe entre el encabezado y la consola', () => {
+    // Medido en el navegador: radio de 239 px con zoom 1.8.
+    const zoom = fitZoom(1.8, 239, { width: 1280, height: 496 });
+    expect(zoom).toBeCloseTo(1.8 + Math.log2(((496 / 2) * 0.9) / 239));
+    expect(zoom).toBeLessThan(1.8);
+  });
+
+  it('lo agranda si se le deja lugar, sin pasar de los topes', () => {
+    expect(fitZoom(1.8, 239, { width: 1280, height: 640 })).toBeGreaterThan(1.8);
+    expect(fitZoom(1.8, 50, { width: 4000, height: 4000 })).toBe(GLOBE_FIT_MAX_ZOOM);
+    expect(fitZoom(1.8, 239, { width: 100, height: 80 })).toBe(GLOBE_FIT_MIN_ZOOM);
+  });
+
+  it('de cerca no cambia nada', () => {
+    expect(fitZoom(6, 239, { width: 1280, height: 496 })).toBe(6);
   });
 });

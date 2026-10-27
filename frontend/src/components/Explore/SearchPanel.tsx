@@ -17,16 +17,15 @@
 import { type CSSProperties, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
-import { useEstimate, useSearch, useStartSearch } from '../../hooks/useSearches';
-import { useSources } from '../../hooks/useSources';
+import { useSearch } from '../../hooks/useSearches';
 import { isFinished } from '../../services/searches';
-import { chosenSources } from '../../services/sources';
-import { type RangeKind, searchInput, useExplorerStore } from '../../store/explorer';
+import { type RangeKind, useExplorerStore } from '../../store/explorer';
 import { DownloadButtons } from './Controls';
 import { formatRange, formatUsd, stageProgress } from './format';
 import { RegionPicker } from './RegionPicker';
 import { SourceSwitches } from './SourceSwitches';
 import { GLASS, PANEL_TITLE, SMALL_BUTTON } from './ui';
+import { useSearchLauncher } from './useSearchLauncher';
 
 const RANGES: { kind: RangeKind; label: string }[] = [
   { kind: 'today', label: 'Hoy' },
@@ -35,7 +34,8 @@ const RANGES: { kind: RangeKind; label: string }[] = [
   { kind: 'custom', label: 'Otro' },
 ];
 
-function ConceptChips() {
+/** Los conceptos activos como chips; también los usa el Centro de mando. */
+export function ConceptChips() {
   const concepts = useConcepts().data?.filter((c) => c.is_active);
   const selected = useExplorerStore((s) => s.conceptIds);
   const toggle = useExplorerStore((s) => s.toggleConcept);
@@ -71,7 +71,8 @@ function ConceptChips() {
   );
 }
 
-function DateRange() {
+/** Hoy, 7 días, 30 días u otro rango; también lo usa el Centro de mando. */
+export function DateRange() {
   const range = useExplorerStore((s) => s.range);
   const setRange = useExplorerStore((s) => s.setRange);
   return (
@@ -257,25 +258,19 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
 }
 
 export function SearchPanel() {
-  const regionId = useExplorerStore((s) => s.regionId);
-  const conceptIds = useExplorerStore((s) => s.conceptIds);
-  const range = useExplorerStore((s) => s.range);
   const searchId = useExplorerStore((s) => s.searchId);
-  const openSearch = useExplorerStore((s) => s.openSearch);
-  const storedSources = useExplorerStore((s) => s.sources);
-  const setSources = useExplorerStore((s) => s.setSources);
-  const sources = useSources();
-  // Sin la lista de fuentes (cargando o con error), se manda sin `providers`
-  // y el servidor usa las de por defecto (F12.2).
-  const providers = sources.data ? chosenSources(sources.data, storedSources) : undefined;
-  const noSources = providers?.length === 0;
-  const input = searchInput({ regionId, conceptIds, range }, providers);
-  const estimate = useEstimate(input);
-  const start = useStartSearch(openSearch);
-  const running = useSearch(searchId).data;
-  const busy = start.isPending || (running !== undefined && !isFinished(running.status));
-  const blocked =
-    !input || !estimate.data || estimate.data.over_limit || !estimate.data.llm.configured;
+  const {
+    input,
+    estimate,
+    start,
+    sources,
+    setSources,
+    providers,
+    noSources,
+    running,
+    busy,
+    blocked,
+  } = useSearchLauncher();
   // Abierto para editar aunque haya una búsqueda terminada. ExplorePage
   // remonta el panel al cambiar de búsqueda, así que vuelve a empezar cerrado.
   const [editing, setEditing] = useState(false);

@@ -62,8 +62,17 @@ export function isCoarse(precision: Precision): boolean {
 }
 
 // Etapas del pipeline en orden (backend: app/domain/search.py) y su texto.
-const STAGES = ['plan', 'query', 'dedupe', 'extract', 'enrich', 'geocode', 'filter', 'close'];
-const STAGE_LABEL: Record<string, string> = {
+export const STAGES = [
+  'plan',
+  'query',
+  'dedupe',
+  'extract',
+  'enrich',
+  'geocode',
+  'filter',
+  'close',
+];
+export const STAGE_LABEL: Record<string, string> = {
   plan: 'Planeando consultas',
   query: 'Consultando proveedores',
   dedupe: 'Quitando duplicados',
