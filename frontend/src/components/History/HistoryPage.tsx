@@ -2,9 +2,12 @@
  * Pantalla Historial (§14.1): las búsquedas anteriores de la persona, de la más
  * reciente a la más vieja, con su estado, notas y costo. "Abrir en el globo"
  * la vuelve a mostrar en Explorar sin gastar nada (las notas ya están
- * guardadas).
+ * guardadas). «Eliminar» la quita del historial con confirmación y se puede
+ * deshacer (27/10/2026): sus notas siguen en el sistema.
  */
-import { useSearchHistory } from '../../hooks/useSearches';
+import { useCallback, useState } from 'react';
+
+import { useDeleteSearch, useRestoreSearch, useSearchHistory } from '../../hooks/useSearches';
 import type { Search } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import {
@@ -14,6 +17,8 @@ import {
   formatUsd,
   providersLabel,
 } from '../Explore/format';
+import { ConfirmDelete } from '../ConfirmDelete';
+import { UndoToast } from '../UndoToast';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; className: string }> = {
   pending: { text: 'En cola', className: 'bg-slate-700 text-slate-200' },
@@ -38,6 +43,24 @@ function reopen(search: Search) {
 export function HistoryPage() {
   const history = useSearchHistory();
   const searches = history.data?.pages.flatMap((page) => page.items) ?? [];
+  const remove = useDeleteSearch();
+  const restore = useRestoreSearch();
+  // La última que se quitó, para «Deshacer».
+  const [removed, setRemoved] = useState<string | null>(null);
+  const closeUndo = useCallback(() => {
+    setRemoved(null);
+  }, []);
+  const removeSearch = (search: Search) => {
+    remove.mutate(search.search_id, {
+      onSuccess: () => {
+        setRemoved(search.search_id);
+        // Si estaba abierta en Explorar, el globo la suelta.
+        if (useExplorerStore.getState().searchId === search.search_id) {
+          useExplorerStore.getState().clearGlobe();
+        }
+      },
+    });
+  };
 
   return (
     <div className="h-full overflow-y-auto px-4 py-6 sm:px-8">
@@ -103,10 +126,22 @@ export function HistoryPage() {
                 >
                   Abrir en el globo
                 </button>
+                <ConfirmDelete
+                  what="la búsqueda del historial"
+                  busy={remove.isPending && remove.variables === search.search_id}
+                  onConfirm={() => {
+                    removeSearch(search);
+                  }}
+                />
               </li>
             );
           })}
         </ul>
+        {remove.error && (
+          <p role="alert" className="mt-3 text-sm text-rose-300">
+            {remove.error.message}
+          </p>
+        )}
         {history.hasNextPage && (
           <button
             type="button"
@@ -120,6 +155,16 @@ export function HistoryPage() {
           </button>
         )}
       </div>
+      {removed && (
+        <UndoToast
+          message="Se quitó la búsqueda del historial."
+          busy={restore.isPending}
+          onUndo={() => {
+            restore.mutate(removed, { onSuccess: closeUndo });
+          }}
+          onClose={closeUndo}
+        />
+      )}
     </div>
   );
 }

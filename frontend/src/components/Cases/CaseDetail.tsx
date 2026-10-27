@@ -10,11 +10,15 @@
  * confirmar o descartar, con sus posibles duplicados, y la sección Vínculos
  * (9.5). El muro sobre el globo llega en la 9.6.
  *
+ * El dueño puede eliminar el caso (27/10/2026): pide confirmación y es
+ * reversible (`CasesPage` ofrece «Deshacer»).
+ *
  * No hace: no agrega notas (eso es el botón "Agregar al caso" de Explorar).
  */
 import {
   useCase,
   useCaseArticles,
+  useDeleteCase,
   useRemoveCaseArticle,
   useUpdateCase,
 } from '../../hooks/useCases';
@@ -24,21 +28,25 @@ import { wallHash } from '../../map/muro/orbit';
 import { CaseEntities } from './CaseEntities';
 import { CaseRelationships } from './CaseRelationships';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
+import { ConfirmDelete } from '../ConfirmDelete';
 import { ExternalLink } from '../ExternalLink';
 
 interface CaseDetailProps {
   caseId: string;
   onEdit: (item: Case) => void;
+  /** Ya se eliminó: quien lo muestra cierra el panel y ofrece deshacer. */
+  onDeleted?: (item: Case) => void;
 }
 
 const ACTION_BUTTON =
   'rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
 
-export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
+export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
   const detail = useCase(caseId);
   const articles = useCaseArticles(caseId);
   const update = useUpdateCase();
   const remove = useRemoveCaseArticle();
+  const deleteCase = useDeleteCase();
 
   if (detail.isPending) return <p className="text-sm text-slate-400">Abriendo el caso…</p>;
   if (detail.isError) {
@@ -132,7 +140,27 @@ export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
               )}
             </div>
           )}
+          {/* Solo el dueño: eliminar se lleva el caso para todos sus miembros. */}
+          {item.role === 'owner' && (
+            <ConfirmDelete
+              what="el caso"
+              label="Eliminar caso"
+              busy={deleteCase.isPending}
+              onConfirm={() => {
+                deleteCase.mutate(item.id, {
+                  onSuccess: () => {
+                    onDeleted?.(item);
+                  },
+                });
+              }}
+            />
+          )}
         </div>
+        {deleteCase.error && (
+          <p role="alert" className="text-xs text-rose-300">
+            {deleteCase.error.message}
+          </p>
+        )}
         {item.description && (
           <p className="whitespace-pre-line text-sm text-slate-300">{item.description}</p>
         )}
