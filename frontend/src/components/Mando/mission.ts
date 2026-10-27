@@ -15,16 +15,20 @@ import { isFinished, type Search } from '../../services/searches';
 import type { SourceOption } from '../../services/sources';
 import { formatRange, STAGE_LABEL, STAGES } from '../Explore/format';
 
-/** Parámetro de la URL que enciende el diseño: `?mando#/explorar`. */
-export const MANDO_PARAM = 'mando';
+/**
+ * Parámetro de la URL que vuelve al diseño 2 (la columna a la izquierda):
+ * `?clasico#/explorar`. Desde el 27/10/2026 el Centro de mando es el diseño
+ * principal; el anterior se guarda por si se ocupa (Benji).
+ */
+export const CLASSIC_PARAM = 'clasico';
 
 /**
- * Si el diseño «Centro de mando» está encendido.
+ * Si se ve el diseño «Centro de mando» (el principal) y no el de columna.
  *
  * @param search La parte `?…` de la URL (por defecto, la de la ventana).
  */
 export function isMandoMode(search: string = window.location.search): boolean {
-  return new URLSearchParams(search).has(MANDO_PARAM);
+  return !new URLSearchParams(search).has(CLASSIC_PARAM);
 }
 
 // Palabras que no entran en una sigla («Fiscalía General de la República» → FGR).

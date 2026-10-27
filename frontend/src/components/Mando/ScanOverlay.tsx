@@ -67,7 +67,7 @@ export function ScanOverlay({ search, notice, right, bottom }: ScanOverlayProps)
                 notice.tone === 'ok'
                   ? ''
                   : notice.tone === 'warn'
-                    ? 'text-amber-200'
+                    ? 'text-violet-200'
                     : 'text-rose-300'
               }`}
             >

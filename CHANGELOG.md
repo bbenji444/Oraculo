@@ -100,6 +100,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **El Centro de mando es el diseño principal (27/10/2026, ADR-0037).** Explorar abre con él sin nada en la URL. El diseño de columna sigue con `?clasico#/explorar` y quedó guardado en la etiqueta `diseno-consola-tactica-v2`. Al elegirlo, Benji pidió estos ajustes:
+  - **la consola:** más chica, de vidrio translúcido (se ve el globo detrás) y sin naranja; lo que falta elegir late en cian;
+  - **el expediente:** más ancho (30 rem), y el resumen de arriba se pliega aparte para que la lista tenga casi todo el alto;
+  - **las noticias:** la cronología y la lista se ven 10 % más grandes;
+  - **las cifras:** láminas de vidrio de colores, con un brillo que las cruza; la barra de categorías brilla.
+
 - **El mundo gira desde que abre el sistema** (27/10/2026): la entrada desde el espacio frena parejo hasta la velocidad del giro y el globo sigue girando sin pausa. Antes pasaban unos 4 s con el mundo casi quieto y parecía que el sistema se trababa. Mientras cargan las fotos de la NASA, el globo se ve como un océano oscuro y no como un disco blanco.
 - **El universo detrás de todas las pestañas** (26/10/2026, ADR-0017): Casos, Conceptos, Historial y Estado ya no tienen el fondo azul-negro liso. Detrás va el mismo universo de Explorar, que deriva muy despacio, con un velo oscuro y dos auroras cian que se mueven lento para que el texto se lea. Es un solo fondo para toda la aplicación, ligero (unos 22 cuadros por segundo).
 - **Encabezado nuevo, centrado y sin fondo** (26/10/2026): la marca y las pestañas van en un solo grupo al centro, sobre las estrellas; en Explorar el universo y el globo siguen detrás del encabezado. La marca es la «marca-signal» de OSINT Oráculo (Orbitron): el nombre con un destello cian que lo recorre, «Oráculo · Noticias geolocalizadas» con un barrido de radar abajo y el globo con un aro que late y un meridiano que gira. Las pestañas llevan una línea cian que crece bajo la activa. Con «menos movimiento» del sistema no hay animaciones.
