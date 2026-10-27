@@ -51,7 +51,11 @@
       <div><strong>{{ view.total }}</strong><span>notas relevantes</span></div>
       <div><strong>{{ o.states_with_notes }}</strong><span>estados con notas</span></div>
       <div><strong>{{ o.cards | length }}</strong><span>categorías</span></div>
-      <div><strong>{{ o.timeline.peaks[0].count if o.timeline.peaks else 0 }}</strong><span>notas en el pico</span></div>
+      {% if o.novelty %}
+        <div><strong>{{ o.novelty.new_facts }}</strong><span>{{ "hecho nuevo" if o.novelty.new_facts == 1 else "hechos nuevos" }}</span></div>
+      {% else %}
+        <div><strong>{{ o.timeline.peaks[0].count if o.timeline.peaks else 0 }}</strong><span>notas en el pico</span></div>
+      {% endif %}
     </div>
   </div>
   <div class="cover-band">USO INTERNO · CONFIDENCIAL · {{ o.code }} · EMITIDO {{ o.issued }}</div>
@@ -69,6 +73,14 @@
     <div class="kpi kpi-outside"><strong>{{ data.outside }}</strong><span>fuera de la región</span></div>
     <div class="kpi kpi-unlocated"><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></div>
   </div>
+  {% if o.novelty %}
+    {# Cada corrida cubre hoy y ayer: casi todo ya venía en la anterior (ADR-0034). #}
+    <div class="novelty">
+      <p class="novelty-title">Novedades desde la corrida {% if o.novelty.previous_at %}de las {{ o.novelty.previous_at | mx_time }} del {{ o.novelty.previous_at | mx_date }}{% else %}anterior{% endif %}</p>
+      <p class="novelty-count"><strong>{{ o.novelty.new_facts }}</strong> {{ "hecho nuevo" if o.novelty.new_facts == 1 else "hechos nuevos" }} · <strong>{{ o.novelty.known_facts }}</strong> ya se {{ "había" if o.novelty.known_facts == 1 else "habían" }} reportado{% if o.novelty.known_with_news %} ({{ o.novelty.known_with_news }} con medios nuevos){% endif %}.</p>
+      <p class="muted small">En cada categoría van primero los hechos nuevos, marcados <span class="ins ins-new">NUEVO</span>. Los ya reportados van al final y sin resumen, porque el resumen salió en el reporte anterior.</p>
+    </div>
+  {% endif %}
 
   <h2>Resumen ejecutivo <span class="badge-ai">IA · INFERENCIA</span></h2>
   <div class="summary">
@@ -235,7 +247,7 @@
         <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
         {% for item in category.notes %}
           {% set article = item.article %}
-          <article class="item">
+          <article class="item{% if item.known %} item-known{% endif %}">
             <span class="number">{{ item.number }}</span>
             <div class="body">
               <h5><a href="{{ article.url }}">{{ article.title | clean }}</a></h5>
@@ -245,9 +257,10 @@
                 {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
               </p>
               <p class="insignias">
+                {% if item.known %}<span class="ins ins-known">YA REPORTADO{% if item.new_outlets %} · +{{ item.new_outlets }} {{ "MEDIO NUEVO" if item.new_outlets == 1 else "MEDIOS NUEVOS" }}{% endif %}</span>{% elif o.novelty %}<span class="ins ins-new">NUEVO</span>{% endif %}
                 {% for badge in item.badges %}<span class="ins ins-{{ badge.kind }}"{% if badge.color %} style="border-color: {{ badge.color }}; color: {{ badge.color }}"{% endif %}>{{ badge.text }}</span>{% endfor %}
               </p>
-              {% if article.summary %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
+              {% if article.summary and not item.known %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
               <p class="link">{{ article.url }}</p>
               {% if item.also %}
                 {# El mismo hecho en otros medios: solo medio, hora y link (sin repetir el resumen). #}

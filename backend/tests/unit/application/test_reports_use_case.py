@@ -23,6 +23,7 @@ from app.application.ports.search_reads import (
     CategoryCount,
     ConceptRef,
     LocationView,
+    PreviousRun,
     RegionPoint,
     SearchDetail,
 )
@@ -42,7 +43,7 @@ from app.domain.enrichment import LLMUsage
 from app.domain.errors import ProviderUnavailableError, RegionNotFoundError, SearchNotFinishedError
 from app.domain.geocoding import Precision
 from app.domain.region import Region, RegionLevel
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, SearchTrigger
 from tests.unit.fake_regions import ALL, CDMX, MEXICO, FakeRegionRepository, make_region
 
 pytestmark = pytest.mark.anyio
@@ -217,6 +218,18 @@ class Summarizer:
         return SummaryResult("Predomina el cobro de piso.", LLMUsage(2000, 300), "gpt-6-luna", "s1")
 
 
+class PreviousRuns:
+    """Corridas anteriores en memoria; anota por cuáles le preguntaron."""
+
+    def __init__(self, found: PreviousRun | None) -> None:
+        self.found = found
+        self.asked: list[UUID] = []
+
+    async def previous_automatic_run(self, search_id: UUID) -> PreviousRun | None:
+        self.asked.append(search_id)
+        return self.found
+
+
 def build(
     row: SearchDetail,
     *,
@@ -226,6 +239,7 @@ def build(
     prices: LLMPrices | None = PRICES,
     static_map: Map | None = None,
     regions: FakeRegionRepository | None = None,
+    previous_runs: PreviousRuns | None = None,
 ) -> BuildReport:
     return BuildReport(
         searches=Reader(row),
@@ -236,7 +250,29 @@ def build(
         summarizer=summarizer,
         prices=prices,
         clock=lambda: NOW,
+        previous_runs=previous_runs,
     )
+
+
+async def test_la_corrida_automatica_trae_la_anterior_para_separar_lo_nuevo() -> None:
+    row = replace(search(), trigger=SearchTrigger.AUTOMATIC, scheduled_for=NOW)
+    previous = PreviousRun(uuid4(), NOW, frozenset({1}))
+    runs = PreviousRuns(previous)
+
+    data = await build(row, previous_runs=runs).execute(row.search_id, ReportFormat.PDF, ACTOR)
+
+    assert data.previous_run == previous
+    assert runs.asked == [row.search_id]
+
+
+async def test_una_busqueda_manual_no_se_compara_con_ninguna_corrida() -> None:
+    row = search()
+    runs = PreviousRuns(PreviousRun(uuid4(), NOW, frozenset({1})))
+
+    data = await build(row, previous_runs=runs).execute(row.search_id, ReportFormat.PDF, ACTOR)
+
+    assert data.previous_run is None
+    assert runs.asked == []
 
 
 async def test_reporte_completo_con_resumen_nuevo_que_se_guarda() -> None:

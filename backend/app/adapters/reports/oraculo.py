@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.application.clock import MEXICO_CITY
-from app.application.ports.search_reads import ArticleItem, SearchDetail
+from app.application.ports.search_reads import ArticleItem, PreviousRun, SearchDetail
 from app.domain.authority import AUTHORITY_LABEL, Authority
 
 PERCENT = 100
@@ -485,12 +485,17 @@ class NumberedNote:
         also: Las demás notas del mismo hecho en otros medios (ADR-0026), de
             la primera a la última. Se citan con su medio y link, sin repetir
             el resumen.
+        known: Si el hecho ya venía en la corrida automática anterior
+            (ADR-0034): la ficha sale corta, sin resumen.
+        new_outlets: En un hecho ya reportado, cuántas de sus notas son nuevas.
     """
 
     number: int
     article: ArticleItem
     badges: tuple[Badge, ...]
     also: tuple[ArticleItem, ...] = ()
+    known: bool = False
+    new_outlets: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -548,7 +553,22 @@ def _stories(articles: Sequence[ArticleItem]) -> list[tuple[ArticleItem, tuple[A
     return stories
 
 
-def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
+Story = tuple[ArticleItem, tuple[ArticleItem, ...]]
+
+
+def _members(story: Story) -> tuple[ArticleItem, ...]:
+    lead, also = story
+    return (lead, *also)
+
+
+def _is_known(story: Story, known: frozenset[int]) -> bool:
+    """Si alguna nota del hecho ya venía en la corrida anterior."""
+    return any(a.article_id in known for a in _members(story))
+
+
+def state_groups(
+    articles: Sequence[ArticleItem], known: frozenset[int] = frozenset()
+) -> tuple[StateGroup, ...]:
     """Estado ▸ Categoría ▸ Hechos, numerados de corrido para citarlos.
 
     El mismo hecho publicado por varios medios es una sola ficha, con la nota
@@ -557,8 +577,12 @@ def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
     («Estoy bien y muy fuerte» en varios medios). El estado y la categoría son
     los de esa primera nota.
 
+    En una corrida automática, dentro de cada categoría van primero los
+    hechos nuevos y al final los que ya traía la corrida anterior (``known``).
+
     Args:
         articles: Notas relevantes, de la más reciente a la más vieja.
+        known: Notas de la corrida anterior (vacío: todo cuenta como nuevo).
 
     Returns:
         Los estados de más a menos notas; las notas sin estado al final.
@@ -586,9 +610,21 @@ def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
             by_category.items(), key=lambda item: (-size(item[1]), item[0])
         ):
             numbered = []
-            for lead, also in members:
+            # sorted es estable: los nuevos primero, cada grupo en su orden.
+            for lead, also in sorted(members, key=lambda story: _is_known(story, known)):
                 number += 1
-                numbered.append(NumberedNote(number, lead, badges(lead), also))
+                was_known = _is_known((lead, also), known)
+                fresh = sum(1 for a in (lead, *also) if a.article_id not in known)
+                numbered.append(
+                    NumberedNote(
+                        number,
+                        lead,
+                        badges(lead),
+                        also,
+                        known=was_known,
+                        new_outlets=fresh if was_known else 0,
+                    )
+                )
             categories.append(
                 CategoryGroup(category, category_color(members[0][0]), tuple(numbered))
             )
@@ -638,6 +674,51 @@ def network_svg(seed: str) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class Novelty:
+    """Qué trae de nuevo una corrida automática frente a la anterior (ADR-0034).
+
+    En la auditoría del 27/10/2026, el 88 al 94 % de las notas de cada corrida
+    ya venía en la anterior: cada una cubre hoy y ayer.
+
+    Attributes:
+        previous_at: Hora programada de la corrida anterior, si la tiene.
+        new_facts: Hechos sin ninguna nota en la corrida anterior.
+        known_facts: Hechos que ya venían.
+        known_with_news: De los que ya venían, cuántos suman medios nuevos.
+    """
+
+    previous_at: datetime | None
+    new_facts: int
+    known_facts: int
+    known_with_news: int
+
+
+def novelty(articles: Sequence[ArticleItem], previous: PreviousRun) -> Novelty:
+    """Cuenta los hechos nuevos y los ya reportados.
+
+    Args:
+        articles: Notas relevantes de la corrida.
+        previous: La corrida anterior y sus notas.
+
+    Returns:
+        Los conteos para la sección «Novedades».
+    """
+    known = previous.article_ids
+    stories = _stories(articles)
+    was_known = [_is_known(story, known) for story in stories]
+    with_news = [
+        flag and any(a.article_id not in known for a in _members(story))
+        for story, flag in zip(stories, was_known, strict=True)
+    ]
+    return Novelty(
+        previous_at=previous.scheduled_for,
+        new_facts=was_known.count(False),
+        known_facts=was_known.count(True),
+        known_with_news=with_news.count(True),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class OraculoView:
     """Todo lo de Oráculo que la plantilla muestra.
 
@@ -652,6 +733,8 @@ class OraculoView:
         timeline: Línea del tiempo.
         groups: Estado ▸ Categoría ▸ Noticias.
         network: La red de nodos de la portada (SVG).
+        novelty: Lo nuevo frente a la corrida anterior, o ``None`` si no hay
+            con qué comparar.
     """
 
     code: str
@@ -664,10 +747,14 @@ class OraculoView:
     timeline: Timeline
     groups: tuple[StateGroup, ...]
     network: str
+    novelty: Novelty | None = None
 
 
 def build_oraculo(
-    search: SearchDetail, articles: Sequence[ArticleItem], generated_at: datetime | None = None
+    search: SearchDetail,
+    articles: Sequence[ArticleItem],
+    generated_at: datetime | None = None,
+    previous: PreviousRun | None = None,
 ) -> OraculoView:
     """Calcula las secciones de Oráculo del reporte.
 
@@ -675,6 +762,7 @@ def build_oraculo(
         search: La búsqueda.
         articles: Notas relevantes, de la más reciente a la más vieja.
         generated_at: Cuándo se generó (por defecto, ahora).
+        previous: La corrida automática anterior, para separar lo nuevo.
 
     Returns:
         Las secciones listas para la plantilla.
@@ -691,6 +779,7 @@ def build_oraculo(
         cards=cards,
         stacks=state_stacks(articles),
         timeline=timeline(articles),
-        groups=state_groups(articles),
+        groups=state_groups(articles, previous.article_ids if previous else frozenset()),
         network=network_svg(code),
+        novelty=novelty(articles, previous) if previous else None,
     )

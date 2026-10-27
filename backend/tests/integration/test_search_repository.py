@@ -617,3 +617,79 @@ async def test_las_corridas_automaticas_aparecen_en_el_historial_de_todos(
 
     assert [s.search_id for s in history] == [automatic]
     assert (history[0].trigger, history[0].scheduled_for) == (SearchTrigger.AUTOMATIC, slot)
+
+
+async def test_la_corrida_anterior_es_la_ultima_automatica_terminada_y_viva(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # ADR-0034: el PDF separa lo nuevo de lo que ya traía la corrida anterior.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        mexico = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+
+    async def automatic(hour: int, status: str, deleted: bool = False) -> UUID:
+        slot = datetime(2026, 10, 26, hour, 0, tzinfo=UTC)
+        found = await searches.create(
+            NewSearch(
+                user_id="monitor-automatico",
+                region_id=mexico,
+                date_from=date(2026, 10, 25),
+                date_to=date(2026, 10, 26),
+                concepts=(SearchConcept(concept_id, CONCEPT_NAME, "", ("FGR",)),),
+                queries_planned=2,
+                credits_estimated=0,
+                providers=(Provider.GOOGLE_NEWS_RSS,),
+                trigger=SearchTrigger.AUTOMATIC,
+                scheduled_for=slot,
+            )
+        )
+        async with test_engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE searches SET status = :status, created_at = :at, "
+                    "deleted_at = CASE WHEN :deleted THEN now() END WHERE id = :id"
+                ),
+                {"status": status, "at": slot, "deleted": deleted, "id": found},
+            )
+        return found
+
+    def note(n: int) -> dict[str, object]:
+        return {"url": f"https://ejemplo.mx/{n}", "hash": f"anterior-{n}", "title": f"Nota {n}"}
+
+    morning = await automatic(13, "completed")
+    await automatic(15, "failed")
+    await automatic(17, "completed", deleted=True)
+    manual = await new_search(searches, test_engine, concept_id)
+    evening = await automatic(21, "completed")
+    async with test_engine.begin() as conn:
+        ids = [
+            (
+                await conn.execute(
+                    text(
+                        "INSERT INTO articles (url_canonical, url_hash, title, title_norm) "
+                        "VALUES (:url, :hash, :title, upper(:title)) RETURNING id"
+                    ),
+                    note(n),
+                )
+            ).scalar_one()
+            for n in (1, 2)
+        ]
+        for article_id, provider in ((ids[0], "google_news_rss"), (ids[0], "indice_local")):
+            await conn.execute(
+                text(
+                    "INSERT INTO search_results (search_id, article_id, provider, provider_rank) "
+                    "VALUES (:s, :a, :p, 1)"
+                ),
+                {"s": morning, "a": article_id, "p": provider},
+            )
+
+    previous = await searches.previous_automatic_run(evening)
+
+    # La de las 15:00 falló y la de las 17:00 se eliminó: cuenta la de las 13:00.
+    assert previous is not None
+    assert (previous.search_id, previous.article_ids) == (morning, frozenset({ids[0]}))
+    assert previous.scheduled_for == datetime(2026, 10, 26, 13, 0, tzinfo=UTC)
+    assert await searches.previous_automatic_run(morning) is None
+    assert (await searches.previous_automatic_run(manual)) is not None

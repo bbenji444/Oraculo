@@ -43,6 +43,7 @@ from app.application.ports.search_reads import (
     CategoryView,
     ConceptRef,
     InRegion,
+    PreviousRun,
     RegionPoint,
     SearchDetail,
     SearchOwnership,
@@ -438,6 +439,32 @@ class PostgresSearchStore:
                 )
             ).scalar()
         return found
+
+    async def previous_automatic_run(self, search_id: UUID) -> PreviousRun | None:
+        """Ver ``PreviousRunPort.previous_automatic_run``."""
+        # Usa el índice parcial searches_automatic (created_at DESC). Una
+        # corrida que falló no cuenta: no dejó reporte que «ya lo dijera».
+        async with self._engine.connect() as conn:
+            previous = (
+                await conn.execute(
+                    text(
+                        "SELECT p.id, p.scheduled_for FROM searches s "
+                        "JOIN searches p ON p.trigger = :automatic AND p.created_at < s.created_at "
+                        "AND p.deleted_at IS NULL AND p.status IN ('completed', 'partial') "
+                        "WHERE s.id = :id ORDER BY p.created_at DESC, p.id DESC LIMIT 1"
+                    ),
+                    {"id": search_id, "automatic": SearchTrigger.AUTOMATIC.value},
+                )
+            ).first()
+            if previous is None:
+                return None
+            ids = (
+                await conn.execute(
+                    text("SELECT DISTINCT article_id FROM search_results WHERE search_id = :id"),
+                    {"id": previous.id},
+                )
+            ).scalars()
+            return PreviousRun(previous.id, previous.scheduled_for, frozenset(ids))
 
     async def snapshot(self, search_id: UUID) -> SearchSnapshot | None:
         """Cómo va una búsqueda (el comando lo consulta mientras corre en el worker).

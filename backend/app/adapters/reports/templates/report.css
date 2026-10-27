@@ -1032,6 +1032,45 @@ table.stacks td.num {
   color: var(--muted);
 }
 
+/* Novedades de una corrida automática frente a la anterior (ADR-0034). */
+.ins-new {
+  border-color: var(--inside);
+  background: var(--inside-soft);
+  color: var(--inside);
+}
+
+.ins-known {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.item-known h5 a {
+  color: var(--muted);
+}
+
+.novelty {
+  margin: 8pt 0 4pt;
+  padding: 8pt 10pt;
+  border: 0.75pt solid var(--line);
+  border-left: 3pt solid var(--inside);
+  border-radius: 3pt;
+  background: var(--inside-soft);
+}
+
+.novelty-title {
+  margin: 0 0 2pt;
+  font: 700 7pt var(--tech);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--inside);
+}
+
+.novelty-count {
+  margin: 0 0 3pt;
+  font-size: 10pt;
+  color: var(--ink);
+}
+
 @media screen {
   .cover {
     height: auto;
