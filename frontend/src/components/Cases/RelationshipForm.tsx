@@ -13,6 +13,7 @@ import { type FormEvent, useState } from 'react';
 import type { Entity } from '../../services/entities';
 import type { RelationshipDraft, RelationshipType } from '../../services/relationships';
 import { CUSTOM_LABEL_MAX_CHARS, draftProblem, RELATIONSHIP_TYPE_OPTIONS } from './labels';
+import { HudSelect } from '../ui/HudSelect';
 
 interface RelationshipFormProps {
   entities: Entity[];
@@ -49,21 +50,19 @@ export function RelationshipForm({ entities, busy, onCreate, onCancel }: Relatio
 
   function entitySelect(field: 'entityA' | 'entityB', label: string) {
     return (
-      <select
-        aria-label={label}
+      <HudSelect
+        label={label}
+        size="sm"
+        className="w-auto max-w-[14rem] min-w-[9rem]"
         value={draft[field]}
-        onChange={(event) => {
-          setDraft({ ...draft, [field]: Number(event.target.value) });
+        options={[
+          { value: 0, label: 'elige…' },
+          ...entities.map((e) => ({ value: e.id, label: `${e.label} (${e.type_label})` })),
+        ]}
+        onChange={(next) => {
+          setDraft({ ...draft, [field]: next });
         }}
-        className={`${FIELD} max-w-[14rem]`}
-      >
-        <option value={0}>elige…</option>
-        {entities.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.label} ({e.type_label})
-          </option>
-        ))}
-      </select>
+      />
     );
   }
 
@@ -77,20 +76,19 @@ export function RelationshipForm({ entities, busy, onCreate, onCancel }: Relatio
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {entitySelect('entityA', 'Primera entidad')}
-        <select
-          aria-label="Tipo de vínculo"
+        <HudSelect
+          label="Tipo de vínculo"
+          size="sm"
+          className="w-auto min-w-[9rem]"
           value={draft.type}
-          onChange={(event) => {
-            setDraft({ ...draft, type: event.target.value as RelationshipType });
+          options={RELATIONSHIP_TYPE_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.directed ? `→ ${o.label} →` : o.label,
+          }))}
+          onChange={(next: RelationshipType) => {
+            setDraft({ ...draft, type: next });
           }}
-          className={FIELD}
-        >
-          {RELATIONSHIP_TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.directed ? `→ ${o.label} →` : o.label}
-            </option>
-          ))}
-        </select>
+        />
         {entitySelect('entityB', 'Segunda entidad')}
       </div>
       {option?.directed && draft.type !== 'custom' && (

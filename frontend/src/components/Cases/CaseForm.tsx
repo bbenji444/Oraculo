@@ -15,6 +15,7 @@ import { useId, useState } from 'react';
 import { useCreateCase, useUpdateCase } from '../../hooks/useCases';
 import { type Case, type CaseInput, caseFieldErrors } from '../../services/cases';
 import { SENSITIVITY_OPTIONS } from './labels';
+import { HudSelect } from '../ui/HudSelect';
 
 interface CaseFormProps {
   /** Caso a editar; sin él, se crea uno nuevo. */
@@ -101,20 +102,15 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
         <label htmlFor={`${id}-sensitivity`} className="hud-label">
           Sensibilidad
         </label>
-        <select
+        <HudSelect
           id={`${id}-sensitivity`}
           value={form.sensitivity}
-          onChange={(event) => {
-            setForm({ ...form, sensitivity: event.target.value as CaseInput['sensitivity'] });
+          invalid={fields.sensitivity !== undefined}
+          options={SENSITIVITY_OPTIONS}
+          onChange={(sensitivity) => {
+            setForm({ ...form, sensitivity });
           }}
-          className={inputClass(fields.sensitivity !== undefined)}
-        >
-          {SENSITIVITY_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        />
         <p className="mt-1 text-xs text-slate-500">
           Solo quienes son miembros del caso lo ven. La sensibilidad se muestra siempre junto a su
           nombre.

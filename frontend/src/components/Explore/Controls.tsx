@@ -8,6 +8,7 @@
  */
 import { type DownloadKind, useDownloads } from '../../hooks/useDownloads';
 import { MOTION_LABELS, MOTION_PRESETS } from '../../map/motion';
+import { HudSelect } from '../ui/HudSelect';
 import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
 import { SpinToggle } from '../GeoExplorer/SpinToggle';
@@ -30,22 +31,20 @@ export function GlobeControls() {
         }}
       />
       <EarthToggle earth={earth} onChange={setEarth} />
-      <label className="flex items-center gap-2 rounded-[10px] border border-sky-400/30 bg-[#050d12]/90 py-1 pr-1 pl-3 font-display text-[9.5px] tracking-[0.16em] text-sky-200/80 uppercase">
-        Animación
-        <select
+      <div className="flex items-center gap-2 rounded-[10px] border border-sky-400/30 bg-[#050d12]/90 py-1 pr-1 pl-3 font-display text-[9.5px] tracking-[0.16em] text-sky-200/80 uppercase">
+        <span aria-hidden="true">Animación</span>
+        <HudSelect
+          label="Animación"
+          size="sm"
+          className="w-auto min-w-[7.5rem]"
           value={motion}
-          onChange={(event) => {
-            setMotion(event.target.value as (typeof MOTION_PRESETS)[number]);
-          }}
-          className="hud-input w-auto px-2 py-1 font-sans text-xs tracking-normal normal-case"
-        >
-          {MOTION_PRESETS.map((preset) => (
-            <option key={preset} value={preset}>
-              {MOTION_LABELS[preset]}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={MOTION_PRESETS.map((preset) => ({
+            value: preset,
+            label: MOTION_LABELS[preset],
+          }))}
+          onChange={setMotion}
+        />
+      </div>
     </div>
   );
 }

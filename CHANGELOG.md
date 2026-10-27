@@ -21,6 +21,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - aviso «Deshacer»: barra de tiempo.
 
   La muestra de todas las piezas sigue en `?diseno#/diseno`.
+- **Menús desplegables con el estilo del sistema (27/10/2026).** Los 9 menús (estado, municipio, localidad, filtros de la cronología, animación del globo, sensibilidad del caso, estatus legal, unir entidades y tipo de vínculo) ya no usan la lista del navegador. Ahora:
+  - se despliegan con animación;
+  - la opción bajo el mouse o el teclado se ilumina con una barra de luz, y la elegida lleva palomita;
+  - se manejan con flechas, Enter, Escape o escribiendo la primera letra.
 - **El PDF de cada corrida automática trae solo hechos nuevos (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
   - «Noticias por estado» lista solo los hechos que no traía esa corrida;
   - en la página 2, «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten;
