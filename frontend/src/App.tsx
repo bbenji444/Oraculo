@@ -57,11 +57,18 @@ function Screen({ tab }: { tab: Tab }) {
       </Suspense>
     );
   }
-  return <ExplorePage />;
+  // Explorar no se dibuja aquí: App la deja montada (ver ExploreKeeper).
+  return null;
 }
 
 export function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash);
+  // Explorar se monta la primera vez que se visita y ya no se desmonta: cada
+  // montaje creaba dos contextos 3D y volvía a subir la foto del cielo a la
+  // tarjeta, y al ir y venir entre pestañas la Intel integrada se reiniciaba
+  // (26/10/2026). Oculta, el globo deja de girar y no dibuja.
+  const [exploreVisited, setExploreVisited] = useState(tab === 'explorar');
+  if (tab === 'explorar' && !exploreVisited) setExploreVisited(true);
 
   useEffect(() => {
     const onHashChange = () => {
@@ -116,6 +123,11 @@ export function App() {
         </div>
       </header>
       <main className="min-h-0 flex-1 overflow-auto">
+        {exploreVisited && (
+          <div hidden={tab !== 'explorar'} className="h-full">
+            <ExplorePage active={tab === 'explorar'} />
+          </div>
+        )}
         <Screen tab={tab} />
       </main>
     </div>
