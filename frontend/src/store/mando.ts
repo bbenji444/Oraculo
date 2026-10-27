@@ -25,12 +25,18 @@ export interface MandoState {
   editing: boolean;
   /** Alto que ocupa la consola abajo, en píxeles: el globo flota encima. */
   dockHeight: number;
+  /**
+   * Resumen del expediente desplegado (cifras, categorías, descargas). Plegado,
+   * la lista de noticias tiene casi todo el alto (Benji, 27/10/2026).
+   */
+  summaryOpen: boolean;
   setSlot: (slot: MissionSlot | null) => void;
   toggleSlot: (slot: MissionSlot) => void;
   setDossierOpen: (open: boolean) => void;
   setDockMinimized: (minimized: boolean) => void;
   setEditing: (editing: boolean) => void;
   setDockHeight: (height: number) => void;
+  setSummaryOpen: (open: boolean) => void;
 }
 
 export const useMandoStore = create<MandoState>()((set) => ({
@@ -39,6 +45,7 @@ export const useMandoStore = create<MandoState>()((set) => ({
   dockMinimized: false,
   editing: false,
   dockHeight: 0,
+  summaryOpen: true,
   setSlot: (slot) => {
     set({ slot });
   },
@@ -56,5 +63,8 @@ export const useMandoStore = create<MandoState>()((set) => ({
   },
   setDockHeight: (dockHeight) => {
     set({ dockHeight });
+  },
+  setSummaryOpen: (summaryOpen) => {
+    set({ summaryOpen });
   },
 }));

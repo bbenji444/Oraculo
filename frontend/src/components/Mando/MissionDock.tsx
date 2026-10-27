@@ -36,10 +36,10 @@ import { latestRun, stageProgress } from '../Explore/format';
 import { RegionPicker } from '../Explore/RegionPicker';
 import { ConceptChips, DateRange } from '../Explore/SearchPanel';
 import { SourceSwitches } from '../Explore/SourceSwitches';
-import { GLASS } from '../Explore/ui';
 import { useSearchLauncher } from '../Explore/useSearchLauncher';
 import { CountUp } from '../ui/CountUp';
 import { MissionProgress } from './MissionProgress';
+import { MANDO_GLASS } from './ui';
 import {
   clockLabel,
   conceptsLabel,
@@ -173,7 +173,7 @@ function SlotEditor({ launcher }: { launcher: Launcher }) {
       id="mando-editor"
       role="dialog"
       aria-label={`Ajustar la misión: ${SLOT_TITLE[slot]}`}
-      className={`${GLASS} mando-editor space-y-3 p-4`}
+      className={`${MANDO_GLASS} mando-editor space-y-3 p-4`}
     >
       <div className="flex items-center gap-2">
         <p className="mando-kicker">Ajustar · {SLOT_TITLE[slot]}</p>
@@ -215,7 +215,7 @@ function CostReadout({ launcher }: { launcher: Launcher }) {
   const { input, estimate, noSources } = launcher;
   if (!input) {
     return (
-      <p className="max-w-[12rem] text-[11px] text-amber-200" aria-live="polite">
+      <p className="max-w-[12rem] text-[11px] text-sky-200" aria-live="polite">
         {noSources ? 'Enciende al menos una fuente.' : 'Completa la misión: qué y dónde.'}
       </p>
     );
@@ -230,19 +230,20 @@ function CostReadout({ launcher }: { launcher: Launcher }) {
       <dl className="grid grid-cols-3 gap-4 text-right">
         <div>
           <dt className="hud-kpi-label">Consultas</dt>
-          <dd className="mando-clock mt-1.5 text-[15px]">
+          <dd className="mando-clock mt-1 text-[13px]">
             <CountUp value={estimate.data.queries.length} />
           </dd>
         </div>
         <div>
           <dt className="hud-kpi-label">Créditos</dt>
-          <dd className={`mando-clock mt-1.5 text-[15px] ${credits > 0 ? 'text-amber-200' : ''}`}>
+          {/* De pago en violeta: el naranja no va con la consola (Benji, 27/10/2026). */}
+          <dd className={`mando-clock mt-1 text-[13px] ${credits > 0 ? 'text-violet-200' : ''}`}>
             <CountUp value={credits} />
           </dd>
         </div>
         <div>
           <dt className="hud-kpi-label">IA máx.</dt>
-          <dd className="mando-clock mt-1.5 text-[15px]">
+          <dd className="mando-clock mt-1 text-[13px]">
             <CountUp
               value={estimate.data.llm.max_cost_usd}
               format={(value) => `$${value.toFixed(3)}`}
@@ -251,13 +252,13 @@ function CostReadout({ launcher }: { launcher: Launcher }) {
         </div>
       </dl>
       {estimate.data.over_limit && (
-        <p className="mt-1 text-right text-[11px] text-amber-200">
+        <p className="mt-1 text-right text-[11px] text-rose-300">
           Se pasaría el tope mensual ({estimate.data.credits_month} de {estimate.data.credits_limit}
           ).
         </p>
       )}
       {!estimate.data.llm.configured && (
-        <p className="mt-1 text-right text-[11px] text-amber-200">
+        <p className="mt-1 text-right text-[11px] text-rose-300">
           Falta la llave de la IA en el servidor.
         </p>
       )}
@@ -280,7 +281,7 @@ function LaunchButton({ launcher }: { launcher: Launcher }) {
           useMandoStore.getState().setEditing(false);
           start.mutate(input);
         }}
-        className="hud-btn hud-btn--solid px-6 py-3.5 text-[12.5px]"
+        className="hud-btn hud-btn--solid px-5 py-2.5 text-[11.5px]"
       >
         {busy ? 'Barrido en curso…' : 'Iniciar barrido ›'}
       </button>
@@ -420,7 +421,10 @@ export function MissionDock({ active }: MissionDockProps) {
 
   if (search && !finished) {
     return (
-      <section aria-label="Consola de misión" className={`${GLASS} mando-dock px-5 pb-4 pt-3.5`}>
+      <section
+        aria-label="Consola de misión"
+        className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}
+      >
         <span aria-hidden="true" className="mando-beam" />
         <header className="mb-3 flex items-center gap-3">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />
@@ -439,7 +443,7 @@ export function MissionDock({ active }: MissionDockProps) {
     return (
       <section
         aria-label="Consola de misión"
-        className={`${GLASS} mando-dock flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5`}
+        className={`${MANDO_GLASS} mando-dock flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="hud-dot hud-dot--live" />
@@ -475,7 +479,10 @@ export function MissionDock({ active }: MissionDockProps) {
   return (
     <>
       <SlotEditor launcher={launcher} />
-      <section aria-label="Consola de misión" className={`${GLASS} mando-dock px-5 pb-3.5 pt-3.5`}>
+      <section
+        aria-label="Consola de misión"
+        className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}
+      >
         <span aria-hidden="true" className="mando-beam" />
         <header className="flex items-center gap-3">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />

@@ -27,8 +27,12 @@ const DOCK_MARGIN_PX = 16;
 // El alto se redondea a este paso: así el globo no se mueve por un píxel cada
 // vez que cambia una palabra de la frase.
 const DOCK_STEP_PX = 24;
-/** Lo que ocupa el expediente a la derecha (26rem + su margen), en píxeles. */
-export const DOSSIER_RESERVE_PX = 26 * 16 + 16;
+/**
+ * Lo que ocupa el expediente a la derecha (30rem + su margen), en píxeles. Si
+ * cambia, cambia también `sm:w-[30rem]` en Dossier y el corrimiento de los
+ * controles del mapa en styles/mando.css.
+ */
+export const DOSSIER_RESERVE_PX = 30 * 16 + 16;
 
 interface MandoPanelsProps {
   active: boolean;
@@ -95,7 +99,7 @@ export function MandoPanels({
         className="pointer-events-none absolute bottom-4 left-4 flex justify-center"
         style={{ right: rightReserve + DOCK_MARGIN_PX }}
       >
-        <div ref={dockRef} className="pointer-events-auto relative w-full max-w-[64rem]">
+        <div ref={dockRef} className="pointer-events-auto relative w-full max-w-[54rem]">
           <MissionDock active={active} />
         </div>
       </div>

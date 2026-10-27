@@ -22,7 +22,7 @@ const LOG_LINES = 3;
 /** Cronómetro aparte: así solo él se vuelve a dibujar cada segundo. */
 function Elapsed({ start }: { start: string | null }) {
   const now = useNow();
-  return <span className="mando-clock text-[15px]">{elapsedLabel(start, now)}</span>;
+  return <span className="mando-clock text-[13px]">{elapsedLabel(start, now)}</span>;
 }
 
 function nodeState(i: number, current: number, failed: boolean): string {
@@ -48,7 +48,7 @@ export function MissionProgress({ search }: { search: Search }) {
             Etapa {Math.min(current + 1, STAGES.length)} de {STAGES.length}
           </p>
           <p
-            className={`mt-1.5 truncate text-[15px] font-semibold ${
+            className={`mt-1 truncate text-[13.5px] font-semibold ${
               failed ? 'text-rose-300' : 'text-slate-50'
             }`}
           >
@@ -66,7 +66,7 @@ export function MissionProgress({ search }: { search: Search }) {
           <div>
             <p className="hud-kpi-label">Avance</p>
             <p
-              className="hud-kpi-value mt-1 text-[1.7rem]"
+              className="hud-kpi-value mt-0.5 text-[1.35rem]"
               role="progressbar"
               aria-valuenow={percent}
               aria-valuemin={0}
@@ -111,7 +111,7 @@ export function MissionProgress({ search }: { search: Search }) {
           </li>
         ))}
       </ul>
-      {search.error_summary && <p className="text-[11px] text-amber-200">{search.error_summary}</p>}
+      {search.error_summary && <p className="text-[11px] text-rose-200">{search.error_summary}</p>}
     </div>
   );
 }
