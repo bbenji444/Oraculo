@@ -38,7 +38,7 @@ import { NARROW_MAX_WIDTH } from '../../map/framing';
 import { wallCaseFromHash } from '../../map/muro/orbit';
 import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
-import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
+import { FinishToast, GlobeControls, MyCasesToggle, PrecisionLegend } from './Controls';
 import { ExploreGlobe } from './ExploreGlobe';
 import { GlobeUnavailable, GraphicsBoundary } from './GraphicsBoundary';
 import { LatestRunCard } from './LatestRunCard';
@@ -104,7 +104,6 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   const wallCaseId = useExplorerStore((s) => s.wallCaseId);
   const inWall = wallCaseId !== null;
   const [map, setMap] = useState<MapLibreMap | null>(null);
-  const showCases = useExplorerStore((s) => s.showCases);
   const somethingOnGlobe = searchId !== null || articleId !== null;
   // Encuadre del globo (Benji, 27/10/2026): con la columna de la izquierda a la
   // vista, el mundo se corre a la derecha; con la búsqueda y la cronología
@@ -212,19 +211,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
             <PrecisionLegend />
           </div>
           <div className="pointer-events-auto flex gap-2">
-            <button
-              type="button"
-              aria-pressed={showCases}
-              onClick={() => {
-                useExplorerStore.getState().setShowCases(!showCases);
-              }}
-              title="Ver mis casos abiertos sobre el globo; clic en uno abre su muro"
-              className={`hud-btn hud-btn--sm bg-[#050d12]/90 ${
-                showCases ? 'border-amber-300/60 text-amber-200' : ''
-              }`}
-            >
-              {showCases ? '● Mis casos' : '○ Mis casos'}
-            </button>
+            <MyCasesToggle />
             <GlobeControls />
           </div>
         </div>

@@ -15,6 +15,29 @@ import { SpinToggle } from '../GeoExplorer/SpinToggle';
 import type { FinishNotice } from './format';
 import { SMALL_BUTTON } from './ui';
 
+/**
+ * Interruptor «Mis casos» (9.6, D9): mis casos abiertos como marcadores ámbar
+ * en el globo. Lo usan los dos diseños de Explorar.
+ */
+export function MyCasesToggle() {
+  const showCases = useExplorerStore((s) => s.showCases);
+  return (
+    <button
+      type="button"
+      aria-pressed={showCases}
+      onClick={() => {
+        useExplorerStore.getState().setShowCases(!showCases);
+      }}
+      title="Ver mis casos abiertos sobre el globo; clic en uno abre su muro"
+      className={`hud-btn hud-btn--sm bg-[#050d12]/90 ${
+        showCases ? 'border-amber-300/60 text-amber-200' : ''
+      }`}
+    >
+      {showCases ? '● Mis casos' : '○ Mis casos'}
+    </button>
+  );
+}
+
 export function GlobeControls() {
   const spinning = useExplorerStore((s) => s.spinning);
   const setSpinning = useExplorerStore((s) => s.setSpinning);
