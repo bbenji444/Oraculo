@@ -3,9 +3,10 @@
  *
  * Pestañas: "Explorar" (globo, búsqueda y resultados, F6), "Casos" (casos de
  * investigación con sus noticias, F9.3), "Conceptos" (administración y "Probar
- * concepto", F2), "Historial" (búsquedas anteriores, F6) y "Estado del sistema"
- * (F0). La pestaña vive en la URL (#/explorar, #/casos, #/conceptos, #/historial,
- * #/estado) para que se pueda compartir o recargar
+ * concepto", F2), "Historial" (búsquedas anteriores, F6), "God's Eye" (el
+ * proyecto God's Eye View tal cual, para evaluarlo, 27/10/2026) y "Estado del
+ * sistema" (F0). La pestaña vive en la URL (#/explorar, #/casos, #/conceptos,
+ * #/historial, #/godseye, #/estado) para que se pueda compartir o recargar
  * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
  *
  * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
@@ -17,12 +18,13 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
+import { GodsEyePage } from './components/GodsEye/GodsEyePage';
 import { GraphicsBoundary } from './components/Explore/GraphicsBoundary';
 import { SpaceBackground } from './components/Space/SpaceBackground';
 import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
-type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'estado' | 'laboratorio';
+type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'godseye' | 'estado' | 'laboratorio';
 
 const MuroLab = lazy(() => import('./lab/MuroLab'));
 // El laboratorio es solo para desarrollo: se pide a propósito en la URL.
@@ -33,6 +35,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'casos', label: 'Casos' },
   { id: 'conceptos', label: 'Conceptos' },
   { id: 'historial', label: 'Historial' },
+  // Antes de «Estado del sistema», como pidió Benji (27/10/2026).
+  { id: 'godseye', label: "God's Eye" },
   { id: 'estado', label: 'Estado del sistema' },
   ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
 ];
@@ -44,6 +48,7 @@ function tabFromHash(): Tab {
   if (hash === '#/casos') return 'casos';
   if (hash === '#/conceptos') return 'conceptos';
   if (hash === '#/historial') return 'historial';
+  if (hash === '#/godseye') return 'godseye';
   return 'explorar';
 }
 
@@ -51,6 +56,7 @@ function Screen({ tab }: { tab: Tab }) {
   if (tab === 'casos') return <CasesPage />;
   if (tab === 'conceptos') return <ConceptsPage />;
   if (tab === 'historial') return <HistoryPage />;
+  if (tab === 'godseye') return <GodsEyePage />;
   if (tab === 'estado') return <SystemStatusPanel />;
   if (tab === 'laboratorio') {
     return (
