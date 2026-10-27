@@ -8,17 +8,14 @@
  * Todo escribe en el store (`selectRegion`), igual que el clic en el globo:
  * mapa y filtros nunca se desincronizan.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { useChildRegions, useRegionDetail, useRegionsByLevel } from '../../hooks/useRegions';
 import { MAX_FILTER_OPTIONS } from '../../services/regions';
 import { useExplorerStore } from '../../store/explorer';
 import { SearchBox } from '../GeoExplorer/SearchBox';
 import { chainOf } from './regionChain';
-
-// Campo de la consola táctica (ADR-0036). Va dentro de una etiqueta Orbitron en
-// mayúsculas: la letra del menú se regresa a la normal.
-const SELECT = 'hud-input px-2 py-1.5 font-sans tracking-normal normal-case';
+import { HudSelect } from '../ui/HudSelect';
 
 interface LevelSelectProps {
   label: string;
@@ -30,25 +27,28 @@ interface LevelSelectProps {
 }
 
 function LevelSelect({ label, value, options, disabled, onChange, placeholder }: LevelSelectProps) {
+  const id = useId();
   return (
-    <label className="hud-label mb-0">
-      {label}
-      <select
-        className={`${SELECT} mt-1.5`}
-        value={value ?? ''}
+    // La etiqueta va aparte (htmlFor): envolviendo al menú, su nombre accesible
+    // llevaría también el valor elegido («Estado Jalisco»).
+    <div>
+      <label htmlFor={id} className="hud-label">
+        {label}
+      </label>
+      <HudSelect
+        id={id}
+        size="sm"
+        value={value === null ? '' : String(value)}
         disabled={disabled}
-        onChange={(event) => {
-          onChange(event.target.value === '' ? null : Number(event.target.value));
+        options={[
+          { value: '', label: placeholder },
+          ...(options ?? []).map((option) => ({ value: String(option.id), label: option.name })),
+        ]}
+        onChange={(next) => {
+          onChange(next === '' ? null : Number(next));
         }}
-      >
-        <option value="">{placeholder}</option>
-        {options?.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
-      </select>
-    </label>
+      />
+    </div>
   );
 }
 
@@ -127,7 +127,7 @@ export function RegionPicker() {
             }}
             placeholder="Filtrar localidades…"
             aria-label="Filtrar localidades"
-            className={SELECT}
+            className="hud-input px-2 py-1.5 text-xs"
           />
           <LevelSelect
             label="Localidad"

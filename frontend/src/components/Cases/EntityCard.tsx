@@ -19,6 +19,7 @@ import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
 import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
 import { ExternalLink } from '../ExternalLink';
+import { HudSelect } from '../ui/HudSelect';
 
 interface EntityCardProps {
   entity: Entity;
@@ -115,21 +116,20 @@ export function EntityCard({
           {canEdit && entity.review_status !== 'discarded' && mergeTargets.length > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
               <label htmlFor={`unir-${String(entity.id)}`}>Es la misma que</label>
-              <select
+              <HudSelect
                 id={`unir-${String(entity.id)}`}
+                size="sm"
+                className="w-auto max-w-[16rem] min-w-[9rem]"
                 value={target}
-                onChange={(event) => {
-                  setTarget(Number(event.target.value));
-                }}
-                className="max-w-[16rem] hud-input w-auto px-2 py-1 text-xs"
-              >
-                <option value={0}>elige…</option>
-                {mergeTargets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label} ({t.review_status_label})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: 0, label: 'elige…' },
+                  ...mergeTargets.map((t) => ({
+                    value: t.id,
+                    label: `${t.label} (${t.review_status_label})`,
+                  })),
+                ]}
+                onChange={setTarget}
+              />
               {target > 0 && (
                 <button
                   type="button"
@@ -150,20 +150,14 @@ export function EntityCard({
         {canEdit && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {isPerson && (
-              <select
-                aria-label={`Estatus legal de ${entity.label}`}
+              <HudSelect
+                label={`Estatus legal de ${entity.label}`}
+                size="sm"
+                className="w-auto min-w-[9rem]"
                 value={legal}
-                onChange={(event) => {
-                  setLegal(event.target.value as LegalStatus);
-                }}
-                className="hud-input w-auto px-2 py-1 text-xs"
-              >
-                {LEGAL_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={LEGAL_STATUS_OPTIONS}
+                onChange={setLegal}
+              />
             )}
             {(entity.review_status !== 'confirmed' || entity.legal_status !== legal) && (
               <button

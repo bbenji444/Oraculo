@@ -201,13 +201,14 @@ describe('flujo principal (H1)', () => {
       screen.getByRole('combobox', { name: 'Buscar estado, municipio o localidad' }),
       { target: { value: 'Jalisco' } },
     );
-    // Sugerencias del buscador (los <select> de estado también tienen opciones).
+    // Sugerencias del buscador (los menús de estado solo abren su lista al hacer clic).
     const suggestions = await screen.findByRole('listbox');
     fireEvent.mouseDown(await within(suggestions).findByRole('option', { name: /^Jalisco/ }));
     const breadcrumbs = await screen.findByRole('navigation', { name: 'Región elegida' });
     expect(within(breadcrumbs).getByText('México')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByLabelText<HTMLSelectElement>('Estado').value).toBe('272');
+      // El menú de estado (HudSelect) muestra el estado elegido.
+      expect(screen.getByLabelText('Estado').textContent).toBe('Jalisco');
     });
 
     // 2. Concepto y estimación antes de gastar.

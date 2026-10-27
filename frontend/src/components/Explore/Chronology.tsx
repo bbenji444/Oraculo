@@ -40,6 +40,7 @@ import { eventDateNote } from './format';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
 import { ExternalLink } from '../ExternalLink';
+import { HudSelect } from '../ui/HudSelect';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const HOUR = new Intl.DateTimeFormat('es-MX', {
@@ -458,36 +459,35 @@ export function Chronology({ articles }: ChronologyProps) {
           </div>
         )}
         <div className="flex flex-wrap gap-1.5">
-          <select
-            aria-label="Filtrar por categoría"
-            value={categoryId ?? ''}
-            onChange={(event) => {
-              setCategory(event.target.value ? Number(event.target.value) : null);
+          <HudSelect
+            label="Filtrar por categoría"
+            size="sm"
+            className="w-auto max-w-[11rem] rounded-full"
+            value={categoryId === null ? '' : String(categoryId)}
+            options={[
+              { value: '', label: 'Todas las categorías' },
+              ...categories.map((c) => ({
+                value: String(c.id),
+                label: `${c.name} (${String(c.count)})`,
+              })),
+            ]}
+            onChange={(next) => {
+              setCategory(next ? Number(next) : null);
             }}
-            className={`${PILL} max-w-[11rem] bg-[#050505]`}
-          >
-            <option value="">Todas las categorías</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.count})
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filtrar por estado"
+          />
+          <HudSelect
+            label="Filtrar por estado"
+            size="sm"
+            className="w-auto max-w-[9rem] rounded-full"
             value={stateCode ?? ''}
-            onChange={(event) => {
-              setState(event.target.value || null);
+            options={[
+              { value: '', label: 'Todos los estados' },
+              ...states.map((s) => ({ value: s.code, label: `${s.name} (${String(s.count)})` })),
+            ]}
+            onChange={(next) => {
+              setState(next || null);
             }}
-            className={`${PILL} max-w-[9rem] bg-[#050505]`}
-          >
-            <option value="">Todos los estados</option>
-            {states.map((s) => (
-              <option key={s.code} value={s.code}>
-                {s.name} ({s.count})
-              </option>
-            ))}
-          </select>
+          />
           {filtered && (
             <button type="button" onClick={clear} className={`${PILL} text-sky-300`}>
               ✕ Quitar

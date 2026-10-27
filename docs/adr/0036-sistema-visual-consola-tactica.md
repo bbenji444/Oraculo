@@ -44,3 +44,8 @@ Una restricción técnica: la computadora de Benji tiene una tarjeta Intel integ
 - Se quitaron los 13 `backdrop-blur` de la interfaz (paneles de Explorar, cronología, controles del globo, buscador de regiones, avisos). Desenfocar lo de atrás obligaba a volver a dibujar el globo cada cuadro.
 - Se corrigió de paso la tarjeta de Historial, que en pantallas angostas partía el título en una palabra por renglón.
 - Los textos que se descifran y las cifras que corren dejan un solo texto al terminar. Mientras se animan, el lector de pantalla recibe el texto real.
+- **Menús desplegables propios (`HudSelect`).** El `<select>` del navegador dibuja su lista con los colores del sistema operativo, que no se pueden cambiar. Los 9 menús del monitor se reemplazaron por un componente con el patrón «combobox de solo selección» de ARIA 1.2:
+  - flechas, Enter, Escape y búsqueda al escribir;
+  - una lista en portal que no recorta ningún panel y abre hacia arriba si abajo no cabe.
+
+  La opción activa cambia al mover el mouse, no al «entrar»: cuando el teclado desplaza la lista bajo el cursor quieto, el navegador avisa que el mouse entró a otra opción.
