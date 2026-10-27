@@ -68,6 +68,7 @@ import {
   articleZoom,
   calloutWidth,
   flyPadding,
+  fitZoom,
   frameZoom,
   GLOBE_FRAME_MS,
   globeCamera,
@@ -111,6 +112,35 @@ interface ExploreGlobeProps {
    */
   insetLeft?: number;
   insetRight?: number;
+  /**
+   * Píxeles que ocupa una consola abajo (diseño «Centro de mando»): el globo
+   * flota encima de ella.
+   */
+  insetBottom?: number;
+  /** Si el globo se encuadra debajo del encabezado y no detrás de él. */
+  clearHeader?: boolean;
+}
+
+interface Insets {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Radio del globo en pantalla, en píxeles. Un punto a 90° del centro de la
+ * cámara cae justo en el borde del globo; su distancia al centro es el radio.
+ */
+function globeRadiusPx(map: MapLibreMap): number {
+  const center = map.getCenter();
+  const middle = map.project(center);
+  const edge = map.project([center.lng + 90, 0]);
+  return Math.hypot(edge.x - middle.x, edge.y - middle.y);
+}
+
+function sameInsets(a: Insets, b: Insets): boolean {
+  return a.left === b.left && a.right === b.right && a.top === b.top && a.bottom === b.bottom;
 }
 
 interface Tooltip {
@@ -279,6 +309,8 @@ export function ExploreGlobe({
   active = true,
   insetLeft = 0,
   insetRight = 0,
+  insetBottom = 0,
+  clearHeader = false,
 }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const auraRef = useRef<HTMLDivElement>(null);
@@ -317,7 +349,16 @@ export function ExploreGlobe({
   const activeRef = useRef(active);
   const spinStartRef = useRef(0);
   const spinStepRef = useRef<() => void>(() => undefined);
-  const insetsRef = useRef({ left: insetLeft, right: insetRight });
+  const insetsRef = useRef<Insets>({
+    left: insetLeft,
+    right: insetRight,
+    top: 0,
+    bottom: insetBottom,
+  });
+  // Para crear el mapa ya encuadrado; los cambios llegan por el efecto de encuadre.
+  const clearHeaderRef = useRef(clearHeader);
+  // Si ya se ajustó el globo al espacio libre al terminar la entrada (diseño 3).
+  const fittedRef = useRef(false);
   // Si el globo está acercado por no tener paneles (frameZoom).
   const expandedRef = useRef(false);
   // Mientras se corre el encuadre, el giro espera: el corrimiento ya lo incluye.
@@ -359,7 +400,8 @@ export function ExploreGlobe({
       fadeDuration: LABEL_FADE_MS,
     });
     // El encuadre de los paneles desde el principio: la entrada ya llega corrida.
-    map.setPadding({ top: 0, bottom: 0, ...insetsRef.current });
+    if (clearHeaderRef.current) insetsRef.current = { ...insetsRef.current, top: headerInsetPx() };
+    map.setPadding(insetsRef.current);
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
     const stopAttribution = collapseAttributionOnStart(map.getContainer());
@@ -695,13 +737,35 @@ export function ExploreGlobe({
   // girando, el corrimiento lleva su vuelta para que el giro no se detenga.
   useEffect(() => {
     const previous = insetsRef.current;
-    insetsRef.current = { left: insetLeft, right: insetRight };
+    const next: Insets = {
+      left: insetLeft,
+      right: insetRight,
+      top: clearHeader ? headerInsetPx() : 0,
+      bottom: insetBottom,
+    };
+    insetsRef.current = next;
     const map = mapRef.current;
     if (!map || !ready || !introFinished) return;
-    if (previous.left === insetLeft && previous.right === insetRight) return;
-    const open = insetLeft + insetRight > 0;
-    const framed = frameZoom(map.getZoom(), open, expandedRef.current);
-    expandedRef.current = framed.expanded;
+    // En el Centro de mando el globo se ajusta también al terminar la entrada.
+    const firstFit = clearHeader && !fittedRef.current;
+    if (sameInsets(previous, next) && !firstFit) return;
+    fittedRef.current = true;
+    let zoom: number;
+    if (clearHeader) {
+      // Centro de mando: el globo entero cabe entre el encabezado, la consola y
+      // el expediente; crece solo cuando se le deja lugar.
+      const screen = screenOf(map);
+      zoom = fitZoom(map.getZoom(), globeRadiusPx(map), {
+        width: screen.width - next.left - next.right,
+        height: screen.height - next.top - next.bottom,
+      });
+    } else {
+      // Solo los paneles de los lados agrandan o achican el globo.
+      const open = insetLeft + insetRight > 0;
+      const framed = frameZoom(map.getZoom(), open, expandedRef.current);
+      expandedRef.current = framed.expanded;
+      zoom = framed.zoom;
+    }
     const center = map.getCenter();
     const turning = spinningRef.current && activeRef.current;
     const turn = turning
@@ -709,8 +773,8 @@ export function ExploreGlobe({
       : 0;
     framingRef.current = true;
     map.easeTo({
-      padding: { left: insetLeft, right: insetRight },
-      zoom: framed.zoom,
+      padding: next,
+      zoom,
       center: [center.lng - turn, center.lat],
       duration: motionRef.current === 'off' ? 0 : GLOBE_FRAME_MS,
       easing: easeInOutCubic,
@@ -721,7 +785,7 @@ export function ExploreGlobe({
     };
     if (map.isMoving()) map.once('moveend', done);
     else done();
-  }, [insetLeft, insetRight, ready, introFinished]);
+  }, [insetLeft, insetRight, insetBottom, clearHeader, ready, introFinished]);
 
   // --- Giro ----------------------------------------------------------------
   useEffect(() => {
@@ -819,7 +883,10 @@ export function ExploreGlobe({
     const reservedLeft = inset.left ?? 0;
     const reservedRight = inset.right ?? 0;
     const screen = screenOf(map);
-    const free = { width: screen.width - reservedLeft - reservedRight, height: screen.height };
+    const free = {
+      width: screen.width - reservedLeft - reservedRight,
+      height: screen.height - (inset.top ?? 0) - (inset.bottom ?? 0),
+    };
     const reserved = reservedLeft + reservedRight > 0;
     const padding = flyPadding(free, !reserved && useExplorerStore.getState().panelOpen);
     // Una localidad sin polígono es un punto: se acerca al zoom de localidad.

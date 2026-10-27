@@ -48,6 +48,13 @@ export const GLOBE_FRAME_MAX_ZOOM = 3;
 export const GLOBE_EXPAND_ZOOM = 0.18;
 // Duración del corrimiento, en milisegundos: lo que tarda el panel en irse.
 export const GLOBE_FRAME_MS = 900;
+// Diseño «Centro de mando»: el globo se ajusta al espacio libre entre el
+// encabezado y la consola. Ocupa esta parte del lado corto (deja aire para el
+// halo de la atmósfera) y su zoom se queda entre estos topes, para que no se
+// vuelva una canica ni se salga de la pantalla.
+export const GLOBE_FIT_SHARE = 0.9;
+export const GLOBE_FIT_MIN_ZOOM = 1.1;
+export const GLOBE_FIT_MAX_ZOOM = 2.4;
 // Zoom al volar a una nota, según qué tan preciso es su lugar: siempre el
 // mismo para la misma precisión (antes era "el mayor entre el actual y este" y,
 // ya de cerca, elegir otra nota no acercaba nada). Benji pidió el 26/10/2026
@@ -383,4 +390,24 @@ export function frameZoom(
   if (!open && !expanded) return { zoom: zoom + GLOBE_EXPAND_ZOOM, expanded: true };
   if (open && expanded) return { zoom: zoom - GLOBE_EXPAND_ZOOM, expanded: false };
   return { zoom, expanded };
+}
+
+/**
+ * Zoom para que el globo entero quepa en el espacio libre (diseño «Centro de
+ * mando»): el radio cambia al doble por cada punto de zoom, así que basta
+ * comparar el radio de ahora con el que cabría.
+ *
+ * De cerca (una ciudad) no cambia nada: ahí no se ve el globo entero.
+ *
+ * @param zoom Zoom actual.
+ * @param radiusPx Radio del globo en pantalla con ese zoom.
+ * @param free Ancho y alto libres (sin encabezado, consola ni paneles).
+ * @example fitZoom(1.8, 239, { width: 1280, height: 496 }) // ≈ 1.70
+ */
+export function fitZoom(zoom: number, radiusPx: number, free: ScreenSize): number {
+  if (zoom >= GLOBE_FRAME_MAX_ZOOM || radiusPx <= 0) return zoom;
+  const target = (Math.min(free.width, free.height) / 2) * GLOBE_FIT_SHARE;
+  if (target <= 0) return zoom;
+  const fitted = zoom + Math.log2(target / radiusPx);
+  return Math.min(GLOBE_FIT_MAX_ZOOM, Math.max(GLOBE_FIT_MIN_ZOOM, fitted));
 }
