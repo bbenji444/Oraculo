@@ -226,6 +226,43 @@ function basemapFor(
     }));
 }
 
+// Color del globo mientras llegan las fotos de la NASA: un océano oscuro. El
+// fondo del mapa base es el color de la tierra (#cccccc en el claro) y al
+// abrir el sistema se veía un disco casi blanco (27/10/2026).
+export const LOADING_OCEAN = '#06142a';
+
+/**
+ * El fondo del mapa base, pero oscuro como un océano a distancia de globo.
+ *
+ * A distancia de globo la foto de la NASA tapa el fondo, así que solo se ve
+ * mientras carga. Desde EARTH_FADE_START_ZOOM vuelve poco a poco a su color,
+ * que de cerca hace de tierra entre las calles.
+ *
+ * @param layer La capa de fondo del mapa base.
+ * @returns La misma capa, con el color que cambia según el zoom.
+ */
+export function loadingBackground(layer: LayerSpecification): LayerSpecification {
+  if (layer.type !== 'background') return { ...layer, id: 'background' };
+  const color = layer.paint?.['background-color'];
+  if (typeof color !== 'string') return { ...layer, id: 'background' };
+  return {
+    ...layer,
+    id: 'background',
+    paint: {
+      ...layer.paint,
+      'background-color': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        EARTH_FADE_START_ZOOM,
+        LOADING_OCEAN,
+        EARTH_FADE_END_ZOOM,
+        color,
+      ],
+    },
+  };
+}
+
 function pmtilesSource(origin: string, file: string, attribution: string): SourceSpecification {
   return { type: 'vector', url: `pmtiles://${origin}/tiles/${file}`, attribution };
 }
@@ -336,7 +373,7 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
       localities: pmtilesSource(origin, 'localities.pmtiles', ATTRIBUTION_INEGI),
     },
     layers: [
-      ...(background ? [{ ...background, id: 'background' }] : []),
+      ...(background ? [loadingBackground(background)] : []),
       // Debajo de la foto de la NASA, que es opaca hasta EARTH_FADE_START_ZOOM:
       // antes de ese zoom estos polígonos no se ven y dibujarlos le costaba a
       // la tarjeta en cada cuadro del giro (26/10/2026). Entran justo cuando

@@ -9,6 +9,7 @@ import {
   featureLabel,
   INTERACTIVE_LAYERS,
   LABELS_MIN_ZOOM,
+  LOADING_OCEAN,
   WORLD_POLYGON_OVERLAP_ZOOMS,
 } from './style';
 
@@ -166,5 +167,19 @@ describe('featureLabel', () => {
   it('sin nombre no hay tooltip', () => {
     expect(featureLabel({ level: 'state' })).toBeNull();
     expect(featureLabel({ name: 42 })).toBeNull();
+  });
+});
+
+describe('fondo mientras cargan las fotos', () => {
+  it('el globo es un océano oscuro a distancia y de cerca recupera su color', () => {
+    const style = buildMapStyle(ORIGIN, 'night');
+    const background = style.layers.find((layer) => layer.id === 'background');
+
+    // Antes era el color de la tierra del mapa base: un disco casi blanco al abrir.
+    expect(background?.type).toBe('background');
+    const color =
+      background?.type === 'background' ? background.paint?.['background-color'] : undefined;
+    expect(Array.isArray(color)).toBe(true);
+    expect(JSON.stringify(color)).toContain(LOADING_OCEAN);
   });
 });
