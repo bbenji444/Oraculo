@@ -39,13 +39,12 @@ export function starCameraRotation(view: CameraView): { x: number; y: number; z:
 /** Textura de estrellas disponible (ADR-0017). */
 export type StarTexture = 'starmap_4k.jpg' | 'starmap_8k.jpg';
 
-// 8K si la tarjeta gráfica la acepta y la pantalla tiene al menos 1,600 píxeles
-// de ancho reales. Antes pedía 2,560 y casi todas las pantallas cargaban la 4K,
-// que con el campo de visión del cielo (SKY_FIELD_OF_VIEW) se ampliaba ~2.4
-// veces y se veía pixeleada (Benji, 26/10/2026). Una laptop de 1366 px a 125 %
-// ya son 1,707.
+// 8K siempre que la tarjeta gráfica la acepte. Con el campo de visión del cielo
+// (SKY_FIELD_OF_VIEW), la 4K cubre ~1,050 pixeles de ancho, así que en casi
+// cualquier pantalla se amplía y se ve pixeleada (Benji, 26/10/2026). Antes
+// también se pedía una pantalla grande, medida una sola vez al arrancar: si
+// arrancaba con otra escala, se quedaba con la 4K.
 export const HIGH_RES_MIN_TEXTURE = 8192;
-export const HIGH_RES_MIN_SCREEN_PX = 1600;
 
 /**
  * Campo de visión vertical de la cámara del cielo, en grados. Con 37° (el de
@@ -59,12 +58,23 @@ export const SKY_FIELD_OF_VIEW = 60;
  * Qué textura de estrellas cargar.
  *
  * @param maxTextureSize Máximo de la tarjeta gráfica (`renderer.capabilities`).
- * @param screenPixels Ancho de la pantalla en píxeles reales.
+ * @returns La 8K si cabe en la tarjeta; si no, la 4K.
  */
-export function starTextureFor(maxTextureSize: number, screenPixels: number): StarTexture {
-  return maxTextureSize >= HIGH_RES_MIN_TEXTURE && screenPixels >= HIGH_RES_MIN_SCREEN_PX
-    ? 'starmap_8k.jpg'
-    : 'starmap_4k.jpg';
+export function starTextureFor(maxTextureSize: number): StarTexture {
+  return maxTextureSize >= HIGH_RES_MIN_TEXTURE ? 'starmap_8k.jpg' : 'starmap_4k.jpg';
+}
+
+/**
+ * Resolución del lienzo del fondo: la de la pantalla en este momento, con tope.
+ *
+ * Se vuelve a pedir en cada cambio de tamaño o de escala. Antes se leía una
+ * sola vez al arrancar, y si arrancaba a 1× (otra pantalla u otro zoom) el
+ * fondo se quedaba a 1× en una pantalla al 125 % y el navegador lo estiraba.
+ *
+ * @param devicePixelRatio `window.devicePixelRatio`.
+ */
+export function spacePixelRatio(devicePixelRatio: number): number {
+  return Math.min(devicePixelRatio, SPACE_MAX_PIXEL_RATIO);
 }
 
 /** Una estrella propia (nítida, encima de la textura). */

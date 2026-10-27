@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   makeStars,
   seededRandom,
+  SPACE_MAX_PIXEL_RATIO,
+  spacePixelRatio,
   starCameraRotation,
   starTextureFor,
   STAR_COUNT,
@@ -21,12 +23,18 @@ describe('fondo de universo', () => {
     expect(turned.z).toBeCloseTo((-15 * Math.PI) / 180);
   });
 
-  it('usa 8K con tarjeta que la acepte y pantalla de 1,600 px o más', () => {
-    expect(starTextureFor(16384, 3840)).toBe('starmap_8k.jpg');
-    // Laptop de 1366 px al 125 %: ya carga la 8K (con la 4K se veía pixeleado).
-    expect(starTextureFor(16384, 1707)).toBe('starmap_8k.jpg');
-    expect(starTextureFor(16384, 1280)).toBe('starmap_4k.jpg');
-    expect(starTextureFor(4096, 3840)).toBe('starmap_4k.jpg');
+  it('usa 8K siempre que la tarjeta la acepte', () => {
+    // Sin importar la pantalla: con la 4K el cielo se veía pixeleado (26/10/2026).
+    expect(starTextureFor(16384)).toBe('starmap_8k.jpg');
+    expect(starTextureFor(8192)).toBe('starmap_8k.jpg');
+    expect(starTextureFor(4096)).toBe('starmap_4k.jpg');
+  });
+
+  it('el lienzo del fondo sigue la escala de la pantalla, con tope', () => {
+    // Pantalla al 125 %: el fondo se dibuja a 1.25, igual que el mapa.
+    expect(spacePixelRatio(1.25)).toBe(1.25);
+    expect(spacePixelRatio(1)).toBe(1);
+    expect(spacePixelRatio(3)).toBe(SPACE_MAX_PIXEL_RATIO);
   });
 
   it('las estrellas son siempre las mismas y están sobre la esfera', () => {

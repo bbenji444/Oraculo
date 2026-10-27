@@ -90,3 +90,9 @@ Cambios:
   - un núcleo con un halo corto;
   - colores azulados, blancos y cálidos, y las más chicas más tenues;
   - un titileo casi nulo (85–100 %), porque en el espacio las estrellas no titilan.
+
+**Corrección el mismo día.** Benji lo seguía viendo pixeleado. Medido en su pantalla al 125 %, el lienzo del fondo medía 1,534 px de ancho, y el del mapa 1,918, porque la escala y la textura se leían **una sola vez al arrancar**. Si la página arrancaba con otra escala (por emulación, otra pantalla o zoom), el fondo se quedaba a 1× con la 4K y el navegador lo estiraba. Ahora:
+
+- la escala se vuelve a leer en cada cambio de tamaño y de resolución (`spacePixelRatio`, más `matchMedia`);
+- el tamaño de las estrellas lo escala el shader;
+- la 8K se usa siempre que la tarjeta la acepte, porque con 60° la 4K se amplía en casi cualquier pantalla.
