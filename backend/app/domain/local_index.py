@@ -31,9 +31,12 @@ from app.domain.errors import InvalidRequestError
 from app.domain.names import normalize_name
 from app.domain.queries import PlannedQuery, QueryPlace
 
-# Mismo máximo que una consulta de GDELT DOC (maxrecords=250): ningún
-# proveedor entrega más por consulta y así se comparan igual.
-MAX_LOCAL_RESULTS = 250
+# Antes era 250, igual que GDELT DOC (maxrecords=250). La corrida FGR de las
+# 23:00 del 26/10/2026 llegó justo a 250 y se quedó sin las notas más viejas de
+# su ventana. El índice es nuestro y consultarlo no cuesta: el límite real es
+# lo que la IA lee por búsqueda (LLM_MAX_ARTICLES_PER_SEARCH); lo que no
+# alcanza a leer queda pendiente y lo lee la corrida siguiente.
+MAX_LOCAL_RESULTS = 500
 # El índice solo guarda notas sobre México (filtro de la ingesta).
 INDEX_COUNTRY_ISO = "MX"
 # Las frases de los ngramas de GDELT tienen 4 palabras (ADR-0014).

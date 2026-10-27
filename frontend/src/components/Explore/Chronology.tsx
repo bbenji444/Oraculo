@@ -30,13 +30,13 @@ import {
   applyTimeline,
   buildTimeline,
   categoriesIn,
-  noteMoment,
   statesIn,
   type StoryItem,
   storyItems,
   type TimelineBucket,
   type TimelineUnit,
 } from './timelineData';
+import { eventDateNote } from './format';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
 import { ExternalLink } from '../ExternalLink';
@@ -165,7 +165,9 @@ interface EntryProps {
 function Entry({ item, selected, selectedRef, onSelect, showDay = false }: EntryProps) {
   const article = item.lead;
   const others = item.articleIds.length - 1;
-  const event = noteMoment(article);
+  // Igual que la ficha: solo si se aleja de la publicación, y sin decir que
+  // «ocurrió» ese día (la IA suele dar la fecha de los antecedentes).
+  const background = eventDateNote(article.event_date, article.published_at);
   const place = article.primary_location?.place;
   return (
     // Dentro de un tema no hay columna de hora ni nodo (no cabrían dos
@@ -217,10 +219,8 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
             {place ?? article.source_name ?? article.source_domain ?? ''}
             {article.category ? ` · ${article.category.name}` : ''}
           </span>
-          {event?.kind === 'event' && (
-            <span className="mt-0.5 block text-[10.5px] text-amber-200/80">
-              ◆ El hecho ocurrió el {shortDay(event.at)}
-            </span>
+          {background && (
+            <span className="mt-0.5 block text-[10.5px] text-amber-200/80">◆ {background}</span>
           )}
         </button>
         {selected && (

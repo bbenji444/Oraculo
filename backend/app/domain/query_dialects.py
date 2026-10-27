@@ -7,7 +7,9 @@ filtros que van **dentro** del texto y los límites de largo:
 - **SearchApi** (Google News): solo el texto base. País, idioma y fechas
   van como parámetros (``gl``, ``hl``, ``time_period``) en el adaptador (F3).
 - **Google News RSS**: el texto base más el rango de fechas como operador
-  (``when:7d``, o ``after:``/``before:`` con fechas fijas).
+  (``when:7d``, o ``after:``/``before:`` con fechas fijas). Es gratis, así
+  que no pasa por la caché, y se parte por palabra clave y por día porque
+  cada respuesta trae a lo más 100 notas (``split_up_to``).
 - **GDELT DOC 2.0**: el texto base más ``sourcelang:spanish`` y
   ``sourcecountry:<FIPS>``; las fechas van como parámetros (``timespan``).
 - **Índice local** (ADR-0013): no es un buscador externo, así que su
@@ -40,6 +42,12 @@ GDELT_MAX_CHARS = 400
 # Google News RSS son gratuitos.
 SEARCHAPI_CREDITS_PER_QUERY = 1
 FREE = 0
+# Google News RSS devuelve a lo más 100 notas por consulta. Medido el
+# 27/10/2026 con la ventana de dos días de la corrida FGR: «("Fiscalía General
+# de la República" OR FGR)» llegó justo a 100; partida por palabra clave y por
+# día fueron 4 consultas (100 + 100 + 68 + 53) con 281 notas distintas. Con 4,
+# un concepto y los otros 5 proveedores caben en MAX_QUERIES_PER_SEARCH (10).
+RSS_MAX_QUERIES_PER_CONCEPT = 4
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 
@@ -187,6 +195,9 @@ class QueryDialect:
         max_chars: Máximo de caracteres del texto, o ``None``.
         suffix: Filtros que van al final del texto.
         cacheable: Si sus respuestas se guardan en la caché de consultas.
+        split_up_to: Si sus respuestas tienen tope, cuántas consultas puede
+            usar un concepto al partirse por palabra clave y por día
+            (``None``: las palabras van juntas con OR, ver ``query_builder``).
         writer: Escritura propia del texto completo, en lugar del texto
             base más ``suffix`` (la usa el índice local).
     """
@@ -198,6 +209,7 @@ class QueryDialect:
     max_chars: int | None
     suffix: Callable[[QueryPlace, DateWindow], list[str]]
     cacheable: bool = True
+    split_up_to: int | None = None
     writer: Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow], str] | None = None
 
     def render(
@@ -255,6 +267,11 @@ DIALECTS: dict[Provider, QueryDialect] = {
         GOOGLE_MAX_WORDS,
         None,
         _google_news_rss_suffix,
+        # Gratis: la caché solo lo volvía viejo. Medido el 27/10/2026: las
+        # corridas de las 07:00 y las 15:00 reusaron la respuesta de las 03:45
+        # y de las 11:29 (caché de 6 h) y no vieron lo publicado entre tanto.
+        cacheable=False,
+        split_up_to=RSS_MAX_QUERIES_PER_CONCEPT,
     ),
     Provider.GDELT: QueryDialect(
         Provider.GDELT, "GDELT", FREE, None, GDELT_MAX_CHARS, _gdelt_suffix

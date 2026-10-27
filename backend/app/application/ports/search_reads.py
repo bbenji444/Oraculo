@@ -164,6 +164,40 @@ class SearchReaderPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class PreviousRun:
+    """La corrida automática anterior a otra y las notas que ya trajo.
+
+    Sirve para que el reporte separe lo nuevo de lo ya reportado: en la
+    auditoría del 27/10/2026, el 88 al 94 % de las notas de cada corrida ya
+    venía en la anterior, porque cada una cubre hoy y ayer (ADR-0034).
+
+    Attributes:
+        search_id: La corrida anterior.
+        scheduled_for: Su hora programada, si la tiene.
+        article_ids: Todas las notas que encontró, relevantes o no.
+    """
+
+    search_id: UUID
+    scheduled_for: datetime | None
+    article_ids: frozenset[int]
+
+
+class PreviousRunPort(Protocol):
+    """Encuentra la corrida automática anterior a una búsqueda."""
+
+    async def previous_automatic_run(self, search_id: UUID) -> PreviousRun | None:
+        """La última corrida automática terminada que se creó antes que esta.
+
+        Args:
+            search_id: La búsqueda de referencia.
+
+        Returns:
+            La corrida anterior, o ``None`` si no hay (o si se eliminó).
+        """
+        ...
+
+
 class InRegion(StrEnum):
     """Filtro de las notas por región (las tres listas de la pantalla)."""
 

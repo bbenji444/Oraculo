@@ -117,3 +117,27 @@ async def test_si_la_url_ya_existe_gana_esa_nota(
             {"a": GOOGLE, "b": MEDIO},
         ).scalar_one()
     assert count == 2
+
+
+async def test_google_news_vuelve_a_dar_la_nota_dias_despues_y_se_reconoce(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Auditoría del 27/10/2026: la misma nota del mismo medio llegó tres días
+    # después por Google News, con otra liga y otra fecha.
+    store = PostgresArticleStore(test_engine)
+    [first] = await store.upsert(dedupe([raw(MEDIO, Provider.SEARCHAPI)], title_similarity))
+    again = RawArticle.create(
+        provider=Provider.GOOGLE_NEWS_RSS,
+        provider_rank=1,
+        url=GOOGLE,
+        title=TITLE,
+        published_at=NOON + timedelta(days=3),
+        source_name="Medio de prueba",
+        source_domain="duplicados.mx",
+    )
+    later = dedupe([again], title_similarity)
+
+    [candidates] = await store.known_like(later)
+    match = match_known(later[0], candidates, title_similarity)
+
+    assert match is not None and match.article_id == first.article_id

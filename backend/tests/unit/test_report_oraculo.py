@@ -3,11 +3,13 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from app.adapters.reports.oraculo import (
     NO_CATEGORY,
     NO_STATE,
     OTHER_COLOR,
+    Novelty,
     badges,
     build_oraculo,
     category_cards,
@@ -15,11 +17,17 @@ from app.adapters.reports.oraculo import (
     confidence,
     expediente,
     network_svg,
+    novelty,
     state_groups,
     state_stacks,
     timeline,
 )
-from app.application.ports.search_reads import ArticleItem, CategoryView, JudgementView
+from app.application.ports.search_reads import (
+    ArticleItem,
+    CategoryView,
+    JudgementView,
+    PreviousRun,
+)
 from app.domain.authority import Authority
 from tests.unit.application.test_reports_use_case import item, place, search
 
@@ -158,3 +166,35 @@ def test_todo_junto() -> None:
         "Armas y explosivos",
         False,
     )
+
+
+def test_corrida_automatica_pone_primero_lo_nuevo_y_cuenta_lo_ya_reportado() -> None:
+    # Auditoría del 27/10/2026: el 88 al 94 % de cada corrida ya venía en la
+    # anterior. El hecho 20 ya salió; el 30 es nuevo; el 20 suma un medio.
+    known = note(20, "08019", OTROS, AT_15, story_id=20, source_name="La Opción")
+    known_new_outlet = note(21, "08019", OTROS, AT_15.replace(minute=30), story_id=20)
+    fresh = note(30, "08019", OTROS, AT_15.replace(minute=50))
+    previous = PreviousRun(uuid4(), datetime(2026, 10, 25, 21, tzinfo=UTC), frozenset({20, 99}))
+
+    view = build_oraculo(search(), (known, known_new_outlet, fresh), AT_15, previous)
+
+    notes = view.groups[0].categories[0].notes
+    assert [(n.article.article_id, n.known, n.new_outlets) for n in notes] == [
+        (30, False, 0),
+        (20, True, 1),
+    ]
+    assert [n.number for n in notes] == [1, 2]
+    assert view.novelty == Novelty(previous.scheduled_for, 1, 1, 1)
+
+
+def test_sin_corrida_anterior_no_hay_novedades_ni_marcas() -> None:
+    view = build_oraculo(search(), NOTES, AT_15)
+
+    assert view.novelty is None
+    assert not any(n.known for g in view.groups for c in g.categories for n in c.notes)
+
+
+def test_novedades_sin_nada_nuevo() -> None:
+    previous = PreviousRun(uuid4(), None, frozenset(n.article_id for n in NOTES))
+
+    assert novelty(NOTES, previous) == Novelty(None, 0, 4, 0)

@@ -38,6 +38,8 @@ from app.application.ports.search_reads import (
     ArticleFilters,
     ArticleItem,
     ArticleReaderPort,
+    PreviousRun,
+    PreviousRunPort,
     SearchDetail,
     SearchReaderPort,
 )
@@ -47,6 +49,7 @@ from app.domain.errors import ProviderError, RegionNotFoundError, SearchNotFinis
 from app.domain.geocoding import Precision, seat_area
 from app.domain.region import Region, RegionLevel
 from app.domain.reports import is_inside, subregion_level
+from app.domain.search import SearchTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +108,8 @@ class ReportData:
         map_svg: Mapa estático (``<svg>``).
         generated_at: Cuándo se generó (UTC).
         generated_by: Quién lo pidió.
+        previous_run: En una corrida automática, la anterior, para separar
+            lo nuevo de lo ya reportado (ADR-0034); ``None`` en las demás.
     """
 
     search: SearchDetail
@@ -123,6 +128,7 @@ class ReportData:
     map_svg: str
     generated_at: datetime
     generated_by: str
+    previous_run: PreviousRun | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +220,7 @@ class BuildReport:
         summarizer: SummarizerPort | None,
         prices: LLMPrices | None,
         clock: Clock,
+        previous_runs: PreviousRunPort | None = None,
     ) -> None:
         """Recibe los puertos.
 
@@ -226,6 +233,8 @@ class BuildReport:
             summarizer: IA del resumen, o ``None`` si falta su llave.
             prices: Precios de esa IA (para guardar el costo).
             clock: Hora actual (UTC).
+            previous_runs: Corridas anteriores; sin él, el reporte no separa
+                lo nuevo.
         """
         self._searches = searches
         self._articles = articles
@@ -235,6 +244,7 @@ class BuildReport:
         self._summarizer = summarizer
         self._prices = prices
         self._clock = clock
+        self._previous_runs = previous_runs
 
     async def execute(
         self, search_id: UUID, report_format: ReportFormat, actor: Actor
@@ -283,9 +293,16 @@ class BuildReport:
             map_svg=await self._map.render(area, level, counts, points),
             generated_at=self._clock(),
             generated_by=actor.user_id,
+            previous_run=await self._previous(search),
         )
         await self._store.record_generated(search_id, report_format.value, actor)
         return data
+
+    async def _previous(self, search: SearchDetail) -> PreviousRun | None:
+        # Solo las corridas automáticas: una búsqueda manual no tiene «la anterior».
+        if self._previous_runs is None or search.trigger is not SearchTrigger.AUTOMATIC:
+            return None
+        return await self._previous_runs.previous_automatic_run(search.search_id)
 
     async def _counts(
         self, search_id: UUID, region: Region, level: AggregateLevel

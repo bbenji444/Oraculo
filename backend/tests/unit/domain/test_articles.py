@@ -69,6 +69,9 @@ def test_resultados_inutilizables_se_rechazan(overrides: dict[str, Any], fragmen
 def test_dominio_de_una_url() -> None:
     assert domain_of("https://www.Milenio.com/policia") == "milenio.com"
     assert domain_of("https://aristeguinoticias.com/x") == "aristeguinoticias.com"
+    # La versión AMP es el mismo medio (auditoría del 27/10/2026).
+    assert domain_of("https://amp.milenio.com/policia/nota") == "milenio.com"
+    assert domain_of("https://www.amp.ejemplo.mx/") == "ejemplo.mx"
 
 
 def test_errores_de_proveedor_dicen_si_conviene_reintentar() -> None:

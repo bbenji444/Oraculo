@@ -330,5 +330,5 @@ def build_view(data: ReportData) -> ReportView:
         groups=news_groups(articles, data.region.name),
         legend=tuple(legend(max((c.count for c in data.counts), default=0))),
         uses_gdelt=any(p.provider in GDELT_PROVIDERS and p.queries > 0 for p in data.providers),
-        oraculo=build_oraculo(data.search, articles, data.generated_at),
+        oraculo=build_oraculo(data.search, articles, data.generated_at, data.previous_run),
     )

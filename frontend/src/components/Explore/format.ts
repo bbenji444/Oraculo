@@ -218,10 +218,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * homicidio de hace un año, historial del 20/10/2026): sin esto parecía un
  * hecho reciente.
  *
+ * Dice «se refiere a hechos del…» y no «el hecho ocurrió el…»: la IA suele
+ * dar la fecha de los antecedentes, no la del suceso que cuenta la nota. En
+ * la corrida del 26/10/2026, la vinculación a proceso de Jáuregui del 25/10
+ * salió con fechas de abril (el operativo) en 57 de 111 notas con fecha.
+ *
  * @param eventDate Fecha del hecho según la IA (AAAA-MM-DD), si hay.
  * @param publishedAt Publicación (ISO, UTC), si hay.
- * @returns "Fecha del hecho: 29 sep 2025", o `null` si no aplica.
- * @example eventDateNote('2025-09-29', '2026-10-16T14:00:00Z') // 'Fecha del hecho: 29 sep 2025'
+ * @returns "Se refiere a hechos del 29 sep 2025", o `null` si no aplica.
+ * @example eventDateNote('2025-09-29', '2026-10-16T14:00:00Z') // 'Se refiere a hechos del 29 sep 2025'
  */
 export function eventDateNote(eventDate: string | null, publishedAt: string | null): string | null {
   if (!eventDate || !publishedAt) return null;
@@ -229,7 +234,7 @@ export function eventDateNote(eventDate: string | null, publishedAt: string | nu
   if (!year || !month || !day) return null;
   const gap = Math.abs(Date.parse(publishedAt) - Date.UTC(year, month - 1, day));
   if (!Number.isFinite(gap) || gap < OLD_EVENT_DAYS * DAY_MS) return null;
-  return `Fecha del hecho: ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
+  return `Se refiere a hechos del ${String(day)} ${MONTHS[month - 1] ?? ''} ${String(year)}`;
 }
 
 const RUN_HOUR = new Intl.DateTimeFormat('es-MX', {

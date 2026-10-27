@@ -10,7 +10,8 @@ con ``make corrida-fgr``. Hace lo mismo que alguien en Explorar, sin pantalla:
 3. la corre aquí mismo con el pipeline de siempre (``run_search_job``): extrae,
    resume, ubica, clasifica por categoría y quién actúa, y agrupa historias;
 4. arma su reporte (resumen ejecutivo, mapa y conteos) y guarda el PDF en
-   ``REPORTS_DIR``, con su ruta en ``reports.pdf_path``.
+   ``REPORTS_DIR``, con su ruta en ``reports.pdf_path``. El reporte separa
+   lo nuevo de lo que ya traía la corrida anterior (ADR-0034).
 
 Todo queda en PostgreSQL: la búsqueda, sus notas, la bitácora y el reporte.
 
@@ -211,4 +212,5 @@ def _builder(settings: Settings, engine: AsyncEngine, store: PostgresReportStore
             else None
         ),
         clock=lambda: datetime.now(UTC),
+        previous_runs=PostgresSearchStore(engine),
     )

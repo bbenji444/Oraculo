@@ -165,6 +165,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 else None
             ),
             clock=_utc_now,
+            previous_runs=app.state.search_store,
         )
         app.state.search_exporter = ExportSearch(
             app.state.search_store,
