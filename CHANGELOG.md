@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Eliminar casos y búsquedas del historial (27/10/2026).** Se borran de forma reversible:
+  - el primer clic pide confirmar («¿Eliminar? · Sí, eliminar · Cancelar») y luego aparece un aviso con «Deshacer» durante 8 segundos;
+  - un caso solo lo elimina su dueño; del historial se pueden quitar las búsquedas propias y las corridas automáticas;
+  - la fila se queda en la base con `deleted_at` y `deleted_by` (migración 0030), así que las notas, las entidades y la bitácora no se pierden; cada eliminación y cada restauración queda en la auditoría;
+  - rutas nuevas: `DELETE /cases/{id}`, `POST /cases/{id}/restore`, `DELETE /searches/{id}` y `POST /searches/{id}/restore` (`docs/api.md`).
 - **Fase 12 — Monitor automatizado FGR: plan y decisiones iniciales.** El plan de Benji queda en `docs/PLAN_MONITOR_FGR.md`, con los ajustes acordados el 24/10/2026:
   - una búsqueda nacional por corrida, repartida por estado;
   - corridas automáticas a las 07:00, 15:00 y 23:00 solo con fuentes gratis (Google News RSS e índice local);

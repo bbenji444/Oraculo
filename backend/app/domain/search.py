@@ -45,6 +45,24 @@ class SearchTrigger(StrEnum):
     """El reloj, en un horario fijo del monitor FGR (07:00, 15:00, 23:00)."""
 
 
+def can_delete_search(owner_id: str, trigger: SearchTrigger, user_id: str) -> bool:
+    """Si una persona puede quitar una búsqueda del historial.
+
+    Las suyas sí. Las corridas automáticas del monitor FGR son de todos y salen
+    en el historial de todos (ADR-0031), así que cualquiera puede quitarlas.
+    Las búsquedas manuales de otra persona, no.
+
+    Args:
+        owner_id: Quién la lanzó (``searches.user_id``).
+        trigger: Manual o automática.
+        user_id: Quién quiere eliminarla.
+
+    Returns:
+        ``True`` si puede.
+    """
+    return trigger is SearchTrigger.AUTOMATIC or owner_id == user_id
+
+
 class Stage(StrEnum):
     """Etapas del pipeline (§9), para ``progress`` y ``processing_errors``."""
 

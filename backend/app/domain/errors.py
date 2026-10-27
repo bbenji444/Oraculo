@@ -189,6 +189,12 @@ class CaseForbiddenError(ForbiddenError):
     code = "case_forbidden"
 
 
+class SearchForbiddenError(ForbiddenError):
+    """La búsqueda es de otra persona: no se puede quitar de su historial."""
+
+    code = "search_forbidden"
+
+
 class CaseClosedError(ConflictError):
     """El caso está cerrado o archivado: hay que reabrirlo para cambiarlo."""
 

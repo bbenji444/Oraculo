@@ -180,3 +180,17 @@ export function caseFieldErrors(error: unknown): CaseFieldErrors {
   }
   return result;
 }
+
+/**
+ * Elimina un caso (solo su dueño). Es reversible: `restoreCase` lo devuelve.
+ *
+ * @throws {ApiError} `case_forbidden` si no es el dueño.
+ */
+export async function deleteCase(id: string): Promise<void> {
+  await requestJson(caseUrl(id), { method: 'DELETE' });
+}
+
+/** Devuelve un caso eliminado tal como estaba («Deshacer»). */
+export async function restoreCase(id: string): Promise<Case> {
+  return asCase(await requestJson(caseUrl(id, '/restore'), { method: 'POST' }));
+}

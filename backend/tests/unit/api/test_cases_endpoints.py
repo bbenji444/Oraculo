@@ -217,3 +217,28 @@ def test_miembros_por_api_solo_con_el_dueno(client: TestClient, session: Session
     ]
     assert forbidden.status_code == 403
     assert removed.status_code == 204
+
+
+def test_eliminar_un_caso_y_deshacerlo(
+    client: TestClient, repo: FakeCaseRepository, session: Session
+) -> None:
+    # 27/10/2026: solo el dueño, y es reversible.
+    case_id = client.post(URL, json=BODY).json()["id"]
+    client.post(f"{URL}/{case_id}/members", json={"user_id": "otra", "role": "editor"})
+
+    session.as_user("otra")
+    assert client.delete(f"{URL}/{case_id}").status_code == 403
+    session.as_user("benji")
+
+    assert client.delete(f"{URL}/{case_id}").status_code == 204
+    assert client.get(f"{URL}/{case_id}").status_code == 404
+    assert client.get(URL).json()["items"] == []
+
+    restored = client.post(f"{URL}/{case_id}/restore")
+
+    assert restored.status_code == 200
+    assert restored.json()["name"] == BODY["name"]
+    assert client.get(f"{URL}/{case_id}").status_code == 200
+    actions = [entry.action for _, entry, _ in repo.audit]
+    assert InvestigationAction.CASE_DELETED in actions
+    assert InvestigationAction.CASE_RESTORED in actions

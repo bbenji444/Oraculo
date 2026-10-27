@@ -21,6 +21,9 @@ SEARCH_FINISHED = "search.finished"
 SEARCH_REPROCESSED = "search.reprocessed"
 # Reporte o exportación de datos de una búsqueda (§16, ADR-0018).
 REPORT_GENERATED = "report.generated"
+# Quitar una búsqueda del historial (reversible) y devolverla (27/10/2026).
+SEARCH_DELETED = "search.deleted"
+SEARCH_RESTORED = "search.restored"
 
 
 @dataclass(frozen=True, slots=True)

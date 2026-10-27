@@ -574,3 +574,62 @@ def test_cada_nota_trae_su_categoria_y_se_cuentan_por_categoria(
     assert item["category"] == {"id": extortion, "name": "Extorsión", "color": None, "symbol": None}
     assert item["category_raw"] == "cobro de piso"
     assert {"category": item["category"], "count": 1} in aggregates["by_category"]
+
+
+def test_quitar_una_busqueda_del_historial_y_deshacerlo(
+    client: TestClient, filled: tuple[str, dict[str, int]], engine: Engine
+) -> None:
+    # 27/10/2026: reversible; sus notas siguen en el sistema.
+    search_id, articles = filled
+    # Que sea de quien la elimina (la API responde como el usuario de desarrollo).
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE searches SET user_id = :u WHERE id = :id"),
+            {"u": "analista-prueba", "id": search_id},
+        )
+
+    deleted = client.delete(f"{URL}/{search_id}")
+
+    assert deleted.status_code == 204
+    history = [s["search_id"] for s in client.get(URL).json()["items"]]
+    assert search_id not in history
+    assert client.get(f"{URL}/{search_id}").status_code == 404
+    with engine.connect() as conn:
+        kept = conn.execute(
+            text("SELECT count(*) FROM articles WHERE id = ANY(:ids)"),
+            {"ids": list(articles.values())},
+        ).scalar_one()
+        actions = list(
+            conn.execute(
+                text(
+                    "SELECT action FROM audit_log WHERE entity_type = 'search' "
+                    "AND entity_id = :id ORDER BY id"
+                ),
+                {"id": search_id},
+            ).scalars()
+        )
+    assert kept == len(articles)
+    assert actions[-1] == "search.deleted"
+    # Eliminarla otra vez: ya no existe para el historial.
+    assert client.delete(f"{URL}/{search_id}").status_code == 404
+
+    restored = client.post(f"{URL}/{search_id}/restore")
+
+    assert restored.status_code == 204
+    assert client.get(f"{URL}/{search_id}").status_code == 200
+    assert search_id in [s["search_id"] for s in client.get(URL).json()["items"]]
+
+
+def test_no_se_quita_la_busqueda_manual_de_otra_persona(
+    client: TestClient, filled: tuple[str, dict[str, int]], engine: Engine
+) -> None:
+    search_id, _ = filled
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE searches SET user_id = 'otra-analista' WHERE id = :id"), {"id": search_id}
+        )
+
+    response = client.delete(f"{URL}/{search_id}")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "search_forbidden"

@@ -263,6 +263,9 @@ class InvestigationAction(StrEnum):
     CASE_ARCHIVED = "case.archived"
     CASE_REOPENED = "case.reopened"
     CASE_VIEWED = "case.viewed"
+    # Eliminar un caso es reversible (27/10/2026): se oculta y se puede restaurar.
+    CASE_DELETED = "case.deleted"
+    CASE_RESTORED = "case.restored"
     CASE_MEMBER_ADDED = "case.member_added"
     CASE_MEMBER_REMOVED = "case.member_removed"
     CASE_ARTICLE_ADDED = "case.article_added"

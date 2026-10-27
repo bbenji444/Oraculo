@@ -140,6 +140,8 @@ class Case:
         created_at: Cuándo se creó.
         updated_at: Último cambio (también al agregar o quitar notas).
         article_count: Cuántas noticias tiene.
+        deleted_at: Cuándo se eliminó (``None`` si sigue vivo). Eliminar es
+            reversible: el caso se queda en la base y se puede restaurar.
     """
 
     id: UUID
@@ -152,6 +154,7 @@ class Case:
     created_at: datetime
     updated_at: datetime
     article_count: int
+    deleted_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +171,20 @@ class CaseView:
     case: Case
     role: CaseMemberRole
     has_article: bool | None = None
+
+
+def can_delete(role: CaseMemberRole) -> bool:
+    """Si el rol puede eliminar (o restaurar) el caso.
+
+    Solo el dueño: eliminar se lleva el caso para todos sus miembros.
+
+    Args:
+        role: Rol en el caso.
+
+    Returns:
+        ``True`` solo para el dueño.
+    """
+    return role is CaseMemberRole.OWNER
 
 
 def can_edit(role: CaseMemberRole) -> bool:

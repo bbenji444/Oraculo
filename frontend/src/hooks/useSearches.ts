@@ -7,15 +7,23 @@
  *   al terminar.
  * - Las notas se piden cuando la búsqueda terminó.
  */
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import {
+  deleteSearch,
   estimateSearch,
   getArticle,
   getSearch,
   isFinished,
   listAllArticles,
   listSearches,
+  restoreSearch,
   type SearchInput,
   startSearch,
 } from '../services/searches';
@@ -91,5 +99,29 @@ export function useSearchHistory() {
     queryFn: ({ pageParam, signal }) => listSearches(pageParam, signal),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
+  });
+}
+
+function useInvalidateHistory() {
+  const client = useQueryClient();
+  // El historial y «la última corrida» (Explorar) salen de la misma lista.
+  return () => client.invalidateQueries({ queryKey: ['searches'] });
+}
+
+/** Quita una búsqueda del historial (reversible). */
+export function useDeleteSearch() {
+  const invalidate = useInvalidateHistory();
+  return useMutation({
+    mutationFn: (searchId: string) => deleteSearch(searchId),
+    onSuccess: invalidate,
+  });
+}
+
+/** Devuelve una búsqueda al historial («Deshacer»). */
+export function useRestoreSearch() {
+  const invalidate = useInvalidateHistory();
+  return useMutation({
+    mutationFn: (searchId: string) => restoreSearch(searchId),
+    onSuccess: invalidate,
   });
 }

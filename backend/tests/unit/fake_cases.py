@@ -57,11 +57,23 @@ class FakeCaseRepository:
         self.audit.append((case.id, audit, self.now))
         return case
 
-    async def get_view(self, case_id: UUID, user_id: str) -> CaseView | None:
+    async def get_view(
+        self, case_id: UUID, user_id: str, *, include_deleted: bool = False
+    ) -> CaseView | None:
         role = self.members.get(case_id, {}).get(user_id)
         if role is None:
             return None
-        return CaseView(self.cases[case_id], role)
+        case = self.cases[case_id]
+        if case.deleted_at is not None and not include_deleted:
+            return None
+        return CaseView(case, role)
+
+    async def set_deleted(
+        self, case_id: UUID, *, deleted: bool, user_id: str, audit: AuditEntry
+    ) -> None:
+        self.tick(1)
+        self.cases[case_id] = replace(self.cases[case_id], deleted_at=self.now if deleted else None)
+        self.audit.append((case_id, audit, self.now))
 
     async def list_for_user(
         self,
@@ -74,7 +86,9 @@ class FakeCaseRepository:
         mine = [
             CaseView(case, self.members[case.id][user_id])
             for case in self.cases.values()
-            if user_id in self.members[case.id] and case.status in statuses
+            if user_id in self.members[case.id]
+            and case.status in statuses
+            and case.deleted_at is None
         ]
         mine.sort(key=lambda v: (v.case.updated_at, str(v.case.id)), reverse=True)
         if after is not None and after.moment is not None:

@@ -16,10 +16,12 @@ import {
   type CasePatch,
   type CaseStatus,
   createCase,
+  deleteCase,
   getCase,
   listCaseArticles,
   listCases,
   removeCaseArticle,
+  restoreCase,
   updateCase,
 } from '../services/cases';
 
@@ -99,6 +101,24 @@ export function useRemoveCaseArticle() {
   return useMutation({
     mutationFn: ({ caseId, articleId }: { caseId: string; articleId: number }) =>
       removeCaseArticle(caseId, articleId),
+    onSuccess: invalidate,
+  });
+}
+
+/** Elimina un caso (reversible). */
+export function useDeleteCase() {
+  const invalidate = useInvalidateCases();
+  return useMutation({
+    mutationFn: (id: string) => deleteCase(id),
+    onSuccess: invalidate,
+  });
+}
+
+/** Devuelve un caso eliminado («Deshacer»). */
+export function useRestoreCase() {
+  const invalidate = useInvalidateCases();
+  return useMutation({
+    mutationFn: (id: string) => restoreCase(id),
     onSuccess: invalidate,
   });
 }

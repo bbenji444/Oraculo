@@ -369,3 +369,20 @@ export async function getArticle(articleId: number, signal?: AbortSignal): Promi
 export function isFinished(status: SearchStatus): boolean {
   return status === 'completed' || status === 'partial' || status === 'failed';
 }
+
+/**
+ * Quita una búsqueda del historial. Es reversible (`restoreSearch`) y sus notas
+ * siguen en el sistema.
+ *
+ * @throws {ApiError} `search_forbidden` si es una búsqueda manual de otra persona.
+ */
+export async function deleteSearch(searchId: string): Promise<void> {
+  await requestJson(apiUrl(`searches/${encodeURIComponent(searchId)}`), { method: 'DELETE' });
+}
+
+/** Devuelve una búsqueda al historial («Deshacer»). */
+export async function restoreSearch(searchId: string): Promise<void> {
+  await requestJson(apiUrl(`searches/${encodeURIComponent(searchId)}/restore`), {
+    method: 'POST',
+  });
+}

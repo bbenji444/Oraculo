@@ -65,7 +65,7 @@ _CASES_ON_MAP_SQL = """
         LEFT JOIN regions r ON r.id = al.region_id
         WHERE ca.case_id = c.id
     ) x
-    WHERE c.status = 'open'
+    WHERE c.status = 'open' AND c.deleted_at IS NULL
 """
 
 

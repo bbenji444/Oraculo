@@ -45,6 +45,7 @@ from app.application.ports.search_reads import (
     InRegion,
     RegionPoint,
     SearchDetail,
+    SearchOwnership,
 )
 from app.application.ports.search_store import (
     ArticleMentions,
@@ -337,7 +338,7 @@ class PostgresSearchStore:
                                     FROM search_concepts sc WHERE sc.search_id = s.id),
                                     '[]') AS concepts
                             FROM searches s JOIN regions r ON r.id = s.region_id
-                            WHERE {where}
+                            WHERE ({where}) AND s.deleted_at IS NULL
                             ORDER BY s.created_at DESC, s.id DESC
                             LIMIT :limit
                             """  # noqa: S608 — where se arma con texto fijo de este módulo
@@ -377,6 +378,50 @@ class PostgresSearchStore:
             for row in rows
         ]
 
+    async def ownership(self, search_id: UUID) -> SearchOwnership | None:
+        """Ver ``SearchTrashPort.ownership``."""
+        async with self._engine.connect() as conn:
+            row = (
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT user_id, trigger, deleted_at IS NOT NULL AS deleted "
+                            "FROM searches WHERE id = :id"
+                        ),
+                        {"id": search_id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        return SearchOwnership(row["user_id"], SearchTrigger(row["trigger"]), row["deleted"])
+
+    async def set_deleted(
+        self, search_id: UUID, *, deleted: bool, actor_id: str, ip: str | None, action: str
+    ) -> None:
+        """Ver ``SearchTrashPort.set_deleted``."""
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE searches SET deleted_at = CASE WHEN :deleted THEN now() END, "
+                    "deleted_by = CASE WHEN :deleted THEN :user END WHERE id = :id"
+                ),
+                {"id": search_id, "deleted": deleted, "user": actor_id},
+            )
+            await conn.execute(
+                text(_INSERT_AUDIT),
+                {
+                    "user_id": actor_id,
+                    "action": action,
+                    "entity_type": AUDIT_ENTITY,
+                    "entity_id": str(search_id),
+                    "payload": _json({}),
+                    "ip": ip,
+                },
+            )
+
     async def last_search_id(self) -> UUID | None:
         """La búsqueda más reciente (para ``make reubicar`` sin id).
 
@@ -386,7 +431,10 @@ class PostgresSearchStore:
         async with self._engine.connect() as conn:
             found: UUID | None = (
                 await conn.execute(
-                    text("SELECT id FROM searches ORDER BY created_at DESC, id DESC LIMIT 1")
+                    text(
+                        "SELECT id FROM searches WHERE deleted_at IS NULL "
+                        "ORDER BY created_at DESC, id DESC LIMIT 1"
+                    )
                 )
             ).scalar()
         return found
