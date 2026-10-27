@@ -140,9 +140,9 @@ export function makeStars(count: number = STAR_COUNT, seed = 20261017): Star[] {
   });
 }
 
-// Titileo apenas perceptible, de 85 % a 100 % de brillo en ciclos de 2 a 5 s.
-// En el espacio las estrellas no titilan; con más se veía de caricatura.
-export const TWINKLE_MIN = 0.85;
+// Las estrellas propias ya no titilan: en el espacio no lo hacen, y así el fondo
+// solo se dibuja cuando la cámara se mueve (26/10/2026: la tarjeta Intel
+// integrada se reiniciaba con el globo y el fondo dibujándose sin parar).
 // La textura de la NASA viene tenue: la mitad de sus píxeles tienen 8 de 255.
 // Antes se multiplicaba todo por 1.9, y el negro se volvía una bruma granulada.
 // Ahora se resta un punto negro (en luz lineal) y luego se aclara: el fondo
@@ -150,8 +150,67 @@ export const TWINKLE_MIN = 0.85;
 // sobre la 8K: percentil 50 = 8, 90 = 16, 99 = 24).
 export const STARMAP_BLACK_POINT = 0.0025;
 export const STARMAP_GAIN = 2.2;
-// El fondo se dibuja a 30 cuadros por segundo: el titileo no necesita más y
-// deja libre la tarjeta gráfica para el globo (meta de 60 fps, §14.2).
+// Como máximo 30 cuadros por segundo, y solo cuando la cámara se mueve: el
+// cielo gira despacio, no necesita más, y deja libre la tarjeta para el globo
+// (meta de 60 fps, §14.2).
 export const SPACE_FPS = 30;
+
+// Piezas de la textura: 2048 × 2048. Subir la 8K (8192 × 4096) de un solo
+// golpe a una Intel UHD tardaba tanto que Windows creía colgada la tarjeta y
+// la reiniciaba, y Chrome le quitaba el 3D a la página (26/10/2026). En piezas,
+// una por cuadro, ninguna subida es larga y se ve igual de nítida.
+export const SKY_TILE_PX = 2048;
+
+/** Una pieza del cielo: qué parte de la foto y qué parte de la esfera cubre. */
+export interface SkyTile {
+  /** Recorte de la foto equirectangular, en pixeles. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Parte de la esfera (radianes, como `SphereGeometry`). */
+  phiStart: number;
+  phiLength: number;
+  thetaStart: number;
+  thetaLength: number;
+}
+
+/**
+ * Parte la foto del cielo en piezas cuadradas que juntas cubren la esfera.
+ *
+ * La foto es equirectangular: el ancho recorre la longitud (φ, 0 a 2π) y el
+ * alto la latitud desde el polo norte (θ, 0 a π). Cada pieza cubre la misma
+ * fracción de los dos.
+ *
+ * @param width Ancho de la foto (8192 en la 8K).
+ * @param height Alto de la foto (4096 en la 8K).
+ * @param tile Lado de cada pieza.
+ * @returns Las piezas por filas, de arriba abajo y de izquierda a derecha.
+ *
+ * @example
+ *   skyTiles(8192, 4096) // 8 piezas: 4 columnas × 2 filas
+ */
+export function skyTiles(width: number, height: number, tile: number = SKY_TILE_PX): SkyTile[] {
+  const columns = Math.max(1, Math.round(width / tile));
+  const rows = Math.max(1, Math.round(height / tile));
+  const tiles: SkyTile[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x = Math.round((column * width) / columns);
+      const y = Math.round((row * height) / rows);
+      tiles.push({
+        x,
+        y,
+        width: Math.round(((column + 1) * width) / columns) - x,
+        height: Math.round(((row + 1) * height) / rows) - y,
+        phiStart: (column / columns) * 2 * Math.PI,
+        phiLength: (2 * Math.PI) / columns,
+        thetaStart: (row / rows) * Math.PI,
+        thetaLength: Math.PI / rows,
+      });
+    }
+  }
+  return tiles;
+}
 // Resolución máxima del lienzo del fondo: en pantallas muy densas no se nota.
 export const SPACE_MAX_PIXEL_RATIO = 1.5;

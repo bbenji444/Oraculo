@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   makeStars,
   seededRandom,
+  skyTiles,
   SPACE_MAX_PIXEL_RATIO,
   spacePixelRatio,
   starCameraRotation,
@@ -51,6 +52,26 @@ describe('fondo de universo', () => {
     // La mayoría son pequeñas: el promedio queda abajo de la mitad del rango.
     const mean = stars.reduce((sum, s) => sum + s.size, 0) / stars.length;
     expect(mean).toBeLessThan((STAR_MIN_SIZE + STAR_MAX_SIZE) / 2);
+  });
+
+  it('la 8K se parte en 8 piezas de 2048 que cubren toda la esfera', () => {
+    const tiles = skyTiles(8192, 4096);
+
+    expect(tiles).toHaveLength(8);
+    expect(tiles.every((t) => t.width === 2048 && t.height === 2048)).toBe(true);
+    // Sin huecos ni encimadas: suman la foto entera y la esfera entera.
+    expect(tiles.reduce((sum, t) => sum + t.width * t.height, 0)).toBe(8192 * 4096);
+    expect(tiles.reduce((sum, t) => sum + t.phiLength * t.thetaLength, 0)).toBeCloseTo(
+      2 * Math.PI * Math.PI,
+    );
+    // La primera es la esquina de arriba a la izquierda: norte, longitud 0.
+    expect(tiles[0]).toMatchObject({ x: 0, y: 0, phiStart: 0, thetaStart: 0 });
+    expect(tiles[7]).toMatchObject({ x: 6144, y: 2048 });
+    expect(tiles[7]?.thetaStart).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('la 4K queda en 2 piezas', () => {
+    expect(skyTiles(4096, 2048)).toHaveLength(2);
   });
 
   it('el generador con semilla repite la serie', () => {
