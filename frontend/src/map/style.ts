@@ -337,7 +337,16 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
     },
     layers: [
       ...(background ? [{ ...background, id: 'background' }] : []),
-      ...worldPolygons.filter((layer) => layer.type !== 'symbol'),
+      // Debajo de la foto de la NASA, que es opaca hasta EARTH_FADE_START_ZOOM:
+      // antes de ese zoom estos polígonos no se ven y dibujarlos le costaba a
+      // la tarjeta en cada cuadro del giro (26/10/2026). Entran justo cuando
+      // la foto empieza a desvanecerse.
+      ...worldPolygons
+        .filter((layer) => layer.type !== 'symbol')
+        .map((layer) => ({
+          ...layer,
+          minzoom: Math.max(layer.minzoom ?? 0, EARTH_FADE_START_ZOOM),
+        })),
       earthLayer('day', earth === 'day'),
       earthLayer('night', earth === 'night'),
       ...mexico.filter((layer) => layer.type !== 'symbol'),
