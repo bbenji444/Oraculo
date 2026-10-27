@@ -111,17 +111,6 @@ body {
   text-transform: uppercase;
 }
 
-/* El nombre del sistema con el brillo de los títulos de OSINT (--brillo-titulo). */
-.marca-oraculo {
-  font-family: var(--font-display);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-shadow:
-    rgb(255 255 255 / 0.5) 0 0 8px,
-    rgb(0 210 255 / 0.55) 0 0 18px,
-    rgb(0 210 255 / 0.3) 0 0 36px;
-}
-
 /* Animaciones de Explorar (ADR-0017): fichas y paneles aparecen suavemente y
    las barras de las gráficas crecen desde abajo. */
 @keyframes fadeIn {
@@ -141,6 +130,230 @@ body {
   to {
     transform: scaleY(1);
   }
+}
+
+/* --- Encabezado (26/10/2026) ---------------------------------------------
+   Sin fondo y centrado, sobre las estrellas. La marca es la «marca-signal»
+   de OSINT Oráculo (resultados.css): Orbitron con un destello cian que la
+   recorre, una línea pequeña con barrido de radar abajo y un pulso en el
+   símbolo; aquí el símbolo es el globo, que además gira. */
+:root {
+  /* Alto del encabezado: Explorar dibuja el globo debajo y corre sus paneles. */
+  --header-h: 6.25rem;
+}
+@media (min-width: 640px) {
+  :root {
+    --header-h: 4.5rem;
+  }
+}
+
+.marca-signal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  user-select: none;
+  animation: marca-entra 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.marca-simbolo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: #00d2ff;
+  filter: drop-shadow(0 0 8px rgb(0 210 255 / 0.55));
+}
+/* El aro que late hacia afuera, como el punto de OSINT. */
+.marca-simbolo::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 210 255 / 0.45);
+  animation: marca-ping 2.4s ease-out infinite;
+}
+/* El meridiano se angosta y se ensancha: parece que el globo gira. */
+.marca-meridiano {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marca-giro 6s linear infinite;
+}
+.marca-nombre {
+  font: 700 15px/1 var(--font-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow:
+    0 0 10px rgb(255 255 255 / 0.35),
+    0 0 22px rgb(0 210 255 / 0.35);
+  background: linear-gradient(
+    105deg,
+    #fff 0%,
+    #fff 38%,
+    rgb(0 210 255 / 0.95) 50%,
+    #fff 62%,
+    #fff 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: marca-shimmer 4.5s ease-in-out infinite;
+}
+.marca-linea {
+  position: relative;
+  display: block;
+  margin-top: 5px;
+  padding-bottom: 3px;
+  overflow: hidden;
+}
+.marca-linea-texto {
+  display: block;
+  font: 600 9px/1 var(--font-display);
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--color-slate-400);
+  white-space: nowrap;
+  transition:
+    color 0.35s,
+    letter-spacing 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.marca-scan {
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(0 210 255 / 0.15) 20%,
+    rgb(0 210 255 / 0.95) 50%,
+    rgb(0 210 255 / 0.15) 80%,
+    transparent 100%
+  );
+  background-size: 55% 100%;
+  background-repeat: no-repeat;
+  animation: marca-scan 2.8s linear infinite;
+  opacity: 0.85;
+}
+/* En celular, menos espaciado para que quepa en un renglón. */
+@media (max-width: 639px) {
+  .marca-linea-texto {
+    letter-spacing: 0.2em;
+  }
+}
+.marca-signal:hover .marca-linea-texto {
+  color: #00d2ff;
+  letter-spacing: 0.42em;
+}
+.marca-signal:hover .marca-nombre {
+  animation-duration: 2.2s;
+}
+@keyframes marca-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes marca-shimmer {
+  0%,
+  70%,
+  100% {
+    background-position: 120% 0;
+  }
+  85% {
+    background-position: -20% 0;
+  }
+}
+@keyframes marca-scan {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+@keyframes marca-ping {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+@keyframes marca-giro {
+  0% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(-1);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* Pestañas: texto técnico con una línea cian que crece bajo la activa. */
+.pestana {
+  position: relative;
+  font: 600 11px/1 var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.pestana::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: #00d2ff;
+  box-shadow: 0 0 10px rgb(0 210 255 / 0.8);
+  transform: scaleX(0);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pestana[aria-current='page']::after,
+.pestana:hover::after {
+  transform: scaleX(1);
+}
+.pestana:hover:not([aria-current='page'])::after {
+  opacity: 0.45;
+}
+
+/* Sin el destello, el nombre se queda blanco (el texto no es transparente). */
+@media (prefers-reduced-motion: reduce) {
+  .marca-nombre {
+    background: none;
+    -webkit-text-fill-color: #fff;
+  }
+  .marca-scan,
+  .marca-meridiano,
+  .marca-simbolo::after {
+    animation: none;
+  }
+}
+
+/* Los controles del globo (acercar, alejar, brújula) bajan al hueco del
+   encabezado: el mapa se dibuja también detrás de él. */
+.globo-bajo-encabezado .maplibregl-ctrl-top-right {
+  top: var(--header-h);
+}
+
+/* Capa de los paneles de Explorar, debajo del encabezado. No atrapa clics (el
+   globo de atrás se sigue arrastrando), pero cada panel adentro sí, salvo que
+   diga `pointer-events-none`: `:where` no suma especificidad y la clase gana. */
+.capa-paneles {
+  pointer-events: none;
+}
+:where(.capa-paneles > *) {
+  pointer-events: auto;
 }
 
 /* "Menos movimiento" del sistema: sin animaciones de interfaz. */

@@ -147,85 +147,89 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           active={active}
         />
       </GraphicsBoundary>
-      <CaseWall map={map} />
-      <CasesOnGlobe map={map} />
+      {/* Los paneles van debajo del encabezado; el universo y el globo, detrás
+          de todo (también del encabezado, que no tiene fondo). */}
+      <div className="capa-paneles absolute inset-x-0 bottom-0 top-[var(--header-h)]">
+        <CaseWall map={map} />
+        <CasesOnGlobe map={map} />
 
-      <aside
-        aria-label="Búsqueda y noticias"
-        className={`pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 transition-[transform,visibility] duration-300 sm:w-[24rem] ${
-          panelOpen && !inWall ? 'visible translate-x-0' : 'invisible -translate-x-full'
-        }`}
-      >
-        {searchId === null && (
-          // Acceso directo a la última corrida del monitor FGR (F12.8).
-          <div className="pointer-events-auto shrink-0">
-            <LatestRunCard />
-          </div>
-        )}
-        <div className="pointer-events-auto shrink-0">
-          {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
-          <SearchPanel key={searchId ?? 'nueva'} />
-        </div>
-        {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
-        {hasResults && (
-          <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
-            {listOpen ? (
-              <ResultsList articles={shown} total={articles.length} colors={colors} />
-            ) : (
-              <Chronology articles={relevant} />
-            )}
-          </div>
-        )}
-      </aside>
-
-      {!panelOpen && !inWall && (
-        <button
-          type="button"
-          onClick={() => {
-            setPanelOpen(true);
-          }}
-          className={`${GLASS} absolute left-4 top-4 flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+        <aside
+          aria-label="Búsqueda y noticias"
+          className={`pointer-events-none absolute inset-y-0 left-0 flex w-full flex-col gap-3 overflow-y-auto p-4 transition-[transform,visibility] duration-300 sm:w-[24rem] ${
+            panelOpen && !inWall ? 'visible translate-x-0' : 'invisible -translate-x-full'
+          }`}
         >
-          › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
-        </button>
-      )}
+          {searchId === null && (
+            // Acceso directo a la última corrida del monitor FGR (F12.8).
+            <div className="pointer-events-auto shrink-0">
+              <LatestRunCard />
+            </div>
+          )}
+          <div className="pointer-events-auto shrink-0">
+            {/* Otra búsqueda vuelve a mostrar el panel completo (o compacto). */}
+            <SearchPanel key={searchId ?? 'nueva'} />
+          </div>
+          {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
+          {hasResults && (
+            <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
+              {listOpen ? (
+                <ResultsList articles={shown} total={articles.length} colors={colors} />
+              ) : (
+                <Chronology articles={relevant} />
+              )}
+            </div>
+          )}
+        </aside>
 
-      <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
-        <div className="pointer-events-auto">
-          <PrecisionLegend />
-        </div>
-        <div className="pointer-events-auto flex gap-2">
+        {!panelOpen && !inWall && (
           <button
             type="button"
-            aria-pressed={showCases}
             onClick={() => {
-              useExplorerStore.getState().setShowCases(!showCases);
+              setPanelOpen(true);
             }}
-            title="Ver mis casos abiertos sobre el globo; clic en uno abre su muro"
-            className={`${GLASS} px-3 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 ${
-              showCases ? 'text-amber-200' : 'text-slate-200 hover:bg-slate-900/80'
-            }`}
+            className={`${GLASS} absolute left-4 top-4 flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
           >
-            {showCases ? '● Mis casos' : '○ Mis casos'}
+            › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
           </button>
-          <GlobeControls />
+        )}
+
+        <div className="pointer-events-none absolute bottom-8 right-4 hidden flex-col items-end gap-2 sm:flex">
+          <div className="pointer-events-auto">
+            <PrecisionLegend />
+          </div>
+          <div className="pointer-events-auto flex gap-2">
+            <button
+              type="button"
+              aria-pressed={showCases}
+              onClick={() => {
+                useExplorerStore.getState().setShowCases(!showCases);
+              }}
+              title="Ver mis casos abiertos sobre el globo; clic en uno abre su muro"
+              className={`${GLASS} px-3 py-2 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 ${
+                showCases ? 'text-amber-200' : 'text-slate-200 hover:bg-slate-900/80'
+              }`}
+            >
+              {showCases ? '● Mis casos' : '○ Mis casos'}
+            </button>
+            <GlobeControls />
+          </div>
         </div>
+
+        {somethingOnGlobe && !inWall && (
+          <button
+            type="button"
+            onClick={() => {
+              useExplorerStore.getState().clearGlobe();
+            }}
+            title="Quita los resultados del globo y deja listo para otra búsqueda (esta queda en Historial)"
+            className={`${GLASS} absolute left-1/2 top-3 z-10 -translate-x-1/2 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
+          >
+            ✕ Limpiar globo
+          </button>
+        )}
+
+        <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />
       </div>
-
-      {somethingOnGlobe && !inWall && (
-        <button
-          type="button"
-          onClick={() => {
-            useExplorerStore.getState().clearGlobe();
-          }}
-          title="Quita los resultados del globo y deja listo para otra búsqueda (esta queda en Historial)"
-          className={`${GLASS} absolute left-1/2 top-3 z-10 -translate-x-1/2 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-900/80 focus-visible:outline-2 focus-visible:outline-sky-400`}
-        >
-          ✕ Limpiar globo
-        </button>
-      )}
-
-      <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />
     </div>
   );
 }
