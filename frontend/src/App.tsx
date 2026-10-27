@@ -19,14 +19,19 @@ import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
 import { GraphicsBoundary } from './components/Explore/GraphicsBoundary';
 import { SpaceBackground } from './components/Space/SpaceBackground';
+import { DesignPreview } from './components/DesignPreview/DesignPreview';
 import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
+import { HudTabs } from './components/ui/HudTabs';
+import { installSpotlight } from './ui/spotlight';
 
-type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'estado' | 'laboratorio';
+type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'estado' | 'laboratorio' | 'diseno';
 
 const MuroLab = lazy(() => import('./lab/MuroLab'));
 // El laboratorio es solo para desarrollo: se pide a propósito en la URL.
 const LAB_ENABLED = new URLSearchParams(window.location.search).has('laboratorio');
+// La muestra del diseño nuevo (27/10/2026): solo con ?diseno en la URL.
+const DESIGN_ENABLED = new URLSearchParams(window.location.search).has('diseno');
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'explorar', label: 'Explorar' },
@@ -35,11 +40,13 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'historial', label: 'Historial' },
   { id: 'estado', label: 'Estado del sistema' },
   ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
+  ...(DESIGN_ENABLED ? [{ id: 'diseno' as const, label: 'Diseño' }] : []),
 ];
 
 function tabFromHash(): Tab {
   const hash = window.location.hash;
   if (hash === '#/laboratorio' && LAB_ENABLED) return 'laboratorio';
+  if (hash === '#/diseno' && DESIGN_ENABLED) return 'diseno';
   if (hash === '#/estado') return 'estado';
   if (hash === '#/casos') return 'casos';
   if (hash === '#/conceptos') return 'conceptos';
@@ -52,6 +59,7 @@ function Screen({ tab }: { tab: Tab }) {
   if (tab === 'conceptos') return <ConceptsPage />;
   if (tab === 'historial') return <HistoryPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
+  if (tab === 'diseno') return <DesignPreview />;
   if (tab === 'laboratorio') {
     return (
       <Suspense fallback={<p className="p-6 text-sm text-slate-400">Cargando el laboratorio…</p>}>
@@ -87,6 +95,9 @@ export function App() {
   // (26/10/2026). Oculta, el globo deja de girar y no dibuja.
   const [exploreVisited, setExploreVisited] = useState(tab === 'explorar');
   if (tab === 'explorar' && !exploreVisited) setExploreVisited(true);
+
+  // La luz que sigue al mouse en paneles y botones (styles/hud.css).
+  useEffect(() => installSpotlight(), []);
 
   useEffect(() => {
     const onHashChange = () => {
@@ -137,25 +148,7 @@ export function App() {
             aria-hidden="true"
             className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
           />
-          <nav
-            aria-label="Secciones"
-            className="sin-barra flex max-w-full min-w-0 gap-1 overflow-x-auto"
-          >
-            {TABS.map((item) => (
-              <a
-                key={item.id}
-                href={`#/${item.id}`}
-                aria-current={tab === item.id ? 'page' : undefined}
-                className={`pestana shrink-0 whitespace-nowrap rounded-md px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-                  tab === item.id
-                    ? 'text-sky-100 [text-shadow:0_0_12px_rgb(0_210_255/0.55)]'
-                    : 'text-slate-400 hover:text-slate-100'
-                }`}
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+          <HudTabs tabs={TABS} active={tab} label="Secciones" />
         </div>
       </header>
       {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás

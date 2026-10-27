@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Muestra del diseño «consola táctica» (27/10/2026, ADR-0036, propuesto).** El jefe de Benji vio la interfaz genérica y sin animación. Con `?diseno` en la URL (`#/diseno`) se ve cómo quedaría cada pantalla, con datos reales:
+  - paneles con borde de luz que sigue al mouse;
+  - botones con destello y onda al hacer clic;
+  - insignias con pulso, cifras que corren y títulos que se descifran;
+  - selector de periodo con pastilla deslizante e interruptores con brillo.
+
+  Las pestañas del encabezado ya usan la barra de luz deslizante. Falta aplicarlo a las demás pantallas cuando Benji lo apruebe.
 - **El PDF de cada corrida automática trae solo hechos nuevos (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
   - «Noticias por estado» lista solo los hechos que no traía esa corrida;
   - en la página 2, «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten;
