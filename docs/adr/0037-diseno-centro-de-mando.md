@@ -1,6 +1,6 @@
 # ADR-0037: Diseño «Centro de mando» para la búsqueda (diseño 3)
 
-- **Estado:** Propuesto (27/10/2026). Está detrás de `?mando` en la URL para compararlo con el diseño 2 («consola táctica»). Benji decide cuál se queda.
+- **Estado:** Aceptado (27/10/2026). Benji lo eligió («se ve muy, muy bien») y desde entonces es el diseño principal. El diseño 2, con la columna, queda con `?clasico` en la URL y con la etiqueta `diseno-consola-tactica-v2`.
 - **Fecha:** 27 de octubre de 2026
 - **Fase:** F12
 - **Decide:** Benji. Lo que pidió el 27/10/2026: «una nueva estructura o acomode de la interfaz de búsqueda… súper novedoso… muy, muy, muy personalizada la búsqueda… que la gente sienta que está en un sistema de millones de pesos». Pidió mantener el mismo globo, los mismos estilos, las mismas letras y los mismos botones.
@@ -54,9 +54,19 @@ Benji quiere comparar ese diseño con otro acomodo de la búsqueda, sin perder e
   - `ConceptChips` y `DateRange` exportados.
 
   Además, el globo acepta márgenes abajo y arriba (`insetBottom`, `clearHeader`).
-- Para verlo se abre `http://localhost:8080/?mando#/explorar`. Sin `?mando` se ve el diseño 2.
+- Desde que se aceptó se abre sin nada en la URL (`?mando` sigue valiendo). Para el diseño 2 se abre `http://localhost:8080/?clasico#/explorar`.
 - **Riesgo:** en pantallas bajas (menos de ~650 px de alto), la consola y el expediente dejan poco lugar al globo. El zoom tiene un tope inferior (`GLOBE_FIT_MIN_ZOOM`) para que no se vuelva una canica.
-- Si Benji elige este diseño, falta:
-  - quitar la bandera `?mando`;
-  - decidir qué pasa con la columna del diseño 2;
-  - agregar una prueba de humo del flujo completo con este diseño.
+- La prueba de humo del flujo principal (H1) recorre este diseño. La del diseño 2 corre con `?clasico`.
+
+## Ajustes al aceptarlo (27/10/2026)
+
+Benji pidió estos ajustes al elegirlo:
+
+- **Sin naranja en la consola.** «No va acorde a los demás colores». Lo que falta elegir late en cian con borde punteado. Los créditos de pago van en violeta y los avisos en rojo.
+- **Consola más chica, pero igual de clara.** La letra de la frase, los márgenes y el botón son más chicos. El ancho máximo bajó de 64 a 54 rem.
+- **Fondo de vidrio.** «Que no sea tan azul… que se pueda ver la parte de atrás». La consola, sus tarjetas y el resumen del expediente son translúcidos (`.mando-glass`), con un brillo en la orilla de arriba. Siguen sin desenfoque, por la tarjeta Intel.
+- **Lista de noticias más grande y clara.** «Se ve una parte muy pequeña de las noticias». Se hicieron tres cambios:
+  - el expediente pasa de 26 a 30 rem;
+  - el resumen de arriba se pliega aparte («▴») a un renglón con sus cifras;
+  - la cronología y la lista se ven 10 % más grandes (`zoom` en `.mando-feed`), sin tocar los componentes que comparten los dos diseños.
+- **Más color y animación en el resumen.** Cada cifra es una lámina de vidrio de su color: cian, verde, violeta y azul cielo. Un brillo cruza cada lámina a destiempo, la barra de categorías brilla y un haz recorre el resumen al llegar los resultados. La barra de categorías ya no usa ámbar.

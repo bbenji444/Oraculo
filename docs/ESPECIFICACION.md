@@ -708,7 +708,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 **Apariencia (ADR-0017)**
 - El globo ocupa la pantalla, sobre un fondo de universo (Vía Láctea y estrellas que titilan) que gira con la cámara.
 - Tierra con textura satelital de la NASA. Por defecto de noche, con las ciudades iluminadas; un botón cambia a la de día. Al acercarse se funde con el mapa de calles y los límites de INEGI.
-- Paneles translúcidos a la izquierda (búsqueda, lista y descargas) que no tapan el centro; la derecha queda libre para el globo.
+- Diseño «Centro de mando» (ADR-0037, el principal desde el 27/10/2026): la búsqueda va en una consola de vidrio abajo al centro y los resultados en un expediente a la derecha. El globo flota completo entre el encabezado y la consola, y se corre a la izquierda cuando el expediente está abierto. El diseño anterior, con los paneles a la izquierda (búsqueda, lista y descargas), sigue con `?clasico` en la URL.
 
 **Vista inicial**
 - La cámara entra desde lejos y llega a México con frenado suave (~3.5 s).

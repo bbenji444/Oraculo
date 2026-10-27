@@ -3,6 +3,11 @@
  * referencia de Benji): el globo domina, sobre el universo, con paneles
  * translúcidos a los lados.
  *
+ * Tiene dos acomodos de los paneles, que comparten el globo y los datos:
+ * - «Centro de mando» (el principal, ADR-0037): consola de misión abajo y
+ *   expediente a la derecha (components/Mando);
+ * - de columna (`?clasico` en la URL, ADR-0036): lo que se describe abajo.
+ *
  * - Izquierda: la última corrida del monitor FGR (si no hay búsqueda abierta),
  *   la búsqueda (al terminar, compacta con sus descargas) y la cronología o la
  *   lista de noticias, que ocupa el espacio libre. La búsqueda y la cronología
@@ -61,10 +66,6 @@ const COLUMN_WIDTH_PX = 384;
 // noticia se oculta para que se vea su ficha.
 const NARROW_SCREEN = '(max-width: 767px)';
 
-// Diseño «Centro de mando» (diseño 3, 27/10/2026): con `?mando` en la URL. Se
-// lee una vez: cambiarlo es abrir otra dirección.
-const MANDO = isMandoMode();
-
 function isNarrowScreen(): boolean {
   // Sin matchMedia (pruebas, navegadores viejos) se trata como pantalla ancha.
   return typeof window.matchMedia === 'function' && window.matchMedia(NARROW_SCREEN).matches;
@@ -79,6 +80,9 @@ interface ExplorePageProps {
 }
 
 export function ExplorePage({ active = true }: ExplorePageProps) {
+  // Diseño «Centro de mando» (el principal desde el 27/10/2026); con `?clasico`
+  // en la URL, el de columna. Se lee al montar: cambiarlo es abrir otra dirección.
+  const [mando] = useState(isMandoMode);
   const searchId = useExplorerStore((s) => s.searchId);
   const search = useSearch(searchId).data;
   const finished = search !== undefined && isFinished(search.status);
@@ -129,7 +133,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   // corre a la izquierda cuando el expediente está abierto a la derecha.
   const dossierOpen = useMandoStore((s) => s.dossierOpen);
   const dockHeight = useMandoStore((s) => s.dockHeight);
-  const insets = MANDO
+  const insets = mando
     ? {
         left: 0,
         right: wide && hasResults && dossierOpen && !inWall ? DOSSIER_RESERVE_PX : 0,
@@ -170,7 +174,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     // a la izquierda del expediente (styles/mando.css).
     <div
       data-earth={earth}
-      data-dossier={MANDO && insets.right > 0 ? 'open' : undefined}
+      data-dossier={mando && insets.right > 0 ? 'open' : undefined}
       className="relative h-full overflow-clip"
     >
       {/* El universo de atrás lo dibuja App para todas las pestañas. El globo
@@ -185,10 +189,10 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           insetLeft={insets.left}
           insetRight={insets.right}
           insetBottom={insets.bottom}
-          clearHeader={MANDO}
+          clearHeader={mando}
         />
       </GraphicsBoundary>
-      {MANDO && !inWall && (
+      {mando && !inWall && (
         <ScanOverlay
           search={search}
           notice={finishedNotice.notice}
@@ -202,7 +206,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
         <CaseWall map={map} />
         <CasesOnGlobe map={map} />
 
-        {MANDO && !inWall && (
+        {mando && !inWall && (
           <MandoPanels
             active={active}
             search={search}
@@ -214,7 +218,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
             rightReserve={insets.right}
           />
         )}
-        {!MANDO && (
+        {!mando && (
           <>
             <aside
               aria-label="Búsqueda y noticias"
@@ -269,7 +273,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
         )}
 
         {/* En el Centro de mando lo hace «Nueva misión», en la consola. */}
-        {somethingOnGlobe && !inWall && !MANDO && (
+        {somethingOnGlobe && !inWall && !mando && (
           <button
             type="button"
             onClick={() => {
@@ -283,7 +287,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
         )}
 
         {/* En el Centro de mando el aviso es el letrero grande sobre el globo. */}
-        {!MANDO && <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />}
+        {!mando && <FinishToast notice={finishedNotice.notice} onClose={finishedNotice.dismiss} />}
       </div>
     </div>
   );

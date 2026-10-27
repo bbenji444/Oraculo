@@ -63,11 +63,12 @@ const SOURCES: SourceOption[] = [
 ];
 
 describe('isMandoMode', () => {
-  it('se enciende solo con ?mando en la URL', () => {
+  it('es el diseño principal; ?clasico vuelve al de columna', () => {
+    expect(isMandoMode('')).toBe(true);
     expect(isMandoMode('?mando')).toBe(true);
-    expect(isMandoMode('?depurar&mando')).toBe(true);
-    expect(isMandoMode('?diseno')).toBe(false);
-    expect(isMandoMode('')).toBe(false);
+    expect(isMandoMode('?depurar')).toBe(true);
+    expect(isMandoMode('?clasico')).toBe(false);
+    expect(isMandoMode('?depurar&clasico')).toBe(false);
   });
 });
 

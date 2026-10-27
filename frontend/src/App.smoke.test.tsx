@@ -192,7 +192,176 @@ afterEach(() => {
 // El avance se consulta cada 2 s (useSearch): las esperas dan margen a un sondeo.
 const POLL_WAIT = { timeout: 5000 };
 
-describe('flujo principal (H1)', () => {
+describe('flujo principal (H1, Centro de mando)', () => {
+  it('armar la misión en Jalisco, seguir el barrido y abrir una nota', async () => {
+    renderApp();
+
+    // 1. Región: «/» abre su tarjeta con el cursor en el buscador.
+    expect(screen.getByRole('button', { name: /^Dónde: elige una región/ })).toBeTruthy();
+    fireEvent.keyDown(window, { key: '/' });
+    const where = screen.getByRole('dialog', { name: 'Ajustar la misión: Dónde' });
+    const finder = within(where).getByRole('combobox', {
+      name: 'Buscar estado, municipio o localidad',
+    });
+    expect(document.activeElement).toBe(finder);
+    fireEvent.change(finder, { target: { value: 'Jalisco' } });
+    const suggestions = await within(where).findByRole('listbox');
+    fireEvent.mouseDown(await within(suggestions).findByRole('option', { name: /^Jalisco/ }));
+    expect(await screen.findByRole('button', { name: /^Dónde: Jalisco/ })).toBeTruthy();
+
+    // 2. Concepto: su tarjeta, y Esc la cierra.
+    fireEvent.click(screen.getByRole('button', { name: /^Qué rastrear: elige un concepto/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Extorsión' }));
+    expect(await screen.findByRole('button', { name: /^Qué rastrear: Extorsión/ })).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    // 3. El costo se ve antes de gastar: 2 consultas y 1 crédito. Mientras la
+    //    cifra corre, el número real queda para el lector de pantalla.
+    const dock = screen.getByRole('region', { name: 'Consola de misión' });
+    const figure = (label: string) => {
+      const value = within(dock).getByText(label).nextElementSibling;
+      if (!(value instanceof HTMLElement)) throw new Error(label);
+      return value;
+    };
+    // La estimación llega del servidor un momento después.
+    await within(dock).findByText('Consultas');
+    expect(await within(figure('Consultas')).findByText('2')).toBeTruthy();
+    expect(within(figure('Créditos')).getByText('1')).toBeTruthy();
+
+    // 4. Lanzar: se envía lo elegido y la consola muestra el barrido por etapas.
+    fireEvent.click(within(dock).getByRole('button', { name: 'Iniciar barrido ›' }));
+    expect(await screen.findByText('Resumiendo y clasificando con la IA')).toBeTruthy();
+    expect(screen.getByRole('listitem', { current: 'step' }).textContent).toBe('IA');
+    expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
+
+    // 5. Al terminar: letrero sobre el globo, renglón de la misión y expediente.
+    const dossier = await screen.findByRole(
+      'complementary',
+      { name: 'Expediente de la misión' },
+      POLL_WAIT,
+    );
+    expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
+    expect(screen.getByRole('region', { name: 'Consola de misión' }).textContent).toContain(
+      '18 notas',
+    );
+    expect(within(dossier).getByRole('region', { name: 'Cronología' })).toBeTruthy();
+
+    // 6. «Noticias» cambia la cronología por la lista; globo y lista, las mismas.
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Noticias' }));
+    const list = await within(dossier).findByRole('region', { name: 'Noticias' });
+    const relevant = articles.items.filter((a) => a.concepts.some((c) => c.is_relevant));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
+    await waitFor(() => {
+      expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
+    });
+
+    // 7. El resumen se pliega aparte para dar todo el alto a la lista.
+    expect(within(dossier).getByRole('button', { name: 'Reporte (PDF)' })).toBeTruthy();
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Plegar el resumen' }));
+    expect(within(dossier).queryByRole('button', { name: 'Reporte (PDF)' })).toBeNull();
+    expect(within(dossier).getByRole('region', { name: 'Noticias' })).toBe(list);
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Desplegar el resumen' }));
+
+    // 8. Elegir una nota abre su ficha en el globo, con su link en otra pestaña.
+    const note = relevant[0];
+    if (!note) throw new Error('El fixture necesita al menos una nota relevante.');
+    fireEvent.click(
+      within(list).getByRole('button', { name: new RegExp(note.title.slice(0, 20)) }),
+    );
+    const card = await within(screen.getByTestId('globo')).findByRole('article');
+    const original = within(card).getByRole('link', { name: /Ver nota original/ });
+    expect(original.getAttribute('href')).toBe(note.url);
+    expect(original.getAttribute('target')).toBe('_blank');
+
+    // 9. Reporte en PDF desde el expediente.
+    const saved: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push(this.download);
+    });
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Reporte (PDF)' }));
+    await waitFor(() => {
+      expect(saved).toEqual(['reporte-extorsion-jalisco-2026-10-17.pdf']);
+    });
+
+    // 10. «›» oculta el expediente y una pestaña en el borde lo regresa.
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Ocultar el expediente' }));
+    expect(screen.queryByRole('complementary', { name: 'Expediente de la misión' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Expediente ·/ }));
+    expect(screen.getByRole('complementary', { name: 'Expediente de la misión' })).toBeTruthy();
+  }, 15000);
+
+  it('reabrir una búsqueda del Historial no gasta nada', async () => {
+    window.location.hash = '#/historial';
+    renderApp();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir en el globo' }));
+
+    expect(await screen.findByRole('region', { name: 'Cronología' }, POLL_WAIT)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
+    expect(await screen.findByRole('region', { name: 'Noticias' })).toBeTruthy();
+    expect(window.location.hash).toBe('#/explorar');
+    expect(startBodies).toEqual([]);
+    expect(useExplorerStore.getState()).toMatchObject({ regionId: 272, conceptIds: [3] });
+  }, 15000);
+});
+
+describe('caso de investigación (H9.1)', () => {
+  it('agregar notas al caso desde su ficha y verlas en la pestaña Casos', async () => {
+    // La búsqueda ya terminó: el primer sondeo la ve lista.
+    searchPolls = 1;
+    const [first, second] = (articles.items as Article[]).filter((a) =>
+      a.concepts.some((c) => c.is_relevant),
+    );
+    if (!first || !second) throw new Error('La grabación necesita dos notas relevantes.');
+    useExplorerStore.setState({ searchId: SEARCH_ID, articleId: first.article_id });
+    renderApp();
+
+    // Primera nota: se elige el caso de la lista.
+    fireEvent.click(await screen.findByRole('button', { name: '+ Agregar al caso' }, POLL_WAIT));
+    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
+    expect(await screen.findByText('Agregada a «Homicidio estilista Polanco».')).toBeTruthy();
+
+    // Siguiente nota: el último caso usado queda a un clic.
+    act(() => {
+      useExplorerStore.getState().selectArticle(second.article_id);
+    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: '+ Agregar a «Homicidio estilista Polanco»' }),
+    );
+    await waitFor(() => {
+      expect(caseArticles).toEqual([first.article_id, second.article_id]);
+    });
+
+    // En Casos: el caso con sus dos noticias.
+    act(() => {
+      window.location.hash = '#/casos';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
+    expect(await screen.findByText('Noticias del caso (2)')).toBeTruthy();
+    // Explorar sigue montada (oculta) con las mismas notas: se buscan en Casos.
+    const visible = (title: string) =>
+      screen.getAllByText(title).filter((el) => !el.closest('[hidden]'));
+    await waitFor(() => {
+      expect(visible(first.title)).toHaveLength(1);
+    });
+    expect(visible(second.title)).toHaveLength(1);
+  }, 15000);
+});
+
+describe('diseño de columna (?clasico, H1)', () => {
+  // El diseño anterior se guarda por si se ocupa (Benji, 27/10/2026): con
+  // `?clasico` en la URL, Explorar vuelve a la columna de la izquierda.
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/?clasico#/explorar');
+  });
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+  });
+
   it('buscar en Jalisco, seguir el avance y abrir una nota', async () => {
     renderApp();
 
@@ -302,63 +471,5 @@ describe('flujo principal (H1)', () => {
       expect(saved).toEqual(['reporte-extorsion-jalisco-2026-10-17.pdf']);
     });
     expect(reportRequests).toEqual(['?format=pdf']);
-  }, 15000);
-
-  it('reabrir una búsqueda del Historial no gasta nada', async () => {
-    window.location.hash = '#/historial';
-    renderApp();
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Abrir en el globo' }));
-
-    expect(await screen.findByRole('region', { name: 'Cronología' }, POLL_WAIT)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
-    expect(await screen.findByRole('region', { name: 'Noticias' })).toBeTruthy();
-    expect(window.location.hash).toBe('#/explorar');
-    expect(startBodies).toEqual([]);
-    expect(useExplorerStore.getState()).toMatchObject({ regionId: 272, conceptIds: [3] });
-  }, 15000);
-});
-
-describe('caso de investigación (H9.1)', () => {
-  it('agregar notas al caso desde su ficha y verlas en la pestaña Casos', async () => {
-    // La búsqueda ya terminó: el primer sondeo la ve lista.
-    searchPolls = 1;
-    const [first, second] = (articles.items as Article[]).filter((a) =>
-      a.concepts.some((c) => c.is_relevant),
-    );
-    if (!first || !second) throw new Error('La grabación necesita dos notas relevantes.');
-    useExplorerStore.setState({ searchId: SEARCH_ID, articleId: first.article_id });
-    renderApp();
-
-    // Primera nota: se elige el caso de la lista.
-    fireEvent.click(await screen.findByRole('button', { name: '+ Agregar al caso' }, POLL_WAIT));
-    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
-    expect(await screen.findByText('Agregada a «Homicidio estilista Polanco».')).toBeTruthy();
-
-    // Siguiente nota: el último caso usado queda a un clic.
-    act(() => {
-      useExplorerStore.getState().selectArticle(second.article_id);
-    });
-    fireEvent.click(
-      await screen.findByRole('button', { name: '+ Agregar a «Homicidio estilista Polanco»' }),
-    );
-    await waitFor(() => {
-      expect(caseArticles).toEqual([first.article_id, second.article_id]);
-    });
-
-    // En Casos: el caso con sus dos noticias.
-    act(() => {
-      window.location.hash = '#/casos';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    });
-    fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
-    expect(await screen.findByText('Noticias del caso (2)')).toBeTruthy();
-    // Explorar sigue montada (oculta) con las mismas notas: se buscan en Casos.
-    const visible = (title: string) =>
-      screen.getAllByText(title).filter((el) => !el.closest('[hidden]'));
-    await waitFor(() => {
-      expect(visible(first.title)).toHaveLength(1);
-    });
-    expect(visible(second.title)).toHaveLength(1);
   }, 15000);
 });

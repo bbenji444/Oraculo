@@ -1,12 +1,12 @@
 # Centro de mando (diseño 3)
 
-El diseño alterno de Explorar: la búsqueda como una consola de misión abajo, el globo encima y los resultados en un expediente a la derecha (ADR-0037). Se enciende con `?mando` en la URL:
+El diseño principal de Explorar desde el 27/10/2026 (ADR-0037): la búsqueda como una consola de misión de vidrio abajo, el globo encima y los resultados en un expediente a la derecha.
+
+El diseño anterior, con la columna a la izquierda (ADR-0036), se ve con `?clasico` en la URL:
 
 ```
-http://localhost:8080/?mando#/explorar
+http://localhost:8080/?clasico#/explorar
 ```
-
-Sin `?mando` se ve el diseño 2 («consola táctica», ADR-0036), que no cambia.
 
 | Archivo               | Qué hace                                                                                                                        |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
