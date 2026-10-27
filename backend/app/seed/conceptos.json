@@ -1,8 +1,8 @@
 [
   {
-    "name": "Fiscalia General de la Republica",
+    "name": "Fiscalía General de la República",
     "description": "Noticias donde actúa la Fiscalía General de la República (FGR) federal: detenciones, cateos, aseguramientos, órdenes de aprehensión, carpetas de investigación, acusaciones, sentencias, extradiciones y nombramientos. También el Ministerio Público Federal, la AIC y las fiscalías especializadas federales. No cuentan las fiscalías estatales ni las notas que solo nombran a la FGR de pasada.",
-    "keywords": ["Fiscalia General de la Republica", "FGR"],
+    "keywords": ["Fiscalía General de la República", "FGR"],
     "exclude_terms": [],
     "color": "#00D2FF",
     "relevance_rule": "fgr_federal"
