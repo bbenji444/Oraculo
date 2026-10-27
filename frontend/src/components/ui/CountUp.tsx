@@ -57,10 +57,13 @@ export function CountUp({ value, format, className }: CountUpProps) {
         final
       ) : (
         // Mientras corre: la cifra final para lectores de pantalla y la que
-        // corre solo a la vista. Al terminar queda una sola.
+        // corre solo a la vista. Al terminar queda una sola. Sin recibir el
+        // mouse, para no tragarse un clic (ver DecodeText).
         <>
-          <span className="sr-only">{final}</span>
-          <span aria-hidden="true">{text}</span>
+          <span className="sr-only pointer-events-none">{final}</span>
+          <span aria-hidden="true" className="pointer-events-none">
+            {text}
+          </span>
         </>
       )}
     </span>
