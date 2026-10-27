@@ -11,6 +11,9 @@ import {
   calloutWidth,
   DESKTOP_ARTICLE_OFFSET,
   flyPadding,
+  frameZoom,
+  GLOBE_EXPAND_ZOOM,
+  GLOBE_FRAME_MAX_ZOOM,
   globeCamera,
   MIN_FRAME_PX,
   MIN_FRAME_ZOOM,
@@ -231,5 +234,27 @@ describe('aureola del globo', () => {
         Math.cos(19 * DEG) * Math.cos(lat * DEG) * Math.cos((lng + 99) * DEG);
       expect(Math.acos(cosD) / DEG).toBeCloseTo(60);
     }
+  });
+});
+
+describe('frameZoom (encuadre según los paneles)', () => {
+  it('al quedar sin paneles, el globo se acerca una sola vez', () => {
+    const first = frameZoom(1.8, false, false);
+    expect(first.zoom).toBeCloseTo(1.8 + GLOBE_EXPAND_ZOOM);
+    expect(first.expanded).toBe(true);
+    expect(frameZoom(first.zoom, false, first.expanded)).toEqual(first);
+  });
+
+  it('al volver un panel, regresa al zoom de antes', () => {
+    const back = frameZoom(1.8 + GLOBE_EXPAND_ZOOM, true, true);
+    expect(back.zoom).toBeCloseTo(1.8);
+    expect(back.expanded).toBe(false);
+  });
+
+  it('de cerca (una ciudad) solo se recentra, sin cambiar el zoom', () => {
+    expect(frameZoom(GLOBE_FRAME_MAX_ZOOM + 2, false, false)).toEqual({
+      zoom: GLOBE_FRAME_MAX_ZOOM + 2,
+      expanded: false,
+    });
   });
 });

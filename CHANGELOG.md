@@ -8,6 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **El globo se acomoda a la búsqueda (27/10/2026).** En Explorar, con la columna de búsqueda a la vista, el mundo se corre a la parte libre de la derecha. Al ocultarla (o al ocultar el panel), se desliza al centro y crece un poco sin dejar de girar. Al volver a abrirla, regresa. Los vuelos a un estado o municipio encuadran la región en la parte libre. En celular la columna tapa todo y el globo se queda centrado.
 - **Diseño «consola táctica» en todo el monitor (27/10/2026, ADR-0036).** El jefe de Benji vio la interfaz genérica y sin animación. Ahora Explorar, Casos, Conceptos, Historial y Estado del sistema usan las mismas piezas:
   - **paneles:** borde de luz y halo que siguen al mouse, y esquinas de mira;
   - **botones:** destello, onda al hacer clic y texto que se abre al pasar el mouse;

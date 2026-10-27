@@ -29,10 +29,12 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
+import { NARROW_MAX_WIDTH } from '../../map/framing';
 import { wallCaseFromHash } from '../../map/muro/orbit';
 import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
@@ -49,6 +51,8 @@ import { useFinishNotice } from './useFinishNotice';
 
 // Lista vacía estable: un arreglo nuevo en cada render haría redibujar el globo.
 const NO_ARTICLES: Article[] = [];
+// Ancho de la columna de la izquierda (sm:w-[24rem]): lo que se corre el globo.
+const COLUMN_WIDTH_PX = 384;
 // Por debajo de este ancho el panel tapa el globo (Tailwind `md`): al elegir una
 // noticia se oculta para que se vea su ficha.
 const NARROW_SCREEN = '(max-width: 767px)';
@@ -102,6 +106,18 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const showCases = useExplorerStore((s) => s.showCases);
   const somethingOnGlobe = searchId !== null || articleId !== null;
+  // Encuadre del globo (Benji, 27/10/2026): con la columna de la izquierda a la
+  // vista, el mundo se corre a la derecha; con la búsqueda y la cronología
+  // plegadas (o el panel oculto), se centra y crece. En celular la columna
+  // tapa todo y el globo se queda centrado.
+  const wide = useMediaQuery(`(min-width: ${String(NARROW_MAX_WIDTH + 1)}px)`, true);
+  const searchCollapsed = useExplorerStore((s) => s.searchCollapsed);
+  const timelineOpen = useTimelineStore((s) => s.open);
+  const columnShown =
+    wide &&
+    panelOpen &&
+    !inWall &&
+    (!searchCollapsed || (hasResults && (timelineOpen || listOpen)));
 
   // La URL manda: `#/explorar?caso=<id>` abre el muro (se puede compartir y recargar).
   useEffect(() => {
@@ -142,6 +158,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           colors={colors}
           onMap={setMap}
           active={active}
+          insetLeft={columnShown ? COLUMN_WIDTH_PX : 0}
         />
       </GraphicsBoundary>
       {/* Los paneles van debajo del encabezado; el universo y el globo, detrás

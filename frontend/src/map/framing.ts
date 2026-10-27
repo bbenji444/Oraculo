@@ -40,6 +40,14 @@ export const MIN_FRAME_PX = 160;
 export const DESKTOP_ARTICLE_OFFSET: [number, number] = [-120, 70];
 // En celular la ficha no cabe a un lado: el punto baja y la ficha va encima.
 export const NARROW_ARTICLE_DROP = 0.22;
+// Encuadre del globo según los paneles (Benji, 27/10/2026): con un panel a un
+// lado, el centro de la cámara se corre a la parte libre; sin paneles, el
+// globo se centra y crece un poco. Solo se agranda en la vista de globo: de
+// cerca (una ciudad) solo se recentra.
+export const GLOBE_FRAME_MAX_ZOOM = 3;
+export const GLOBE_EXPAND_ZOOM = 0.18;
+// Duración del corrimiento, en milisegundos: lo que tarda el panel en irse.
+export const GLOBE_FRAME_MS = 900;
 // Zoom al volar a una nota, según qué tan preciso es su lugar: siempre el
 // mismo para la misma precisión (antes era "el mayor entre el actual y este" y,
 // ya de cerca, elegir otra nota no acercaba nada). Benji pidió el 26/10/2026
@@ -352,4 +360,27 @@ export function globeCamera(
   }
   const zoom = Math.log2((radius * 2 * Math.PI * Math.cos(center[1] * DEGREES)) / TILE_SIZE);
   return { center, zoom: Math.min(maxZoom, Math.max(MIN_FRAME_ZOOM, zoom)) };
+}
+
+/**
+ * Zoom del globo al abrir o cerrar los paneles de los lados.
+ *
+ * Al quedar libre (sin paneles), la vista de globo se acerca
+ * `GLOBE_EXPAND_ZOOM`; al volver un panel, se aleja lo mismo. `expanded`
+ * recuerda si ya se acercó, para que abrir y cerrar varias veces no acumule.
+ *
+ * @param zoom Zoom actual.
+ * @param open Si queda algún panel a un lado.
+ * @param expanded Si el globo está acercado por no tener paneles.
+ * @example frameZoom(1.8, false, false) // { zoom: 1.98, expanded: true }
+ */
+export function frameZoom(
+  zoom: number,
+  open: boolean,
+  expanded: boolean,
+): { zoom: number; expanded: boolean } {
+  if (zoom >= GLOBE_FRAME_MAX_ZOOM) return { zoom, expanded: false };
+  if (!open && !expanded) return { zoom: zoom + GLOBE_EXPAND_ZOOM, expanded: true };
+  if (open && expanded) return { zoom: zoom - GLOBE_EXPAND_ZOOM, expanded: false };
+  return { zoom, expanded };
 }

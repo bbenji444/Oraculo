@@ -68,6 +68,8 @@ import {
   articleZoom,
   calloutWidth,
   flyPadding,
+  frameZoom,
+  GLOBE_FRAME_MS,
   globeCamera,
   type ScreenSize,
 } from '../../map/framing';
@@ -102,6 +104,13 @@ interface ExploreGlobeProps {
    * ocupa la tarjeta de video.
    */
   active?: boolean;
+  /**
+   * Píxeles que ocupan los paneles a la izquierda y a la derecha. El centro
+   * del globo se corre a la parte libre con una animación, y sin paneles se
+   * centra y crece un poco (Benji, 27/10/2026; map/framing.ts).
+   */
+  insetLeft?: number;
+  insetRight?: number;
 }
 
 interface Tooltip {
@@ -263,7 +272,14 @@ function placeAura(map: MapLibreMap, aura: HTMLElement | null, sun: HTMLElement 
   });
 }
 
-export function ExploreGlobe({ articles, colors, onMap, active = true }: ExploreGlobeProps) {
+export function ExploreGlobe({
+  articles,
+  colors,
+  onMap,
+  active = true,
+  insetLeft = 0,
+  insetRight = 0,
+}: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const auraRef = useRef<HTMLDivElement>(null);
   const sunRef = useRef<HTMLDivElement>(null);
@@ -301,6 +317,11 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
   const activeRef = useRef(active);
   const spinStartRef = useRef(0);
   const spinStepRef = useRef<() => void>(() => undefined);
+  const insetsRef = useRef({ left: insetLeft, right: insetRight });
+  // Si el globo está acercado por no tener paneles (frameZoom).
+  const expandedRef = useRef(false);
+  // Mientras se corre el encuadre, el giro espera: el corrimiento ya lo incluye.
+  const framingRef = useRef(false);
   const earthRef = useRef(earth);
   const lastInteractionRef = useRef(0);
   const levelRef = useRef<RegionLevel | null>(null);
@@ -337,6 +358,8 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       // los desvanece en 300 ms por defecto y se sentía que cargaba lento).
       fadeDuration: LABEL_FADE_MS,
     });
+    // El encuadre de los paneles desde el principio: la entrada ya llega corrida.
+    map.setPadding({ top: 0, bottom: 0, ...insetsRef.current });
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
     const stopAttribution = collapseAttributionOnStart(map.getContainer());
@@ -353,7 +376,7 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
       setIntroFinished(true);
     };
     const spinStep = () => {
-      if (!spinningRef.current || !introDone || !activeRef.current) return;
+      if (!spinningRef.current || !introDone || !activeRef.current || framingRef.current) return;
       const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(performance.now() - spinStartRef.current));
       const degrees = spinDegrees(map.getZoom()) * spinFactor(motionRef.current) * ramp;
       if (degrees === 0) return;
@@ -666,6 +689,40 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     if (!map.isMoving()) spinStepRef.current();
   }, [active, ready]);
 
+  // --- Encuadre según los paneles ------------------------------------------
+  // Con la búsqueda a un lado, el centro de la cámara (su `padding`) se corre a
+  // la parte libre; al ocultarla, el globo se centra y crece un poco. Si está
+  // girando, el corrimiento lleva su vuelta para que el giro no se detenga.
+  useEffect(() => {
+    const previous = insetsRef.current;
+    insetsRef.current = { left: insetLeft, right: insetRight };
+    const map = mapRef.current;
+    if (!map || !ready || !introFinished) return;
+    if (previous.left === insetLeft && previous.right === insetRight) return;
+    const open = insetLeft + insetRight > 0;
+    const framed = frameZoom(map.getZoom(), open, expandedRef.current);
+    expandedRef.current = framed.expanded;
+    const center = map.getCenter();
+    const turning = spinningRef.current && activeRef.current;
+    const turn = turning
+      ? spinDegrees(map.getZoom()) * spinFactor(motionRef.current) * (GLOBE_FRAME_MS / SPIN_STEP_MS)
+      : 0;
+    framingRef.current = true;
+    map.easeTo({
+      padding: { left: insetLeft, right: insetRight },
+      zoom: framed.zoom,
+      center: [center.lng - turn, center.lat],
+      duration: motionRef.current === 'off' ? 0 : GLOBE_FRAME_MS,
+      easing: easeInOutCubic,
+    });
+    const done = () => {
+      framingRef.current = false;
+      spinStepRef.current();
+    };
+    if (map.isMoving()) map.once('moveend', done);
+    else done();
+  }, [insetLeft, insetRight, ready, introFinished]);
+
   // --- Giro ----------------------------------------------------------------
   useEffect(() => {
     spinningRef.current = spinning;
@@ -756,11 +813,19 @@ export function ExploreGlobe({ articles, colors, onMap, active = true }: Explore
     // Encuadre de la parte principal (sin territorios lejanos), medido sobre
     // la esfera y no en el mapa plano (map/framing.ts).
     const box = region.focus_bbox;
-    const padding = flyPadding(screenOf(map), useExplorerStore.getState().panelOpen);
+    // Con el encuadre de los paneles (padding de la cámara) el centro ya está en
+    // la parte libre: se encuadra en ella y sin volver a apartar el panel.
+    const inset = map.getPadding();
+    const reservedLeft = inset.left ?? 0;
+    const reservedRight = inset.right ?? 0;
+    const screen = screenOf(map);
+    const free = { width: screen.width - reservedLeft - reservedRight, height: screen.height };
+    const reserved = reservedLeft + reservedRight > 0;
+    const padding = flyPadding(free, !reserved && useExplorerStore.getState().panelOpen);
     // Una localidad sin polígono es un punto: se acerca al zoom de localidad.
     const isPoint = box[0] === box[2] && box[1] === box[3];
     const maxZoom = FLY_MAX_ZOOM[isPoint ? 'locality' : region.level];
-    const camera = globeCamera(box, screenOf(map), padding, maxZoom);
+    const camera = globeCamera(box, free, padding, maxZoom);
     const [lng, lat] = camera.center;
     const { zoom } = camera;
     const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, kind, motionRef.current);
