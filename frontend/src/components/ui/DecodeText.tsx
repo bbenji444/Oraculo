@@ -44,8 +44,17 @@ export function DecodeText({ text, onHover = true, className }: DecodeTextProps)
   }, [play]);
 
   return (
-    <span className={className} aria-label={text} onMouseEnter={onHover ? play : undefined}>
-      <span aria-hidden="true">{shown}</span>
+    <span className={className} onMouseEnter={onHover ? play : undefined}>
+      {shown === text ? (
+        text
+      ) : (
+        // Mientras se descifra: el texto real para lectores de pantalla y la
+        // animación solo a la vista. Al terminar queda un solo texto.
+        <>
+          <span className="sr-only">{text}</span>
+          <span aria-hidden="true">{shown}</span>
+        </>
+      )}
     </span>
   );
 }

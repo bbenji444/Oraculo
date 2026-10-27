@@ -15,7 +15,9 @@
  * preferencia del sistema operativo.
  */
 @import 'tailwindcss';
-@import './hud.css';
+/* En la capa de componentes: las utilidades de Tailwind (p-5, border-rose-…)
+   pueden ajustar cada pieza de la consola táctica. */
+@import './hud.css' layer(components);
 
 @custom-variant dark (&:where(.dark, .dark *));
 

@@ -510,6 +510,91 @@
   margin-top: 2px;
 }
 
+/* Fila de tabla: la misma luz que .hud-row (la barra va en la primera celda). */
+.hud-trow {
+  cursor: pointer;
+  transition: background 0.3s var(--hud-ease);
+}
+.hud-trow > :first-child {
+  box-shadow: inset 0 0 0 transparent;
+  transition: box-shadow 0.35s var(--hud-ease);
+}
+.hud-trow:hover,
+.hud-trow[aria-current='true'] {
+  background: linear-gradient(90deg, rgb(0 210 255 / 0.09), rgb(0 210 255 / 0.015) 70%);
+}
+.hud-trow:hover > :first-child,
+.hud-trow[aria-current='true'] > :first-child {
+  box-shadow: inset 2px 0 0 var(--hud-cyan);
+}
+
+/* Aviso vacío («Elige un caso…»): borde punteado que respira. */
+.hud-empty {
+  position: relative;
+  border: 1px dashed rgb(0 210 255 / 0.25);
+  border-radius: 14px;
+  padding: 1.75rem 1.5rem;
+  background: rgb(0 210 255 / 0.02);
+  color: #809699;
+  font-size: 0.9rem;
+  animation: hud-breathe 3.6s ease-in-out infinite;
+}
+
+/* Encabezado de una sección dentro de un panel (Entidades, Vínculos…). */
+.hud-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgb(0 210 255 / 0.1);
+  padding: 0.85rem 1.25rem;
+}
+.hud-section-title {
+  color: #c7f5ff;
+  font: 600 11px/1.2 var(--font-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Subpestañas (Sugeridas · Confirmadas…): una línea de luz crece bajo la
+   elegida y asoma al pasar el mouse por las demás. */
+.hud-subtab {
+  position: relative;
+  padding: 0.6rem 0.8rem;
+  color: #809699;
+  font: 600 10px/1 var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.3s var(--hud-ease);
+}
+.hud-subtab::after {
+  content: '';
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hud-cyan);
+  box-shadow: 0 0 10px var(--hud-cyan);
+  transform: scaleX(0);
+  transition: transform 0.35s var(--hud-ease);
+}
+.hud-subtab:hover {
+  color: var(--hud-ink);
+}
+.hud-subtab:hover::after {
+  transform: scaleX(0.4);
+}
+.hud-subtab[aria-selected='true'] {
+  color: var(--hud-ink);
+}
+.hud-subtab[aria-selected='true']::after {
+  transform: scaleX(1);
+}
+
 /* --- Campos -------------------------------------------------------------------- */
 
 /* Contenedor de un campo: al enfocarlo, un haz cruza su borde inferior. */
@@ -562,6 +647,51 @@
   color: #5f7377;
 }
 
+/* Campo suelto (input, select, textarea sin contenedor): al enfocarlo se
+   enciende el borde y aparece un aro de luz. */
+.hud-input {
+  width: 100%;
+  border: 1px solid var(--hud-cyan-line);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  background: rgb(2 8 11 / 0.75);
+  color: var(--hud-ink);
+  font-size: 0.9rem;
+  outline: none;
+  transition:
+    border-color 0.3s var(--hud-ease),
+    box-shadow 0.3s var(--hud-ease),
+    background 0.3s var(--hud-ease);
+}
+.hud-input::placeholder {
+  color: #5f7377;
+}
+.hud-input:hover {
+  border-color: rgb(0 210 255 / 0.35);
+}
+.hud-input:focus,
+.hud-input:focus-within {
+  border-color: rgb(0 210 255 / 0.7);
+  background: rgb(2 12 16 / 0.9);
+  box-shadow:
+    0 0 0 3px rgb(0 210 255 / 0.1),
+    0 0 18px rgb(0 210 255 / 0.12);
+}
+.hud-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Etiqueta de un campo: texto técnico chico. */
+.hud-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: rgb(0 210 255 / 0.7);
+  font: 600 9.5px/1 var(--font-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
 /* Interruptor: el punto viaja con un rastro de luz. */
 .hud-switch {
   position: relative;
@@ -591,12 +721,14 @@
     background 0.35s var(--hud-ease),
     box-shadow 0.35s var(--hud-ease);
 }
-.hud-switch[aria-checked='true'] {
+.hud-switch[aria-checked='true'],
+.hud-switch[data-on='true'] {
   border-color: var(--hud-cyan);
   background: rgb(0 210 255 / 0.22);
   box-shadow: 0 0 14px rgb(0 210 255 / 0.35);
 }
-.hud-switch[aria-checked='true']::after {
+.hud-switch[aria-checked='true']::after,
+.hud-switch[data-on='true']::after {
   transform: translateX(1.2rem);
   background: var(--hud-ink);
   box-shadow: 0 0 10px var(--hud-cyan);
@@ -645,7 +777,9 @@
   transition: color 0.3s var(--hud-ease);
 }
 .hud-seg > button:hover,
-.hud-seg > button[aria-pressed='true'] {
+.hud-seg > button[aria-pressed='true'],
+.hud-seg > button[aria-checked='true'],
+.hud-seg > button[aria-selected='true'] {
   color: var(--hud-ink);
 }
 
@@ -732,6 +866,20 @@
   animation: hud-trace 2.4s linear infinite;
 }
 
+/* Barra de avance de una búsqueda: un destello la recorre mientras corre. */
+.hud-progress {
+  position: relative;
+  overflow: hidden;
+}
+.hud-progress::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  transform: translateX(-100%);
+  animation: hud-shine 1.6s linear infinite;
+}
+
 /* Mini gráfica: la línea se dibuja y el área aparece detrás. */
 .hud-sparkline-line {
   stroke-dasharray: 1;
@@ -775,6 +923,27 @@
   border: 1px solid rgb(0 210 255 / 0.6);
   border-radius: 50%;
   animation: hud-ping 2.8s var(--hud-ease) infinite;
+}
+
+/* Radar en ámbar: algo necesita atención (Estado del sistema). */
+.hud-radar--warn {
+  border-color: rgb(255 181 71 / 0.5);
+  background:
+    radial-gradient(circle, rgb(255 181 71 / 0.9) 0 2px, transparent 3px),
+    repeating-radial-gradient(circle, transparent 0 7px, rgb(255 181 71 / 0.2) 7px 8px);
+}
+.hud-radar--warn::before {
+  background: conic-gradient(from 0deg, rgb(255 181 71 / 0.55), transparent 28%);
+}
+.hud-radar--warn::after {
+  border-color: rgb(255 181 71 / 0.6);
+}
+
+/* Barra que se vacía: el tiempo que queda (aviso «Deshacer»). */
+.hud-countdown {
+  background: linear-gradient(90deg, var(--hud-cyan), rgb(0 210 255 / 0.3));
+  transform-origin: left;
+  animation: hud-drain linear both;
 }
 
 /* --- Animaciones --------------------------------------------------------------- */
@@ -838,6 +1007,28 @@
   }
 }
 
+@keyframes hud-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes hud-breathe {
+  50% {
+    border-color: rgb(0 210 255 / 0.5);
+    background: rgb(0 210 255 / 0.04);
+  }
+}
+
+@keyframes hud-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes hud-line {
   to {
     stroke-dashoffset: 0;
@@ -876,7 +1067,11 @@
   .hud-tab,
   .hud-seg::before,
   .hud-tabs-bar,
-  .hud-switch::after {
+  .hud-switch::after,
+  .hud-input,
+  .hud-trow,
+  .hud-subtab,
+  .hud-subtab::after {
     transition: none;
   }
   .hud-reveal,
@@ -889,7 +1084,10 @@
   .hud-sparkline-area,
   .hud-sparkline-dot,
   .hud-radar::before,
-  .hud-radar::after {
+  .hud-radar::after,
+  .hud-countdown,
+  .hud-empty,
+  .hud-progress::after {
     animation: none;
   }
   .hud-sparkline-line {

@@ -10,6 +10,8 @@
  */
 import { useState } from 'react';
 
+import { HudButton } from './ui/HudButton';
+
 interface ConfirmDeleteProps {
   /** Qué se elimina, para el lector de pantalla («la búsqueda», «el caso»). */
   what: string;
@@ -20,9 +22,6 @@ interface ConfirmDeleteProps {
   label?: string;
 }
 
-const BASE =
-  'rounded-lg px-3 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
-
 export function ConfirmDelete({
   what,
   onConfirm,
@@ -32,43 +31,40 @@ export function ConfirmDelete({
   const [asking, setAsking] = useState(false);
   if (!asking) {
     return (
-      <button
-        type="button"
+      <HudButton
+        variant="danger"
+        size="sm"
         aria-label={`${label} ${what}`}
         onClick={() => {
           setAsking(true);
         }}
-        className={`${BASE} border border-rose-400/25 text-rose-200 hover:bg-rose-500/15`}
       >
         {label}
-      </button>
+      </HudButton>
     );
   }
   return (
     <span
       role="group"
       aria-label={`Confirmar: eliminar ${what}`}
-      className="flex items-center gap-1.5"
+      className="hud-reveal flex items-center gap-2"
     >
-      <span className="text-xs text-rose-200">¿Eliminar?</span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onConfirm}
-        className={`${BASE} bg-rose-500/80 text-white hover:bg-rose-500`}
-      >
+      <span className="font-display text-[10px] tracking-[0.18em] text-rose-200 uppercase">
+        ¿Eliminar?
+      </span>
+      <HudButton variant="danger" size="sm" disabled={busy} onClick={onConfirm}>
         Sí, eliminar
-      </button>
-      <button
-        type="button"
+      </HudButton>
+      <HudButton
+        variant="ghost"
+        size="sm"
         disabled={busy}
         onClick={() => {
           setAsking(false);
         }}
-        className={`${BASE} border border-slate-600 text-slate-200 hover:bg-slate-800`}
       >
         Cancelar
-      </button>
+      </HudButton>
     </span>
   );
 }
