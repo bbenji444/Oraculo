@@ -39,6 +39,7 @@ import {
 } from './timelineData';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
+import { ExternalLink } from '../ExternalLink';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const HOUR = new Intl.DateTimeFormat('es-MX', {
@@ -240,14 +241,12 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
                     {note.published_at ? HOUR.format(new Date(note.published_at)) : '—'}
                   </span>
                   <span className="min-w-0">
-                    <a
+                    <ExternalLink
                       href={note.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
                       className="text-sky-300 hover:text-sky-100 hover:underline"
                     >
                       {note.source_name ?? note.source_domain ?? 'Medio sin nombre'} ↗
-                    </a>
+                    </ExternalLink>
                     {note.title !== article.title && (
                       <span
                         className="block truncate text-[10.5px] text-slate-400"

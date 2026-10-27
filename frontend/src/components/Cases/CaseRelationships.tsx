@@ -24,6 +24,7 @@ import type { Relationship, RelationshipEnd } from '../../services/relationships
 import { formatDay } from '../Explore/format';
 import { confidencePercent, relationshipPhrase } from './labels';
 import { RelationshipForm } from './RelationshipForm';
+import { ExternalLink } from '../ExternalLink';
 
 const TABS: { value: ReviewStatus; label: string }[] = [
   { value: 'suggested', label: 'Sugeridos' },
@@ -134,14 +135,9 @@ function RelationshipItem({
         <ul className="mt-2 space-y-1 border-l border-slate-700 pl-3 text-xs">
           {relationship.shared_articles.map((a) => (
             <li key={a.article_id}>
-              <a
-                href={a.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-300 hover:underline"
-              >
+              <ExternalLink href={a.url} className="text-sky-300 hover:underline">
                 {a.title} ↗
-              </a>
+              </ExternalLink>
               {a.published_at && (
                 <span className="text-slate-400"> · {formatDay(a.published_at)}</span>
               )}

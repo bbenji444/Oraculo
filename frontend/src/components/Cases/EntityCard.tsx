@@ -18,6 +18,7 @@ import type { ResolutionAction } from '../../hooks/useResolution';
 import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
 import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
+import { ExternalLink } from '../ExternalLink';
 
 interface EntityCardProps {
   entity: Entity;
@@ -210,14 +211,9 @@ export function EntityCard({
                 «{m.evidence_span}»
               </blockquote>
               <p className="mt-0.5 text-slate-400">
-                <a
-                  href={m.article_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sky-300 hover:underline"
-                >
+                <ExternalLink href={m.article_url} className="text-sky-300 hover:underline">
                   {m.article_title} ↗
-                </a>
+                </ExternalLink>
                 {m.source_name && ` · ${m.source_name}`}
                 {m.published_at && ` · ${formatDay(m.published_at)}`}
                 {m.legal_status_hint_label && ` · la nota dice: ${m.legal_status_hint_label}`}

@@ -44,6 +44,7 @@ import type { CaseGraph } from '../../services/caseGraph';
 import { useExplorerStore } from '../../store/explorer';
 import { GLASS } from './ui';
 import { WallPanel } from './WallPanel';
+import { ExternalLink } from '../ExternalLink';
 
 interface CaseWallProps {
   map: MapLibreMap | null;
@@ -389,14 +390,9 @@ export function CaseWall({ map }: CaseWallProps) {
             {note.entity_ids.length} entidades confirmadas del caso aparecen aquí.
           </p>
           <div className="mt-2 flex gap-3 text-xs">
-            <a
-              href={note.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sky-300 hover:underline"
-            >
+            <ExternalLink href={note.url} className="text-sky-300 hover:underline">
               Ver nota original ↗
-            </a>
+            </ExternalLink>
             <button
               type="button"
               onClick={() => {

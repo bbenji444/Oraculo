@@ -20,6 +20,7 @@ import {
   PRECISION_LABEL,
   providersLabel,
 } from './format';
+import { ExternalLink } from '../ExternalLink';
 
 interface NewsCardProps {
   article: Article;
@@ -126,14 +127,12 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
       </p>
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-[11px] text-slate-500">{providersLabel(article.providers)}</span>
-        <a
+        <ExternalLink
           href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
           className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-medium text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400"
         >
           Ver nota original ↗
-        </a>
+        </ExternalLink>
       </div>
       <AddToCase articleId={article.article_id} />
     </article>

@@ -82,6 +82,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El mapa carga más rápido al ir de una nota a otra** (27/10/2026): MapLibre 6 decodificaba las teselas de calles con un solo hilo, de una en una, y el mapa se veía gris y se iba llenando poco a poco. Ahora usa la mitad de los procesadores, hasta 4 hilos (4 en la computadora de Benji), y los nombres aparecen en 120 ms en lugar de 300.
+- **«Ver nota original» se abre en una pestaña nueva también en el navegador integrado** (27/10/2026): todos los enlaces a notas abren una ventana nueva al hacer clic, sin tocar la pestaña del monitor. Ctrl+clic y clic con la rueda siguen igual.
 - **Los menús desplegables ya no salen blancos** (27/10/2026): las opciones de los filtros (categoría, estado) tenían fondo blanco y texto cian claro, casi ilegible; ahora tienen el fondo y el texto de Oráculo.
 - **La ficha de una nota ya no choca con el encabezado y se puede arrastrar** (27/10/2026): nunca sube detrás de Casos, Conceptos, Historial… y se mueve con el mouse desde cualquier parte que no sea un link o un botón; la línea al punto la sigue. Al elegir otra nota vuelve a su lugar.
 - **El globo ya no se cae en tarjetas de video integradas** (26/10/2026, ADR-0017): en la Intel UHD de Benji, Chrome le quitaba el 3D a la página. Ahora la foto del cielo se sube en 8 piezas (la tarea más larga de la carga bajó de 550 a 158 ms), el fondo solo se dibuja cuando la cámara se mueve (0 dibujos con el globo quieto), Explorar se queda montada al cambiar de pestaña, sin crear el globo otra vez, y el mapa base del mundo ya no se dibuja debajo de la foto de la NASA (−22 % de dibujos al girar). Si aun así se pierden los gráficos y no vuelven en 6 s, el globo lo avisa.

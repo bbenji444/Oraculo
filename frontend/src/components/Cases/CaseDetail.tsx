@@ -24,6 +24,7 @@ import { wallHash } from '../../map/muro/orbit';
 import { CaseEntities } from './CaseEntities';
 import { CaseRelationships } from './CaseRelationships';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
+import { ExternalLink } from '../ExternalLink';
 
 interface CaseDetailProps {
   caseId: string;
@@ -186,14 +187,12 @@ export function CaseDetail({ caseId, onEdit }: CaseDetailProps) {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <a
+                  <ExternalLink
                     href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-medium text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400"
                   >
                     Ver nota original ↗
-                  </a>
+                  </ExternalLink>
                   {canEdit && isOpen && (
                     <button
                       type="button"
