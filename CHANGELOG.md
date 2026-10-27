@@ -114,6 +114,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Las pestañas responden al clic aunque sus letras se estén descifrando** (27/10/2026). Mientras dura la animación, el texto vive en partes internas que se crean al empezar y se borran al terminar. Un clic que empezaba sobre una de ellas y acababa cuando ya no existía se perdía, y había que esperar a que la animación terminara. Esas partes ya no reciben el mouse: el clic cae siempre en la pestaña. Lo mismo para las cifras que corren.
 - **El globo deja de cargar la tarjeta de video con desenfoques** (27/10/2026): trece paneles y avisos usaban `backdrop-blur`, que obliga a volver a dibujar lo de atrás cada cuadro. Ahora son paneles oscuros sin desenfoque.
 - **La tarjeta de Historial ya no se desarma en pantallas angostas** (27/10/2026): el título se partía en una palabra por renglón.
 - **Google News llegaba viejo e incompleto a las corridas (27/10/2026, ADR-0034):**

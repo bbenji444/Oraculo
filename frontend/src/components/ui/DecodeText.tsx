@@ -50,9 +50,15 @@ export function DecodeText({ text, onHover = true, className }: DecodeTextProps)
       ) : (
         // Mientras se descifra: el texto real para lectores de pantalla y la
         // animación solo a la vista. Al terminar queda un solo texto.
+        // pointer-events-none: estas partes se crean al empezar y se borran al
+        // terminar; si recibieran el mouse, un clic que empezara sobre ellas y
+        // acabara cuando ya no existen se perdía (había que esperar a que la
+        // animación terminara para cambiar de pestaña, Benji 27/10/2026).
         <>
-          <span className="sr-only">{text}</span>
-          <span aria-hidden="true">{shown}</span>
+          <span className="sr-only pointer-events-none">{text}</span>
+          <span aria-hidden="true" className="pointer-events-none">
+            {shown}
+          </span>
         </>
       )}
     </span>
