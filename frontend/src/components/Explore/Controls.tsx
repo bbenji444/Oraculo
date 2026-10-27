@@ -30,14 +30,14 @@ export function GlobeControls() {
         }}
       />
       <EarthToggle earth={earth} onChange={setEarth} />
-      <label className="flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/85 px-3 py-1.5 text-xs text-slate-300 shadow-lg shadow-black/30 backdrop-blur">
+      <label className="flex items-center gap-2 rounded-[10px] border border-sky-400/30 bg-[#050d12]/90 py-1 pr-1 pl-3 font-display text-[9.5px] tracking-[0.16em] text-sky-200/80 uppercase">
         Animación
         <select
           value={motion}
           onChange={(event) => {
             setMotion(event.target.value as (typeof MOTION_PRESETS)[number]);
           }}
-          className="rounded-md bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+          className="hud-input w-auto px-2 py-1 font-sans text-xs tracking-normal normal-case"
         >
           {MOTION_PRESETS.map((preset) => (
             <option key={preset} value={preset}>
@@ -52,12 +52,9 @@ export function GlobeControls() {
 
 export function PrecisionLegend() {
   return (
-    <div className="rounded-xl border border-slate-700/80 bg-slate-900/85 px-3 py-2 text-[11px] text-slate-300 shadow-lg shadow-black/30 backdrop-blur">
+    <div className="rounded-xl border border-sky-400/20 bg-[#050d12]/90 px-3 py-2 text-[11px] text-slate-300 shadow-lg shadow-black/40">
       <p className="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="size-2.5 rounded-full bg-sky-400 ring-2 ring-sky-400/30"
-        />
+        <span aria-hidden="true" className="hud-dot hud-dot--live size-2.5" />
         Lugar preciso (municipio o localidad)
       </p>
       <p className="mt-1 flex items-center gap-2">
@@ -185,7 +182,7 @@ export function FinishToast({
       className="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center px-4"
     >
       {notice && (
-        <div className="pointer-events-auto flex animate-[fadeIn_200ms_ease-out] items-center gap-3 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2.5 text-sm text-slate-100 shadow-lg shadow-black/40 backdrop-blur">
+        <div className="hud-panel hud-reveal pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-sm text-slate-100">
           <span aria-hidden="true" className={NOTICE_TONE[notice.tone]}>
             {notice.tone === 'ok' ? '✓' : notice.tone === 'warn' ? '⚠' : '✕'}
           </span>
@@ -194,7 +191,7 @@ export function FinishToast({
             type="button"
             onClick={onClose}
             aria-label="Cerrar aviso"
-            className="rounded px-1 text-slate-400 hover:text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="hud-icon-btn size-7"
           >
             ×
           </button>

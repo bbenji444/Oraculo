@@ -46,10 +46,7 @@ export class GraphicsBoundary extends Component<GraphicsBoundaryProps, GraphicsB
 export function GlobeUnavailable() {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-6">
-      <div
-        role="alert"
-        className="max-w-sm rounded-2xl border border-white/10 bg-slate-950/80 p-5 text-center shadow-2xl backdrop-blur-md"
-      >
+      <div role="alert" className="hud-panel hud-reveal max-w-sm p-5 text-center">
         <p className="text-sm font-semibold text-slate-100">No se pudo dibujar el globo</p>
         <p className="mt-2 text-xs leading-relaxed text-slate-300">
           El navegador apagó los gráficos 3D de la página. Suele pasar cuando la tarjeta de video se
@@ -61,7 +58,7 @@ export function GlobeUnavailable() {
           onClick={() => {
             window.location.reload();
           }}
-          className="mt-4 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
+          className="hud-btn hud-btn--solid mt-4"
         >
           Recargar
         </button>

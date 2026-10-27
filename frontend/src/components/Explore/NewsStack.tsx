@@ -37,7 +37,7 @@ export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }
             <button
               type="button"
               onClick={onZoom}
-              className="rounded-md px-2 py-0.5 text-[11px] text-sky-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-sky-400"
+              className="hud-btn hud-btn--ghost hud-btn--sm px-2 py-1"
             >
               Acercar
             </button>
@@ -46,7 +46,7 @@ export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }
             type="button"
             onClick={onClose}
             aria-label="Cerrar lista"
-            className="rounded-md px-1.5 text-slate-400 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="hud-icon-btn size-7"
           >
             ×
           </button>
@@ -62,7 +62,7 @@ export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }
                 onClick={() => {
                   onSelect(article.article_id);
                 }}
-                className="flex w-full gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-sky-400"
+                className="flex w-full gap-2 rounded-lg px-2 py-1.5 text-left transition-all duration-300 hover:translate-x-0.5 hover:bg-sky-400/[0.08] focus-visible:outline-2 focus-visible:outline-sky-400"
               >
                 <span
                   aria-hidden="true"

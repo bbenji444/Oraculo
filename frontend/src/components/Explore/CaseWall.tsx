@@ -286,7 +286,9 @@ export function CaseWall({ map }: CaseWallProps) {
           aria-label="Muro del caso"
           className={`${GLASS} pointer-events-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-xs text-slate-300`}
         >
-          <span className="font-semibold text-slate-50">Caso: {data?.name ?? 'cargando…'}</span>
+          <span className="font-display text-[11px] tracking-[0.18em] text-slate-50 uppercase">
+            Caso: {data?.name ?? 'cargando…'}
+          </span>
           {data && (
             <span>
               {data.nodes.length} {data.nodes.length === 1 ? 'entidad' : 'entidades'} ·{' '}
@@ -316,11 +318,7 @@ export function CaseWall({ map }: CaseWallProps) {
           >
             Colores
           </button>
-          <button
-            type="button"
-            onClick={close}
-            className="rounded-lg bg-slate-800 px-2.5 py-1 font-medium text-slate-100 hover:bg-slate-700"
-          >
+          <button type="button" onClick={close} className="hud-btn hud-btn--sm">
             ✕ Salir del muro
           </button>
         </div>
@@ -328,7 +326,7 @@ export function CaseWall({ map }: CaseWallProps) {
 
       {legendOpen && (
         <div className={`${GLASS} absolute left-4 top-20 z-20 w-56 p-3 text-xs text-slate-300`}>
-          <p className="mb-1 font-medium text-slate-100">Centro: tipo</p>
+          <p className="hud-label mb-2">Centro: tipo</p>
           {LEGEND_KINDS.map(([kind, label]) => (
             <p key={kind} className="flex items-center gap-2">
               <span
@@ -338,7 +336,7 @@ export function CaseWall({ map }: CaseWallProps) {
               {label}
             </p>
           ))}
-          <p className="mb-1 mt-2 font-medium text-slate-100">Borde: estatus legal</p>
+          <p className="hud-label mt-3 mb-2">Borde: estatus legal</p>
           {LEGEND_LEGAL.map(([code, label]) => (
             <p key={code} className="flex items-center gap-2">
               <span

@@ -8,7 +8,7 @@
  * Las notas del mismo hecho en varios medios van en una sola tarjeta con
  * «▸ +N medios» (ADR-0026); debajo de las pestañas se dice en cuántas.
  */
-import { useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useRef } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
@@ -85,7 +85,20 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
           No relevantes
         </label>
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-1" role="tablist" aria-label="Filtrar por región">
+      <div
+        className="hud-seg mt-3"
+        role="tablist"
+        aria-label="Filtrar por región"
+        style={
+          {
+            '--seg-i': Math.max(
+              0,
+              TABS.findIndex((tab) => tab.id === filter),
+            ),
+            '--seg-n': TABS.length,
+          } as CSSProperties
+        }
+      >
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -95,11 +108,7 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
             onClick={() => {
               setFilter(tab.id);
             }}
-            className={`rounded-lg px-1 py-1 text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
-              filter === tab.id
-                ? 'bg-sky-500/25 text-sky-100'
-                : 'bg-white/5 text-slate-400 hover:bg-white/10'
-            }`}
+            className="px-1 text-[9px] focus-visible:outline-2 focus-visible:outline-sky-400"
           >
             {tab.label} · {articles.filter((a) => matches(a, tab.id)).length}
           </button>

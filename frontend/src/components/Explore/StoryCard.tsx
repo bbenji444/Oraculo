@@ -49,12 +49,12 @@ function ArticleRow({
       onClick={() => {
         onSelect(article.article_id);
       }}
-      className={`flex w-full gap-2.5 rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${
+      className={`flex w-full gap-2.5 rounded-xl border text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
         nested ? 'px-2.5 py-1.5' : 'px-3 py-2'
       } ${
         isSelected
-          ? 'border-sky-400/50 bg-sky-500/15'
-          : 'border-transparent bg-white/[0.03] hover:bg-white/[0.07]'
+          ? 'border-sky-400/50 bg-sky-400/[0.12] shadow-[0_0_18px_rgb(0_210_255/0.15)]'
+          : 'border-transparent bg-white/[0.03] hover:translate-x-0.5 hover:border-sky-400/25 hover:bg-sky-400/[0.06]'
       }`}
     >
       <span

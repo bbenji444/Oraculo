@@ -16,8 +16,9 @@ import { useExplorerStore } from '../../store/explorer';
 import { SearchBox } from '../GeoExplorer/SearchBox';
 import { chainOf } from './regionChain';
 
-const SELECT =
-  'w-full rounded-lg border border-white/10 bg-slate-900/80 px-2 py-1.5 text-sm text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-40';
+// Campo de la consola táctica (ADR-0036). Va dentro de una etiqueta Orbitron en
+// mayúsculas: la letra del menú se regresa a la normal.
+const SELECT = 'hud-input px-2 py-1.5 font-sans tracking-normal normal-case';
 
 interface LevelSelectProps {
   label: string;
@@ -30,10 +31,10 @@ interface LevelSelectProps {
 
 function LevelSelect({ label, value, options, disabled, onChange, placeholder }: LevelSelectProps) {
   return (
-    <label className="block text-xs text-slate-400">
+    <label className="hud-label mb-0">
       {label}
       <select
-        className={`${SELECT} mt-1`}
+        className={`${SELECT} mt-1.5`}
         value={value ?? ''}
         disabled={disabled}
         onChange={(event) => {

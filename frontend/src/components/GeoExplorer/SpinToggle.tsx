@@ -13,7 +13,7 @@ export function SpinToggle({ spinning, onToggle }: SpinToggleProps) {
       type="button"
       aria-pressed={spinning}
       onClick={onToggle}
-      className="flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/85 px-3 py-2 text-xs text-slate-200 shadow-lg shadow-black/30 backdrop-blur hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400"
+      className="hud-btn hud-btn--sm bg-[#050d12]/90"
     >
       <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 fill-current text-sky-400">
         {spinning ? (

@@ -42,7 +42,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
             type="button"
             onClick={onClose}
             aria-label="Cerrar ficha"
-            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="hud-icon-btn -mt-1 -mr-1 size-8 shrink-0"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 fill-current">
               <path d="m10 8.94 4.47-4.47 1.06 1.06L11.06 10l4.47 4.47-1.06 1.06L10 11.06l-4.47 4.47-1.06-1.06L8.94 10 4.47 5.53l1.06-1.06L10 8.94Z" />
@@ -80,12 +80,15 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
           {relevant.map((c) => (
             <span
               key={c.concept_id}
-              className="flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-xs text-slate-100"
+              className="flex items-center gap-1.5 rounded-full border border-sky-400/25 bg-sky-400/[0.07] px-2.5 py-0.5 text-xs text-slate-100"
             >
               <span
                 aria-hidden="true"
                 className="size-2 rounded-full"
-                style={{ backgroundColor: colors.get(c.concept_id) ?? '#38BDF8' }}
+                style={{
+                  backgroundColor: colors.get(c.concept_id) ?? '#38BDF8',
+                  boxShadow: `0 0 8px ${colors.get(c.concept_id) ?? '#38BDF8'}`,
+                }}
               />
               {c.name}
             </span>
@@ -94,20 +97,18 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
       )}
       {article.summary && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-300/80">
-            Resumen automático
-          </p>
-          <p className="mt-0.5 leading-relaxed text-slate-200">{article.summary}</p>
+          <p className="hud-kicker text-[9.5px]">Resumen automático</p>
+          <p className="mt-1.5 leading-relaxed text-slate-200">{article.summary}</p>
         </div>
       )}
       <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300">
         <span
-          className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+          className={`rounded-md px-1.5 py-0.5 font-display text-[9px] tracking-[0.14em] uppercase ${
             location === null
-              ? 'bg-slate-700 text-slate-300'
+              ? 'border border-slate-500/40 text-slate-300'
               : isCoarse(location.precision)
                 ? 'border border-dashed border-amber-300/70 text-amber-200'
-                : 'bg-sky-500/20 text-sky-200'
+                : 'border border-sky-400/40 bg-sky-400/10 text-sky-100'
           }`}
         >
           {PRECISION_LABEL[location?.precision ?? 'unknown']}
@@ -127,10 +128,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
       </p>
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-[11px] text-slate-500">{providersLabel(article.providers)}</span>
-        <ExternalLink
-          href={article.url}
-          className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-medium text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400"
-        >
+        <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
           Ver nota original ↗
         </ExternalLink>
       </div>

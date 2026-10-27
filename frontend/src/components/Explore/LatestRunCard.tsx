@@ -33,18 +33,22 @@ export function LatestRunCard() {
           providers: run.providers,
         });
       }}
-      className={`${GLASS} group flex w-full flex-col gap-1 border-sky-400/30 px-4 py-3 text-left transition-colors hover:border-sky-300/60 hover:bg-sky-400/[0.06] focus-visible:outline-2 focus-visible:outline-sky-400`}
+      className={`${GLASS} hud-panel--interactive group flex w-full items-center gap-3 border-sky-400/35 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-sky-400`}
     >
-      <span className="titulo-oraculo text-[10px] font-bold text-sky-300">
-        <span aria-hidden="true">◉ </span>
-        {automaticRunLabel(run)}
-      </span>
-      <span className="text-[13px] font-medium text-slate-100">
-        {run.concepts.map((c) => c.name).join(', ')} · {run.region_name}
-      </span>
-      <span className="text-[11px] text-slate-400">
-        {run.results_count} notas · {run.credits_used} créditos ·{' '}
-        <span className="text-sky-300 group-hover:text-sky-200">Abrir en el globo ›</span>
+      <span aria-hidden="true" className="hud-radar size-9" />
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="font-display text-[10px] tracking-[0.2em] text-sky-300 uppercase">
+          {automaticRunLabel(run)}
+        </span>
+        <span className="text-[13px] font-medium text-slate-50">
+          {run.concepts.map((c) => c.name).join(', ')} · {run.region_name}
+        </span>
+        <span className="text-[11px] text-slate-400">
+          {run.results_count} notas · {run.credits_used} créditos ·{' '}
+          <span className="text-sky-300 transition-colors group-hover:text-sky-100">
+            Abrir en el globo ›
+          </span>
+        </span>
       </span>
     </button>
   );

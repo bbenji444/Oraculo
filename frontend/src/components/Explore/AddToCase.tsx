@@ -28,7 +28,7 @@ interface AddToCaseProps {
 }
 
 const ROW =
-  'flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs focus-visible:outline-2 focus-visible:outline-sky-400 disabled:cursor-default';
+  'flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:cursor-default';
 
 export function AddToCase({ articleId }: AddToCaseProps) {
   const [open, setOpen] = useState(false);
@@ -82,7 +82,7 @@ export function AddToCase({ articleId }: AddToCaseProps) {
             onClick={() => {
               addTo(last);
             }}
-            className="max-w-full truncate rounded-lg bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-100 hover:bg-emerald-500/30 focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+            className="hud-btn hud-btn--sm max-w-full truncate border-emerald-400/50 text-emerald-100"
           >
             + Agregar a «{last.name}»
           </button>
@@ -94,7 +94,7 @@ export function AddToCase({ articleId }: AddToCaseProps) {
             setOpen(!open);
             setNotice(null);
           }}
-          className="rounded-lg border border-white/15 px-2.5 py-1 text-xs text-slate-200 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-sky-400"
+          className="hud-btn hud-btn--sm"
         >
           {last && !last.has_article ? '▾ Otro caso' : '+ Agregar al caso'}
         </button>
@@ -112,7 +112,7 @@ export function AddToCase({ articleId }: AddToCaseProps) {
         <div
           role="group"
           aria-label="Elegir caso"
-          className="space-y-1 rounded-xl border border-white/10 bg-slate-950/70 p-1.5"
+          className="hud-reveal space-y-1 rounded-xl border border-sky-400/25 bg-[#050d12]/95 p-1.5 shadow-lg shadow-black/50"
         >
           {cases.isPending && <p className="px-2 py-1 text-xs text-slate-400">Cargando casos…</p>}
           {cases.isSuccess && ordered.length === 0 && (
@@ -126,7 +126,7 @@ export function AddToCase({ articleId }: AddToCaseProps) {
               onClick={() => {
                 addTo(item);
               }}
-              className={`${ROW} ${item.has_article ? 'text-slate-400' : 'text-slate-100 hover:bg-white/10'}`}
+              className={`${ROW} ${item.has_article ? 'text-slate-400' : 'text-slate-100 hover:translate-x-0.5 hover:bg-sky-400/10'}`}
             >
               <span className="truncate">{item.name}</span>
               <span className="shrink-0 text-[11px]">
@@ -140,7 +140,7 @@ export function AddToCase({ articleId }: AddToCaseProps) {
               onClick={() => {
                 setNewName('');
               }}
-              className={`${ROW} text-sky-200 hover:bg-white/10`}
+              className={`${ROW} text-sky-200 hover:translate-x-0.5 hover:bg-sky-400/10`}
             >
               + Nuevo caso…
             </button>
@@ -153,12 +153,12 @@ export function AddToCase({ articleId }: AddToCaseProps) {
                   setNewName(event.target.value);
                 }}
                 placeholder="Nombre del caso"
-                className="min-w-0 flex-1 rounded-md border border-white/15 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 focus:border-sky-500/70 focus:outline-none"
+                className="hud-input min-w-0 flex-1 px-2 py-1 text-xs"
               />
               <button
                 type="submit"
                 disabled={busy || !newName.trim()}
-                className="rounded-md bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                className="hud-btn hud-btn--solid hud-btn--sm"
               >
                 Crear y agregar
               </button>
