@@ -239,10 +239,15 @@ function earthSource(origin: string, mode: EarthMode): SourceSpecification {
   };
 }
 
-/** Ajustes de color de cada cara de la Tierra (medidos a ojo en el globo, 26/10/2026). */
+/**
+ * Ajustes de color de cada cara de la Tierra (medidos a ojo en el globo,
+ * 26/10/2026). De noche la saturación bajó de 0.25 a 0.08: la foto de la NASA
+ * ya trae un tono azul violeta y con 0.25 el mundo se veía «muy azul o muy
+ * morado» (Benji). Se deja un poco porque también le gusta.
+ */
 const EARTH_LOOK: Record<EarthMode, Record<string, number>> = {
   day: { 'raster-saturation': 0.18, 'raster-contrast': 0.12, 'raster-brightness-min': 0.02 },
-  night: { 'raster-saturation': 0.25, 'raster-contrast': 0.22, 'raster-brightness-max': 1 },
+  night: { 'raster-saturation': 0.08, 'raster-contrast': 0.22, 'raster-brightness-max': 1 },
 };
 
 function earthLayer(mode: EarthMode, visible: boolean): LayerSpecification {
