@@ -17,6 +17,8 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
+import { GraphicsBoundary } from './components/Explore/GraphicsBoundary';
+import { SpaceBackground } from './components/Space/SpaceBackground';
 import { HistoryPage } from './components/History/HistoryPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 
@@ -98,6 +100,20 @@ export function App() {
 
   return (
     <div className="relative h-dvh font-sans text-slate-100">
+      {/* El universo detrás de todas las pestañas (Benji, 26/10/2026). En
+          Explorar sigue al globo; en las demás deriva solo, muy despacio. Si
+          la tarjeta de video falla, queda el fondo negro del cuerpo. */}
+      <GraphicsBoundary fallback={null}>
+        <SpaceBackground mode={tab === 'explorar' ? 'camera' : 'drift'} />
+      </GraphicsBoundary>
+      {/* Fuera de Explorar, un velo oscuro con aurora cian para que el texto
+          se lea sobre las estrellas (ver .velo-universo). */}
+      <div
+        aria-hidden="true"
+        className={`velo-universo pointer-events-none absolute inset-0 transition-opacity duration-700 ${
+          tab === 'explorar' ? 'opacity-0' : 'opacity-100'
+        }`}
+      />
       {/* Encabezado sin fondo y centrado, sobre las estrellas (Benji, 26/10/2026):
           la marca de OSINT Oráculo y las pestañas en un solo grupo al centro.
           En celular las pestañas bajan a su propio renglón y se deslizan. */}
@@ -121,7 +137,10 @@ export function App() {
             aria-hidden="true"
             className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
           />
-          <nav aria-label="Secciones" className="flex max-w-full min-w-0 gap-1 overflow-x-auto">
+          <nav
+            aria-label="Secciones"
+            className="sin-barra flex max-w-full min-w-0 gap-1 overflow-x-auto"
+          >
             {TABS.map((item) => (
               <a
                 key={item.id}

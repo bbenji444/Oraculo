@@ -299,6 +299,15 @@ body {
   }
 }
 
+/* Las pestañas se deslizan si no caben, pero sin la barra gris de Windows
+   (en un encabezado sin fondo se veía como un parche). */
+.sin-barra {
+  scrollbar-width: none;
+}
+.sin-barra::-webkit-scrollbar {
+  display: none;
+}
+
 /* Pestañas: texto técnico con una línea cian que crece bajo la activa. */
 .pestana {
   position: relative;
@@ -344,6 +353,53 @@ body {
    encabezado: el mapa se dibuja también detrás de él. */
 .globo-bajo-encabezado .maplibregl-ctrl-top-right {
   top: var(--header-h);
+}
+
+/* Velo sobre el universo en Casos, Conceptos, Historial y Estado: oscurece las
+   estrellas lo justo para leer (más en el centro, donde va el texto) y deja
+   una aurora cian que se mueve muy despacio. Solo se mueven capas con
+   `transform`: lo hace la tarjeta sin volver a dibujar la página. */
+.velo-universo {
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse 75% 65% at 50% 45%,
+      rgb(5 5 5 / 0.72),
+      rgb(5 5 5 / 0.45) 70%,
+      transparent
+    ),
+    linear-gradient(to bottom, rgb(5 5 5 / 0.35), rgb(5 5 5 / 0.55) 40%, rgb(5 5 5 / 0.75));
+}
+.velo-universo::before,
+.velo-universo::after {
+  content: '';
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  will-change: transform;
+}
+.velo-universo::before {
+  top: -35vmax;
+  left: -10vmax;
+  background: radial-gradient(circle, rgb(0 210 255 / 0.16), transparent 65%);
+  animation: aurora-a 38s ease-in-out infinite alternate;
+}
+.velo-universo::after {
+  bottom: -40vmax;
+  right: -15vmax;
+  background: radial-gradient(circle, rgb(0 95 127 / 0.28), transparent 65%);
+  animation: aurora-b 46s ease-in-out infinite alternate;
+}
+@keyframes aurora-a {
+  to {
+    transform: translate(28vmax, 8vmax) scale(1.15);
+  }
+}
+@keyframes aurora-b {
+  to {
+    transform: translate(-24vmax, -10vmax) scale(1.2);
+  }
 }
 
 /* Capa de los paneles de Explorar, debajo del encabezado. No atrapa clics (el

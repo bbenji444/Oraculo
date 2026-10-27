@@ -34,7 +34,6 @@ import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
 import { wallCaseFromHash } from '../../map/muro/orbit';
-import { SpaceBackground } from '../Space/SpaceBackground';
 import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
 import { FinishToast, GlobeControls, PrecisionLegend } from './Controls';
@@ -133,12 +132,11 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     // data-earth: los paneles de vidrio se oscurecen en modo día (ver GLASS).
     // overflow-clip y no hidden: con hidden, scrollIntoView de una lista podía
     // desplazar la pantalla entera y dejar una franja negra abajo.
-    <div data-earth={earth} className="relative h-full overflow-clip bg-[#02030a]">
-      {/* Cada uno con su red: si la tarjeta de video falla, el resto sigue
+    // Sin fondo propio: detrás va el universo que dibuja App.
+    <div data-earth={earth} className="relative h-full overflow-clip">
+      {/* El universo de atrás lo dibuja App para todas las pestañas. El globo
+          tiene su red: si la tarjeta de video falla, el resto sigue
           funcionando en lugar de quedar la pantalla en blanco. */}
-      <GraphicsBoundary fallback={null}>
-        <SpaceBackground active={active} />
-      </GraphicsBoundary>
       <GraphicsBoundary fallback={<GlobeUnavailable />}>
         <ExploreGlobe
           articles={inWall ? NO_ARTICLES : shown}

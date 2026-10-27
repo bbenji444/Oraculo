@@ -9,8 +9,10 @@
  *   parte en piezas de 2048 px (`skyTiles`) que se suben a la tarjeta una por
  *   cuadro. Subirla entera de un golpe era la operación más larga de la página.
  * - Solo se dibuja cuando la cámara se mueve o cambia el tamaño, a 30 cuadros
- *   por segundo como máximo. Quieto, no gasta nada. Con `active` en falso
- *   (otra pestaña del sistema) no dibuja.
+ *   por segundo como máximo. Quieto, no gasta nada. Fuera de Explorar
+ *   («drift») deriva solo, muy despacio, a 24 cuadros por segundo.
+ * - Es uno solo para toda la aplicación (lo monta `App`), detrás de todas
+ *   las pestañas: no hay una segunda copia que ocupe la tarjeta.
  * - Sin suavizado de bordes: a un cielo de estrellas no le sirve y cuesta
  *   memoria de video.
  * - Al salir de Explorar se suelta el contexto de la tarjeta de inmediato.
@@ -39,6 +41,8 @@ import {
   makeStars,
   SKY_FIELD_OF_VIEW,
   skyTiles,
+  DRIFT_FPS,
+  driftView,
   SPACE_FPS,
   spacePixelRatio,
   STAR_MAX_SIZE,
@@ -111,21 +115,36 @@ const STAR_FRAGMENT = /* glsl */ `
   }
 `;
 
+/**
+ * Cómo se mueve el cielo:
+ * - «camera» (Explorar): sigue a la cámara del globo y solo se dibuja cuando
+ *   ella se mueve.
+ * - «drift» (Casos, Conceptos, Historial…): deriva solo, muy despacio
+ *   (`driftView`), a DRIFT_FPS cuadros por segundo.
+ */
+export type SkyMode = 'camera' | 'drift';
+
 interface SpaceBackgroundProps {
-  /** Si Explorar está a la vista; en otra pestaña del sistema no se dibuja. */
-  active?: boolean;
+  mode?: SkyMode;
 }
 
-export function SpaceBackground({ active = true }: SpaceBackgroundProps) {
+export function SpaceBackground({ mode = 'camera' }: SpaceBackgroundProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef(active);
+  const modeRef = useRef(mode);
+  // Desde dónde y cuándo empezó a derivar: así al cambiar de pestaña no salta.
+  const driftRef = useRef({ startLng: 0, startMs: 0 });
   const requestDrawRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
-    activeRef.current = active;
-    // Al volver a Explorar, se pinta con la vista actual.
-    if (active) requestDrawRef.current();
-  }, [active]);
+    if (mode === 'drift' && modeRef.current !== 'drift') {
+      driftRef.current = {
+        startLng: useCameraStore.getState().view.lng,
+        startMs: performance.now(),
+      };
+    }
+    modeRef.current = mode;
+    requestDrawRef.current();
+  }, [mode]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -190,28 +209,36 @@ export function SpaceBackground({ active = true }: SpaceBackgroundProps) {
     };
     const draw = () => {
       if (disposed || renderer.getContext().isContextLost()) return;
-      const rotation = starCameraRotation(useCameraStore.getState().view);
+      const drift = driftRef.current;
+      const view =
+        modeRef.current === 'drift'
+          ? driftView(drift.startLng, performance.now() - drift.startMs)
+          : useCameraStore.getState().view;
+      const rotation = starCameraRotation(view);
       camera.rotation.set(rotation.x, rotation.y, rotation.z);
       renderer.render(scene, camera);
     };
 
     // Un dibujo por cuadro como mucho y a 30 por segundo: los movimientos de la
-    // cámara llegan a 60 por segundo mientras el globo gira.
+    // cámara llegan a 60 por segundo mientras el globo gira. Al derivar se
+    // dibuja sin parar, pero a DRIFT_FPS.
     let frame = 0;
     let lastDraw = 0;
     const frameDraw = (now: number) => {
-      if (now - lastDraw < MS_PER_SECOND / SPACE_FPS) {
+      const drifting = modeRef.current === 'drift';
+      if (now - lastDraw < MS_PER_SECOND / (drifting ? DRIFT_FPS : SPACE_FPS)) {
         frame = requestAnimationFrame(frameDraw);
         return;
       }
       frame = 0;
       lastDraw = now;
       draw();
+      if (drifting) requestDraw();
     };
-    const requestDraw = () => {
-      if (frame || disposed || !activeRef.current || document.hidden) return;
+    function requestDraw() {
+      if (frame || disposed || document.hidden) return;
       frame = requestAnimationFrame(frameDraw);
-    };
+    }
     requestDrawRef.current = requestDraw;
 
     // La foto: se baja, se decodifica fuera del hilo principal y se sube a la

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   makeStars,
   seededRandom,
+  driftView,
+  DRIFT_DEGREES_PER_SECOND,
   skyTiles,
   SPACE_MAX_PIXEL_RATIO,
   spacePixelRatio,
@@ -68,6 +70,20 @@ describe('fondo de universo', () => {
     expect(tiles[0]).toMatchObject({ x: 0, y: 0, phiStart: 0, thetaStart: 0 });
     expect(tiles[7]).toMatchObject({ x: 6144, y: 2048 });
     expect(tiles[7]?.thetaStart).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('fuera de Explorar el cielo deriva despacio desde donde estaba', () => {
+    const start = driftView(-102, 0);
+    const minute = driftView(-102, 60_000);
+
+    // No salta: arranca en la longitud que tenía la cámara.
+    expect(start.lng).toBe(-102);
+    expect(minute.lng).toBeCloseTo(-102 - DRIFT_DEGREES_PER_SECOND * 60);
+    // El vaivén de latitud es suave y no se pasa de los polos.
+    for (let t = 0; t < 400_000; t += 20_000) {
+      const { lat } = driftView(0, t);
+      expect(Math.abs(lat)).toBeLessThan(25);
+    }
   });
 
   it('la 4K queda en 2 piezas', () => {

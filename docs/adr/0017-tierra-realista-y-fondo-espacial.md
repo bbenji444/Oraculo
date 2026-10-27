@@ -123,3 +123,13 @@ Cambios:
 | Globo girando, llamadas de dibujo en 3 s | 24,522 | 19,061 (−22 %) |
 | Pestaña Historial, dibujos en 2 s | (se destruía el globo) | 0 |
 | Volver a Explorar | contextos nuevos y otra descarga de la 8K | los mismos lienzos, 0 descargas |
+
+## El universo en todas las pestañas (26/10/2026)
+
+Benji pidió el fondo del universo también en Casos, Conceptos, Historial y Estado, en lugar del azul-negro liso.
+
+- **Un solo `SpaceBackground` para toda la aplicación**, montado en `App`, en lugar de uno dentro de Explorar. No hay una segunda copia ocupando la tarjeta.
+- **En Explorar** (modo «camera») sigue al globo y solo se dibuja cuando la cámara se mueve.
+- **En las demás pestañas** (modo «drift») deriva solo, muy despacio: una vuelta cada 10 minutos, con un vaivén suave de latitud (`driftView`), a 24 cuadros por segundo. Medido en Historial: unos 22 cuadros por segundo de 9 llamadas cada uno.
+- **Encima, el velo `.velo-universo`.** Oscurece las estrellas para leer, sobre todo en el centro, donde va el texto, y lleva dos auroras cian que se mueven en 38 y 46 s. Solo se animan con `transform`, sin `blur` (desenfocar una capa grande en cada cuadro le costaría a la tarjeta).
+- En Explorar el velo se desvanece en 0.7 s.
