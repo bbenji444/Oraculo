@@ -250,7 +250,7 @@ Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl 
 
 ```
 make bootstrap       # instala servicios y dependencias (se puede repetir)
-make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta y monitor FGR), nginx (http://localhost:8080) y God's Eye View si está instalado (http://localhost:4173)
+make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta y monitor FGR) y nginx (http://localhost:8080)
 make down            # los detiene
 make status          # qué corre y resultado de /health
 make logs            # sigue los logs de la API, del worker y del reloj
@@ -258,8 +258,6 @@ make test            # pruebas backend (con cobertura) + frontend
 make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
 make format          # aplica el formato de ruff y Prettier
 make migrate         # aplica migraciones Alembic
-make gev-instalar    # copia God's Eye View tal cual de GitHub, con su Node 24 propio (pestaña «God's Eye», ADR-0035)
-make gev-probar      # pruebas unitarias de God's Eye View
 make frontend-build  # compila el frontend que sirve nginx
 make geo-download    # descarga INEGI y Natural Earth (con manifiesto)
 make geo-inspect     # proyección, encoding, conteos y 5 nombres reales con Ñ

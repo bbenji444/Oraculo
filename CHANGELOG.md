@@ -8,11 +8,6 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
-- **Pestaña «God's Eye» (27/10/2026, ADR-0035).** El proyecto [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) de Bilawal Sidhu (código MIT), copiado tal cual y sin integrar, para que Benji lo evalúe:
-  - `make gev-instalar` lo baja fijo en un commit, con su Node 24 propio verificado;
-  - `make up` lo arranca en http://localhost:4173;
-  - la pestaña, antes de «Estado del sistema», dice si está corriendo y lo abre completo en su propia pestaña (no se deja mostrar dentro de otra página);
-  - verificado: sus 8,809 pruebas (0 fallan) y sus fuentes sin llave, entre ellas vuelos, satélites, misiones, cámaras, clima, incendios, ciclones y sismos.
 - **El PDF de cada corrida automática trae solo hechos nuevos (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
   - «Noticias por estado» lista solo los hechos que no traía esa corrida;
   - en la página 2, «Novedades» dice cuántos hechos son nuevos y cuántos no se repiten;
@@ -95,6 +90,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - Modo día: al acercarse, el mapa de calles ahora es claro (antes siempre usaba la variante oscura de Protomaps y parecía de noche). `make geo-basemap` baja también los íconos claros.
 - Explorar ya no muestra las gráficas "Top 5 estados con más noticias" ni "Tipos de noticias" (decisión de Benji: no aportaban y estorbaban). La derecha queda libre para el globo; el reporte en PDF conserva su página de análisis.
 - Los créditos del mapa (INEGI, Natural Earth, NASA, OpenStreetMap) empiezan plegados en Explorar: solo se ve el botón "i" y aparecen al hacer clic. Antes MapLibre los dejaba abiertos porque el giro del globo no cuenta como arrastre.
+
+### Quitado
+
+- **God's Eye View** (27/10/2026, ADR-0035): se probó el mismo día como módulo aparte, con su pestaña «God's Eye». Benji lo retiró porque no le sirve para el monitor, y además era lento y no combinaba con el diseño. Se quitaron la pestaña, el servicio de `make up` y los comandos `gev-*`.
 
 ### Corregido
 

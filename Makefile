@@ -30,7 +30,7 @@ COVERAGE_MIN := 85
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
         limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos \
-        corrida-fgr gev-instalar gev-probar
+        corrida-fgr
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -54,12 +54,6 @@ status: ## Muestra qué servicios corren y el resultado de /health
 
 logs: ## Sigue los logs de la API, del worker y del reloj (Ctrl+C para salir)
 	bash scripts/dev/servicios.sh logs
-
-gev-instalar: ## Copia God's Eye View tal cual de GitHub (con Node 24 propio) para la pestaña «God's Eye»
-	bash scripts/dev/gods_eye.sh instalar
-
-gev-probar: ## Corre las pruebas unitarias de God's Eye View
-	bash scripts/dev/gods_eye.sh probar
 
 migrate: ## Aplica las migraciones de Alembic a la base de desarrollo
 	$(UV_RUN) alembic upgrade head
