@@ -16,6 +16,7 @@ import type {
   RelationshipType,
 } from '../../services/relationships';
 import { formatDay } from '../Explore/format';
+import type { ChipTone } from '../ui/HudChip';
 
 /** Opciones del formulario, de menor a mayor reserva. */
 export const SENSITIVITY_OPTIONS: { value: Sensitivity; label: string }[] = [
@@ -24,18 +25,18 @@ export const SENSITIVITY_OPTIONS: { value: Sensitivity; label: string }[] = [
   { value: 'confidential', label: 'Confidencial' },
 ];
 
-/** Color de la insignia de sensibilidad: más cálido, más reserva. */
-export const SENSITIVITY_TONE: Record<Sensitivity, string> = {
-  normal: 'bg-slate-700/70 text-slate-200',
-  restricted: 'bg-amber-500/20 text-amber-200',
-  confidential: 'bg-rose-500/20 text-rose-200',
+/** Color de la insignia de sensibilidad (`HudChip`): más cálido, más reserva. */
+export const SENSITIVITY_TONE: Record<Sensitivity, ChipTone> = {
+  normal: 'slate',
+  restricted: 'amber',
+  confidential: 'rose',
 };
 
-/** Color de la insignia de estado. */
-export const STATUS_TONE: Record<CaseStatus, string> = {
-  open: 'bg-emerald-500/20 text-emerald-200',
-  closed: 'bg-slate-700/70 text-slate-300',
-  archived: 'bg-slate-800 text-slate-400',
+/** Color de la insignia de estado (`HudChip`). */
+export const STATUS_TONE: Record<CaseStatus, ChipTone> = {
+  open: 'green',
+  closed: 'slate',
+  archived: 'slate',
 };
 
 /**

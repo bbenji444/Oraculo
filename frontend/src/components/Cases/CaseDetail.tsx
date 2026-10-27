@@ -13,8 +13,13 @@
  * El dueño puede eliminar el caso (27/10/2026): pide confirmación y es
  * reversible (`CasesPage` ofrece «Deshacer»).
  *
+ * Diseño «consola táctica» (ADR-0036): cabecera en un panel con borde de luz,
+ * insignias con pulso y cada noticia como una fila que se ilumina.
+ *
  * No hace: no agrega notas (eso es el botón "Agregar al caso" de Explorar).
  */
+import type { CSSProperties } from 'react';
+
 import {
   useCase,
   useCaseArticles,
@@ -30,6 +35,10 @@ import { CaseRelationships } from './CaseRelationships';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
 import { ConfirmDelete } from '../ConfirmDelete';
 import { ExternalLink } from '../ExternalLink';
+import { DecodeText } from '../ui/DecodeText';
+import { HudButton } from '../ui/HudButton';
+import { HudChip } from '../ui/HudChip';
+import { HudPanel } from '../ui/HudPanel';
 
 interface CaseDetailProps {
   caseId: string;
@@ -37,9 +46,6 @@ interface CaseDetailProps {
   /** Ya se eliminó: quien lo muestra cierra el panel y ofrece deshacer. */
   onDeleted?: (item: Case) => void;
 }
-
-const ACTION_BUTTON =
-  'rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
 
 export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
   const detail = useCase(caseId);
@@ -66,77 +72,71 @@ export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
 
   return (
     <section aria-label={`Caso ${item.name}`} className="space-y-4">
-      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+      <HudPanel scan className="hud-reveal space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-slate-50">{item.name}</h2>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`rounded-md px-1.5 py-0.5 ${STATUS_TONE[item.status]}`}>
+            <p className="hud-kicker">Expediente</p>
+            <h2 className="mt-2 font-display text-xl tracking-[0.1em] text-slate-50 uppercase">
+              <DecodeText text={item.name} />
+            </h2>
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <HudChip tone={STATUS_TONE[item.status]} dot live={item.status === 'open'}>
                 {item.status_label}
-              </span>
-              <span className={`rounded-md px-1.5 py-0.5 ${SENSITIVITY_TONE[item.sensitivity]}`}>
-                {item.sensitivity_label}
-              </span>
+              </HudChip>
+              <HudChip tone={SENSITIVITY_TONE[item.sensitivity]}>{item.sensitivity_label}</HudChip>
               <span className="text-slate-400">
                 Creado por {item.created_by} el {formatDay(item.created_at)}
               </span>
             </p>
           </div>
           {/* Cualquier miembro puede ver el muro (9.6); abrirlo queda en la bitácora. */}
-          <a
-            href={wallHash(item.id)}
-            className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white shadow-lg shadow-sky-900/40 hover:bg-sky-500 focus-visible:outline-2 focus-visible:outline-sky-300"
-          >
-            🌐 Ver en el globo
+          <a href={wallHash(item.id)} className="hud-btn hud-btn--solid">
+            <span>🌐 Ver en el globo</span>
           </a>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               {isOpen && (
                 <>
-                  <button
-                    type="button"
-                    className={ACTION_BUTTON}
+                  <HudButton
+                    size="sm"
                     onClick={() => {
                       onEdit(item);
                     }}
                   >
                     Editar
-                  </button>
-                  <button
-                    type="button"
-                    className={ACTION_BUTTON}
+                  </HudButton>
+                  <HudButton
+                    size="sm"
                     disabled={update.isPending}
                     onClick={() => {
                       setStatus('closed');
                     }}
                   >
                     Cerrar caso
-                  </button>
+                  </HudButton>
                 </>
               )}
               {item.status === 'closed' && (
-                <button
-                  type="button"
-                  className={ACTION_BUTTON}
+                <HudButton
+                  size="sm"
                   disabled={update.isPending}
                   onClick={() => {
                     setStatus('archived');
                   }}
                 >
                   Archivar
-                </button>
+                </HudButton>
               )}
               {!isOpen && (
-                <button
-                  type="button"
-                  className={ACTION_BUTTON}
+                <HudButton
+                  size="sm"
                   disabled={update.isPending}
                   onClick={() => {
                     setStatus('open');
                   }}
                 >
                   Reabrir
-                </button>
+                </HudButton>
               )}
             </div>
           )}
@@ -174,10 +174,10 @@ export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
             {update.error.message}
           </p>
         )}
-      </div>
+      </HudPanel>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-        <h3 className="border-b border-slate-800 px-4 py-3 text-sm font-semibold text-slate-100">
+      <HudPanel className="hud-reveal overflow-hidden" style={{ '--i': 1 } as CSSProperties}>
+        <h3 className="border-b border-sky-400/10 px-5 py-3 font-display text-[11px] tracking-[0.2em] text-sky-100 uppercase">
           Noticias del caso ({item.article_count})
         </h3>
         {articles.isPending && <p className="p-4 text-sm text-slate-400">Cargando noticias…</p>}
@@ -200,11 +200,11 @@ export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
             {remove.error.message}
           </p>
         )}
-        <ul className="divide-y divide-slate-800">
+        <ul className="p-2">
           {articles.data?.map((article) => {
             const location = article.primary_location;
             return (
-              <li key={article.article_id} className="flex flex-wrap items-start gap-3 px-4 py-3">
+              <li key={article.article_id} className="hud-row flex-wrap cursor-default items-start">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-slate-100">{article.title}</p>
                   <p className="mt-0.5 text-xs text-slate-400">
@@ -215,30 +215,27 @@ export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <ExternalLink
-                    href={article.url}
-                    className="rounded-lg bg-sky-500/20 px-2.5 py-1 text-xs font-medium text-sky-100 hover:bg-sky-500/30 focus-visible:outline-2 focus-visible:outline-sky-400"
-                  >
+                  <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
                     Ver nota original ↗
                   </ExternalLink>
                   {canEdit && isOpen && (
-                    <button
-                      type="button"
+                    <HudButton
+                      variant="danger"
+                      size="sm"
                       disabled={remove.isPending}
                       onClick={() => {
                         remove.mutate({ caseId: item.id, articleId: article.article_id });
                       }}
-                      className="rounded-lg px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-500/10 focus-visible:outline-2 focus-visible:outline-rose-400 disabled:opacity-50"
                     >
                       Quitar
-                    </button>
+                    </HudButton>
                   )}
                 </div>
               </li>
             );
           })}
         </ul>
-      </div>
+      </HudPanel>
 
       <CaseEntities caseId={item.id} canEdit={canEdit && isOpen} />
       <CaseRelationships caseId={item.id} canEdit={canEdit && isOpen} />

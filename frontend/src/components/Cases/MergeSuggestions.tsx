@@ -23,9 +23,6 @@ interface MergeSuggestionsProps {
   onDecide: (action: ResolutionAction) => void;
 }
 
-const BUTTON =
-  'rounded-lg px-2.5 py-1 text-xs font-medium focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-50';
-
 function legalText(entity: Entity): string | null {
   if (entity.type !== 'person') return null;
   if (entity.legal_status_label) return `Estatus: ${entity.legal_status_label}`;
@@ -39,8 +36,10 @@ function Side({ entity, keep }: { entity: Entity; keep: boolean }) {
   const legal = legalText(entity);
   return (
     <div
-      className={`min-w-0 flex-1 rounded-lg border p-2 ${
-        keep ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-slate-700'
+      className={`min-w-0 flex-1 rounded-xl border p-3 transition-all duration-300 ${
+        keep
+          ? 'border-emerald-400/60 bg-emerald-400/[0.06] shadow-[0_0_18px_rgb(44_245_160/0.15)]'
+          : 'border-sky-400/15'
       }`}
     >
       <p className="text-sm text-slate-100">
@@ -86,7 +85,7 @@ function Pair({
   return (
     <li className="space-y-2 px-4 py-3">
       <p className="text-xs text-slate-400">
-        <span className="mr-2 rounded-md bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">
+        <span className="mr-2 rounded-md border border-sky-400/20 bg-sky-400/5 px-1.5 py-0.5 text-[11px] text-slate-200">
           {first.type_label}
         </span>
         Posible duplicado: <span className="text-slate-200">{suggestion.reason_label}</span>
@@ -120,7 +119,7 @@ function Pair({
             onClick={() => {
               onDecide({ kind: 'merge', keepId, mergeId });
             }}
-            className={`${BUTTON} bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30`}
+            className="hud-btn hud-btn--sm border-emerald-400/50 text-emerald-100"
           >
             Son la misma
           </button>
@@ -130,7 +129,7 @@ function Pair({
             onClick={() => {
               onDecide({ kind: 'dismiss', firstId: first.id, secondId: second.id });
             }}
-            className={`${BUTTON} text-slate-300 hover:bg-slate-800`}
+            className="hud-btn hud-btn--ghost hud-btn--sm"
           >
             No son la misma
           </button>
@@ -146,14 +145,14 @@ export function MergeSuggestions({ suggestions, canEdit, busy, onDecide }: Merge
   const count = suggestions.length;
 
   return (
-    <div className="border-b border-slate-800">
+    <div className="border-b border-sky-400/10">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => {
           setOpen(!open);
         }}
-        className="flex w-full items-center justify-between px-4 py-2 text-left text-xs text-amber-100 hover:bg-amber-500/5"
+        className="flex w-full items-center justify-between gap-3 bg-amber-400/[0.04] px-5 py-2.5 text-left text-xs text-amber-100 transition-colors duration-300 hover:bg-amber-400/10"
       >
         <span>
           {count} {count === 1 ? 'posible duplicado' : 'posibles duplicados'}: el sistema solo
@@ -162,7 +161,7 @@ export function MergeSuggestions({ suggestions, canEdit, busy, onDecide }: Merge
         <span className="text-sky-300">{open ? 'Ocultar' : 'Revisar'}</span>
       </button>
       {open && (
-        <ul className="divide-y divide-slate-800 bg-slate-950/30">
+        <ul className="divide-y divide-sky-400/10 bg-black/20">
           {suggestions.map((s) => (
             <Pair
               key={`${String(s.first.id)}-${String(s.second.id)}`}

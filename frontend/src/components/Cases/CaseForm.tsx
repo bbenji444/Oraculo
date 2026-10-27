@@ -5,6 +5,9 @@
  * (`invalid_case`) se muestran junto a su campo. Guardar llama al hook de
  * crear o de editar; quien lo usa decide qué hacer al terminar.
  *
+ * Diseño «consola táctica» (ADR-0036): panel con borde de luz, campos con aro
+ * de enfoque y botones con destello.
+ *
  * No hace: no cierra ni archiva el caso (eso está en el detalle).
  */
 import { useId, useState } from 'react';
@@ -20,10 +23,7 @@ interface CaseFormProps {
   onCancel: () => void;
 }
 
-const inputClass = (invalid: boolean) =>
-  `w-full rounded-lg border bg-slate-950/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500/70 focus:outline-none ${
-    invalid ? 'border-rose-500/70' : 'border-slate-700'
-  }`;
+const inputClass = (invalid: boolean) => `hud-input ${invalid ? 'border-rose-500/70' : ''}`;
 
 export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
   const id = useId();
@@ -51,13 +51,16 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
     <form
       onSubmit={save}
       aria-labelledby={`${id}-title`}
-      className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+      className="hud-panel hud-spot hud-reveal space-y-5 p-5"
     >
-      <h2 id={`${id}-title`} className="text-base font-semibold text-slate-50">
+      <h2
+        id={`${id}-title`}
+        className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase"
+      >
         {editing ? 'Editar caso' : 'Nuevo caso'}
       </h2>
       <div>
-        <label htmlFor={`${id}-name`} className="mb-1 block text-xs font-medium text-slate-300">
+        <label htmlFor={`${id}-name`} className="hud-label">
           Nombre
         </label>
         <input
@@ -76,10 +79,7 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
         ))}
       </div>
       <div>
-        <label
-          htmlFor={`${id}-description`}
-          className="mb-1 block text-xs font-medium text-slate-300"
-        >
+        <label htmlFor={`${id}-description`} className="hud-label">
           Descripción <span className="font-normal text-slate-500">(opcional)</span>
         </label>
         <textarea
@@ -98,10 +98,7 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
         ))}
       </div>
       <div>
-        <label
-          htmlFor={`${id}-sensitivity`}
-          className="mb-1 block text-xs font-medium text-slate-300"
-        >
+        <label htmlFor={`${id}-sensitivity`} className="hud-label">
           Sensibilidad
         </label>
         <select
@@ -124,23 +121,18 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
         </p>
       </div>
       {error && Object.keys(fields).length === 0 && (
-        <p role="alert" className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+        <p
+          role="alert"
+          className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200"
+        >
           {error.message}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-4">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 focus-visible:outline-2 focus-visible:outline-sky-300 disabled:opacity-50"
-        >
+      <div className="flex flex-wrap items-center gap-2 border-t border-sky-400/10 pt-5">
+        <button type="submit" disabled={saving} className="hud-btn hud-btn--solid">
           {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear caso'}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400"
-        >
+        <button type="button" onClick={onCancel} className="hud-btn hud-btn--ghost">
           Cancelar
         </button>
       </div>

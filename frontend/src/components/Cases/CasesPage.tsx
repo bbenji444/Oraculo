@@ -7,6 +7,8 @@
  *
  * El dueño puede eliminar un caso; al hacerlo sale «Deshacer» (27/10/2026).
  *
+ * Diseño «consola táctica» (ADR-0036).
+ *
  * No hace llamadas HTTP: usa los hooks de `useCases`.
  */
 import { useCallback, useState } from 'react';
@@ -17,6 +19,8 @@ import { CaseDetail } from './CaseDetail';
 import { CaseForm } from './CaseForm';
 import { CaseList } from './CaseList';
 import { UndoToast } from '../UndoToast';
+import { HudButton } from '../ui/HudButton';
+import { SectionHeading } from '../ui/SectionHeading';
 
 /** Qué muestra el panel derecho. */
 type Panel =
@@ -40,24 +44,22 @@ export function CasesPage() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <section aria-labelledby="casos-titulo" className="min-w-0">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="casos-titulo" className="titulo-oraculo text-base font-bold text-sky-50">
-                Casos
-              </h2>
-              <p className="text-sm text-slate-400">
-                Investigaciones con sus noticias. Solo ves los casos de los que eres miembro.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPanel({ kind: 'new' });
-              }}
-              className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 focus-visible:outline-2 focus-visible:outline-sky-300"
-            >
-              + Nuevo caso
-            </button>
+          <div id="casos-titulo" className="mb-6">
+            <SectionHeading
+              kicker="Expedientes de investigación"
+              title="Casos"
+              description="Investigaciones con sus noticias. Solo ves los casos de los que eres miembro."
+              actions={
+                <HudButton
+                  variant="solid"
+                  onClick={() => {
+                    setPanel({ kind: 'new' });
+                  }}
+                >
+                  + Nuevo caso
+                </HudButton>
+              }
+            />
           </div>
           <CaseList
             selectedId={selectedId}
@@ -68,9 +70,7 @@ export function CasesPage() {
         </section>
         <div className="min-w-0">
           {panel.kind === 'none' && (
-            <p className="rounded-xl border border-dashed border-slate-800 p-6 text-sm text-slate-400">
-              Elige un caso para ver sus noticias, o crea uno nuevo.
-            </p>
+            <p className="hud-empty">Elige un caso para ver sus noticias, o crea uno nuevo.</p>
           )}
           {panel.kind === 'new' && (
             <CaseForm

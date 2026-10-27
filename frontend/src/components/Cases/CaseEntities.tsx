@@ -13,7 +13,7 @@
  * No hace: no dibuja vínculos (`CaseRelationships`).
  */
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { invalidateCaseEntities } from '../../hooks/caseKeys';
 import { useAnalyzePending, useCaseEntities, useReviewEntity } from '../../hooks/useEntities';
@@ -63,9 +63,12 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-100">Entidades</h3>
+    <div
+      className="hud-panel hud-spot hud-reveal overflow-hidden"
+      style={{ '--i': 2 } as CSSProperties}
+    >
+      <div className="hud-section-head">
+        <h3 className="hud-section-title">Entidades</h3>
         {analysis && (
           <p aria-live="polite" className="text-xs text-slate-400">
             {analysis.queued > 0
@@ -78,7 +81,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
         )}
       </div>
       {canEdit && pending > 0 && analysis?.queued === 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 px-4 py-2 text-xs text-slate-300">
+        <div className="flex flex-wrap items-center gap-3 border-b border-sky-400/10 bg-sky-400/[0.03] px-5 py-2.5 text-xs text-slate-300">
           <span>
             {pending} {pending === 1 ? 'nota sin analizar' : 'notas sin analizar'} (~
             {usd(analysis.estimated_pending_cost_usd)})
@@ -89,7 +92,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
             onClick={() => {
               analyze.mutate();
             }}
-            className="rounded-lg bg-sky-600 px-2.5 py-1 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            className="hud-btn hud-btn--solid hud-btn--sm"
           >
             Analizar con IA
           </button>
@@ -103,7 +106,11 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
           resolution.mutate(action);
         }}
       />
-      <div role="tablist" aria-label="Estado de las entidades" className="flex gap-1 px-3 pt-2">
+      <div
+        role="tablist"
+        aria-label="Estado de las entidades"
+        className="flex gap-1 border-b border-sky-400/10 px-3"
+      >
         {TABS.map((t) => (
           <button
             key={t.value}
@@ -113,9 +120,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
             onClick={() => {
               setTab(t.value);
             }}
-            className={`rounded-t-lg px-3 py-1.5 text-xs ${
-              tab === t.value ? 'bg-slate-800 text-slate-50' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className="hud-subtab focus-visible:outline-2 focus-visible:outline-sky-400"
           >
             {t.label} ({data?.counts[t.value] ?? 0})
           </button>
@@ -134,7 +139,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
             : 'Nada por aquí todavía.'}
         </p>
       )}
-      <ul className="divide-y divide-slate-800">
+      <ul className="divide-y divide-sky-400/10">
         {data?.items.map((entity) => (
           <EntityCard
             key={entity.id}
