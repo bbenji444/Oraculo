@@ -431,13 +431,13 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 **Nota sobre GDELT:** `sourcelang:spanish` solo filtra por idioma, así que sin otro filtro entrarían medios de España, Argentina, etc. Por eso se agrega `sourcecountry:<país>`, que filtra por el país del medio. La documentación oficial confirma la sintaxis (nombre del país en inglés sin espacios, o código FIPS de 2 letras), que el signo menos excluye palabras y el máximo de 250 resultados ([GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)). Se usa el código FIPS de Natural Earth (`MX`) y, si un país no lo tiene, su nombre en inglés sin espacios (ADR-0009). `# VERIFICAR:` en F3 que `sourcecountry:MX` devuelve resultados.
 
 **Reglas:**
-- **Una consulta por proveedor y concepto.** Las palabras clave se unen con `OR`. Si se excede el límite de longitud del proveedor, se reparten en grupos.
+- **Una consulta por proveedor y concepto.** Las palabras clave se unen con `OR`. Si se excede el límite de longitud del proveedor, se reparten en grupos. Excepción: Google News RSS trae a lo más 100 notas por consulta. Por eso se parte por palabra clave y, en ventanas de fechas fijas de hasta 3 días, por día, sin pasar de 4 consultas por concepto (ADR-0034).
 - **El nombre de la región se usa tal cual se escribe en medios.** Se usa `search_terms` de la región o, si está vacío, `name` (con acentos). Para CDMX: `("Ciudad de México" OR CDMX)`; para el estado 15, `("Estado de México" OR Edomex)`, nunca "México" solo. La lista curada vive en `geodata/search_terms.csv` (ADR-0009).
 - **Nombres repetidos.** Si un municipio comparte nombre con otro, la consulta exige también su estado (`"Benito Juárez" ("Quintana Roo")`). Las localidades siempre llevan su estado.
 - **Exclusiones** con signo menos en los tres proveedores. Las palabras no pueden contener comillas, paréntesis, dos puntos, guion inicial ni `OR`/`AND` sueltos.
 - **País seleccionado:** no se agrega lugar a la consulta; se usan los filtros de país e idioma del proveedor.
 - **Presupuesto:** máximo de consultas por búsqueda configurable (`MAX_QUERIES_PER_SEARCH`, por defecto 10). La UI muestra la estimación antes de ejecutar.
-- **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos.
+- **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos. Google News RSS y el índice local no pasan por la caché: son gratis y la caché solo los volvía viejos (ADR-0034).
 - **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor, y solo con los proveedores que recibiría una búsqueda real (los configurados): hoy SearchApi, el índice local y Google News RSS (ADR-0021).
 
 ---

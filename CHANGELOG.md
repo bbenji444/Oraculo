@@ -8,6 +8,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **«Novedades» en el PDF de cada corrida automática (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
+  - en la página 2 dice cuántos hechos son nuevos y cuántos ya se habían reportado;
+  - en cada categoría van primero los nuevos, marcados NUEVO;
+  - los ya reportados van al final, sin resumen.
+
+  En la corrida de las 23:00 del 26/10 fueron 33 hechos nuevos y 65 ya reportados, y el PDF bajó de 26 a 22 páginas. La auditoría completa está en `docs/analisis-2026-10-27.md`.
 - **Eliminar casos y búsquedas del historial (27/10/2026).** Se borran de forma reversible:
   - el primer clic pide confirmar («¿Eliminar? · Sí, eliminar · Cancelar») y luego aparece un aviso con «Deshacer» durante 8 segundos;
   - un caso solo lo elimina su dueño; del historial se pueden quitar las búsquedas propias y las corridas automáticas;
@@ -87,6 +93,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Google News llegaba viejo e incompleto a las corridas (27/10/2026, ADR-0034):**
+  - **caché:** las corridas de las 07:00 y de las 15:00 reusaban la respuesta de horas antes (caché de 6 h). Google News es gratis y ya no pasa por la caché;
+  - **tope:** cada consulta trae a lo más 100 notas. Ahora se parte por palabra clave y por día, hasta 4 consultas por concepto;
+  - **acentos:** «Fiscalia General de la Republica», sin acentos y entre comillas, traía 4 notas en dos días. El concepto ahora busca «Fiscalía General de la República» (migración 0031).
+
+  En la sonda del mismo día, la ventana de dos días juntó 281 notas distintas en lugar de 102. Cuesta unos 0.02 USD más por corrida.
+- **El índice local ya no corta en 250 notas** (27/10/2026): la corrida de las 23:00 llegó justo a ese tope. Ahora son 500.
+- **La misma nota ya no se guarda dos veces cuando Google News la vuelve a fechar** (27/10/2026): el mismo medio con el mismo título exacto, a menos de una semana, es la misma nota. La regla pide al menos 6 palabras en el título, porque las columnas repiten su nombre.
+- **El mismo medio ya no cuenta doble con su versión AMP** (27/10/2026): `amp.milenio.com` es `milenio.com`.
+- **La «fecha del hecho» ya no dice que algo «ocurrió» ese día** (27/10/2026): la IA suele dar la fecha de los antecedentes. La vinculación de Jáuregui del 25/10 salía como del 1 de abril. Ahora dice «Se refiere a hechos del…».
 - **El mapa carga más rápido al ir de una nota a otra** (27/10/2026): MapLibre 6 decodificaba las teselas de calles con un solo hilo, de una en una, y el mapa se veía gris y se iba llenando poco a poco. Ahora usa la mitad de los procesadores, hasta 4 hilos (4 en la computadora de Benji), y los nombres aparecen en 120 ms en lugar de 300.
 - **«Ver nota original» se abre en una pestaña nueva también en el navegador integrado** (27/10/2026): todos los enlaces a notas abren una ventana nueva al hacer clic, sin tocar la pestaña del monitor. Ctrl+clic y clic con la rueda siguen igual.
 - **Los menús desplegables ya no salen blancos** (27/10/2026): las opciones de los filtros (categoría, estado) tenían fondo blanco y texto cian claro, casi ilegible; ahora tienen el fondo y el texto de Oráculo.
