@@ -219,6 +219,93 @@ def test_rango_de_fechas_fijas_en_google_news_rss() -> None:
     assert text.endswith("after:2026-10-01 before:2026-10-16")
 
 
+FGR = ConceptDraft.validated(
+    name="Fiscalía General de la República",
+    description="Actuación de la FGR federal",
+    keywords=("Fiscalía General de la República", "FGR"),
+    exclude_terms=(),
+    color="#1F6FEB",
+)
+NATIONAL = place_for(facts(RegionLevel.COUNTRY, "México"))
+
+
+def test_google_news_rss_se_parte_por_palabra_y_por_dia_en_ventanas_cortas() -> None:
+    # Medido el 27/10/2026: con OR la consulta llegaba al tope de 100 notas;
+    # partida así trajo 281 distintas.
+    window = DateWindow.between(date(2026, 10, 25), date(2026, 10, 26))
+
+    queries = build_queries(FGR, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text for q in queries] == [
+        '"Fiscalía General de la República" after:2026-10-25 before:2026-10-26',
+        '"Fiscalía General de la República" after:2026-10-26 before:2026-10-27',
+        "FGR after:2026-10-25 before:2026-10-26",
+        "FGR after:2026-10-26 before:2026-10-27",
+    ]
+    assert [q.keywords for q in queries] == [
+        ("Fiscalía General de la República",),
+        ("Fiscalía General de la República",),
+        ("FGR",),
+        ("FGR",),
+    ]
+    # El adaptador filtra con la ventana completa: no pierde lo que Google
+    # fecha en el día de al lado.
+    assert {q.window for q in queries} == {window}
+
+
+def test_google_news_rss_ultimos_dias_se_parte_solo_por_palabra() -> None:
+    # when:2d cuenta horas hacia atrás: no se puede partir en días de calendario.
+    window = DateWindow.last_days(2, TODAY)
+
+    queries = build_queries(FGR, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text for q in queries] == [
+        '"Fiscalía General de la República" when:2d',
+        "FGR when:2d",
+    ]
+
+
+def test_google_news_rss_ventana_larga_se_parte_solo_por_palabra() -> None:
+    window = DateWindow.between(date(2026, 10, 1), date(2026, 10, 15))
+
+    texts_ = [q.text for q in build_queries(FGR, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS])]
+
+    assert texts_ == [
+        '"Fiscalía General de la República" after:2026-10-01 before:2026-10-16',
+        "FGR after:2026-10-01 before:2026-10-16",
+    ]
+
+
+def test_google_news_rss_con_muchas_palabras_vuelve_a_una_consulta_con_or() -> None:
+    # Cinco palabras en «últimos 7 días»: por palabra no caben en 4 consultas.
+    [query] = build_queries(CIBERSEGURIDAD, IZTAPALAPA, WEEK, [Provider.GOOGLE_NEWS_RSS])
+
+    assert query.keywords == CIBERSEGURIDAD.keywords
+
+
+def test_dos_palabras_en_tres_dias_parten_por_dia_con_or() -> None:
+    # 2 palabras x 3 días = 6 > 4: se parte por día con las palabras juntas.
+    window = DateWindow.between(date(2026, 10, 24), date(2026, 10, 26))
+
+    queries = build_queries(FGR, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text for q in queries] == [
+        '("Fiscalía General de la República" OR FGR) after:2026-10-24 before:2026-10-25',
+        '("Fiscalía General de la República" OR FGR) after:2026-10-25 before:2026-10-26',
+        '("Fiscalía General de la República" OR FGR) after:2026-10-26 before:2026-10-27',
+    ]
+
+
+def test_solo_google_news_rss_se_parte_y_no_usa_cache() -> None:
+    window = DateWindow.between(date(2026, 10, 25), date(2026, 10, 26))
+
+    providers = [q.provider for q in build_queries(FGR, NATIONAL, window)]
+
+    assert providers.count(Provider.GOOGLE_NEWS_RSS) == 4
+    assert all(providers.count(p) == 1 for p in Provider if p is not Provider.GOOGLE_NEWS_RSS)
+    assert DIALECTS[Provider.GOOGLE_NEWS_RSS].cacheable is False
+
+
 def test_colombia_filtra_por_su_fips_en_gdelt() -> None:
     colombia = place_for(facts(RegionLevel.COUNTRY, "Colombia", country=COLOMBIA))
 

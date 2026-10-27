@@ -9,11 +9,17 @@ Regla de §7.2: **una consulta por proveedor y concepto**, con las palabras
 clave unidas por OR. Si el texto excede el límite del proveedor, las
 palabras clave se reparten en varias consultas, conservando el orden.
 
+Excepción: un proveedor gratis con tope de notas por respuesta (Google News
+RSS, 100) se parte por palabra clave y, en ventanas cortas, por día, sin
+pasar de ``QueryDialect.split_up_to`` consultas. Con OR las palabras
+compiten por las mismas 100 notas y la sigla «FGR» tapaba al nombre completo.
+
 No hace: no aplica el presupuesto por búsqueda (``MAX_QUERIES_PER_SEARCH``)
 ni la caché; eso es de la búsqueda completa (F3/F4).
 """
 
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Protocol
 
 from app.domain.errors import ConceptValidationError, QueryTooLongError
@@ -25,6 +31,10 @@ from app.domain.queries import (
     QueryPlace,
 )
 from app.domain.query_dialects import DIALECTS, QueryDialect
+
+# Ventanas de fechas fijas de hasta tantos días se parten por día. Con más, las
+# consultas no cabrían en el máximo por búsqueda (MAX_QUERIES_PER_SEARCH = 10).
+SPLIT_MAX_DAYS = 3
 
 
 class ConceptTerms(Protocol):
@@ -67,6 +77,43 @@ def _split_keywords(
     return chunks
 
 
+def _days(window: DateWindow) -> list[DateWindow]:
+    """Los días de una ventana fija corta, uno por uno; si no, la ventana entera.
+
+    «Últimos N días» no se parte: ``when:Nd`` cuenta horas hacia atrás desde
+    ahora y un día de calendario no equivale a eso.
+    """
+    span = (window.date_to - window.date_from).days + 1
+    if window.relative_days is not None or not 1 < span <= SPLIT_MAX_DAYS:
+        return [window]
+    return [
+        DateWindow.between(day, day)
+        for day in (window.date_from + timedelta(days=i) for i in range(span))
+    ]
+
+
+def _plan(
+    dialect: QueryDialect, concept: ConceptTerms, place: QueryPlace, window: DateWindow
+) -> list[tuple[tuple[str, ...], DateWindow]]:
+    """Qué palabras y qué días lleva cada consulta de un proveedor.
+
+    Sin tope de notas, son los grupos de ``_split_keywords`` con la ventana
+    completa. Con tope (``split_up_to``) se prueba, en este orden, lo que más
+    notas trae sin pasarse: cada palabra cada día, cada grupo cada día, cada
+    palabra con la ventana completa y, al final, los grupos.
+    """
+    chunks = _split_keywords(dialect, concept, place, window)
+    limit = dialect.split_up_to
+    if limit is None:
+        return [(chunk, window) for chunk in chunks]
+    singles = [(keyword,) for keyword in concept.keywords]
+    days = _days(window)
+    for groups, spans in ((singles, days), (chunks, days), (singles, [window])):
+        if len(groups) * len(spans) <= limit:
+            return [(g, span) for g in groups for span in spans]
+    return [(chunk, window) for chunk in chunks]
+
+
 def build_queries(
     concept: ConceptTerms,
     place: QueryPlace,
@@ -101,11 +148,14 @@ def build_queries(
     queries = []
     for provider in providers:
         dialect = DIALECTS[provider]
-        for chunk in _split_keywords(dialect, concept, place, window):
+        for chunk, span in _plan(dialect, concept, place, window):
             queries.append(
                 PlannedQuery(
                     provider=provider,
-                    text=dialect.render(chunk, place, concept.exclude_terms, window),
+                    # El texto lleva el día; ``window`` sigue siendo la ventana
+                    # completa porque con ella el adaptador descarta lo de
+                    # fuera (Google News RSS no siempre respeta after:/before:).
+                    text=dialect.render(chunk, place, concept.exclude_terms, span),
                     keywords=chunk,
                     country=place.country,
                     language=SEARCH_LANGUAGE,
