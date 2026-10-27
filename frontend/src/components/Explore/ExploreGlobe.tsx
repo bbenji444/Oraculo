@@ -86,6 +86,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { NewsCard } from './NewsCard';
 import { NewsStack } from './NewsStack';
 import { CASES_DOT_LAYER } from './CasesOnGlobe';
+import { GlobeUnavailable } from './GraphicsBoundary';
 import { GLASS } from './ui';
 
 interface ExploreGlobeProps {
@@ -93,6 +94,12 @@ interface ExploreGlobeProps {
   colors: ReadonlyMap<number, string>;
   /** Avisa cuando el mapa está listo (o se quita), para el muro y «Mis casos» (9.6). */
   onMap?: (map: MapLibreMap | null) => void;
+  /**
+   * Si Explorar está a la vista. En otra pestaña del sistema el globo se queda
+   * montado (no se destruye ni se vuelve a crear) pero deja de girar, así no
+   * ocupa la tarjeta de video.
+   */
+  active?: boolean;
 }
 
 interface Tooltip {
@@ -134,6 +141,10 @@ const INTRO_CENTER: [number, number] = [-35, 20];
 // «Acercar» un grupo: 1.5 niveles más que donde se separa, sin pasar de 15.
 const STACK_EXTRA_ZOOM = 1.5;
 const MAX_STACK_ZOOM = 15;
+// Si el navegador quita los gráficos 3D y no los devuelve en este tiempo, se
+// avisa con «Recargar». Casi siempre vuelven en menos de un segundo y MapLibre
+// redibuja solo; el aviso es para cuando Chrome ya los bloqueó.
+const GRAPHICS_LOST_NOTICE_MS = 6000;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
@@ -228,7 +239,7 @@ function placeAura(map: MapLibreMap, aura: HTMLElement | null, sun: HTMLElement 
   });
 }
 
-export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
+export function ExploreGlobe({ articles, colors, onMap, active = true }: ExploreGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const auraRef = useRef<HTMLDivElement>(null);
   const sunRef = useRef<HTMLDivElement>(null);
@@ -242,6 +253,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
   const [stack, setStack] = useState<Stack | null>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [cardHeight, setCardHeight] = useState(CALLOUT_INITIAL_HEIGHT);
+  const [graphicsLost, setGraphicsLost] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const regionId = useExplorerStore((s) => s.regionId);
@@ -258,6 +270,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
   // El mapa vive fuera de React: lee estos refs dentro de sus eventos.
   const motionRef = useRef<MotionPreset>(motion);
   const spinningRef = useRef(spinning);
+  const activeRef = useRef(active);
   const spinStartRef = useRef(0);
   const spinStepRef = useRef<() => void>(() => undefined);
   const earthRef = useRef(earth);
@@ -301,7 +314,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
 
     let introDone = !intro;
     const spinStep = () => {
-      if (!spinningRef.current || !introDone) return;
+      if (!spinningRef.current || !introDone || !activeRef.current) return;
       const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(performance.now() - spinStartRef.current));
       const degrees = spinDegrees(map.getZoom()) * spinFactor(motionRef.current) * ramp;
       if (degrees === 0) return;
@@ -326,6 +339,18 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
     });
     map.on('wheel', () => {
       setStack(null);
+    });
+
+    let lostTimer = 0;
+    map.on('webglcontextlost', () => {
+      window.clearTimeout(lostTimer);
+      lostTimer = window.setTimeout(() => {
+        setGraphicsLost(true);
+      }, GRAPHICS_LOST_NOTICE_MS);
+    });
+    map.on('webglcontextrestored', () => {
+      window.clearTimeout(lostTimer);
+      setGraphicsLost(false);
     });
 
     map.on('load', () => {
@@ -535,6 +560,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
       observer.disconnect();
       stopAttribution();
       cancelAnimationFrame(calloutFrame);
+      window.clearTimeout(lostTimer);
       map.remove();
       mapRef.current = null;
       setReady(false);
@@ -561,6 +587,20 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
       transformStyle: keepNewsLayers,
     });
   }, [earth, ready]);
+
+  // --- Pestaña a la vista -------------------------------------------------
+  useEffect(() => {
+    const returning = active && !activeRef.current;
+    activeRef.current = active;
+    const map = mapRef.current;
+    // Solo al volver de otra pestaña: en la primera carga no hace falta, y
+    // medir de nuevo cortaba la entrada desde el espacio y el giro.
+    if (!returning || !ready || !map) return;
+    // Mientras estuvo oculto el contenedor midió 0: se vuelve a medir y, si
+    // estaba girando, sigue.
+    map.resize();
+    if (!map.isMoving()) spinStepRef.current();
+  }, [active, ready]);
 
   // --- Giro ----------------------------------------------------------------
   useEffect(() => {
@@ -843,6 +883,7 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
         }}
       />
       <div ref={containerRef} className="h-full w-full" aria-label="Globo interactivo" />
+      {graphicsLost && <GlobeUnavailable />}
       {tooltip?.label && (
         <div
           role="tooltip"

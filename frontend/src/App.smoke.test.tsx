@@ -352,7 +352,12 @@ describe('caso de investigación (H9.1)', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
     expect(await screen.findByText('Noticias del caso (2)')).toBeTruthy();
-    expect(await screen.findByText(first.title)).toBeTruthy();
-    expect(screen.getByText(second.title)).toBeTruthy();
+    // Explorar sigue montada (oculta) con las mismas notas: se buscan en Casos.
+    const visible = (title: string) =>
+      screen.getAllByText(title).filter((el) => !el.closest('[hidden]'));
+    await waitFor(() => {
+      expect(visible(first.title)).toHaveLength(1);
+    });
+    expect(visible(second.title)).toHaveLength(1);
   }, 15000);
 });

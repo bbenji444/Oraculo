@@ -96,3 +96,30 @@ Cambios:
 - la escala se vuelve a leer en cada cambio de tamaño y de resolución (`spacePixelRatio`, más `matchMedia`);
 - el tamaño de las estrellas lo escala el shader;
 - la 8K se usa siempre que la tarjeta la acepte, porque con 60° la 4K se amplía en casi cualquier pantalla.
+
+## Rendimiento: que no se caiga el globo (26/10/2026)
+
+**Contexto.** En el equipo de Benji (Intel UHD integrada, Direct3D 11) Chrome le quitó el 3D a la página: «Web page caused context loss and was blocked». Esto pasa cuando la tarjeta se reinicia y Chrome culpa a la página. Lo que se midió en ese equipo:
+
+- **La 8K se subía de un solo golpe:** era la tarea más larga de la carga, 550 ms.
+- **El fondo se dibujaba 30 veces por segundo** aunque nada se moviera, por el titileo.
+- **Ir a otra pestaña y volver** destruía y volvía a crear los dos contextos 3D y subía otra vez la 8K.
+- **Debajo de la foto de la NASA se dibujaba el mapa base del mundo**, que no se ve antes del zoom 5.
+
+**Decisiones.**
+
+1. **El cielo en piezas.** La 8K se baja una vez, se decodifica fuera del hilo principal (`createImageBitmap`) y se parte en 8 piezas de 2048 px (`skyTiles`). Se sube una por cuadro con `renderer.initTexture`. Se ve igual de nítida.
+2. **Dibujo bajo demanda.** El fondo solo se dibuja cuando la cámara se mueve o cambia el tamaño, a 30 cuadros por segundo como máximo. Las estrellas propias ya no titilan (en el espacio no lo hacen). Además, sin suavizado de bordes.
+3. **Explorar se queda montada.** `App` la monta la primera vez que se visita y después solo la oculta. Oculta, el globo no gira y el fondo no dibuja. Al desmontar se suelta el contexto de inmediato (`forceContextLoss`).
+4. **El mapa base del mundo empieza en el zoom 5** (`EARTH_FADE_START_ZOOM`), justo donde la foto empieza a desvanecerse.
+5. **Aviso si no vuelve.** Si se pierde el contexto y no regresa en 6 s, el globo dice «No se pudo dibujar el globo» con «Recargar». Si regresa, MapLibre y three.js redibujan solos. Si al crear el globo ya no hay 3D, `GraphicsBoundary` evita la pantalla en blanco.
+
+**Medido después, en el mismo equipo:**
+
+| | Antes | Después |
+|---|---|---|
+| Tarea más larga al cargar | 550 ms | 158 ms |
+| Fondo con el globo quieto | ~30 cuadros/s | 0 |
+| Globo girando, llamadas de dibujo en 3 s | 24,522 | 19,061 (−22 %) |
+| Pestaña Historial, dibujos en 2 s | (se destruía el globo) | 0 |
+| Volver a Explorar | contextos nuevos y otra descarga de la 8K | los mismos lienzos, 0 descargas |

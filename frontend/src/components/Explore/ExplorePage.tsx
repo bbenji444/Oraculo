@@ -60,7 +60,15 @@ function isNarrowScreen(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(NARROW_SCREEN).matches;
 }
 
-export function ExplorePage() {
+interface ExplorePageProps {
+  /**
+   * Si Explorar está a la vista. App la deja montada al cambiar de pestaña
+   * para no destruir y volver a crear el globo cada vez (26/10/2026).
+   */
+  active?: boolean;
+}
+
+export function ExplorePage({ active = true }: ExplorePageProps) {
   const searchId = useExplorerStore((s) => s.searchId);
   const search = useSearch(searchId).data;
   const finished = search !== undefined && isFinished(search.status);
@@ -129,10 +137,15 @@ export function ExplorePage() {
       {/* Cada uno con su red: si la tarjeta de video falla, el resto sigue
           funcionando en lugar de quedar la pantalla en blanco. */}
       <GraphicsBoundary fallback={null}>
-        <SpaceBackground />
+        <SpaceBackground active={active} />
       </GraphicsBoundary>
       <GraphicsBoundary fallback={<GlobeUnavailable />}>
-        <ExploreGlobe articles={inWall ? NO_ARTICLES : shown} colors={colors} onMap={setMap} />
+        <ExploreGlobe
+          articles={inWall ? NO_ARTICLES : shown}
+          colors={colors}
+          onMap={setMap}
+          active={active}
+        />
       </GraphicsBoundary>
       <CaseWall map={map} />
       <CasesOnGlobe map={map} />

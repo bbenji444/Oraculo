@@ -1,12 +1,19 @@
 /**
  * Fondo de universo detrás del globo (ADR-0017): la esfera de estrellas y Vía
- * Láctea de la NASA vista desde dentro, más estrellas propias nítidas que
- * titilan. Gira con la cámara del mapa (`useCameraStore`), así el universo
- * acompaña al globo.
+ * Láctea de la NASA vista desde dentro, más estrellas propias nítidas. Gira con
+ * la cámara del mapa (`useCameraStore`), así el universo acompaña al globo.
  *
- * Rendimiento: dibuja a 30 cuadros por segundo como máximo, con resolución
- * limitada, y se detiene si la pestaña no está a la vista. Con "menos
- * movimiento" las estrellas no titilan y solo se dibuja al mover la cámara.
+ * Rendimiento (26/10/2026: la tarjeta Intel integrada de Benji se reiniciaba y
+ * Chrome le quitaba el 3D a la página):
+ * - La foto 8K se baja una vez, se decodifica fuera del hilo principal y se
+ *   parte en piezas de 2048 px (`skyTiles`) que se suben a la tarjeta una por
+ *   cuadro. Subirla entera de un golpe era la operación más larga de la página.
+ * - Solo se dibuja cuando la cámara se mueve o cambia el tamaño, a 30 cuadros
+ *   por segundo como máximo. Quieto, no gasta nada. Con `active` en falso
+ *   (otra pestaña del sistema) no dibuja.
+ * - Sin suavizado de bordes: a un cielo de estrellas no le sirve y cuesta
+ *   memoria de video.
+ * - Al salir de Explorar se suelta el contexto de la tarjeta de inmediato.
  *
  * No hace: no dibuja la Tierra (eso es MapLibre, encima de este lienzo).
  */
@@ -24,28 +31,28 @@ import {
   ShaderMaterial,
   SphereGeometry,
   SRGBColorSpace,
-  TextureLoader,
+  Texture,
   WebGLRenderer,
 } from 'three';
 
 import {
   makeStars,
-  SPACE_FPS,
   SKY_FIELD_OF_VIEW,
+  skyTiles,
+  SPACE_FPS,
   spacePixelRatio,
   STAR_MAX_SIZE,
   STARMAP_BLACK_POINT,
   STARMAP_GAIN,
   starCameraRotation,
   starTextureFor,
-  TWINKLE_MIN,
 } from '../../map/space';
-import { prefersReducedMotion } from '../../map/spin';
 import { useCameraStore } from '../../store/camera';
 
 // Radio de la esfera del cielo (su campo de visión es SKY_FIELD_OF_VIEW).
 const SKY_RADIUS = 100;
-const SPHERE_SEGMENTS = 64;
+// Segmentos de cada pieza: la esfera entera queda con unos 64 × 32, como antes.
+const TILE_SEGMENTS = 16;
 // Las estrellas propias van un poco dentro de la esfera para quedar encima.
 const STARS_RADIUS = 95;
 const MS_PER_SECOND = 1000;
@@ -76,19 +83,13 @@ const SKY_FRAGMENT = /* glsl */ `
 // Las estrellas grandes se dibujan más brillantes; las chicas, tenues.
 const STAR_VERTEX = /* glsl */ `
   attribute float size;
-  attribute float phase;
   attribute float tint;
-  uniform float time;
-  uniform float twinkleMin;
   uniform float maxSize;
   uniform float pixelRatio;
   varying float vAlpha;
   varying vec3 vColor;
   void main() {
-    // Titileo lento: cada estrella con su desfase y su propio ritmo.
-    float wave = 0.5 + 0.5 * sin(time * (0.4 + 0.3 * fract(phase)) + phase);
-    float bright = clamp(size / maxSize, 0.35, 1.0);
-    vAlpha = mix(twinkleMin, 1.0, wave) * bright;
+    vAlpha = clamp(size / maxSize, 0.35, 1.0);
     // Colores de estrellas reales: azuladas, blancas y algunas amarillas o naranjas.
     vec3 blue = vec3(0.72, 0.82, 1.0);
     vec3 white = vec3(1.0, 0.98, 0.95);
@@ -110,13 +111,31 @@ const STAR_FRAGMENT = /* glsl */ `
   }
 `;
 
-export function SpaceBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+interface SpaceBackgroundProps {
+  /** Si Explorar está a la vista; en otra pestaña del sistema no se dibuja. */
+  active?: boolean;
+}
+
+export function SpaceBackground({ active = true }: SpaceBackgroundProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef(active);
+  const requestDrawRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
+    activeRef.current = active;
+    // Al volver a Explorar, se pinta con la vista actual.
+    if (active) requestDrawRef.current();
+  }, [active]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    // Un lienzo nuevo en cada montaje: al salir se suelta su contexto
+    // (forceContextLoss) y ese lienzo ya no sirve para otro.
+    const canvas = document.createElement('canvas');
+    canvas.className = 'absolute inset-0 h-full w-full';
+    host.append(canvas);
+    const renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false });
     renderer.setPixelRatio(spacePixelRatio(window.devicePixelRatio));
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.setClearColor(new Color('#02030a'));
@@ -124,27 +143,6 @@ export function SpaceBackground() {
     const scene = new Scene();
     const camera = new PerspectiveCamera(SKY_FIELD_OF_VIEW, 1, 0.1, SKY_RADIUS * 2);
     camera.rotation.order = 'YXZ';
-
-    const textureName = starTextureFor(renderer.capabilities.maxTextureSize);
-    const texture = new TextureLoader().load(`/tiles/space/${textureName}`, () => {
-      draw();
-    });
-    texture.colorSpace = SRGBColorSpace;
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    const sky = new Mesh(
-      new SphereGeometry(SKY_RADIUS, SPHERE_SEGMENTS, SPHERE_SEGMENTS),
-      new ShaderMaterial({
-        vertexShader: SKY_VERTEX,
-        fragmentShader: SKY_FRAGMENT,
-        uniforms: {
-          map: { value: texture },
-          blackPoint: { value: STARMAP_BLACK_POINT },
-          gain: { value: STARMAP_GAIN },
-        },
-        side: BackSide,
-      }),
-    );
-    scene.add(sky);
 
     const stars = makeStars();
     const geometry = new BufferGeometry();
@@ -161,30 +159,25 @@ export function SpaceBackground() {
       new BufferAttribute(Float32Array.from(stars.map((s) => s.size)), 1),
     );
     geometry.setAttribute(
-      'phase',
-      new BufferAttribute(Float32Array.from(stars.map((s) => s.phase)), 1),
-    );
-    geometry.setAttribute(
       'tint',
       new BufferAttribute(Float32Array.from(stars.map((s) => s.tint)), 1),
     );
-    const reduced = prefersReducedMotion();
-    const timeUniform = { value: 0 };
     const pixelRatioUniform = { value: renderer.getPixelRatio() };
     const material = new ShaderMaterial({
       vertexShader: STAR_VERTEX,
       fragmentShader: STAR_FRAGMENT,
-      uniforms: {
-        time: timeUniform,
-        twinkleMin: { value: reduced ? 1 : TWINKLE_MIN },
-        maxSize: { value: STAR_MAX_SIZE },
-        pixelRatio: pixelRatioUniform,
-      },
+      uniforms: { maxSize: { value: STAR_MAX_SIZE }, pixelRatio: pixelRatioUniform },
       transparent: true,
       depthWrite: false,
       blending: AdditiveBlending,
     });
     scene.add(new Points(geometry, material));
+
+    let disposed = false;
+    // Función y no la variable: dentro de la carga asíncrona TypeScript daría
+    // por hecho que sigue en falso (cambia en la limpieza, entre los await).
+    const isDisposed = () => disposed;
+    const tiles: { mesh: Mesh<SphereGeometry, ShaderMaterial>; texture: Texture }[] = [];
 
     const resize = () => {
       const { clientWidth, clientHeight } = canvas;
@@ -195,20 +188,96 @@ export function SpaceBackground() {
       camera.aspect = clientWidth / Math.max(1, clientHeight);
       camera.updateProjectionMatrix();
     };
-    const applyView = () => {
+    const draw = () => {
+      if (disposed || renderer.getContext().isContextLost()) return;
       const rotation = starCameraRotation(useCameraStore.getState().view);
       camera.rotation.set(rotation.x, rotation.y, rotation.z);
-    };
-    function draw() {
-      applyView();
       renderer.render(scene, camera);
-    }
+    };
+
+    // Un dibujo por cuadro como mucho y a 30 por segundo: los movimientos de la
+    // cámara llegan a 60 por segundo mientras el globo gira.
+    let frame = 0;
+    let lastDraw = 0;
+    const frameDraw = (now: number) => {
+      if (now - lastDraw < MS_PER_SECOND / SPACE_FPS) {
+        frame = requestAnimationFrame(frameDraw);
+        return;
+      }
+      frame = 0;
+      lastDraw = now;
+      draw();
+    };
+    const requestDraw = () => {
+      if (frame || disposed || !activeRef.current || document.hidden) return;
+      frame = requestAnimationFrame(frameDraw);
+    };
+    requestDrawRef.current = requestDraw;
+
+    // La foto: se baja, se decodifica fuera del hilo principal y se sube a la
+    // tarjeta en piezas, una por cuadro (ver SKY_TILE_PX).
+    const addTiles = async () => {
+      const name = starTextureFor(renderer.capabilities.maxTextureSize);
+      const response = await fetch(`/tiles/space/${name}`);
+      const full = await createImageBitmap(await response.blob());
+      const pieces = skyTiles(full.width, full.height);
+      for (const piece of pieces) {
+        if (isDisposed()) break;
+        // imageOrientation «flipY»: three.js no voltea las ImageBitmap y la
+        // esfera espera la foto con el norte arriba.
+        const bitmap = await createImageBitmap(full, piece.x, piece.y, piece.width, piece.height, {
+          imageOrientation: 'flipY',
+        });
+        if (isDisposed()) {
+          bitmap.close();
+          break;
+        }
+        const texture = new Texture(bitmap);
+        texture.flipY = false;
+        texture.colorSpace = SRGBColorSpace;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.needsUpdate = true;
+        const mesh = new Mesh(
+          new SphereGeometry(
+            SKY_RADIUS,
+            TILE_SEGMENTS,
+            TILE_SEGMENTS,
+            piece.phiStart,
+            piece.phiLength,
+            piece.thetaStart,
+            piece.thetaLength,
+          ),
+          new ShaderMaterial({
+            vertexShader: SKY_VERTEX,
+            fragmentShader: SKY_FRAGMENT,
+            uniforms: {
+              map: { value: texture },
+              blackPoint: { value: STARMAP_BLACK_POINT },
+              gain: { value: STARMAP_GAIN },
+            },
+            side: BackSide,
+          }),
+        );
+        // Se sube ya (no en el siguiente dibujo) y se espera un cuadro antes
+        // de la siguiente pieza: así la tarjeta nunca hace una subida larga.
+        renderer.initTexture(texture);
+        tiles.push({ mesh, texture });
+        scene.add(mesh);
+        requestDraw();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      full.close();
+    };
+    addTiles().catch(() => {
+      // Sin la foto queda el cielo negro con las estrellas propias: no es error
+      // para el analista (por ejemplo, si se sale de Explorar mientras carga).
+    });
 
     resize();
-    draw();
+    requestDraw();
     const observer = new ResizeObserver(() => {
       resize();
-      draw();
+      requestDraw();
     });
     observer.observe(canvas);
     // Un cambio de escala solo (zoom del navegador, otra pantalla) no siempre
@@ -217,7 +286,7 @@ export function SpaceBackground() {
     let scaleQuery: MediaQueryList | null = null;
     const onScale = () => {
       resize();
-      draw();
+      requestDraw();
       watchScale();
     };
     function watchScale() {
@@ -228,35 +297,40 @@ export function SpaceBackground() {
       scaleQuery.addEventListener('change', onScale);
     }
     watchScale();
-    // Con "menos movimiento" solo se dibuja cuando la cámara se mueve.
-    const unsubscribe = useCameraStore.subscribe(() => {
-      if (reduced) draw();
-    });
-
-    let frame = 0;
-    let last = 0;
-    const tick = (now: number) => {
-      frame = requestAnimationFrame(tick);
-      if (document.hidden || now - last < MS_PER_SECOND / SPACE_FPS) return;
-      last = now;
-      timeUniform.value = now / MS_PER_SECOND;
-      draw();
+    // Solo se dibuja cuando la cámara se mueve.
+    const unsubscribe = useCameraStore.subscribe(requestDraw);
+    const onVisibility = () => {
+      requestDraw();
     };
-    if (!reduced) frame = requestAnimationFrame(tick);
+    document.addEventListener('visibilitychange', onVisibility);
+    // Si el navegador devuelve la tarjeta, three.js vuelve a subir lo que
+    // necesita; aquí solo hace falta volver a pintar.
+    canvas.addEventListener('webglcontextrestored', requestDraw);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frame);
       unsubscribe();
       observer.disconnect();
       scaleQuery?.removeEventListener('change', onScale);
+      document.removeEventListener('visibilitychange', onVisibility);
+      canvas.removeEventListener('webglcontextrestored', requestDraw);
       geometry.dispose();
       material.dispose();
-      texture.dispose();
-      sky.geometry.dispose();
-      sky.material.dispose();
+      for (const { mesh, texture } of tiles) {
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+        texture.dispose();
+        const image: unknown = texture.image;
+        if (image instanceof ImageBitmap) image.close();
+      }
       renderer.dispose();
+      // Suelta el contexto ya, sin esperar al recolector: Chrome limita cuántos
+      // contextos 3D puede haber y cada uno ocupa memoria de video.
+      renderer.forceContextLoss();
+      canvas.remove();
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />;
+  return <div ref={hostRef} className="absolute inset-0" aria-hidden="true" />;
 }

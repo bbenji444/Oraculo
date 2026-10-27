@@ -79,6 +79,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El globo ya no se cae en tarjetas de video integradas** (26/10/2026, ADR-0017): en la Intel UHD de Benji, Chrome le quitaba el 3D a la página. Ahora la foto del cielo se sube en 8 piezas (la tarea más larga de la carga bajó de 550 a 158 ms), el fondo solo se dibuja cuando la cámara se mueve (0 dibujos con el globo quieto), Explorar se queda montada al cambiar de pestaña, sin crear el globo otra vez, y el mapa base del mundo ya no se dibuja debajo de la foto de la NASA (−22 % de dibujos al girar). Si aun así se pierden los gráficos y no vuelven en 6 s, el globo lo avisa.
 - **Descargar el PDF ya no deja la pantalla en blanco** (26/10/2026): si la tarjeta de video se reinicia y Chrome bloquea los gráficos 3D de la página, el globo muestra un aviso con «Recargar». La búsqueda, la cronología y el PDF siguen funcionando. Antes, el error al crear el globo desmontaba toda la aplicación.
 - **El mismo hecho ya no se parte cuando un caso domina** (ADR-0026): la vinculación a proceso de Jáuregui quedaba en unas 12 historias, porque sus palabras salían en decenas de títulos y dejaban de contar como poco comunes. Ahora basta un parecido por palabras de 0.75 o más con 3 palabras en común, y la nota entra a la historia más parecida, no a la más antigua. La corrida FGR pasa de 94 a 87 hechos. Se reagrupó el 26/10/2026, con respaldo previo.
 - **Elegir una nota ya no desplaza la pantalla de Explorar** ni deja una franja negra abajo.
