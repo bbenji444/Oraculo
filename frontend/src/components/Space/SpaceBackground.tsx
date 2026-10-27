@@ -32,7 +32,7 @@ import {
   makeStars,
   SPACE_FPS,
   SKY_FIELD_OF_VIEW,
-  SPACE_MAX_PIXEL_RATIO,
+  spacePixelRatio,
   STAR_MAX_SIZE,
   STARMAP_BLACK_POINT,
   STARMAP_GAIN,
@@ -81,6 +81,7 @@ const STAR_VERTEX = /* glsl */ `
   uniform float time;
   uniform float twinkleMin;
   uniform float maxSize;
+  uniform float pixelRatio;
   varying float vAlpha;
   varying vec3 vColor;
   void main() {
@@ -93,7 +94,7 @@ const STAR_VERTEX = /* glsl */ `
     vec3 white = vec3(1.0, 0.98, 0.95);
     vec3 warm = vec3(1.0, 0.84, 0.64);
     vColor = tint < 0.5 ? mix(blue, white, tint * 2.0) : mix(white, warm, (tint - 0.5) * 2.0);
-    gl_PointSize = size;
+    gl_PointSize = size * pixelRatio;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -116,7 +117,7 @@ export function SpaceBackground() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, SPACE_MAX_PIXEL_RATIO));
+    renderer.setPixelRatio(spacePixelRatio(window.devicePixelRatio));
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.setClearColor(new Color('#02030a'));
 
@@ -124,10 +125,7 @@ export function SpaceBackground() {
     const camera = new PerspectiveCamera(SKY_FIELD_OF_VIEW, 1, 0.1, SKY_RADIUS * 2);
     camera.rotation.order = 'YXZ';
 
-    const textureName = starTextureFor(
-      renderer.capabilities.maxTextureSize,
-      window.screen.width * window.devicePixelRatio,
-    );
+    const textureName = starTextureFor(renderer.capabilities.maxTextureSize);
     const texture = new TextureLoader().load(`/tiles/space/${textureName}`, () => {
       draw();
     });
@@ -157,10 +155,10 @@ export function SpaceBackground() {
         3,
       ),
     );
-    const pixelRatio = renderer.getPixelRatio();
+    // Tamaños en pixeles CSS: el shader los multiplica por la resolución actual.
     geometry.setAttribute(
       'size',
-      new BufferAttribute(Float32Array.from(stars.map((s) => s.size * pixelRatio)), 1),
+      new BufferAttribute(Float32Array.from(stars.map((s) => s.size)), 1),
     );
     geometry.setAttribute(
       'phase',
@@ -172,13 +170,15 @@ export function SpaceBackground() {
     );
     const reduced = prefersReducedMotion();
     const timeUniform = { value: 0 };
+    const pixelRatioUniform = { value: renderer.getPixelRatio() };
     const material = new ShaderMaterial({
       vertexShader: STAR_VERTEX,
       fragmentShader: STAR_FRAGMENT,
       uniforms: {
         time: timeUniform,
         twinkleMin: { value: reduced ? 1 : TWINKLE_MIN },
-        maxSize: { value: STAR_MAX_SIZE * pixelRatio },
+        maxSize: { value: STAR_MAX_SIZE },
+        pixelRatio: pixelRatioUniform,
       },
       transparent: true,
       depthWrite: false,
@@ -188,6 +188,9 @@ export function SpaceBackground() {
 
     const resize = () => {
       const { clientWidth, clientHeight } = canvas;
+      // La escala se vuelve a leer cada vez (ver spacePixelRatio).
+      renderer.setPixelRatio(spacePixelRatio(window.devicePixelRatio));
+      pixelRatioUniform.value = renderer.getPixelRatio();
       renderer.setSize(clientWidth, clientHeight, false);
       camera.aspect = clientWidth / Math.max(1, clientHeight);
       camera.updateProjectionMatrix();
@@ -208,6 +211,23 @@ export function SpaceBackground() {
       draw();
     });
     observer.observe(canvas);
+    // Un cambio de escala solo (zoom del navegador, otra pantalla) no siempre
+    // cambia el tamaño en CSS: se escucha aparte, y se vuelve a escuchar con la
+    // escala nueva cada vez que cambia.
+    let scaleQuery: MediaQueryList | null = null;
+    const onScale = () => {
+      resize();
+      draw();
+      watchScale();
+    };
+    function watchScale() {
+      scaleQuery?.removeEventListener('change', onScale);
+      // Sin matchMedia (navegadores viejos, pruebas) basta el ResizeObserver.
+      if (typeof window.matchMedia !== 'function') return;
+      scaleQuery = window.matchMedia(`(resolution: ${String(window.devicePixelRatio)}dppx)`);
+      scaleQuery.addEventListener('change', onScale);
+    }
+    watchScale();
     // Con "menos movimiento" solo se dibuja cuando la cámara se mueve.
     const unsubscribe = useCameraStore.subscribe(() => {
       if (reduced) draw();
@@ -228,6 +248,7 @@ export function SpaceBackground() {
       cancelAnimationFrame(frame);
       unsubscribe();
       observer.disconnect();
+      scaleQuery?.removeEventListener('change', onScale);
       geometry.dispose();
       material.dispose();
       texture.dispose();
