@@ -63,6 +63,7 @@ from app.domain.aggregates import NoteLocation
 from app.domain.dedupe import (
     GOOGLE_NEWS_HOST,
     NEAR_DUPLICATE_WINDOW,
+    SAME_OUTLET_WINDOW,
     DedupedArticle,
     KnownArticle,
     is_google_news,
@@ -570,18 +571,24 @@ class ResultPreview:
 # pg_trgm usa el índice ``articles_title_trgm`` con su umbral por defecto
 # (0.3), mucho más bajo que la regla del dominio (0.9 con rapidfuzz): aquí
 # solo se junta a las posibles; ``match_known`` decide. Sin fecha, solo
-# cuenta el título idéntico, igual que en ``dedupe``.
+# cuenta el título idéntico, igual que en ``dedupe``. La segunda rama trae la
+# misma nota del mismo medio que Google News vuelve a fechar días después.
 _KNOWN_LIKE = text(
     """
-    SELECT id, url_canonical, title_norm, published_at
+    SELECT id, url_canonical, title_norm, published_at, source_domain
     FROM articles
     WHERE url_hash <> :hash
-      AND CASE WHEN CAST(:published AS timestamptz) IS NULL OR published_at IS NULL
-               THEN title_norm = :title
-               ELSE title_norm % :title
-                    AND published_at BETWEEN CAST(:date_from AS timestamptz)
-                                         AND CAST(:date_to AS timestamptz)
-          END
+      AND (
+            CASE WHEN CAST(:published AS timestamptz) IS NULL OR published_at IS NULL
+                 THEN title_norm = :title
+                 ELSE title_norm % :title
+                      AND published_at BETWEEN CAST(:date_from AS timestamptz)
+                                           AND CAST(:date_to AS timestamptz)
+            END
+         OR (source_domain = CAST(:domain AS text) AND title_norm = :title
+             AND published_at BETWEEN CAST(:outlet_from AS timestamptz)
+                                  AND CAST(:outlet_to AS timestamptz))
+      )
     ORDER BY similarity(title_norm, :title) DESC
     LIMIT :limit
     """
@@ -682,12 +689,17 @@ class PostgresArticleStore:
                         "published": published,
                         "date_from": published - NEAR_DUPLICATE_WINDOW if published else None,
                         "date_to": published + NEAR_DUPLICATE_WINDOW if published else None,
+                        "domain": item.article.source_domain,
+                        "outlet_from": published - SAME_OUTLET_WINDOW if published else None,
+                        "outlet_to": published + SAME_OUTLET_WINDOW if published else None,
                         "limit": _KNOWN_LIKE_LIMIT,
                     },
                 )
                 found.append(
                     [
-                        KnownArticle(r.id, r.url_canonical, r.title_norm, r.published_at)
+                        KnownArticle(
+                            r.id, r.url_canonical, r.title_norm, r.published_at, r.source_domain
+                        )
                         for r in rows
                     ]
                 )

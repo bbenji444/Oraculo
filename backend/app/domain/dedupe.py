@@ -36,6 +36,15 @@ NEAR_DUPLICATE_SIMILARITY = 0.9
 # Ventana de fechas para "casi iguales" (§9): el mismo hecho publicado un día
 # después por otro medio sigue siendo la misma nota.
 NEAR_DUPLICATE_WINDOW = timedelta(days=1)
+# Google News vuelve a dar notas viejas con otra liga y una fecha días después.
+# Medido el 27/10/2026: «Don Rodo, hermano de El Mencho, gana amparo a la FGR»
+# (oem.com.mx) llegó con fecha del 23/10 y otra vez del 26/10, y se guardó dos
+# veces. El mismo medio con el mismo título exacto es la misma nota dentro de
+# esta ventana.
+SAME_OUTLET_WINDOW = timedelta(days=7)
+# Pero un medio sí repite títulos cortos: sus columnas («Portafolios Político»,
+# «Se pudrió el PAN») salen con el mismo nombre en días distintos.
+SAME_OUTLET_MIN_WORDS = 6
 # Parámetros que solo rastrean de dónde vino el clic; no cambian la nota.
 _TRACKING_PARAMS = frozenset(
     {
@@ -226,12 +235,29 @@ class KnownArticle:
         url_canonical: Su URL canónica.
         title_norm: Su título normalizado.
         published_at: Su fecha (UTC), si la tiene.
+        source_domain: Dominio de su medio, si se conoce.
     """
 
     article_id: int
     url_canonical: str
     title_norm: str
     published_at: datetime | None
+    source_domain: str | None = None
+
+
+def _same_outlet(known: KnownArticle, item: DedupedArticle) -> bool:
+    """Mismo medio, mismo título exacto (largo) y a ≤ ``SAME_OUTLET_WINDOW``."""
+    domain = item.article.source_domain
+    published = item.article.published_at
+    return (
+        domain is not None
+        and known.source_domain == domain
+        and known.title_norm == item.title_norm
+        and len(item.title_norm.split()) >= SAME_OUTLET_MIN_WORDS
+        and known.published_at is not None
+        and published is not None
+        and abs(known.published_at - published) <= SAME_OUTLET_WINDOW
+    )
 
 
 def match_known(
@@ -239,8 +265,10 @@ def match_known(
 ) -> KnownArticle | None:
     """Busca, entre notas ya guardadas, la misma nota que ``item`` con otro link.
 
-    Usa la misma regla que ``dedupe`` (título ≥ 0.9 de parecido y ±1 día).
-    Si varias cumplen, gana la de título más parecido.
+    Usa la misma regla que ``dedupe`` (título ≥ 0.9 de parecido y ±1 día),
+    o el mismo medio con el mismo título exacto a ≤ 7 días: Google News
+    vuelve a dar notas viejas con otra fecha. Si varias cumplen, gana la de
+    título más parecido.
 
     Args:
         item: Nota nueva, ya sin duplicados dentro de su búsqueda.
@@ -259,6 +287,9 @@ def match_known(
         k
         for k in known
         if k.url_canonical != item.url_canonical
-        and _close(k.title_norm, k.published_at, item.title_norm, published, similarity)
+        and (
+            _close(k.title_norm, k.published_at, item.title_norm, published, similarity)
+            or _same_outlet(k, item)
+        )
     ]
     return max(matches, key=lambda k: similarity(k.title_norm, item.title_norm), default=None)

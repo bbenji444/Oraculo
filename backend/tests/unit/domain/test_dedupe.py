@@ -1,5 +1,6 @@
 """Quitar duplicados de una búsqueda (§9, paso 3), con la similitud real de rapidfuzz."""
 
+from dataclasses import replace as dataclass_replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -191,3 +192,52 @@ def test_guardada_sin_fecha_solo_cuenta_el_titulo_identico() -> None:
 
     assert match_known(new, [known(2, GOOGLE_URL, MICKY, None)], title_similarity) is not None
     assert match_known(new, [known(2, GOOGLE_URL, MICKY + ".", None)], title_similarity) is None
+
+
+# Par real (auditoría del 27/10/2026): Google News volvió a dar la nota de
+# oem.com.mx tres días después, con otra liga.
+DON_RODO = "Don Rodo, hermano de El Mencho, gana amparo a la FGR"
+
+
+def outlet_known(
+    title: str, domain: str | None, published: datetime = NOON - timedelta(days=3)
+) -> KnownArticle:
+    return KnownArticle(
+        7,
+        canonical_url("https://oem.com.mx/la-prensa/don-rodo"),
+        normalize_name(title),
+        published,
+        domain,
+    )
+
+
+def test_el_mismo_medio_con_el_mismo_titulo_dias_despues_es_la_misma_nota() -> None:
+    [new] = dedupe([article(GOOGLE_URL, DON_RODO, Provider.GOOGLE_NEWS_RSS)], title_similarity)
+    new.article = replace_domain(new.article, "oem.com.mx")
+
+    match = match_known(new, [outlet_known(DON_RODO, "oem.com.mx")], title_similarity)
+
+    assert match is not None and match.article_id == 7
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        # Otro medio con el mismo título: puede ser otra nota (agencias, refritos).
+        outlet_known(DON_RODO, "milenio.com"),
+        # Fuera de la semana.
+        outlet_known(DON_RODO, "oem.com.mx", NOON - timedelta(days=8)),
+        # Título corto: las columnas repiten su nombre cada día.
+        outlet_known("Portafolios Político", "oem.com.mx"),
+    ],
+)
+def test_mismo_medio_no_basta_sin_titulo_largo_identico_y_cercano(candidate: KnownArticle) -> None:
+    title = "Portafolios Político" if "PORTAFOLIOS" in candidate.title_norm else DON_RODO
+    [new] = dedupe([article(GOOGLE_URL, title, Provider.GOOGLE_NEWS_RSS)], title_similarity)
+    new.article = replace_domain(new.article, "oem.com.mx")
+
+    assert match_known(new, [candidate], title_similarity) is None
+
+
+def replace_domain(raw: RawArticle, domain: str) -> RawArticle:
+    return dataclass_replace(raw, source_domain=domain)
