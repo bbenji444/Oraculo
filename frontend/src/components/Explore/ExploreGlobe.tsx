@@ -828,8 +828,9 @@ export function ExploreGlobe({ articles, colors, onMap }: ExploreGlobeProps) {
         style={{
           background:
             // closest-side: los % son del radio del cuadro (el globo llega al 71 %).
-            // Cian apagado, casi gris: el cian puro se veía demasiado azul.
-            'radial-gradient(circle closest-side, transparent 0 70.5%, rgb(175 214 230 / 0.32) 72%, rgb(130 175 205 / 0.12) 77%, rgb(110 145 185 / 0.04) 87%, transparent 100%)',
+            // Ligeramente azulada (Benji, 26/10/2026): ni el cian puro, que se
+            // veía demasiado azul, ni el gris del primer ajuste.
+            'radial-gradient(circle closest-side, transparent 0 70.5%, rgb(150 205 245 / 0.34) 72%, rgb(100 165 230 / 0.13) 77%, rgb(80 135 215 / 0.045) 87%, transparent 100%)',
         }}
       />
       <div
