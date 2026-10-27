@@ -39,10 +39,21 @@ export function starCameraRotation(view: CameraView): { x: number; y: number; z:
 /** Textura de estrellas disponible (ADR-0017). */
 export type StarTexture = 'starmap_4k.jpg' | 'starmap_8k.jpg';
 
-// 8K solo si la tarjeta gráfica la acepta y la pantalla tiene al menos ~2.5K
-// píxeles de ancho reales: en una pantalla común no se nota y cuesta memoria.
+// 8K si la tarjeta gráfica la acepta y la pantalla tiene al menos 1,600 píxeles
+// de ancho reales. Antes pedía 2,560 y casi todas las pantallas cargaban la 4K,
+// que con el campo de visión del cielo (SKY_FIELD_OF_VIEW) se ampliaba ~2.4
+// veces y se veía pixeleada (Benji, 26/10/2026). Una laptop de 1366 px a 125 %
+// ya son 1,707.
 export const HIGH_RES_MIN_TEXTURE = 8192;
-export const HIGH_RES_MIN_SCREEN_PX = 2560;
+export const HIGH_RES_MIN_SCREEN_PX = 1600;
+
+/**
+ * Campo de visión vertical de la cámara del cielo, en grados. Con 37° (el de
+ * MapLibre) se veía una franja angosta del cielo, muy ampliada. Con 60° la
+ * textura 8K queda casi a su tamaño real. Las estrellas se desplazan un poco
+ * más lento que el globo al girar, y eso se lee como que están más lejos.
+ */
+export const SKY_FIELD_OF_VIEW = 60;
 
 /**
  * Qué textura de estrellas cargar.
@@ -70,11 +81,12 @@ export interface Star {
   tint: number;
 }
 
-// Pocas estrellas nítidas alcanzan: la textura ya trae millones tenues.
-export const STAR_COUNT = 2400;
-// Tamaños en píxeles: la mayoría pequeñas, unas pocas brillantes.
-export const STAR_MIN_SIZE = 0.6;
-export const STAR_MAX_SIZE = 2.4;
+// Estrellas nítidas encima de la textura, que ya trae millones tenues.
+export const STAR_COUNT = 3200;
+// Tamaños en píxeles: la mayoría pequeñas y unas pocas brillantes. Menos de
+// 1 px se dibujaba como un cuadrito que parpadeaba al moverse (26/10/2026).
+export const STAR_MIN_SIZE = 1;
+export const STAR_MAX_SIZE = 3.2;
 // Exponente que hace raras a las estrellas grandes (distribución sesgada).
 const STAR_SIZE_SKEW = 3;
 
@@ -118,11 +130,16 @@ export function makeStars(count: number = STAR_COUNT, seed = 20261017): Star[] {
   });
 }
 
-// El titileo es lento y suave: un ciclo de 2 a 5 s, entre 65 % y 100 % de brillo.
-export const TWINKLE_MIN = 0.65;
-// Brillo de la textura de la NASA: viene tenue (la Vía Láctea casi no se ve en
-// la muestra del 17/10/2026); 1.9 la hace visible sin quemar las estrellas.
-export const STARMAP_EXPOSURE = 1.9;
+// Titileo apenas perceptible, de 85 % a 100 % de brillo en ciclos de 2 a 5 s.
+// En el espacio las estrellas no titilan; con más se veía de caricatura.
+export const TWINKLE_MIN = 0.85;
+// La textura de la NASA viene tenue: la mitad de sus píxeles tienen 8 de 255.
+// Antes se multiplicaba todo por 1.9, y el negro se volvía una bruma granulada.
+// Ahora se resta un punto negro (en luz lineal) y luego se aclara: el fondo
+// queda negro y la Vía Láctea y las estrellas se ven más (medido el 26/10/2026
+// sobre la 8K: percentil 50 = 8, 90 = 16, 99 = 24).
+export const STARMAP_BLACK_POINT = 0.0025;
+export const STARMAP_GAIN = 2.2;
 // El fondo se dibuja a 30 cuadros por segundo: el titileo no necesita más y
 // deja libre la tarjeta gráfica para el globo (meta de 60 fps, §14.2).
 export const SPACE_FPS = 30;

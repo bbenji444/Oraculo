@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeStars, seededRandom, starCameraRotation, starTextureFor, STAR_COUNT } from './space';
+import {
+  makeStars,
+  seededRandom,
+  starCameraRotation,
+  starTextureFor,
+  STAR_COUNT,
+  STAR_MAX_SIZE,
+  STAR_MIN_SIZE,
+} from './space';
 
 describe('fondo de universo', () => {
   it('la cámara de las estrellas gira con la del mapa', () => {
@@ -13,9 +21,11 @@ describe('fondo de universo', () => {
     expect(turned.z).toBeCloseTo((-15 * Math.PI) / 180);
   });
 
-  it('usa 8K solo con tarjeta y pantalla que lo aprovechen', () => {
+  it('usa 8K con tarjeta que la acepte y pantalla de 1,600 px o más', () => {
     expect(starTextureFor(16384, 3840)).toBe('starmap_8k.jpg');
-    expect(starTextureFor(16384, 1920)).toBe('starmap_4k.jpg');
+    // Laptop de 1366 px al 125 %: ya carga la 8K (con la 4K se veía pixeleado).
+    expect(starTextureFor(16384, 1707)).toBe('starmap_8k.jpg');
+    expect(starTextureFor(16384, 1280)).toBe('starmap_4k.jpg');
     expect(starTextureFor(4096, 3840)).toBe('starmap_4k.jpg');
   });
 
@@ -27,12 +37,12 @@ describe('fondo de universo', () => {
     expect(again[123]).toEqual(stars[123]);
     for (const star of stars.slice(0, 200)) {
       expect(Math.hypot(star.x, star.y, star.z)).toBeCloseTo(1);
-      expect(star.size).toBeGreaterThanOrEqual(0.6);
-      expect(star.size).toBeLessThanOrEqual(2.4);
+      expect(star.size).toBeGreaterThanOrEqual(STAR_MIN_SIZE);
+      expect(star.size).toBeLessThanOrEqual(STAR_MAX_SIZE);
     }
     // La mayoría son pequeñas: el promedio queda abajo de la mitad del rango.
     const mean = stars.reduce((sum, s) => sum + s.size, 0) / stars.length;
-    expect(mean).toBeLessThan(1.5);
+    expect(mean).toBeLessThan((STAR_MIN_SIZE + STAR_MAX_SIZE) / 2);
   });
 
   it('el generador con semilla repite la serie', () => {
