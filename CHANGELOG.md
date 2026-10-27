@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Pestaña «God's Eye» (27/10/2026, ADR-0035).** El proyecto [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view) de Bilawal Sidhu (código MIT), copiado tal cual y sin integrar, para que Benji lo evalúe:
+  - `make gev-instalar` lo baja fijo en un commit, con su Node 24 propio verificado;
+  - `make up` lo arranca en http://localhost:4173;
+  - la pestaña, antes de «Estado del sistema», dice si está corriendo y lo abre completo en su propia pestaña (no se deja mostrar dentro de otra página);
+  - verificado: sus 8,809 pruebas (0 fallan) y sus fuentes sin llave, entre ellas vuelos, satélites, misiones, cámaras, clima, incendios, ciclones y sismos.
 - **«Novedades» en el PDF de cada corrida automática (27/10/2026, ADR-0034).** Cada corrida cubre hoy y ayer, así que entre el 66 y el 94 % de sus notas ya venía en la anterior. El reporte ahora se compara con la última corrida automática terminada:
   - en la página 2 dice cuántos hechos son nuevos y cuántos ya se habían reportado;
   - en cada categoría van primero los nuevos, marcados NUEVO;
