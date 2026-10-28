@@ -132,6 +132,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Consola más chaparrita y ubicación sin ambigüedad (28/10/2026).**
+  - La consola del Centro de mando baja de 240 a 179 px de alto con las mismas piezas: el radar, la frase y los márgenes son más chicos, y el costo va en un solo renglón de tres cifras con su nombre completo.
+  - En el filtro de ubicación, «Dentro» y «Fuera» ahora dicen «Dentro de zona» y «Fuera de zona», también en el diseño de columna.
 - **Cada corrida automática trae solo lo publicado desde la anterior (28/10/2026, ADR-0031, migración 0033).** La de las 07:00 cubre de las 23:00 de ayer a las 07:00, la de las 15:00 de 07:00 a 15:00 y la de las 23:00 de 15:00 a 23:00. Antes pedía «hoy y ayer» y la de las 07:00 del 28/10 trajo 356 notas: 160 relevantes, de las que solo 23 eran nuevas. Con la ventana habrían sido 73 notas y 22 relevantes. Lo de fuera ni se guarda ni se paga a la IA. La pantalla y el PDF dicen las horas que cubre cada corrida.
 - **En el expediente, sin la curva de notas por hora; los atajos de la consola se entienden mejor (28/10/2026).** Las corridas dicen sus horas y las búsquedas anteriores, su día: «Tu búsqueda del 27 oct: FGR en Jalisco».
 - **El expediente muestra muchas más noticias (28/10/2026).** En una pantalla de 900 px de alto caben 9 a 11, antes 2 o 3. Cambios:

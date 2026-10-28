@@ -20,8 +20,8 @@ import { GLASS, PANEL_TITLE } from './ui';
 
 const TABS: { id: ListFilter; label: string }[] = [
   { id: 'all', label: 'Todas' },
-  { id: 'true', label: 'Dentro' },
-  { id: 'false', label: 'Fuera' },
+  { id: 'true', label: 'Dentro de zona' },
+  { id: 'false', label: 'Fuera de zona' },
   { id: 'none', label: 'Sin ubicación' },
 ];
 

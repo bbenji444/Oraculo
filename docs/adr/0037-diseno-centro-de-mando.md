@@ -120,3 +120,12 @@ Benji pidió estos ajustes al elegirlo:
   - los resultados anteriores van en un pie a todo el ancho, sin cortar ni desvanecer: la corrida y dos búsquedas (`DOCK_RECENTS`), y si no caben, bajan de renglón.
 - **«Fuente».** La cuarta parte de la frase dice solo «Fuente»; cuántas y de cuáles se lee al pasar el mouse.
 - **Calendario propio** (`HudDatePicker`), con el mismo vidrio y luz que los menús. El del navegador no se puede estilizar.
+
+## Novenos ajustes (28/10/2026, noche)
+
+- **Consola chaparrita.** Benji: «que no abarque mucho espacio del globo». Baja de 240 a 179 px de alto, medido en 1600 × 860, con todo completo:
+  - radar de 4.6 rem;
+  - la frase a 0.92 rem;
+  - el costo en un renglón de tres cifras;
+  - márgenes más cortos.
+- **«Dentro de zona» y «Fuera de zona»** en el filtro de ubicación, en un solo renglón.
