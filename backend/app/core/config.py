@@ -88,6 +88,11 @@ _DEFAULT_AUTOMATIC_CONCEPT = "Fiscalia General de la Republica"
 _DEFAULT_AUTOMATIC_REGION_CODE = "MEX"
 _DEFAULT_AUTOMATIC_WINDOW_DAYS = 1
 _DEFAULT_AUTOMATIC_USER = "monitor-automatico"
+# Tope de notas nuevas que la IA lee en cada corrida automática. La de las 15:00
+# del 27/10/2026 llegó al tope general de 150 y 10 notas esperaron a la
+# siguiente corrida. Benji lo subió a 250: ~0.00024 USD por nota, unos 0.025 USD
+# más por corrida en el peor caso. Las búsquedas manuales siguen con el general.
+_DEFAULT_AUTOMATIC_LLM_MAX_ARTICLES = 250
 _DEFAULT_REPORTS_DIR = _REPO_ROOT / "data" / "reportes"
 
 # Pipeline de búsqueda (F4, ADR-0015):
@@ -256,6 +261,8 @@ class Settings(BaseSettings):
     # que ya se vio en otra corrida se reutiliza sin volver a pagar a la IA.
     automatic_window_days: int = Field(default=_DEFAULT_AUTOMATIC_WINDOW_DAYS, ge=1, le=7)
     automatic_user: str = Field(default=_DEFAULT_AUTOMATIC_USER, min_length=1)
+    # Notas nuevas que la IA lee por corrida (en lugar de LLM_MAX_ARTICLES_PER_SEARCH).
+    automatic_llm_max_articles: int = Field(default=_DEFAULT_AUTOMATIC_LLM_MAX_ARTICLES, ge=1)
     # Carpeta donde cada corrida deja su reporte en PDF (en el disco del servidor).
     reports_dir: Path = _DEFAULT_REPORTS_DIR
 

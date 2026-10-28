@@ -25,7 +25,7 @@ Faltaba unirlas sin que una persona lo pida.
    - región `MEX` (todo México; la geolocalización reparte por estado);
    - hoy y ayer;
    - solo **Google News RSS** y el **índice local**, que se llena cada 15 minutos con GDELT y los RSS de los medios. Son 0 créditos y sin captchas.
-3. **Pasa por las mismas reglas que una manual** (`StartSearch`): tope de consultas, llave de la IA y tope de créditos. Corre en el mismo worker, con el mismo pipeline.
+3. **Pasa por las mismas reglas que una manual** (`StartSearch`): tope de consultas, llave de la IA y tope de créditos. Corre en el mismo worker, con el mismo pipeline. La única diferencia es el tope de notas que lee la IA: `AUTOMATIC_LLM_MAX_ARTICLES` (250) en lugar de `LLM_MAX_ARTICLES_PER_SEARCH` (150). La corrida de las 15:00 del 27/10/2026 llegó al tope general y 10 notas esperaron a la siguiente. Benji lo subió a 250, unos 0.025 USD más por corrida en el peor caso.
 4. **Se guarda todo en PostgreSQL** (migración 0028):
    - la búsqueda, marcada `searches.trigger = 'automatic'`, con su `scheduled_for`;
    - sus notas (`search_results`), la bitácora y el reporte (`reports`);

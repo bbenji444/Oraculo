@@ -100,6 +100,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Las corridas automáticas leen hasta 250 notas nuevas con la IA (27/10/2026, ADR-0031).** Antes era el tope general de 150; en la corrida de las 15:00 se alcanzó y 10 notas esperaron a la siguiente. Cuesta unos 0.025 USD más por corrida en el peor caso. Las búsquedas manuales siguen con 150. Se ajusta con `AUTOMATIC_LLM_MAX_ARTICLES`.
 - **Más noticias a la vista en el expediente y una cronología más clara (27/10/2026).** En una pantalla de 920 px de alto pasan de 3 a unas 6 o 7. Cambios:
   - el resumen es más bajo: cifras más chicas, categorías en un renglón, y pestañas y PDF juntos;
   - si se pliega, el resumen se queda plegado en las siguientes visitas;

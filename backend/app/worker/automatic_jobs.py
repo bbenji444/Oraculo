@@ -109,6 +109,24 @@ def report_file_name(scheduled_for: datetime) -> str:
     return f"fgr_{scheduled_for:%Y-%m-%d_%H%M}.pdf"
 
 
+def automatic_settings(settings: Settings) -> Settings:
+    """La configuración de una corrida automática: su propio tope de notas para la IA.
+
+    Las corridas cubren todo México y dos días, y traen más notas que una
+    búsqueda manual; con el tope general (150) algunas esperaban a la corrida
+    siguiente (27/10/2026). El resto de la configuración es la misma.
+
+    Args:
+        settings: Configuración general.
+
+    Returns:
+        Una copia con ``llm_max_articles_per_search`` = ``automatic_llm_max_articles``.
+    """
+    return settings.model_copy(
+        update={"llm_max_articles_per_search": settings.automatic_llm_max_articles}
+    )
+
+
 async def run_automatic_job(settings: Settings, now: datetime | None = None) -> AutomaticRunSummary:
     """Corre una corrida automática completa.
 
@@ -124,6 +142,7 @@ async def run_automatic_job(settings: Settings, now: datetime | None = None) -> 
         AutomaticRunConfigError: Si falta el concepto o la región del perfil.
         LLMNotConfiguredError, ServiceUnavailableError: Ver ``StartSearch``.
     """
+    settings = automatic_settings(settings)
     local_now = (now or datetime.now(UTC)).astimezone(MEXICO_CITY)
     slot = run_slot(local_now, parse_run_hours(settings.automatic_run_hours))
     engine = create_async_engine(settings.database_url())

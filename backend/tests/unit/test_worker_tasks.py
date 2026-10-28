@@ -13,7 +13,7 @@ from app.application.use_cases.run_search import SearchReport
 from app.core.config import Settings
 from app.domain.search import SearchStatus
 from app.worker import tasks
-from app.worker.automatic_jobs import report_file_name
+from app.worker.automatic_jobs import automatic_settings, report_file_name
 from app.worker.celery_app import AUTOMATIC_RUN_TASK, build_beat_schedule, celery_app
 from app.worker.ingest_jobs import IngestSummary
 from tests.unit.fake_ingest import FILE
@@ -43,6 +43,15 @@ def test_el_reloj_programa_el_monitor_fgr_a_las_7_15_y_23_de_la_cdmx() -> None:
 
 def test_el_monitor_se_apaga_desde_la_configuracion() -> None:
     assert "monitor-fgr" not in build_beat_schedule(Settings(automatic_runs_enabled=False))
+
+
+def test_las_corridas_automaticas_tienen_su_propio_tope_para_la_ia() -> None:
+    general = Settings(llm_max_articles_per_search=150)
+    assert automatic_settings(general).llm_max_articles_per_search == 250
+    # Las búsquedas manuales no cambian.
+    assert general.llm_max_articles_per_search == 150
+    propio = Settings(llm_max_articles_per_search=150, automatic_llm_max_articles=300)
+    assert automatic_settings(propio).llm_max_articles_per_search == 300
 
 
 def test_el_pdf_de_cada_corrida_se_nombra_por_fecha_y_hora() -> None:
