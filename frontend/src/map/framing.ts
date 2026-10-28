@@ -49,10 +49,11 @@ export const GLOBE_EXPAND_ZOOM = 0.18;
 // Duración del corrimiento, en milisegundos: lo que tarda el panel en irse.
 export const GLOBE_FRAME_MS = 900;
 // Diseño «Centro de mando»: el globo se ajusta al espacio libre entre el
-// encabezado y la consola. Ocupa esta parte del lado corto (deja aire para el
-// halo de la atmósfera) y su zoom se queda entre estos topes, para que no se
+// encabezado y la consola. Ocupa todo el lado corto: su orilla y el halo pasan
+// detrás del vidrio de la consola (antes 0.9; Benji lo pidió más grande el
+// 27/10/2026) y su zoom se queda entre estos topes, para que no se
 // vuelva una canica ni se salga de la pantalla.
-export const GLOBE_FIT_SHARE = 0.9;
+export const GLOBE_FIT_SHARE = 1;
 export const GLOBE_FIT_MIN_ZOOM = 1.1;
 export const GLOBE_FIT_MAX_ZOOM = 2.4;
 // Zoom al volar a una nota, según qué tan preciso es su lugar: siempre el

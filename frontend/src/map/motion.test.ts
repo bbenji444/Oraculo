@@ -8,6 +8,7 @@ import {
   introSpin,
   FLY_MAX_MS,
   FLY_MIN_MS,
+  FLY_ARTICLE_FACTOR,
   flyDurationMs,
   flyPitch,
   greatCircleDegrees,
@@ -122,5 +123,16 @@ describe('aparición de los resultados', () => {
     expect(pulsePhase(0)).toBe(0);
     expect(pulsePhase(700)).toBeCloseTo(0.5);
     expect(pulsePhase(1400)).toBe(0);
+  });
+});
+
+describe('vuelo a una nota', () => {
+  it('es más ágil que el vuelo a una región con el mismo recorrido', () => {
+    const from = { lng: -102, lat: 23, zoom: 2 };
+    const to = { lng: -98.2, lat: 19.3, zoom: 11.5 };
+    const region = flyDurationMs(from, to, 'region', 'normal');
+    expect(flyDurationMs(from, to, 'article', 'normal')).toBe(
+      Math.round(region * FLY_ARTICLE_FACTOR),
+    );
   });
 });

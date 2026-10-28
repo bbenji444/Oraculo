@@ -168,6 +168,10 @@ interface Stack {
 // Distancia de la ficha de una nota sin lugar al borde de arriba del espacio
 // libre, en píxeles: debajo de los controles del globo.
 const UNPLACED_CARD_TOP_PX = 72;
+// En el Centro de mando, los controles del globo van arriba a la izquierda,
+// debajo del encabezado: la ficha de una nota empieza debajo de ellos para no
+// taparlos (alto de su renglón de botones más su margen, en píxeles).
+const MANDO_CONTROLS_PX = 60;
 
 interface Callout {
   // Nota a la que pertenece: si cambia la nota elegida, esta ficha ya no se muestra.
@@ -180,7 +184,9 @@ interface Callout {
 // Vista de «inicio»: México con el eje inclinado (map/spin.ts). Es a donde
 // vuelven «Limpiar globo» y el botón de inicio.
 const INITIAL_CENTER: [number, number] = [-102, 23.5];
-const INITIAL_ZOOM = 1.8;
+// Un poco más cerca que al principio (1.8): el globo abarca más pantalla al
+// abrir el sistema (Benji, 27/10/2026).
+const INITIAL_ZOOM = 2;
 // Al abrir el sistema la entrada termina sobre el Atlántico (Benji, 26/10/2026)
 // y desde ahí el giro normal trae a América y a México a la vista.
 const INTRO_CENTER: [number, number] = [-35, 20];
@@ -194,6 +200,9 @@ const GRAPHICS_LOST_NOTICE_MS = 6000;
 // Curva de vuelo de MapLibre: 1.42 es su valor por defecto (aleja y acerca
 // sin marear); un poco más alta da más sensación de "despegue".
 const FLY_CURVE = 1.5;
+// Vuelo a una nota: más arco (se aleja un poco y cae sobre el lugar), para que
+// se sienta el viaje aunque la nota esté cerca (Benji: «más dinámicos»).
+const ARTICLE_FLY_CURVE = 1.9;
 // Lista de un grupo: 20 rem de ancho; alto según cuántas notas (encabezado +
 // renglones de dos líneas), con tope y desplazamiento dentro.
 const STACK_WIDTH = 320;
@@ -325,6 +334,8 @@ export function ExploreGlobe({
   // La entrada desde el espacio terminó: hasta entonces nadie más mueve la cámara
   // (el muro de la 9.6 volaría y la entrada lo pisaría).
   const [introFinished, setIntroFinished] = useState(false);
+  // Sube cuando aterriza un vuelo que dejó pendiente el encuadre de los paneles.
+  const [framePending, setFramePending] = useState(0);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [callout, setCallout] = useState<Callout | null>(null);
   const [stack, setStack] = useState<Stack | null>(null);
@@ -368,6 +379,9 @@ export function ExploreGlobe({
   const expandedRef = useRef(false);
   // Mientras se corre el encuadre, el giro espera: el corrimiento ya lo incluye.
   const framingRef = useRef(false);
+  // Si hay un vuelo pedido en curso (a una nota o región): el encuadre no lo
+  // interrumpe, solo cambia el margen de la cámara.
+  const flyingRef = useRef(false);
   const earthRef = useRef(earth);
   const lastInteractionRef = useRef(0);
   const levelRef = useRef<RegionLevel | null>(null);
@@ -411,7 +425,6 @@ export function ExploreGlobe({
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
     const stopAttribution = collapseAttributionOnStart(map.getContainer());
     const fly = smoothFlights(map, () => window.devicePixelRatio);
-    flyRef.current = fly;
 
     let introDone = !intro;
     let introFrame = 0;
@@ -436,6 +449,20 @@ export function ExploreGlobe({
     };
     spinStepRef.current = spinStep;
     map.on('moveend', spinStep);
+    // Un vuelo pedido (elegir una nota, reabrir una búsqueda) termina la
+    // entrada: si no, la entrada seguía moviendo la cámara cuadro a cuadro y
+    // el globo nunca llegaba a la nota (27/10/2026).
+    flyRef.current = (duration, start) => {
+      finishIntro();
+      fly(duration, () => {
+        start();
+        if (!map.isMoving()) return;
+        flyingRef.current = true;
+        map.once('moveend', () => {
+          flyingRef.current = false;
+        });
+      });
+    };
     for (const type of USER_EVENTS) {
       map.on(type, () => {
         lastInteractionRef.current = performance.now();
@@ -754,6 +781,18 @@ export function ExploreGlobe({
     // En el Centro de mando el globo se ajusta también al terminar la entrada.
     const firstFit = clearHeader && !fittedRef.current;
     if (sameInsets(previous, next) && !firstFit) return;
+    if (flyingRef.current) {
+      // Va volando a una nota o región: cambiar el margen ahora (setPadding es
+      // un jumpTo) cortaba el vuelo a medio camino. Se encuadra al aterrizar.
+      insetsRef.current = previous;
+      const retry = () => {
+        setFramePending((count) => count + 1);
+      };
+      map.once('moveend', retry);
+      return () => {
+        map.off('moveend', retry);
+      };
+    }
     fittedRef.current = true;
     let zoom: number;
     if (clearHeader) {
@@ -790,7 +829,7 @@ export function ExploreGlobe({
     };
     if (map.isMoving()) map.once('moveend', done);
     else done();
-  }, [insetLeft, insetRight, insetBottom, clearHeader, ready, introFinished]);
+  }, [insetLeft, insetRight, insetBottom, clearHeader, ready, introFinished, framePending]);
 
   // --- Giro ----------------------------------------------------------------
   useEffect(() => {
@@ -956,7 +995,7 @@ export function ExploreGlobe({
       const point = map.project([lng, lat]);
       setCallout({ articleId: article.article_id, x: point.x, y: point.y, visible: true });
     };
-    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'region', motionRef.current);
+    const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'article', motionRef.current);
     flyRef.current(duration, () => {
       map.flyTo({
         center: [lng, lat],
@@ -964,7 +1003,7 @@ export function ExploreGlobe({
         offset: articleOffset(screenOf(map)),
         pitch: flyPitch('article'),
         bearing: REGION_BEARING,
-        curve: FLY_CURVE,
+        curve: ARTICLE_FLY_CURVE,
         duration,
         essential: false,
       });
@@ -1030,8 +1069,11 @@ export function ExploreGlobe({
   // Lugar de la ficha: nunca se sale del mapa ni sube al encabezado
   // (map/newsLayers.ts). Si se arrastró, se suma lo que se movió, sin salirse.
   const cardWidth = calloutWidth(viewport);
+  const cardViewport = clearHeader
+    ? { ...viewport, top: viewport.top + MANDO_CONTROLS_PX }
+    : viewport;
   const placement = (point: { x: number; y: number }) => {
-    const base = calloutPlacement(point, { width: cardWidth, height: cardHeight }, viewport);
+    const base = calloutPlacement(point, { width: cardWidth, height: cardHeight }, cardViewport);
     if (drag.articleId !== articleId) return base;
     const left = clamp(
       base.left + drag.dx,

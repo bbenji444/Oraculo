@@ -716,7 +716,8 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 - La rotación se detiene al interactuar y hay un botón para reanudarla. Se reanuda sola tras 25 s sin uso, acelerando poco a poco.
 
 **Movimiento**
-- Los vuelos duran según la distancia y el cambio de zoom (1.2 a 4.5 s). Subir por las migas de pan es más rápido.
+- Los vuelos duran según la distancia y el cambio de zoom (1.2 a 4.5 s). Subir por las migas de pan es más rápido, y volar a una noticia también (75 % del tiempo, con más arco).
+- Elegir una noticia siempre la ubica: el vuelo termina la entrada si aún no acaba, y el encuadre de los paneles espera a que aterrice. Si la noticia no tiene lugar, su ficha sale sin vuelo.
 - Control de velocidad: lenta, normal, rápida o sin animación. Se recuerda en el navegador. Si el sistema pide menos movimiento, no hay animaciones.
 
 **Interacción**

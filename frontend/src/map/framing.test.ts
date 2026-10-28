@@ -14,6 +14,7 @@ import {
   fitZoom,
   frameZoom,
   GLOBE_FIT_MAX_ZOOM,
+  GLOBE_FIT_SHARE,
   GLOBE_FIT_MIN_ZOOM,
   GLOBE_EXPAND_ZOOM,
   GLOBE_FRAME_MAX_ZOOM,
@@ -265,8 +266,8 @@ describe('frameZoom (encuadre según los paneles)', () => {
 describe('fitZoom (globo entero en el espacio libre, diseño 3)', () => {
   it('achica el globo si no cabe entre el encabezado y la consola', () => {
     // Medido en el navegador: radio de 239 px con zoom 1.8.
-    const zoom = fitZoom(1.8, 239, { width: 1280, height: 496 });
-    expect(zoom).toBeCloseTo(1.8 + Math.log2(((496 / 2) * 0.9) / 239));
+    const zoom = fitZoom(1.8, 239, { width: 1280, height: 400 });
+    expect(zoom).toBeCloseTo(1.8 + Math.log2(((400 / 2) * GLOBE_FIT_SHARE) / 239));
     expect(zoom).toBeLessThan(1.8);
   });
 
