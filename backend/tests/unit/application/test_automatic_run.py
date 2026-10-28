@@ -1,6 +1,6 @@
 """Petición de las corridas automáticas del monitor FGR (F12.8, ADR-0031)."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -12,6 +12,7 @@ from app.application.use_cases.automatic_run import (
 )
 from app.domain.concept import ConceptDraft
 from app.domain.queries import Provider
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchTrigger
 from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_regions import MEXICO, FakeRegionRepository
@@ -44,16 +45,18 @@ def concepts_with(*names: str) -> FakeConceptRepository:
     return repo
 
 
-async def test_busca_la_fgr_en_todo_mexico_hoy_y_ayer_con_fuentes_gratis() -> None:
+async def test_la_de_las_7_busca_la_fgr_en_todo_mexico_solo_desde_las_23() -> None:
     repo = concepts_with("Homicidio", "Fiscalia General de la Republica")
     fgr = next(c for c in repo.concepts.values() if c.data.name.startswith("Fiscalia"))
+    last = SLOT - timedelta(hours=8)
 
-    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(
-        date(2026, 10, 26), SLOT
-    )
+    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(SLOT, last)
 
     assert request.concept_ids == (fgr.id,)
     assert request.region_id == MEXICO.id
+    # Benji, 28/10/2026: solo lo publicado desde la corrida anterior (23:00).
+    assert request.time_window == RunWindow(last, SLOT)
+    # A los buscadores se les piden los dos días que toca la ventana.
     assert (request.window.date_from, request.window.date_to) == (
         date(2026, 10, 25),
         date(2026, 10, 26),
@@ -67,13 +70,26 @@ async def test_sin_el_concepto_no_se_arma() -> None:
     with pytest.raises(AutomaticRunConfigError, match="make seed"):
         await PrepareAutomaticRun(
             concepts_with("Homicidio"), FakeRegionRepository(), PROFILE
-        ).request(date(2026, 10, 26), SLOT)
+        ).request(SLOT)
 
 
 async def test_sin_la_region_no_se_arma() -> None:
     repo = concepts_with("Fiscalia General de la Republica")
 
     with pytest.raises(AutomaticRunConfigError, match="MEX"):
-        await PrepareAutomaticRun(repo, FakeRegionRepository(()), PROFILE).request(
-            date(2026, 10, 26), SLOT
-        )
+        await PrepareAutomaticRun(repo, FakeRegionRepository(()), PROFILE).request(SLOT)
+
+
+async def test_la_de_las_15_pide_solo_el_dia_en_curso() -> None:
+    repo = concepts_with("Fiscalia General de la Republica")
+    slot = datetime(2026, 10, 26, 15, 0, tzinfo=MEXICO_CITY)
+
+    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(
+        slot, slot - timedelta(hours=8)
+    )
+
+    assert request.time_window == RunWindow(slot - timedelta(hours=8), slot)
+    assert (request.window.date_from, request.window.date_to) == (
+        date(2026, 10, 26),
+        date(2026, 10, 26),
+    )

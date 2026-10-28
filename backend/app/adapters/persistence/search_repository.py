@@ -74,6 +74,7 @@ from app.domain.extraction import ProcessingText
 from app.domain.geocoding import MEXICO_ISO3, Mention, MentionRole, Precision, Resolution
 from app.domain.queries import Provider
 from app.domain.region import RegionLevel
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus, SearchTrigger
 
 AUDIT_ENTITY = "search"
@@ -131,11 +132,13 @@ class PostgresSearchStore:
                     text(
                         "INSERT INTO searches (user_id, region_id, date_from, date_to, "
                         "queries_planned, credits_estimated, providers, trigger, "
-                        "scheduled_for) VALUES (:user_id, :region_id, :date_from, :date_to, "
-                        ":queries, :credits, :providers, :trigger, :scheduled_for) "
-                        "RETURNING id"
+                        "scheduled_for, window_start, window_end) VALUES (:user_id, "
+                        ":region_id, :date_from, :date_to, :queries, :credits, :providers, "
+                        ":trigger, :scheduled_for, :window_start, :window_end) RETURNING id"
                     ),
                     {
+                        "window_start": search.time_window.start if search.time_window else None,
+                        "window_end": search.time_window.end if search.time_window else None,
                         "providers": [p.value for p in search.providers],
                         "trigger": search.trigger.value,
                         "scheduled_for": search.scheduled_for,
@@ -172,7 +175,8 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT s.id, s.user_id, s.region_id, r.code, s.date_from, "
-                            "s.date_to, s.status, s.providers FROM searches s "
+                            "s.date_to, s.status, s.providers, s.window_start, s.window_end "
+                            "FROM searches s "
                             "JOIN regions r ON r.id = s.region_id WHERE s.id = :id"
                         ),
                         {"id": search_id},
@@ -217,7 +221,37 @@ class PostgresSearchStore:
                 for c in concepts
             ),
             providers=tuple(Provider(p) for p in row["providers"]),
+            time_window=(
+                RunWindow(row["window_start"], row["window_end"])
+                if row["window_start"] is not None and row["window_end"] is not None
+                else None
+            ),
         )
+
+    async def last_finished_automatic_slot(self, before: datetime) -> datetime | None:
+        """Hora programada de la última corrida automática que terminó antes de ``before``.
+
+        La corrida siguiente cubre desde ahí (``run_window``): si la anterior
+        falló, no se pierde lo de en medio.
+
+        Args:
+            before: Hora programada de la corrida que se va a armar.
+
+        Returns:
+            Esa hora, o ``None`` si nunca terminó una.
+        """
+        async with self._engine.connect() as conn:
+            found: datetime | None = (
+                await conn.execute(
+                    text(
+                        "SELECT max(scheduled_for) FROM searches WHERE trigger = :automatic "
+                        "AND deleted_at IS NULL AND status IN ('completed', 'partial') "
+                        "AND scheduled_for < :before"
+                    ),
+                    {"automatic": SearchTrigger.AUTOMATIC.value, "before": before},
+                )
+            ).scalar()
+        return found
 
     async def start(self, search_id: UUID) -> None:
         """Ver ``SearchStorePort.start``."""
@@ -376,6 +410,8 @@ class PostgresSearchStore:
                 providers=tuple(row["providers"]),
                 trigger=SearchTrigger(row["trigger"]),
                 scheduled_for=row["scheduled_for"],
+                window_start=row["window_start"],
+                window_end=row["window_end"],
             )
             for row in rows
         ]

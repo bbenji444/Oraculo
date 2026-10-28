@@ -94,6 +94,8 @@ def profile_from(settings: Settings) -> AutomaticProfile:
         sources=parse_sources(settings.automatic_sources),
         window_days=settings.automatic_window_days,
         user_id=settings.automatic_user,
+        run_hours=parse_run_hours(settings.automatic_run_hours),
+        margin_minutes=settings.automatic_window_margin_minutes,
     )
 
 
@@ -175,7 +177,10 @@ async def _create(
         credits_limit=settings.searchapi_monthly_credit_limit,
         default_sources=profile.sources,
     )
-    request = await PrepareAutomaticRun(concepts, regions, profile).request(local_now.date(), slot)
+    # Cubre desde la última corrida que terminó (si la anterior falló, no se
+    # pierde lo de en medio).
+    last_finished = await PostgresSearchStore(engine).last_finished_automatic_slot(slot)
+    request = await PrepareAutomaticRun(concepts, regions, profile).request(slot, last_finished)
     started = await StartSearch(
         planner, PostgresSearchStore(engine), _RunsHere(), settings.max_queries_per_search
     ).execute(request)

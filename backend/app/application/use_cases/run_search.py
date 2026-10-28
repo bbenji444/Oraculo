@@ -327,7 +327,14 @@ class RunSearch:
         self, search: StoredSearch, tally: _Tally, execution: ExecutionResult
     ) -> list[_Work]:
         await self._progress(search.search_id, tally, Stage.DEDUPE)
-        unique = dedupe(execution.articles, self._similarity)
+        found = execution.articles
+        if search.time_window is not None:
+            # Corrida automática: solo lo publicado desde la corrida anterior
+            # (Benji, 28/10/2026). Lo de fuera ni se guarda ni se paga a la IA.
+            window = search.time_window
+            found = tuple(a for a in found if window.contains(a.published_at))
+            tally.extra["outside_window"] = len(execution.articles) - len(found)
+        unique = dedupe(found, self._similarity)
         # Nivel 2 de duplicados (ADR-0025): la misma nota que ya se guardó en
         # otra búsqueda con otro link se reutiliza, con su IA ya pagada.
         candidates = await self._articles.known_like(unique)

@@ -27,6 +27,7 @@ from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
 from app.domain.geocoding import Mention, Resolution
 from app.domain.queries import Provider
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus, SearchTrigger, Stage
 
 
@@ -66,6 +67,8 @@ class NewSearch:
         providers: Fuentes con las que corre (switches, ADR-0027).
         trigger: Quién la lanzó: una persona o el reloj (F12.8, ADR-0031).
         scheduled_for: Hora programada de una corrida automática, o ``None``.
+        time_window: Horas que cubre una corrida automática (desde la
+            anterior); ``None`` en las manuales, que van por días.
     """
 
     user_id: str
@@ -78,6 +81,7 @@ class NewSearch:
     providers: tuple[Provider, ...] = ()
     trigger: SearchTrigger = SearchTrigger.MANUAL
     scheduled_for: datetime | None = None
+    time_window: RunWindow | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +99,8 @@ class StoredSearch:
         concepts: Conceptos copiados al crearla.
         providers: Fuentes elegidas; vacío en las búsquedas de antes de
             F12.2, que corrían con todas las configuradas.
+        time_window: Horas que cubre (corridas automáticas desde el
+            28/10/2026): solo cuentan las notas publicadas en ellas.
     """
 
     search_id: UUID
@@ -106,6 +112,7 @@ class StoredSearch:
     status: SearchStatus
     concepts: tuple[SearchConcept, ...]
     providers: tuple[Provider, ...] = ()
+    time_window: RunWindow | None = None
 
 
 @dataclass(frozen=True, slots=True)

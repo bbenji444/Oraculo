@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -44,6 +44,7 @@ from app.domain.extraction import ExtractionStatus, ProcessingText
 from app.domain.geocoding import Mention, MentionRole, Resolution
 from app.domain.names import normalize_name
 from app.domain.queries import PlannedQuery, Provider, QueryPlace
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus, Stage
 from tests.unit import fake_gazetteer as cat
 from tests.unit.application.test_execute_queries import MEXICO as MEXICO_FILTER
@@ -666,3 +667,26 @@ async def test_si_clasificar_falla_la_busqueda_sigue_y_cuenta_lo_gastado() -> No
 
     assert report.status is SearchStatus.COMPLETED
     assert any(e.message.startswith("Clasificación:") for e in searches.errors)
+
+
+async def test_la_corrida_automatica_solo_toma_lo_publicado_en_sus_horas() -> None:
+    # Benji, 28/10/2026: cada corrida, solo lo publicado desde la anterior.
+    # MADRID se publicó una hora antes de que empezara la ventana.
+    early = replace(MADRID, published_at=PUBLISHED - timedelta(hours=9))
+    window = RunWindow(PUBLISHED - timedelta(hours=8), PUBLISHED + timedelta(hours=1))
+    search = replace(stored_search(), time_window=window)
+    use_case, _searches, articles, llm, _e = pipeline(
+        sources=[
+            Source(Provider.SEARCHAPI, [IZTA_SEARCHAPI, early], cost=1),
+            Source(Provider.LOCAL_INDEX, [IZTA_LOCAL]),
+        ],
+        search=search,
+    )
+
+    report = await use_case.run(uuid4())
+
+    # Lo de fuera ni se guarda ni se paga a la IA.
+    assert report.articles == 1
+    assert "https://elpais.com/madrid" not in articles.ids
+    assert report.enriched == 1
+    assert len(llm.requests) == 1
