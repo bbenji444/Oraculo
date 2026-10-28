@@ -16,6 +16,7 @@
  *
  * No hace: no dibuja ni pide datos; solo calcula (lo usa `Timeline.tsx`).
  */
+import { hasMapPoint } from '../../map/newsLayers';
 import type { Article } from '../../services/searches';
 
 /** Diferencia de la CDMX con UTC, en milisegundos (sin horario de verano). */
@@ -310,4 +311,40 @@ export function storyItems(articles: readonly Article[]): StoryItem[] {
     });
   }
   return items.sort((a, b) => b.at - a.at || b.lead.article_id - a.lead.article_id);
+}
+
+// De más a menos preciso: a cuál nota de un hecho conviene volar en el globo.
+const PRECISION_RANK: Readonly<Record<string, number>> = {
+  locality: 4,
+  municipality: 3,
+  state: 2,
+  country: 1,
+};
+
+/**
+ * La nota de un hecho que se abre en el globo: la que está ubicada con más
+ * precisión. La principal (la primera que se publicó) suele venir de Google
+ * News sin texto ni lugar, aunque otro medio del mismo hecho sí diga dónde
+ * pasó; antes el clic no movía el globo (Benji, 27/10/2026). Si ninguna está
+ * ubicada, la principal.
+ *
+ * @param item Un hecho de la cronología.
+ * @returns La nota a elegir al hacer clic.
+ */
+export function mapLead(item: Pick<StoryItem, 'lead' | 'notes'>): Article {
+  let best = item.lead;
+  let bestRank = rankOf(best);
+  for (const note of item.notes) {
+    const rank = rankOf(note);
+    if (rank > bestRank) {
+      best = note;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+function rankOf(article: Article): number {
+  if (!hasMapPoint(article)) return 0;
+  return PRECISION_RANK[article.primary_location?.precision ?? ''] ?? 1;
 }

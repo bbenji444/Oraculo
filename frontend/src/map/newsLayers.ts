@@ -394,3 +394,14 @@ export function pointCoordinates(geometry: unknown): [number, number] | null {
   const [lng, lat] = coordinates as unknown[];
   return typeof lng === 'number' && typeof lat === 'number' ? [lng, lat] : null;
 }
+
+/**
+ * Si la nota tiene un punto en el mapa al que se pueda volar. Las que la IA
+ * no supo ubicar no lo tienen: su ficha se muestra sin vuelo.
+ *
+ * @example hasMapPoint(notaSinUbicacion) // false
+ */
+export function hasMapPoint(article: Pick<Article, 'primary_location'>): boolean {
+  const location = article.primary_location;
+  return (location?.lon ?? null) !== null && (location?.lat ?? null) !== null;
+}

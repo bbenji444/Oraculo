@@ -45,6 +45,7 @@ import {
 import {
   DASHED_RING_IMAGE,
   dashedRingPixels,
+  hasMapPoint,
   isOnVisibleSide,
   keepNewsLayers,
   NEWS_SOURCE,
@@ -163,6 +164,10 @@ interface Stack {
   /** `articleRequest` al abrirla: elegir otra nota (desde donde sea) la cierra. */
   request: number;
 }
+
+// Distancia de la ficha de una nota sin lugar al borde de arriba del espacio
+// libre, en píxeles: debajo de los controles del globo.
+const UNPLACED_CARD_TOP_PX = 72;
 
 interface Callout {
   // Nota a la que pertenece: si cambia la nota elegida, esta ficha ya no se muestra.
@@ -994,6 +999,10 @@ export function ExploreGlobe({
 
   // Alto real de la ficha (cambia con el largo del resumen) para acomodarla.
   const calloutShown = callout?.visible === true && callout.articleId === articleId;
+  // Nota sin punto en el mapa (la IA no supo dónde pasó): antes no pasaba nada
+  // al elegirla y parecía que el clic no servía (Benji, 27/10/2026). Ahora su
+  // ficha sale en medio del espacio libre, con un aviso.
+  const unplaced = selected !== null && !hasMapPoint(selected);
   useEffect(() => {
     const card = cardRef.current;
     if (!calloutShown || !card) return;
@@ -1179,6 +1188,33 @@ export function ExploreGlobe({
             </div>
           </div>
         </>
+      )}
+      {selected && unplaced && (
+        <div
+          className="absolute z-20"
+          style={{
+            left: insetLeft + (viewport.width - insetLeft - insetRight - cardWidth) / 2,
+            top: viewport.top + UNPLACED_CARD_TOP_PX,
+            width: cardWidth,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-label="Nota sin lugar en el mapa"
+            className={`${GLASS} animate-[fadeIn_200ms_ease-out] p-4`}
+          >
+            <p className="mb-2 font-display text-[9.5px] tracking-[0.22em] text-sky-300 uppercase">
+              Sin lugar en el mapa · la nota no dice dónde pasó
+            </p>
+            <NewsCard
+              article={selected}
+              colors={colors}
+              onClose={() => {
+                useExplorerStore.getState().selectArticle(null);
+              }}
+            />
+          </div>
+        </div>
       )}
       {stack?.request === articleRequest && stackPlacement && (
         <div
