@@ -59,7 +59,10 @@
   --oraculo-a2: #0090b8;
   --oraculo-a1: #005f7f;
   --oraculo-text: #e0f7fa;
-  --tech: "Orbitron Reporte", "Noto Sans Reporte", sans-serif;
+  /* Títulos, cifras e insignias: Noto Sans, formal (28/10/2026). Antes era
+     Orbitron, que se veía de videojuego; ahora solo va en la marca. */
+  --tech: "Noto Sans Reporte", sans-serif;
+  --brand: "Orbitron Reporte", "Noto Sans Reporte", sans-serif;
 }
 
 /* ---------------------------------------------------------------- Páginas */
@@ -682,7 +685,7 @@ table.grid td.num {
 }
 
 .cover-brand {
-  font: 700 15pt var(--tech);
+  font: 700 15pt var(--brand);
   letter-spacing: 0.3em;
   color: #ffffff;
 }
@@ -1174,42 +1177,75 @@ h2.section-sub {
   bookmark-level: 2;
 }
 
-/* Cronología de hechos destacados: una línea vertical con un nodo del color
-   de la categoría, como la cronología del monitor. */
-ol.timeline {
-  margin: 6pt 0 10pt;
+/* Cronología de hechos destacados: una línea vertical con marcas de hora y
+   una tarjeta por hecho, con un nodo y un filo del color de su categoría,
+   como la cronología del monitor. */
+.timeline {
+  margin: 6pt 0 10pt 6pt;
   padding: 0 0 0 14pt;
-  list-style: none;
-  border-left: 1.2pt solid #bfe9f5;
+  border-left: 1.4pt solid #bfe9f5;
+}
+
+.tl-hour {
+  margin: 8pt 0 5pt -21pt;
+  break-after: avoid;
+}
+
+.tl-hour span {
+  display: inline-block;
+  padding: 1.5pt 7pt;
+  border-radius: 8pt;
+  background: var(--oraculo-bg);
+  color: #ffffff;
+  font: 700 7pt var(--tech);
+  letter-spacing: 0.08em;
 }
 
 .tl-item {
   position: relative;
-  margin: 0 0 8pt;
-  padding: 0 0 0 4pt;
+  margin: 0 0 6pt;
   break-inside: avoid;
 }
 
 .tl-dot {
   position: absolute;
-  top: 1.5pt;
-  left: -19.4pt;
+  top: 6pt;
+  left: -19.6pt;
   width: 8pt;
   height: 8pt;
-  border: 1.5pt solid #ffffff;
+  border: 1.6pt solid #ffffff;
   border-radius: 50%;
+}
+
+.tl-card {
+  padding: 5pt 8pt 5pt 9pt;
+  border: 0.6pt solid var(--line);
+  border-left: 2.5pt solid var(--line);
+  border-radius: 3pt;
+  background: #fbfdfe;
 }
 
 .tl-when {
   margin: 0;
-  font: 700 6.5pt var(--tech);
-  letter-spacing: 0.1em;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.tl-when b {
   color: var(--oraculo-a1);
-  text-transform: uppercase;
+}
+
+.tl-outlets {
+  float: right;
+  padding: 0 4pt;
+  border-radius: 6pt;
+  background: #e6f8fd;
+  color: var(--oraculo-a1);
+  font-weight: 700;
 }
 
 .tl-title {
-  margin: 1pt 0 2pt;
+  margin: 2pt 0 2pt;
   font-size: 9.5pt;
   line-height: 1.3;
   bookmark-level: 3;
@@ -1221,8 +1257,8 @@ ol.timeline {
 }
 
 .tl-text {
-  margin: 0 0 2pt;
-  font-size: 8.3pt;
+  margin: 0 0 3pt;
+  font-size: 8.2pt;
   line-height: 1.45;
   color: var(--text);
 }
@@ -1309,4 +1345,300 @@ td.ix-src b {
   background: var(--soft);
   font-size: 8pt;
   color: var(--text);
+}
+
+/* --- Preguntas del analista (28/10/2026) ----------------------------------- */
+
+/* «¿De qué delitos?» y «¿Qué tan confiable?» siguen en la misma hoja: con
+   salto de página quedaban hojas casi vacías (PDF del 28/10/2026). */
+.what,
+.trust {
+  margin-top: 6pt;
+}
+
+.tl-top {
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* Cada bloque abre con su pregunta, numerada, y su conclusión de una línea. */
+h2.q-title {
+  margin: 14pt 0 2pt;
+  padding: 0;
+  border: 0;
+  font: 700 12.5pt "Noto Sans Reporte", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  break-after: avoid;
+  bookmark-level: 2;
+}
+
+h2.section + h2.q-title {
+  margin-top: 6pt;
+}
+
+.q-num {
+  display: inline-block;
+  min-width: 15pt;
+  margin-right: 6pt;
+  padding: 1pt 4pt;
+  border-radius: 2pt;
+  background: var(--oraculo-a1);
+  color: #ffffff;
+  font: 700 8pt "Noto Sans Reporte", sans-serif;
+  text-align: center;
+  vertical-align: 1.5pt;
+}
+
+.q-answer {
+  margin: 0 0 8pt;
+  padding-left: 27pt;
+  font-size: 9pt;
+  color: var(--oraculo-a1);
+  break-after: avoid;
+}
+
+h3.sub {
+  margin: 6pt 0 4pt;
+  font-size: 8pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ¿Qué es lo más importante? Tres tarjetas grandes. */
+.top-fact {
+  display: table;
+  width: 100%;
+  margin: 0 0 6pt;
+  border: 0.75pt solid var(--line);
+  border-left: 4pt solid var(--line);
+  border-radius: 3pt;
+  break-inside: avoid;
+}
+
+.top-rank,
+.top-body,
+.top-outlets {
+  display: table-cell;
+  vertical-align: top;
+}
+
+.top-rank {
+  width: 26pt;
+  padding: 6pt 0 0;
+  font: 700 22pt/1 "Noto Sans Reporte", sans-serif;
+  text-align: center;
+}
+
+.top-body {
+  padding: 6pt 8pt 6pt 2pt;
+}
+
+.top-meta {
+  margin: 0;
+  font-size: 7pt;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.top-title {
+  margin: 1pt 0 3pt;
+  font-size: 10.5pt;
+  line-height: 1.3;
+}
+
+.top-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.top-text {
+  margin: 2pt 0 0;
+  font-size: 8.3pt;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.top-outlets {
+  width: 52pt;
+  padding: 8pt 6pt;
+  background: var(--soft);
+  text-align: center;
+}
+
+.top-outlets strong {
+  display: block;
+  font-size: 18pt;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.top-outlets span {
+  display: block;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.top-outlets .dots {
+  margin-top: 4pt;
+  font-size: 0;
+}
+
+.top-outlets .dots i {
+  display: inline-block;
+  width: 4pt;
+  height: 4pt;
+  margin: 0 0.8pt;
+  border-radius: 50%;
+}
+
+/* Barras horizontales con color propio (tipo de actuación). */
+table.hbars {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+}
+
+table.hbars td {
+  padding: 2.6pt 0;
+  border-bottom: 0.5pt solid var(--line);
+}
+
+table.hbars td.name {
+  width: 30%;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+table.hbars td.bar {
+  padding-right: 8pt;
+}
+
+table.hbars td.bar span {
+  display: block;
+  height: 8pt;
+  border-radius: 2pt;
+}
+
+table.hbars td.num {
+  width: 13%;
+  white-space: nowrap;
+}
+
+/* ¿Qué pasa en cada estado? Fichas de tres en fondo. */
+.state-cards {
+  font-size: 0;
+}
+
+.state-card {
+  box-sizing: border-box;
+  display: inline-block;
+  width: 32%;
+  margin: 0 2% 6pt 0;
+  padding: 6pt 8pt;
+  border: 0.75pt solid var(--line);
+  border-radius: 3pt;
+  vertical-align: top;
+  font-size: 8pt;
+  break-inside: avoid;
+}
+
+.state-card:nth-child(3n) {
+  margin-right: 0;
+}
+
+.sc-head {
+  margin: 0 0 3pt;
+  color: var(--ink);
+}
+
+.sc-head b {
+  font-size: 9.5pt;
+}
+
+.sc-head span {
+  float: right;
+  color: var(--muted);
+  font-size: 7.5pt;
+}
+
+.sc-bar,
+.state-strip,
+.stackbar {
+  display: flex;
+  overflow: hidden;
+  margin: 0 0 4pt;
+  border-radius: 2pt;
+  background: var(--soft);
+}
+
+.sc-bar {
+  height: 5pt;
+}
+
+.sc-bar span,
+.state-strip span {
+  display: block;
+  height: 100%;
+}
+
+.sc-line {
+  margin: 0;
+  font-size: 7.5pt;
+  color: var(--ink);
+}
+
+.sc-line span {
+  display: inline-block;
+  width: 40pt;
+  color: var(--muted);
+}
+
+.sc-headline {
+  margin: 3pt 0 0;
+  font-size: 7.3pt;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+/* ¿Qué tan confiable es? Dos barras apiladas lado a lado. */
+.trust-grid {
+  display: table;
+  width: 100%;
+  margin-bottom: 8pt;
+}
+
+.trust-grid > div {
+  display: table-cell;
+  width: 50%;
+  padding-right: 12pt;
+  vertical-align: top;
+}
+
+.stackbar {
+  height: 14pt;
+}
+
+.stackbar span {
+  display: block;
+  height: 100%;
+  color: #ffffff;
+  font-size: 7pt;
+  font-weight: 700;
+  line-height: 14pt;
+  text-align: center;
+}
+
+/* Índice: una franja de colores por estado y el filo de cada renglón. */
+.state-strip {
+  height: 3pt;
+  margin: -4pt 0 6pt;
+}
+
+td.ix-num {
+  border-left: 2pt solid var(--line);
 }

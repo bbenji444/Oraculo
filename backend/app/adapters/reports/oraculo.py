@@ -735,6 +735,9 @@ class Highlight:
         color: Color de su categoría.
         badges: Sus insignias.
         also: Las demás notas del mismo hecho.
+        category: Su categoría.
+        hour: «23:00» si es el primero de su hora en la cronología (la línea
+            lleva un marcador de hora), o vacío.
     """
 
     article: ArticleItem
@@ -743,20 +746,42 @@ class Highlight:
     color: str
     badges: tuple[Badge, ...]
     also: tuple[ArticleItem, ...] = ()
+    category: str = ""
+    hour: str = ""
 
 
 def _best_score(article: ArticleItem) -> float:
     return max((j.relevance_score for j in article.judgements if j.is_relevant), default=0.0)
 
 
+def ranked_stories(articles: Sequence[ArticleItem]) -> list[Story]:
+    """Los hechos, del más importante al menos importante.
+
+    Importa más el hecho que publicaron más medios; entre iguales, el que la
+    IA juzgó más relevante y luego el más reciente.
+
+    Args:
+        articles: Notas relevantes.
+
+    Returns:
+        Cada hecho como (primera nota, demás notas).
+    """
+
+    def importance(story: Story) -> tuple[int, float, float]:
+        lead, also = story
+        moment = lead.published_at.timestamp() if lead.published_at else 0.0
+        return (-(1 + len(also)), -_best_score(lead), -moment)
+
+    return sorted(_stories(articles), key=importance)
+
+
 def highlights(
     articles: Sequence[ArticleItem], limit: int = MAX_HIGHLIGHTS
 ) -> tuple[Highlight, ...]:
-    """Los hechos más importantes, para la cronología del reporte.
+    """Los hechos más importantes (``ranked_stories``), para la cronología.
 
-    Importa más el hecho que publicaron más medios; entre iguales, el que la
-    IA juzgó más relevante y luego el más reciente. Se muestran en orden de
-    hora, como la cronología del monitor.
+    Se muestran en orden de hora, como la cronología del monitor, con un
+    marcador cada vez que cambia la hora.
 
     Args:
         articles: Notas relevantes.
@@ -765,22 +790,31 @@ def highlights(
     Returns:
         Hasta ``limit`` hechos, del primero al último que se publicó.
     """
-
-    def importance(story: Story) -> tuple[int, float, float]:
-        lead, also = story
-        moment = lead.published_at.timestamp() if lead.published_at else 0.0
-        return (-(1 + len(also)), -_best_score(lead), -moment)
-
-    chosen = sorted(_stories(articles), key=importance)[:limit]
+    chosen = ranked_stories(articles)[:limit]
 
     def when(story: Story) -> tuple[datetime, int]:
         lead = story[0]
         return (lead.published_at or datetime.max.replace(tzinfo=UTC), lead.article_id)
 
-    return tuple(
-        Highlight(lead, 1 + len(also), state_name(lead), category_color(lead), badges(lead), also)
-        for lead, also in sorted(chosen, key=when)
-    )
+    items = []
+    previous = ""
+    for lead, also in sorted(chosen, key=when):
+        moment = lead.published_at.astimezone(MEXICO_CITY) if lead.published_at else None
+        hour = f"{moment:%H}:00" if moment else "Sin hora"
+        items.append(
+            Highlight(
+                lead,
+                1 + len(also),
+                state_name(lead),
+                category_color(lead),
+                badges(lead),
+                also,
+                category=category_name(lead),
+                hour=hour if hour != previous else "",
+            )
+        )
+        previous = hour
+    return tuple(items)
 
 
 def limit_groups(

@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 from app.adapters.reports.labels import GDELT_PROVIDERS, LEVEL_LABEL
 from app.adapters.reports.oraculo import OraculoView, build_oraculo
+from app.adapters.reports.questions import QuestionsView, build_questions
 from app.adapters.reports.static_map import LegendClass, legend
 from app.application.clock import MEXICO_CITY
 from app.application.ports.search_reads import ArticleItem
@@ -128,6 +129,8 @@ class ReportView:
         uses_gdelt: Si hay que citar a The GDELT Project (§8).
         oraculo: Expediente, categorías, línea del tiempo y Estado ▸ Categoría
             ▸ Noticias (F12.10, ADR-0033).
+        questions: Las preguntas del analista con sus respuestas visuales
+            (28/10/2026).
     """
 
     title: str
@@ -148,6 +151,7 @@ class ReportView:
     legend: tuple[LegendClass, ...]
     uses_gdelt: bool
     oraculo: OraculoView
+    questions: QuestionsView
 
 
 def _percent(count: int, total: int) -> int:
@@ -312,6 +316,7 @@ def build_view(data: ReportData) -> ReportView:
     inside = sum(c.count for c in data.counts) + data.coarser
     days, unit = day_bars(articles, data.search.date_from, data.search.date_to)
     sources = source_bars(articles)
+    oraculo = build_oraculo(data.search, articles, data.generated_at, data.previous_run)
     return ReportView(
         title=", ".join(c.name for c in data.search.concepts),
         level_label=level_label,
@@ -330,5 +335,6 @@ def build_view(data: ReportData) -> ReportView:
         groups=news_groups(articles, data.region.name),
         legend=tuple(legend(max((c.count for c in data.counts), default=0))),
         uses_gdelt=any(p.provider in GDELT_PROVIDERS and p.queries > 0 for p in data.providers),
-        oraculo=build_oraculo(data.search, articles, data.generated_at, data.previous_run),
+        oraculo=oraculo,
+        questions=build_questions(articles, oraculo.timeline),
     )

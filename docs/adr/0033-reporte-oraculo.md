@@ -78,3 +78,33 @@ Benji: «a mí de nada me sirve tener 100, 200 noticias en un listado interminab
   - la numeración no cambia, para que las citas sigan valiendo.
 
 **Alternativa descartada:** quitar el índice. Se descartó porque Benji pidió que las noticias sigan apareciendo una por una.
+
+## Ajuste: las preguntas del analista (28/10/2026, noche)
+
+Benji pidió ver el reporte «desde un punto humano: curioso, preguntón… que le gusta tener todo claro y organizado», con respuestas «no escritas, sino de forma representativa», y una tipografía más formal.
+
+**Decisión.** Cada bloque abre con una pregunta numerada. Debajo va una línea de conclusión, calculada sin IA (`questions.py`), y luego su gráfica:
+
+| # | Pregunta | Respuesta visual |
+|---|---|---|
+| 01 | ¿Qué pasó en este periodo? | Cifras, resumen ejecutivo y datos clave |
+| 02 | ¿Qué es lo más importante? | Los 3 hechos más publicados, en tarjetas con su resumen y sus medios |
+| 03 | ¿De qué delitos se trata? | Dona y tabla por categoría |
+| 04 | ¿Qué tipo de actuación hubo? | Barras: sentencias, procesos, detenciones, aseguramientos, investigaciones, denuncias |
+| 05 | ¿Dónde pasó? | Mapa y tabla por estado |
+| 06 | ¿Qué pasa en cada estado? | Fichas de los 6 estados con más notas: delito, actuación y hecho más publicado |
+| 07 | ¿Cuándo pasó? | Barras por hora de colores por categoría, con picos |
+| 08 | ¿Cómo se desarrollaron los hechos? | Cronología con marcas de hora y una tarjeta por hecho |
+| 09 | ¿Qué tan confiable es la información? | Confianza de la IA, precisión del lugar y medios |
+
+Al final va el índice por estado, con una franja de colores por estado y un filo de color por renglón.
+
+**El tipo de actuación** sale del tipo de hecho que anotó la IA al leer la nota (`event_type`) y, si ahí no hay nada reconocible, del título. Se agrupa por raíces de palabras (detien-, asegur-, vincul-, sentencia…). Se rotula «Clasificación automática».
+
+**Tipografía.** Títulos, cifras e insignias pasan de Orbitron a Noto Sans: Orbitron se veía de videojuego y no daba formalidad. Orbitron queda solo en la marca «ORÁCULO» de la portada.
+
+**Sin repetir.** Los 3 hechos más importantes llevan su resumen en «¿Qué es lo más importante?». En la cronología solo se marcan como «Hecho destacado nº N».
+
+**Resultado** con la corrida de las 07:00 del 28/10/2026: 10 páginas, sin hojas casi vacías.
+
+**Alternativa descartada:** que la IA escriba las conclusiones de cada pregunta. Costaría una llamada más por reporte, y una cifra mal redactada por la IA sería más grave que una frase sencilla calculada.
