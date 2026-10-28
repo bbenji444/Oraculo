@@ -537,6 +537,8 @@ export function MissionDock({ active }: MissionDockProps) {
           type="button"
           onClick={() => {
             useMandoStore.getState().setEditing(true);
+            // El globo vuelve al Atlántico y gira mientras se arma la consulta.
+            useExplorerStore.getState().showOverview();
           }}
           title="Cambiar qué, dónde, cuándo o fuentes y lanzar otra consulta"
           className="hud-btn hud-btn--sm"
@@ -546,7 +548,7 @@ export function MissionDock({ active }: MissionDockProps) {
         <button
           type="button"
           onClick={() => {
-            useExplorerStore.getState().clearGlobe();
+            useExplorerStore.getState().clearGlobe('atlantic');
           }}
           title="Quitar los resultados del globo y armar otra consulta (esta queda en Historial)"
           className="hud-btn hud-btn--sm"
