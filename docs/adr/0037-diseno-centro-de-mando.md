@@ -139,3 +139,4 @@ Benji pidió estos ajustes al elegirlo:
 
   Todo es `transform` y `opacity`, y se apaga con «reducir animaciones».
 - **Bitácora sin confusión.** «Notas encontradas: N (la IA decide cuáles sirven)», en lugar de «Fuentes consultadas: N notas»: Benji entendió que eran N resultados.
+- **Volver a empezar se ve.** Benji: «automáticamente el mundo se dirija a la parte del océano Atlántico y empiece a girar». «Nueva consulta» (`clearGlobe('atlantic')`) y «Ajustar consulta» (`showOverview`) piden ese destino (`homeTarget`). El globo vuela a la vista de la entrada y, al aterrizar, se enciende el giro; mientras vuela, el giro se apaga para no cortar el vuelo.

@@ -192,6 +192,9 @@ const INITIAL_ZOOM = 2;
 // Al abrir el sistema la entrada termina sobre el Atlántico (Benji, 26/10/2026)
 // y desde ahí el giro normal trae a América y a México a la vista.
 const INTRO_CENTER: [number, number] = [-35, 20];
+// «Nueva consulta» y «Ajustar consulta» vuelven a esa misma vista y la ponen a
+// girar al instante (Benji, 28/10/2026).
+const ATLANTIC_CENTER = INTRO_CENTER;
 // «Acercar» un grupo: 1.5 niveles más que donde se separa, sin pasar de 15.
 const STACK_EXTRA_ZOOM = 1.5;
 const MAX_STACK_ZOOM = 15;
@@ -929,18 +932,23 @@ export function ExploreGlobe({
     onMap?.(ready && introFinished ? mapRef.current : null);
   }, [onMap, ready, introFinished]);
 
-  // «Limpiar globo»: de regreso a la vista de México.
+  // «Limpiar globo»: de regreso a la vista de México. En el Centro de mando,
+  // «Nueva consulta» y «Ajustar consulta» van al Atlántico y al llegar giran.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || homeRequest === 0) return;
-    const target = { lng: INITIAL_CENTER[0], lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM };
+    const atlantic = useExplorerStore.getState().homeTarget === 'atlantic';
+    const center = atlantic ? ATLANTIC_CENTER : INITIAL_CENTER;
+    const target = { lng: center[0], lat: center[1], zoom: INITIAL_ZOOM };
     const duration = flyDurationMs(cameraOf(map), target, 'up', motionRef.current);
     // De vuelta en la vista general: al aterrizar se ajusta al espacio libre.
     overviewRef.current = true;
     fittedRef.current = false;
+    // Mientras vuela no gira: el giro haría su propio vuelo y cortaría este.
+    if (atlantic) useExplorerStore.getState().setSpinning(false);
     flyRef.current(duration, () => {
       map.flyTo({
-        center: INITIAL_CENTER,
+        center,
         zoom: INITIAL_ZOOM,
         padding: cameraInsets(insetsRef.current),
         pitch: 0,
@@ -950,6 +958,16 @@ export function ExploreGlobe({
         essential: false,
       });
     });
+    if (!atlantic) return;
+    const spin = () => {
+      useExplorerStore.getState().setSpinning(true);
+    };
+    // El vuelo ya arrancó (flyRef lo empieza en el acto): gira al aterrizar.
+    if (map.isMoving()) map.once('moveend', spin);
+    else spin();
+    return () => {
+      map.off('moveend', spin);
+    };
   }, [homeRequest, ready]);
 
   // --- Región elegida: resaltar y volar -------------------------------------

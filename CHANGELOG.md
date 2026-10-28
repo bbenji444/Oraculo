@@ -132,6 +132,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **«Nueva consulta» y «Ajustar consulta» regresan el globo al Atlántico y lo ponen a girar (28/10/2026).** Al tocar cualquiera de los dos botones, el globo vuela a la vista del Atlántico, la misma con la que abre el sistema, y al llegar empieza a girar solo. «Limpiar globo», en el diseño de columna, sigue volviendo a México.
 - **La espera del barrido, más viva y más clara (28/10/2026).** Mientras se busca:
   - una ráfaga de luz corre por las etapas ya hechas;
   - la etapa en curso tiene un aro que gira;

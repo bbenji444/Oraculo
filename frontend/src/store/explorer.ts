@@ -75,6 +75,12 @@ export interface ExplorerState {
    * globo vuela cada vez que cambia.
    */
   homeRequest: number;
+  /**
+   * A dónde vuela el globo con `homeRequest`: México («Limpiar globo») o la
+   * vista del Atlántico girando (Centro de mando, «Nueva consulta» y «Ajustar
+   * consulta»; Benji, 28/10/2026).
+   */
+  homeTarget: HomeTarget;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
   setRange: (range: DateRange) => void;
@@ -109,9 +115,16 @@ export interface ExplorerState {
    * «Limpiar globo» (9.6, D10): quita resultados, nota elegida y muro, y vuelve a
    * la vista de México. Región, conceptos y fechas se quedan en el formulario
    * para buscar otra cosa con un clic; la búsqueda sigue en Historial.
+   *
+   * @param target A dónde vuela el globo (por defecto, México).
    */
-  clearGlobe: () => void;
+  clearGlobe: (target?: HomeTarget) => void;
+  /** Lleva el globo a la vista del Atlántico y lo pone a girar, sin quitar nada. */
+  showOverview: () => void;
 }
+
+/** A dónde vuelve el globo: México o la vista del Atlántico que gira. */
+export type HomeTarget = 'mexico' | 'atlantic';
 
 // Días de cada rango rápido; "hoy" es el último día (la API cuenta hasta hoy).
 const RANGE_DAYS: Record<Exclude<RangeKind, 'custom'>, number> = { today: 1, '7': 7, '30': 30 };
@@ -190,6 +203,7 @@ export const useExplorerStore = create<ExplorerState>()(
       constellation: false,
       showCases: false,
       homeRequest: 0,
+      homeTarget: 'mexico',
       selectRegion: (regionId) => {
         // Elegir una región detiene el giro: la cámara vuela hacia ella.
         set(regionId === null ? { regionId } : { regionId, spinning: false });
@@ -278,7 +292,7 @@ export const useExplorerStore = create<ExplorerState>()(
       setShowCases: (showCases) => {
         set({ showCases });
       },
-      clearGlobe: () => {
+      clearGlobe: (target = 'mexico') => {
         set((state) => ({
           searchId: null,
           articleId: null,
@@ -291,7 +305,11 @@ export const useExplorerStore = create<ExplorerState>()(
           // Otra búsqueda empieza con el formulario a la vista.
           searchCollapsed: false,
           homeRequest: state.homeRequest + 1,
+          homeTarget: target,
         }));
+      },
+      showOverview: () => {
+        set((state) => ({ homeRequest: state.homeRequest + 1, homeTarget: 'atlantic' }));
       },
     }),
     {

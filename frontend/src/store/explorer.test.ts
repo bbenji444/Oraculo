@@ -200,5 +200,26 @@ describe('muro y limpiar globo (9.6)', () => {
     expect([state.searchId, state.articleId, state.wallCaseId]).toEqual([null, null, null]);
     expect([state.regionId, state.conceptIds, state.panelOpen]).toEqual([272, [3], true]);
     expect(state.homeRequest).toBe(before + 1);
+    expect(state.homeTarget).toBe('mexico');
+  });
+
+  it('nueva consulta y ajustar consulta llevan el globo al Atlántico (Centro de mando)', () => {
+    const store = useExplorerStore.getState();
+    store.openSearch('busqueda-1');
+    const before = useExplorerStore.getState().homeRequest;
+
+    store.clearGlobe('atlantic');
+    expect(useExplorerStore.getState().homeTarget).toBe('atlantic');
+    expect(useExplorerStore.getState().searchId).toBeNull();
+
+    // Ajustar no quita la consulta: solo mueve el globo.
+    store.openSearch('busqueda-2');
+    store.showOverview();
+    const state = useExplorerStore.getState();
+    expect([state.searchId, state.homeTarget, state.homeRequest]).toEqual([
+      'busqueda-2',
+      'atlantic',
+      before + 2,
+    ]);
   });
 });
