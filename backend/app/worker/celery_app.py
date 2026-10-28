@@ -34,8 +34,9 @@ AUTOMATIC_RUN_TASK = "monitor.automatic_run"
 # de verano (octubre de 2022). Si volviera, basta reiniciar el reloj con el
 # nuevo desfase.
 _MEXICO_CITY_UTC_OFFSET = -6
-# Una corrida que no alcanzó a empezar en 2 horas se descarta: la siguiente
-# (8 horas después) cubre hoy y ayer, así que no se pierde nada.
+# Una corrida que no alcanzó a empezar en 2 horas se descarta. La siguiente
+# cubre solo su propio periodo (ADR-0031): el periodo perdido se recupera
+# corriéndola a mano con ``make corrida-fgr``.
 _AUTOMATIC_RUN_EXPIRES_SECONDS = 2 * 60 * 60
 
 

@@ -1,8 +1,8 @@
 """Comando ``make corrida-fgr``: corre ahora una corrida del monitor FGR (F12.8).
 
 Hace exactamente lo que el reloj hace a las 07:00, 15:00 y 23:00 (ADR-0031):
-busca a la FGR en todo México, hoy y ayer, solo con Google News RSS y el
-índice local; la guarda como corrida automática y deja su PDF en
+busca a la FGR en todo México, solo lo publicado desde la corrida programada
+anterior, con Google News RSS y el índice local; la guarda como corrida automática y deja su PDF en
 ``REPORTS_DIR``. Sirve para probar el monitor sin esperar al horario.
 
 Antes de correr muestra qué buscaría y cuánto costaría (0 créditos; centavos

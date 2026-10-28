@@ -290,8 +290,8 @@ a {
 }
 
 .fact {
-  flex: 1 1 40%;
-  padding: 7pt 10pt;
+  flex: 1 1 28%;
+  padding: 6pt 9pt;
   border: 0.75pt solid var(--line);
   border-radius: 3pt;
 }
@@ -1086,4 +1086,227 @@ table.stacks td.num {
 
 .s-date {
   string-set: docdate content();
+}
+
+/* --- Rediseño del 28/10/2026: menos listado, más gráficas ------------------ */
+
+/* Dona de categorías a la izquierda y su tabla a la derecha. */
+.breakdown {
+  display: table;
+  width: 100%;
+  margin: 2pt 0 6pt;
+  break-inside: avoid;
+}
+
+.breakdown > .donut,
+.breakdown > .cat-table {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.donut {
+  width: 34mm;
+  height: 34mm;
+  margin-right: 6mm;
+}
+
+table.cat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+}
+
+table.cat-table td {
+  padding: 1.4pt 0;
+  border-bottom: 0.5pt solid var(--line);
+  font-size: 7.5pt;
+}
+
+table.cat-table td.num {
+  width: 13%;
+  padding: 1.4pt 6pt 1.4pt 0;
+  white-space: nowrap;
+}
+
+td.cat-name {
+  width: 40%;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+td.cat-name i {
+  display: inline-block;
+  width: 7pt;
+  height: 7pt;
+  margin-right: 4pt;
+  border-radius: 1.5pt;
+  vertical-align: -0.5pt;
+}
+
+td.cat-bar {
+  width: 20%;
+  padding-right: 6pt;
+}
+
+td.cat-bar span {
+  display: block;
+  height: 5pt;
+  border-radius: 2.5pt;
+}
+
+td.cat-note {
+  width: 27%;
+  padding-left: 4pt;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+/* Subtítulo de sección dentro de la misma página (con marcador en el PDF). */
+h2.section-sub {
+  margin-top: 14pt;
+  font-family: var(--tech);
+  font-size: 10.5pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 0.75pt solid var(--oraculo-a2);
+  padding-bottom: 3pt;
+  bookmark-level: 2;
+}
+
+/* Cronología de hechos destacados: una línea vertical con un nodo del color
+   de la categoría, como la cronología del monitor. */
+ol.timeline {
+  margin: 6pt 0 10pt;
+  padding: 0 0 0 14pt;
+  list-style: none;
+  border-left: 1.2pt solid #bfe9f5;
+}
+
+.tl-item {
+  position: relative;
+  margin: 0 0 8pt;
+  padding: 0 0 0 4pt;
+  break-inside: avoid;
+}
+
+.tl-dot {
+  position: absolute;
+  top: 1.5pt;
+  left: -19.4pt;
+  width: 8pt;
+  height: 8pt;
+  border: 1.5pt solid #ffffff;
+  border-radius: 50%;
+}
+
+.tl-when {
+  margin: 0;
+  font: 700 6.5pt var(--tech);
+  letter-spacing: 0.1em;
+  color: var(--oraculo-a1);
+  text-transform: uppercase;
+}
+
+.tl-title {
+  margin: 1pt 0 2pt;
+  font-size: 9.5pt;
+  line-height: 1.3;
+  bookmark-level: 3;
+}
+
+.tl-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.tl-text {
+  margin: 0 0 2pt;
+  font-size: 8.3pt;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.tl-source {
+  margin: 0;
+  font-size: 7pt;
+  color: var(--muted);
+}
+
+.tl-source a {
+  color: var(--inside);
+  text-decoration: none;
+}
+
+.ins-outlets {
+  border-color: var(--oraculo-a2);
+  background: #e6f8fd;
+  color: var(--oraculo-a1);
+}
+
+/* Índice de noticias: un renglón por hecho. */
+table.index {
+  width: 100%;
+  margin: 0 0 6pt;
+  border-collapse: collapse;
+  font-size: 7.8pt;
+}
+
+table.index tr {
+  break-inside: avoid;
+}
+
+table.index td {
+  padding: 2.4pt 3pt;
+  border-bottom: 0.5pt solid var(--line);
+  vertical-align: top;
+}
+
+table.index tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+td.ix-num {
+  width: 18pt;
+}
+
+td.ix-num .number {
+  display: inline-block;
+  min-width: 13pt;
+  padding: 0.5pt 2pt;
+  border-radius: 2pt;
+  background: var(--oraculo-bg);
+  color: #ffffff;
+  font: 700 6.5pt var(--tech);
+  text-align: center;
+}
+
+td.ix-time {
+  width: 26pt;
+  color: var(--oraculo-a1);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+td.ix-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+td.ix-src {
+  width: 26%;
+  color: var(--muted);
+}
+
+td.ix-src b {
+  color: var(--oraculo-a1);
+}
+
+.omitted {
+  margin-top: 8pt;
+  padding: 6pt 10pt;
+  border-left: 3pt solid var(--oraculo-a2);
+  background: var(--soft);
+  font-size: 8pt;
+  color: var(--text);
 }

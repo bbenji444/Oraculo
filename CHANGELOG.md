@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **PDF más visual y sin listados interminables (28/10/2026, ADR-0033).** Benji: «prefiero resúmenes, gráficas, datos importantes». El reporte trae:
+  - una dona por delito;
+  - la línea del tiempo por hora de colores por categoría, como el globo;
+  - una cronología de los 8 hechos que más medios publicaron, con su resumen;
+  - un índice compacto, un renglón por hecho y hasta 40 hechos; lo demás se consulta en el monitor o en el CSV.
+
+  La portada, el panorama, el mapa y el anexo siguen igual.
 - **Calendario con el estilo del sistema (28/10/2026, `HudDatePicker`).** «Desde» y «Hasta» ya no abren el calendario gris del navegador. Ahora el calendario es propio:
   - vidrio oscuro y días que se iluminan al pasar el mouse;
   - hoy con un punto, el día elegido brillando y una banda entre las dos fechas;

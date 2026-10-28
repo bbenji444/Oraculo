@@ -3,8 +3,8 @@
 La lanza el reloj de Celery a las 07:00, 15:00 y 23:00 (CDMX), o una persona
 con ``make corrida-fgr``. Hace lo mismo que alguien en Explorar, sin pantalla:
 
-1. arma la petición (``PrepareAutomaticRun``): FGR, todo México, hoy y ayer,
-   solo Google News RSS y el índice local (0 créditos);
+1. arma la petición (``PrepareAutomaticRun``): FGR, todo México, solo las
+   horas desde la corrida anterior, Google News RSS y el índice local (0 créditos);
 2. la crea con las mismas reglas que una manual (``StartSearch``: tope de
    consultas, llave de la IA, tope de créditos) y la marca como automática;
 3. la corre aquí mismo con el pipeline de siempre (``run_search_job``): extrae,

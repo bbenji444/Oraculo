@@ -64,3 +64,17 @@ Los colores y tipografías salen de OSINT Oráculo (F12.7a).
 El reporte de la corrida de las 15:00 del 26/10 traía 143 fichas en 33 páginas. Varias eran el mismo hecho contado por varios medios, con resúmenes casi iguales («Estoy bien y muy fuerte», de Jáuregui, en tres medios).
 
 Ahora cada hecho (historia, ADR-0026) es **una ficha**: la de la nota que se publicó primero, con una línea «También lo publicaron (N)» que da el medio, la hora y el link de las demás, sin repetir el resumen. El encabezado de cada estado dice «37 hechos · 76 notas · 54 %». El porcentaje sigue contando notas, igual que el mapa. Ese reporte quedó en 76 fichas y 22 páginas.
+
+## Ajuste: menos listado, más gráficas (28/10/2026)
+
+Benji: «a mí de nada me sirve tener 100, 200 noticias en un listado interminable porque nadie lo va a ver. Prefiero resúmenes, gráficas, datos importantes… que sí aparezcan las noticias de manera individual, pero no quiero saturarlo».
+
+- **Notas por categoría:** dona con el total al centro y una tabla con barra de color, número, porcentaje y el estado donde más salen. Antes eran tarjetas.
+- **Línea del tiempo por hora, de colores por categoría** (`TimeBar.segments`), como los puntos del globo, con su leyenda.
+- **Cronología de hechos destacados** (`highlights`). Son los 8 hechos que más medios publicaron (`MAX_HIGHLIGHTS`); entre iguales, el más relevante y luego el más reciente. Van en orden de hora, en una línea vertical con un nodo del color de su categoría. Cada uno lleva su resumen, sus insignias y cuántos medios lo publicaron. Son las únicas notas con resumen.
+- **Índice de noticias:**
+  - Estado ▸ Categoría ▸ un renglón por hecho, con número, hora, título con link, medio y «+N» medios;
+  - tiene un tope de 40 hechos (`MAX_LISTED_FACTS`, `limit_groups`); lo demás se consulta en el monitor o en el CSV;
+  - la numeración no cambia, para que las citas sigan valiendo.
+
+**Alternativa descartada:** quitar el índice. Se descartó porque Benji pidió que las noticias sigan apareciendo una por una.

@@ -15,7 +15,11 @@ Aquí se calcula todo eso a partir de las notas relevantes, sin IA:
 - ``state_stacks``: barras apiladas por categoría en cada estado.
 - ``timeline``: notas por hora o por día (fecha de publicación, hora de la
   CDMX, ADR-0032) con los 3 picos y la nota principal de cada uno.
-- ``state_groups``: Estado ▸ Categoría ▸ Noticias, numeradas para citarlas.
+- ``donut``: la dona de las notas por categoría.
+- ``highlights``: los hechos más importantes, en orden de hora, para la
+  cronología del reporte (los que más medios publicaron).
+- ``state_groups`` y ``limit_groups``: Estado ▸ Categoría ▸ Noticias,
+  numeradas para citarlas, con un tope para no saturar el PDF.
 - ``badges``: las insignias de cada nota (categoría, quién actúa, confianza).
 - ``network_svg``: la red de nodos de la portada.
 - ``clean``: quita emojis y símbolos que la fuente del PDF no tiene.
@@ -65,6 +69,20 @@ MAX_CARD_LABELS = 3
 # Hasta 3 días se cuenta por hora; con más, por día (igual que el monitor, ADR-0032).
 HOURLY_UP_TO = timedelta(days=3)
 PEAKS = 3
+# Benji, 28/10/2026: «no quiero saturarlo de noticias… prefiero resúmenes,
+# gráficas, datos importantes». La cronología lleva los hechos más importantes
+# con su resumen, y el índice lista los demás en un renglón cada uno, hasta un
+# tope; el resto se consulta en el sistema o en el CSV.
+MAX_HIGHLIGHTS = 8
+MAX_LISTED_FACTS = 40
+# Dona de categorías: radios externo e interno en el lienzo de 120 × 120.
+DONUT_OUTER = 56.0
+DONUT_INNER = 34.0
+DONUT_CENTER = 60.0
+# Una sola categoría ocupa la vuelta entera; el arco SVG no dibuja 360°.
+FULL_TURN = 0.9999
+# Pasando media vuelta el arco SVG toma el camino largo (bandera large-arc).
+HALF_TURN = 0.5
 # Umbrales de la insignia de confianza (puntaje de relevancia de la IA, 0 a 1).
 HIGH_CONFIDENCE = 0.85
 MEDIUM_CONFIDENCE = 0.6
@@ -317,6 +335,9 @@ class TimeBar:
         count: Notas publicadas en el tramo.
         share: Alto respecto al tramo más alto (0 a 1).
         peak: Si es uno de los picos.
+        segments: La barra partida por categoría, del color de cada una (como
+            los puntos del globo); ``share`` de cada tramo respecto al tramo
+            más alto.
     """
 
     start: datetime
@@ -324,6 +345,7 @@ class TimeBar:
     count: int
     share: float
     peak: bool
+    segments: tuple[Segment, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,6 +380,9 @@ class Timeline:
 
 # Cada cuántas barras se rotula el eje para que los rótulos no se encimen.
 _LABEL_EVERY = {"hora": 6, "día": 2}
+# Con pocas barras (una corrida cubre 8 horas) se rotulan todas: con una cada
+# 6 horas solo se leían «23 h» y «05 h» (PDF del 28/10/2026).
+LABEL_ALL_UP_TO = 12
 
 
 def timeline(articles: Sequence[ArticleItem]) -> Timeline:
@@ -396,7 +421,7 @@ def timeline(articles: Sequence[ArticleItem]) -> Timeline:
     peak_starts = sorted(
         (s for s in starts if buckets.get(s)), key=lambda s: (-len(buckets[s]), s)
     )[:PEAKS]
-    every = _LABEL_EVERY[unit]
+    every = 1 if len(starts) <= LABEL_ALL_UP_TO else _LABEL_EVERY[unit]
     bars = tuple(
         TimeBar(
             start=start,
@@ -404,6 +429,7 @@ def timeline(articles: Sequence[ArticleItem]) -> Timeline:
             count=len(buckets.get(start, [])),
             share=len(buckets.get(start, [])) / top,
             peak=start in peak_starts,
+            segments=_segments(buckets.get(start, []), top),
         )
         for index, start in enumerate(starts)
     )
@@ -416,6 +442,16 @@ def timeline(articles: Sequence[ArticleItem]) -> Timeline:
         for start in peak_starts
     )
     return Timeline(unit, bars, peaks)
+
+
+def _segments(members: Sequence[ArticleItem], top: int) -> tuple[Segment, ...]:
+    """Una barra partida por categoría, de la que tiene más notas a la que menos."""
+    colors = {category_name(a): category_color(a) for a in members}
+    counts = Counter(category_name(a) for a in members)
+    return tuple(
+        Segment(category, colors[category], count, count / top)
+        for category, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    )
 
 
 def _axis_label(start: datetime, hourly: bool) -> str:
@@ -635,6 +671,151 @@ def state_groups(articles: Sequence[ArticleItem]) -> tuple[StateGroup, ...]:
     return tuple(groups)
 
 
+@dataclass(frozen=True, slots=True)
+class DonutSlice:
+    """Un tramo de la dona de categorías.
+
+    Attributes:
+        name: Categoría.
+        color: Su color.
+        count: Notas.
+        percent: Porcentaje de las notas relevantes.
+        path: Trazo SVG del tramo (``d`` de un ``<path>``), solo números.
+    """
+
+    name: str
+    color: str
+    count: int
+    percent: int
+    path: str
+
+
+def _arc_point(radius: float, turn: float) -> tuple[float, float]:
+    angle = 2 * math.pi * turn - math.pi / 2
+    return DONUT_CENTER + radius * math.cos(angle), DONUT_CENTER + radius * math.sin(angle)
+
+
+def donut(cards: Sequence[CategoryCard]) -> tuple[DonutSlice, ...]:
+    """La dona de las notas por categoría, en el orden de las tarjetas.
+
+    Args:
+        cards: Las tarjetas por categoría (``category_cards``).
+
+    Returns:
+        Un tramo por categoría, empezando arriba y en el sentido del reloj.
+    """
+    total = sum(card.count for card in cards)
+    slices = []
+    start = 0.0
+    for card in cards:
+        share = min(card.count / total, FULL_TURN) if total else 0.0
+        end = start + share
+        x1, y1 = _arc_point(DONUT_OUTER, start)
+        x2, y2 = _arc_point(DONUT_OUTER, end)
+        x3, y3 = _arc_point(DONUT_INNER, end)
+        x4, y4 = _arc_point(DONUT_INNER, start)
+        large = 1 if share > HALF_TURN else 0
+        path = (
+            f"M{x1:.2f} {y1:.2f} A{DONUT_OUTER} {DONUT_OUTER} 0 {large} 1 {x2:.2f} {y2:.2f} "
+            f"L{x3:.2f} {y3:.2f} A{DONUT_INNER} {DONUT_INNER} 0 {large} 0 {x4:.2f} {y4:.2f} Z"
+        )
+        slices.append(DonutSlice(card.name, card.color, card.count, card.percent, path))
+        start = end
+    return tuple(slices)
+
+
+@dataclass(frozen=True, slots=True)
+class Highlight:
+    """Un hecho destacado de la cronología del reporte.
+
+    Attributes:
+        article: La primera nota que se publicó del hecho.
+        outlets: Cuántos medios lo publicaron (la nota y las demás del hecho).
+        state: Estado del hecho.
+        color: Color de su categoría.
+        badges: Sus insignias.
+        also: Las demás notas del mismo hecho.
+    """
+
+    article: ArticleItem
+    outlets: int
+    state: str
+    color: str
+    badges: tuple[Badge, ...]
+    also: tuple[ArticleItem, ...] = ()
+
+
+def _best_score(article: ArticleItem) -> float:
+    return max((j.relevance_score for j in article.judgements if j.is_relevant), default=0.0)
+
+
+def highlights(
+    articles: Sequence[ArticleItem], limit: int = MAX_HIGHLIGHTS
+) -> tuple[Highlight, ...]:
+    """Los hechos más importantes, para la cronología del reporte.
+
+    Importa más el hecho que publicaron más medios; entre iguales, el que la
+    IA juzgó más relevante y luego el más reciente. Se muestran en orden de
+    hora, como la cronología del monitor.
+
+    Args:
+        articles: Notas relevantes.
+        limit: Cuántos hechos.
+
+    Returns:
+        Hasta ``limit`` hechos, del primero al último que se publicó.
+    """
+
+    def importance(story: Story) -> tuple[int, float, float]:
+        lead, also = story
+        moment = lead.published_at.timestamp() if lead.published_at else 0.0
+        return (-(1 + len(also)), -_best_score(lead), -moment)
+
+    chosen = sorted(_stories(articles), key=importance)[:limit]
+
+    def when(story: Story) -> tuple[datetime, int]:
+        lead = story[0]
+        return (lead.published_at or datetime.max.replace(tzinfo=UTC), lead.article_id)
+
+    return tuple(
+        Highlight(lead, 1 + len(also), state_name(lead), category_color(lead), badges(lead), also)
+        for lead, also in sorted(chosen, key=when)
+    )
+
+
+def limit_groups(
+    groups: Sequence[StateGroup], max_facts: int = MAX_LISTED_FACTS
+) -> tuple[tuple[StateGroup, ...], int]:
+    """Recorta el índice de noticias a ``max_facts`` hechos.
+
+    Se conservan los estados con más notas primero (el orden de
+    ``state_groups``) y la numeración original, para que las citas no cambien.
+
+    Args:
+        groups: Estado ▸ Categoría ▸ Noticias.
+        max_facts: Cuántos hechos caben en el índice.
+
+    Returns:
+        Los grupos recortados y cuántos hechos quedaron fuera.
+    """
+    kept: list[StateGroup] = []
+    room = max_facts
+    omitted = 0
+    for group in groups:
+        categories = []
+        for category in group.categories:
+            notes = category.notes[: max(room, 0)]
+            omitted += len(category.notes) - len(notes)
+            room -= len(notes)
+            if notes:
+                categories.append(CategoryGroup(category.name, category.color, notes))
+        if categories:
+            kept.append(
+                StateGroup(group.name, group.count, group.percent, tuple(categories), group.facts)
+            )
+    return tuple(kept), omitted
+
+
 def network_svg(seed: str) -> str:
     """La red de nodos de la portada (como las portadas de Oráculo 2.0).
 
@@ -678,7 +859,9 @@ class Novelty:
     """Qué trae de nuevo una corrida automática frente a la anterior (ADR-0034).
 
     En la auditoría del 27/10/2026, el 88 al 94 % de las notas de cada corrida
-    ya venía en la anterior: cada una cubre hoy y ayer.
+    ya venía en la anterior, cuando cada una cubría hoy y ayer. Desde el
+    28/10/2026 cada corrida cubre solo su periodo (ADR-0031), pero un hecho
+    que se siguió publicando ya se reportó en la anterior.
 
     Attributes:
         previous_at: Hora programada de la corrida anterior, si la tiene.
@@ -731,11 +914,15 @@ class OraculoView:
         cards: Tarjetas por categoría.
         stacks: Barras apiladas por estado.
         timeline: Línea del tiempo.
-        groups: Estado ▸ Categoría ▸ Noticias. En una corrida automática,
-            solo los hechos nuevos frente a la anterior.
+        groups: Índice Estado ▸ Categoría ▸ Noticias, hasta
+            ``MAX_LISTED_FACTS`` hechos. En una corrida automática, solo los
+            hechos nuevos frente a la anterior.
         network: La red de nodos de la portada (SVG).
         novelty: Lo nuevo frente a la corrida anterior, o ``None`` si no hay
             con qué comparar.
+        donut: La dona de las notas por categoría.
+        highlights: Los hechos más importantes, para la cronología.
+        omitted_facts: Hechos que no cupieron en el índice.
     """
 
     code: str
@@ -749,6 +936,9 @@ class OraculoView:
     groups: tuple[StateGroup, ...]
     network: str
     novelty: Novelty | None = None
+    donut: tuple[DonutSlice, ...] = ()
+    highlights: tuple[Highlight, ...] = ()
+    omitted_facts: int = 0
 
 
 def build_oraculo(
@@ -771,6 +961,8 @@ def build_oraculo(
     code = expediente(search)
     cards = category_cards(articles)
     named = [c for c in cards if c.name not in {"Otros", NO_CATEGORY}]
+    listed = new_facts_only(articles, previous.article_ids) if previous else list(articles)
+    groups, omitted = limit_groups(state_groups(listed))
     return OraculoView(
         code=code,
         issued=date_caps(generated_at or datetime.now(UTC)),
@@ -780,9 +972,10 @@ def build_oraculo(
         cards=cards,
         stacks=state_stacks(articles),
         timeline=timeline(articles),
-        groups=state_groups(
-            new_facts_only(articles, previous.article_ids) if previous else articles
-        ),
+        groups=groups,
         network=network_svg(code),
         novelty=novelty(articles, previous) if previous else None,
+        donut=donut(cards),
+        highlights=highlights(listed),
+        omitted_facts=omitted,
     )

@@ -174,7 +174,8 @@ class PreviousRun:
 
     Sirve para que el reporte separe lo nuevo de lo ya reportado: en la
     auditoría del 27/10/2026, el 88 al 94 % de las notas de cada corrida ya
-    venía en la anterior, porque cada una cubre hoy y ayer (ADR-0034).
+    venía en la anterior, cuando cada una cubría hoy y ayer (ADR-0034). Con la
+    ventana por horas (ADR-0031) sirve para los hechos que se siguen publicando.
 
     Attributes:
         search_id: La corrida anterior.
