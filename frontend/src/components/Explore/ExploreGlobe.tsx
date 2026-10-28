@@ -68,6 +68,7 @@ import {
   ringAround,
   articleZoom,
   calloutWidth,
+  columnInTheWay,
   flyPadding,
   fitZoom,
   frameZoom,
@@ -980,8 +981,15 @@ export function ExploreGlobe({
       width: screen.width - reservedLeft - reservedRight,
       height: screen.height - inset.top - inset.bottom,
     };
-    const reserved = reservedLeft + reservedRight > 0;
-    const padding = flyPadding(free, !reserved && useExplorerStore.getState().panelOpen);
+    const padding = flyPadding(
+      free,
+      columnInTheWay({
+        mando: clearHeaderRef.current,
+        reservedPx: reservedLeft + reservedRight,
+        panelOpen: useExplorerStore.getState().panelOpen,
+      }),
+      clearHeaderRef.current,
+    );
     // Una localidad sin polígono es un punto: se acerca al zoom de localidad.
     const isPoint = box[0] === box[2] && box[1] === box[3];
     const maxZoom = FLY_MAX_ZOOM[isPoint ? 'locality' : region.level];

@@ -9,6 +9,7 @@ import {
   articleZoom,
   CALLOUT_WIDTH,
   calloutWidth,
+  columnInTheWay,
   DESKTOP_ARTICLE_OFFSET,
   flyPadding,
   fitZoom,
@@ -47,6 +48,24 @@ describe('márgenes al volar a una región', () => {
 
     expect(padding.left + padding.right).toBeLessThanOrEqual(PHONE.width - MIN_FRAME_PX);
     expect(padding.top + padding.bottom).toBeLessThanOrEqual(PHONE.height - MIN_FRAME_PX);
+  });
+
+  it('en el Centro de mando no aparta la columna del diseño 2 aunque siga «abierta»', () => {
+    // Antes se apartaba y el vuelo a Argentina caía 25° al oeste y más lejos
+    // (Benji, 28/10/2026: «en vez de acercarse… se aleja»).
+    expect(columnInTheWay({ mando: true, reservedPx: 0, panelOpen: true })).toBe(false);
+    expect(columnInTheWay({ mando: false, reservedPx: 0, panelOpen: true })).toBe(true);
+    expect(columnInTheWay({ mando: false, reservedPx: 400, panelOpen: true })).toBe(false);
+
+    const free = { width: 1600, height: 588 };
+    const argentina: [number, number, number, number] = [-73.57, -55.05, -53.66, -21.79];
+    const camera = globeCamera(argentina, free, flyPadding(free, false), 6);
+    const apart = globeCamera(argentina, free, flyPadding(free, true), 6);
+    expect(Math.abs(camera.center[0] - -63.6)).toBeLessThan(1);
+    expect(camera.zoom).toBeGreaterThan(apart.zoom + 0.3);
+    // Con los márgenes cortos del Centro de mando el país se ve más de cerca.
+    const close = globeCamera(argentina, free, flyPadding(free, false, true), 6);
+    expect(close.zoom).toBeGreaterThan(camera.zoom + 0.15);
   });
 
   it('en una ventana muy baja los márgenes se reducen en proporción', () => {
