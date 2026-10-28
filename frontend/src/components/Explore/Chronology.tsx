@@ -26,7 +26,7 @@
  *
  * No hace: no pide datos ni calcula los tramos (eso es `timelineData.ts`).
  */
-import { type Ref, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type Ref, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Article } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
@@ -44,6 +44,7 @@ import {
   type TimelineUnit,
 } from './timelineData';
 import { CategoryTag } from './CategoryTag';
+import { categoryColor } from './categoryColor';
 import { eventDateNote } from './format';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
@@ -185,6 +186,13 @@ function Spark({ buckets, unit, max, range, onPick, height = SPARK_HEIGHT, capti
   );
 }
 
+/**
+ * Renglones de una línea (expediente del Centro de mando): el título completo
+ * se ve al elegir el hecho o al pasar el mouse; así caben muchos más (Benji,
+ * 28/10/2026). Se pasa por contexto para no cruzar todos los renglones.
+ */
+const DenseRows = createContext(false);
+
 interface EntryProps {
   item: StoryItem;
   selected: boolean;
@@ -195,6 +203,7 @@ interface EntryProps {
 }
 
 function Entry({ item, selected, selectedRef, onSelect, showDay = false }: EntryProps) {
+  const dense = useContext(DenseRows);
   const article = item.lead;
   // Al elegirlo se abre la nota mejor ubicada del hecho (timelineData.mapLead).
   const target = mapLead(item);
@@ -221,9 +230,18 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
               selected
                 ? 'size-3 bg-white shadow-[0_0_12px_rgb(255_255_255/0.9)]'
                 : others > 0
-                  ? 'size-2.5 bg-sky-300 shadow-[0_0_10px_rgb(0_210_255/0.9)]'
-                  : 'size-2 bg-sky-400/80 shadow-[0_0_6px_rgb(0_210_255/0.6)]'
+                  ? 'size-2.5'
+                  : 'size-2'
             }`}
+            // Del color de su categoría (el delito), como en la lista y el globo.
+            style={
+              selected
+                ? undefined
+                : {
+                    backgroundColor: categoryColor(article.category),
+                    boxShadow: `0 0 ${others > 0 ? '10px' : '6px'} ${categoryColor(article.category)}`,
+                  }
+            }
           />
         </>
       )}
@@ -241,15 +259,22 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
           onClick={() => {
             onSelect(target.article_id);
           }}
-          className={`w-full rounded-xl px-2.5 py-1.5 text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
+          className={`w-full rounded-xl px-2.5 ${dense ? 'py-1' : 'py-1.5'} text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
             selected ? '' : 'hover:translate-x-0.5 hover:bg-white/[0.045]'
           }`}
         >
-          <span className="line-clamp-2 text-[12.5px] font-medium leading-snug text-slate-50">
+          <span
+            title={dense ? `${article.title}${background ? ` · ◆ ${background}` : ''}` : undefined}
+            className={`${dense && !selected ? 'block truncate' : 'line-clamp-2'} text-[12.5px] font-medium leading-snug text-slate-50`}
+          >
             {article.title}
           </span>
           {/* Los datos como etiquetas: medio, lugar, categoría y cuántos medios. */}
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400">
+          <span
+            className={`${dense ? 'mt-0.5' : 'mt-1'} flex items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400 ${
+              dense ? 'flex-nowrap overflow-hidden' : 'flex-wrap'
+            }`}
+          >
             {showDay && (
               <span className="tabular-nums">
                 {shortDay(item.at)} {HOUR.format(new Date(item.at))}
@@ -270,12 +295,13 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
             )}
             <CategoryTag article={article} />
             {others > 0 && (
-              <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-1.5 text-sky-200">
+              <span className="shrink-0 whitespace-nowrap rounded-full border border-sky-400/30 bg-sky-400/10 px-1.5 text-sky-200">
                 +{others} medio{others === 1 ? '' : 's'}
               </span>
             )}
           </span>
-          {background && (
+          {/* Compacto: la nota de antecedentes va en la ayuda del renglón. */}
+          {background && !dense && (
             <span className="mt-0.5 block text-[10.5px] text-amber-200/80">◆ {background}</span>
           )}
         </button>
@@ -335,6 +361,7 @@ interface ThemeEntryProps {
  * está adentro, para que se vea en la lista.
  */
 function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProps) {
+  const dense = useContext(DenseRows);
   const containsSelected =
     selectedId !== null && block.items.some((item) => item.articleIds.includes(selectedId));
   const [expanded, setExpanded] = useState(false);
@@ -371,7 +398,7 @@ function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProp
           <span className="mt-0.5 block text-[10.5px] text-slate-400">
             {block.items.length} hechos · {block.notes} notas · {span}
           </span>
-          {!open && (
+          {!open && !dense && (
             <span className="mt-0.5 block truncate text-[10.5px] text-slate-300">
               Lo último: {block.items[0]?.lead.title}
             </span>
@@ -485,7 +512,8 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
   return (
     <section
       aria-label="Cronología"
-      className={`${GLASS_OSINT} flex max-h-full w-full min-w-0 flex-col`}
+      // En el expediente ya va dentro de un panel: sin marco propio.
+      className={`${dossier ? 'min-h-0 flex-1' : `${GLASS_OSINT} max-h-full`} flex w-full min-w-0 flex-col`}
     >
       <div
         className={`space-y-2 border-b border-sky-400/10 px-4 ${dossier ? 'pb-2.5 pt-2.5' : 'pb-3 pt-3'}`}
@@ -579,47 +607,52 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
         </div>
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {days.length === 0 && (
-          <p className="px-1 py-4 text-xs text-slate-400">No hay notas con estos filtros.</p>
-        )}
-        {days.map((group) => (
-          <div key={group.day} className="relative">
-            <p className="sticky top-0 z-10 -mx-3 border-b border-sky-400/10 bg-[#050505]/95 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90">
-              {DAY.format(new Date(group.at))}
-              <span className="ml-2 font-sans text-[10px] font-normal normal-case tracking-normal text-slate-500">
-                {group.rows.length} {group.rows.length === 1 ? 'entrada' : 'entradas'}
-              </span>
-            </p>
-            {/* La línea vertical luminosa que une los hechos del día. */}
-            <span
-              aria-hidden="true"
-              className="absolute bottom-2 left-[2.95rem] top-9 w-px -translate-x-1/2 bg-gradient-to-b from-sky-400/70 via-sky-400/30 to-sky-400/0"
-            />
-            <ol className="space-y-0.5" aria-label={`Hechos del ${DAY.format(new Date(group.at))}`}>
-              {group.rows.map((row) =>
-                row.kind === 'theme' ? (
-                  <ThemeEntry
-                    key={`tema-${row.key}`}
-                    block={row}
-                    selectedId={selectedId}
-                    selectedRef={selectedRef}
-                    onSelect={selectArticle}
-                  />
-                ) : (
-                  <Entry
-                    key={row.lead.article_id}
-                    item={row}
-                    selected={selectedId !== null && row.articleIds.includes(selectedId)}
-                    selectedRef={selectedRef}
-                    onSelect={selectArticle}
-                  />
-                ),
-              )}
-            </ol>
-          </div>
-        ))}
-      </div>
+      <DenseRows.Provider value={dossier}>
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+          {days.length === 0 && (
+            <p className="px-1 py-4 text-xs text-slate-400">No hay notas con estos filtros.</p>
+          )}
+          {days.map((group) => (
+            <div key={group.day} className="relative">
+              <p className="sticky top-0 z-10 -mx-3 border-b border-sky-400/10 bg-[#050505]/95 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90">
+                {DAY.format(new Date(group.at))}
+                <span className="ml-2 font-sans text-[10px] font-normal normal-case tracking-normal text-slate-500">
+                  {group.rows.length} {group.rows.length === 1 ? 'entrada' : 'entradas'}
+                </span>
+              </p>
+              {/* La línea vertical luminosa que une los hechos del día. */}
+              <span
+                aria-hidden="true"
+                className="absolute bottom-2 left-[2.95rem] top-9 w-px -translate-x-1/2 bg-gradient-to-b from-sky-400/70 via-sky-400/30 to-sky-400/0"
+              />
+              <ol
+                className="space-y-0.5"
+                aria-label={`Hechos del ${DAY.format(new Date(group.at))}`}
+              >
+                {group.rows.map((row) =>
+                  row.kind === 'theme' ? (
+                    <ThemeEntry
+                      key={`tema-${row.key}`}
+                      block={row}
+                      selectedId={selectedId}
+                      selectedRef={selectedRef}
+                      onSelect={selectArticle}
+                    />
+                  ) : (
+                    <Entry
+                      key={row.lead.article_id}
+                      item={row}
+                      selected={selectedId !== null && row.articleIds.includes(selectedId)}
+                      selectedRef={selectedRef}
+                      onSelect={selectArticle}
+                    />
+                  ),
+                )}
+              </ol>
+            </div>
+          ))}
+        </div>
+      </DenseRows.Provider>
     </section>
   );
 }

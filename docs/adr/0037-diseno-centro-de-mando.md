@@ -78,3 +78,9 @@ Benji pidió estos ajustes al elegirlo:
   - el resumen es más bajo y se puede dejar plegado; la preferencia se recuerda;
   - dentro del expediente, la cronología no repite su título (`variant="dossier"`).
 - **Un clic en la cronología siempre hace algo.** Se abre la nota del hecho mejor ubicada (`mapLead`). Si ninguna tiene lugar, la ficha sale sin vuelo y con aviso.
+
+## Terceros ajustes (28/10/2026)
+
+- **Pestañas en el panel de las noticias.** «Cronología | Noticias» van arriba, dentro del mismo panel, para las dos vistas. La cronología y la lista ya no tienen marco ni título propios (`variant="dossier"`).
+- **Muchas más noticias.** Benji insistió: «quiero que en el listado de noticias se vean muchas más». Los renglones del expediente llevan el título en una línea, que se ve completo al elegirlo o al pasar el mouse, y un solo renglón de datos. Ya no se agranda la letra (se quitó el `zoom`). En 900 px de alto caben 9 a 11 noticias.
+- **Un color por categoría** (migración 0032, `categoryColor`). La barra, las etiquetas, los nodos de la cronología y los puntos del globo usan el color de la categoría de cada nota.

@@ -126,10 +126,17 @@ const SINGLE_DOWNLOAD_TEXT = 'Descargar reporte (PDF)';
  *
  * @param props.searchId Búsqueda terminada.
  */
-export function DownloadButtons({ searchId }: { searchId: string }) {
+export function DownloadButtons({
+  searchId,
+  compact = false,
+}: {
+  searchId: string;
+  /** Solo «PDF» en el botón (el resumen del expediente, donde el espacio cuenta). */
+  compact?: boolean;
+}) {
   const downloads = useDownloads(searchId);
   const visible = DOWNLOADS.filter((d) => VISIBLE_DOWNLOADS.includes(d.kind));
-  const single = visible.length === 1;
+  const single = visible.length === 1 && !compact;
   return (
     <div aria-label="Descargas" role="group" className="space-y-1">
       <div

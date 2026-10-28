@@ -2,20 +2,18 @@
  * Expediente de la consulta (Centro de mando): los resultados a la derecha,
  * para que el globo quede a la izquierda con las notas.
  *
- * Arriba va el resumen, de vidrio y con color:
- * - un título que se descifra;
- * - cuatro cifras que corren, cada una con su color: relevantes, estados,
- *   créditos y costo de la IA;
- * - una barra con las categorías que más salen;
- * - las descargas.
+ * Dos paneles:
+ * - **Resumen**, de vidrio y con color: título que se descifra, el PDF, cuatro
+ *   cifras que corren (relevantes, estados, créditos y costo de la IA) y una
+ *   barra con las categorías que más salen, cada una de su color. «▴» lo
+ *   pliega a un renglón.
+ * - **Noticias**: arriba las pestañas «Cronología | Noticias», en el mismo
+ *   lugar para las dos vistas; abajo la cronología o la lista, compactas, para
+ *   que quepan muchas (Benji, 28/10/2026: «quiero que en el listado de
+ *   noticias se vean muchas más noticias»).
  *
- * «▴» pliega el resumen a un renglón para que la lista de abajo tenga casi
- * todo el alto. Benji pidió poder cerrar lo de arriba por separado y ver
- * «un listado mucho más grande» (27/10/2026).
- *
- * Abajo va la misma cronología o lista del diseño de columna, más grande y
- * con letra más clara (`.mando-feed`). «›» oculta todo el expediente (el
- * globo se recentra) y una pestaña en el borde lo vuelve a abrir.
+ * «›» oculta todo el expediente (el globo se recentra) y una pestaña en el
+ * borde lo vuelve a abrir.
  *
  * No hace: no filtra por su cuenta; muestra las mismas notas que el globo.
  */
@@ -24,11 +22,13 @@ import { type CSSProperties, useEffect } from 'react';
 import type { Article, Search } from '../../services/searches';
 import { useMandoStore } from '../../store/mando';
 import { useTimelineStore } from '../../store/timeline';
+import { categoryColor } from '../Explore/categoryColor';
 import { Chronology } from '../Explore/Chronology';
 import { DownloadButtons } from '../Explore/Controls';
 import { formatRange, providersLabel } from '../Explore/format';
 import { ResultsList } from '../Explore/ResultsList';
 import { categoriesIn, statesIn } from '../Explore/timelineData';
+import { GLASS } from '../Explore/ui';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
@@ -36,12 +36,9 @@ import { MANDO_GLASS } from './ui';
 
 // Categorías en la barra: las que más salen; el resto no se distinguiría.
 const TOP_CATEGORIES = 5;
-// Las que se nombran debajo de la barra, en un solo renglón (el resto se ve al
+// Las que se nombran debajo de la barra, en un solo renglón (todas se ven al
 // pasar el mouse por la barra): así el resumen ocupa menos alto.
 const NAMED_CATEGORIES = 3;
-// Colores de la consola para los tramos de la barra: cian, verde, violeta,
-// azul cielo y turquesa. Sin ámbar ni naranja (Benji, 27/10/2026).
-const CATEGORY_COLORS = ['#00d2ff', '#2cf5a0', '#9b8cff', '#38bdf8', '#5eead4'];
 // Retraso entre cifras al entrar, en milisegundos: entran una tras otra.
 const KPI_STAGGER_MS = 90;
 // Color de cada cifra, en «r g b» para que el CSS lo use con transparencia
@@ -130,36 +127,33 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   const categories = categoriesIn(relevant).slice(0, TOP_CATEGORIES);
   const view: DossierView = listOpen ? 'list' : 'chrono';
   const title = `${search.concepts.map((c) => c.name).join(', ')} · ${search.region_name}`;
+  const sources =
+    search.providers && search.providers.length > 0 ? ` · ${providersLabel(search.providers)}` : '';
   return (
     <aside
       aria-label="Expediente de la consulta"
-      className="mando-dossier pointer-events-none absolute inset-y-4 right-4 flex w-[calc(100%-2rem)] flex-col gap-3 sm:w-[30rem]"
+      className="mando-dossier pointer-events-none absolute inset-y-4 right-4 flex w-[calc(100%-2rem)] flex-col gap-2.5 sm:w-[30rem]"
     >
       <section
         aria-label="Resumen de la consulta"
-        className={`${MANDO_GLASS} pointer-events-auto shrink-0 space-y-2.5 px-4 py-3`}
+        className={`${MANDO_GLASS} pointer-events-auto shrink-0 space-y-2 px-3.5 py-2.5`}
       >
         {/* Un haz recorre el resumen al llegar los resultados. */}
         <span aria-hidden="true" key={search.search_id} className="hud-scan" />
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <p className="mando-kicker">
               Expediente · {formatRange(search.date_from, search.date_to)}
             </p>
             <h2
-              className="mt-1.5 truncate text-[15px] leading-snug font-semibold text-slate-50"
-              title={`${title}${search.providers && search.providers.length > 0 ? ` · ${providersLabel(search.providers)}` : ''}`}
+              className="mt-1 truncate text-[14px] leading-snug font-semibold text-slate-50"
+              title={`${title}${sources}`}
             >
               <DecodeText text={title} />
             </h2>
-            {!summaryOpen && (
-              // Plegado: las cifras en un renglón, para no perderlas de vista.
-              <p className="mt-1 text-[11px] text-slate-300">
-                <span className="text-sky-300">{shown.length}</span> relevantes ·{' '}
-                <span className="text-emerald-300">{states.length}</span> estados ·{' '}
-                {search.credits_used} créditos · IA {usd(search.llm_cost_usd)} USD
-              </p>
-            )}
+          </div>
+          <div className="shrink-0">
+            <DownloadButtons searchId={search.search_id} compact />
           </div>
           <button
             type="button"
@@ -169,7 +163,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
             }}
             title={summaryOpen ? 'Plegar el resumen para ver más noticias' : 'Desplegar el resumen'}
             aria-label={summaryOpen ? 'Plegar el resumen' : 'Desplegar el resumen'}
-            className="hud-icon-btn size-8 text-sm"
+            className="hud-icon-btn size-7 text-xs"
           >
             {summaryOpen ? '▴' : '▾'}
           </button>
@@ -180,93 +174,107 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
             }}
             title="Ocultar el expediente"
             aria-label="Ocultar el expediente"
-            className="hud-icon-btn size-8 text-sm"
+            className="hud-icon-btn size-7 text-xs"
           >
             ›
           </button>
         </div>
 
-        {summaryOpen && (
-          <div className="mando-summary space-y-3">
-            <dl className="grid grid-cols-4 gap-2">
+        {summaryOpen ? (
+          <div className="mando-summary space-y-2">
+            <dl className="grid grid-cols-4 gap-1.5">
               <Kpi label="Relevantes" value={shown.length} tone="cyan" order={0} />
               <Kpi label="Estados" value={states.length} tone="green" order={1} />
               <Kpi label="Créditos" value={search.credits_used} tone="violet" order={2} />
               <Kpi label="IA USD" value={search.llm_cost_usd} tone="sky" order={3} format={usd} />
             </dl>
-
             {categories.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div
                   className="mando-meter"
                   aria-hidden="true"
                   title={categories.map((c) => `${c.name}: ${String(c.count)}`).join(' · ')}
                 >
-                  {categories.map((category, i) => (
-                    <span
-                      key={category.id}
-                      style={{
-                        flexGrow: category.count,
-                        backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                        // El brillo del tramo (currentColor en mando.css) es de su color.
-                        color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                        animationDelay: `${String(i * KPI_STAGGER_MS)}ms`,
-                      }}
-                    />
-                  ))}
+                  {categories.map((category, i) => {
+                    const color = categoryColor(category);
+                    return (
+                      <span
+                        key={category.id}
+                        style={{
+                          flexGrow: category.count,
+                          backgroundColor: color,
+                          // El brillo del tramo (currentColor en mando.css) es de su color.
+                          color,
+                          animationDelay: `${String(i * KPI_STAGGER_MS)}ms`,
+                        }}
+                      />
+                    );
+                  })}
                 </div>
                 <ul
                   aria-label="Categorías que más salen"
                   className="flex flex-nowrap gap-x-3 overflow-hidden"
                 >
-                  {categories.slice(0, NAMED_CATEGORIES).map((category, i) => (
-                    <li
-                      key={category.id}
-                      className="flex min-w-0 shrink items-center gap-1.5 truncate text-[10.5px] text-slate-300"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="size-1.5 rounded-full"
-                        style={{
-                          backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-                          boxShadow: `0 0 6px ${CATEGORY_COLORS[i % CATEGORY_COLORS.length] ?? ''}`,
-                        }}
-                      />
-                      {category.name} <span className="text-slate-500">{category.count}</span>
-                    </li>
-                  ))}
+                  {categories.slice(0, NAMED_CATEGORIES).map((category) => {
+                    const color = categoryColor(category);
+                    return (
+                      <li
+                        key={category.id}
+                        className="flex min-w-0 shrink items-center gap-1.5 truncate text-[10.5px] text-slate-300"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="size-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                        />
+                        <span className="truncate">{category.name}</span>
+                        <span className="text-slate-500">{category.count}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
           </div>
+        ) : (
+          // Plegado: las cifras en un renglón, para no perderlas de vista.
+          <p className="text-[11px] text-slate-300">
+            <span className="text-sky-300">{shown.length}</span> relevantes ·{' '}
+            <span className="text-emerald-300">{states.length}</span> estados ·{' '}
+            {search.credits_used} créditos · IA {usd(search.llm_cost_usd)} USD
+          </p>
         )}
-
-        {/* Pestañas y PDF en un renglón: siempre a la mano, aun plegado. */}
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <HudSegmented
-              options={VIEWS}
-              value={view}
-              onChange={(next) => {
-                setListOpen(next === 'list');
-              }}
-              label="Vista del expediente"
-            />
-          </div>
-          <div className="w-[11.5rem] shrink-0">
-            <DownloadButtons searchId={search.search_id} />
-          </div>
-        </div>
       </section>
 
-      {/* Más grande y con letra más clara que en la columna (styles/mando.css). */}
-      <div className="mando-feed pointer-events-auto flex min-h-0 flex-1 flex-col">
-        {listOpen ? (
-          <ResultsList articles={shown} total={articles.length} colors={colors} />
-        ) : (
-          <Chronology articles={relevant} variant="dossier" />
-        )}
-      </div>
+      {/* Las pestañas van en el panel de las noticias, en el mismo lugar para la
+          cronología y para la lista (Benji, 28/10/2026). */}
+      <section
+        aria-label="Listado de la consulta"
+        className={`${GLASS} pointer-events-auto flex min-h-0 flex-1 flex-col`}
+      >
+        <div className="shrink-0 px-3 pt-2.5">
+          <HudSegmented
+            options={VIEWS}
+            value={view}
+            onChange={(next) => {
+              setListOpen(next === 'list');
+            }}
+            label="Vista del expediente"
+          />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {listOpen ? (
+            <ResultsList
+              articles={shown}
+              total={articles.length}
+              colors={colors}
+              variant="dossier"
+            />
+          ) : (
+            <Chronology articles={relevant} variant="dossier" />
+          )}
+        </div>
+      </section>
     </aside>
   );
 }

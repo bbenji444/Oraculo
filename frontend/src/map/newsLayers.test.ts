@@ -86,6 +86,15 @@ describe('notas como puntos', () => {
     expect(geojson.features[1]?.properties.color).toBe(NEWS_DEFAULT_COLOR);
     expect(geojson.features[0]?.geometry.coordinates).toEqual([-103.3, 20.7]);
   });
+
+  it('el color de su categoría gana al de su concepto (28/10/2026)', () => {
+    const conCategoria: Article = {
+      ...article(5, {}, 3),
+      category: { id: 5, name: 'Homicidio', color: '#FF4D6D', symbol: null },
+    };
+    const geojson = newsFeatures([conCategoria], new Map([[3, '#AA0000']]));
+    expect(geojson.features[0]?.properties.color).toBe('#FF4D6D');
+  });
 });
 
 describe('punto en el mapa', () => {
