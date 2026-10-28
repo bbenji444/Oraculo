@@ -23,7 +23,6 @@ PROFILE = AutomaticProfile(
     concept="Fiscalía General de la República",
     region_code="MEX",
     sources=(Provider.GOOGLE_NEWS_RSS, Provider.LOCAL_INDEX),
-    window_days=1,
     user_id="monitor-automatico",
 )
 SLOT = datetime(2026, 10, 26, 7, 0, tzinfo=MEXICO_CITY)
@@ -50,7 +49,7 @@ async def test_la_de_las_7_busca_la_fgr_en_todo_mexico_solo_desde_las_23() -> No
     fgr = next(c for c in repo.concepts.values() if c.data.name.startswith("Fiscalia"))
     last = SLOT - timedelta(hours=8)
 
-    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(SLOT, last)
+    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(SLOT)
 
     assert request.concept_ids == (fgr.id,)
     assert request.region_id == MEXICO.id
@@ -84,9 +83,7 @@ async def test_la_de_las_15_pide_solo_el_dia_en_curso() -> None:
     repo = concepts_with("Fiscalia General de la Republica")
     slot = datetime(2026, 10, 26, 15, 0, tzinfo=MEXICO_CITY)
 
-    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(
-        slot, slot - timedelta(hours=8)
-    )
+    request = await PrepareAutomaticRun(repo, FakeRegionRepository(), PROFILE).request(slot)
 
     assert request.time_window == RunWindow(slot - timedelta(hours=8), slot)
     assert (request.window.date_from, request.window.date_to) == (

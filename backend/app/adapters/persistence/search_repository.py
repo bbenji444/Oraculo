@@ -228,31 +228,6 @@ class PostgresSearchStore:
             ),
         )
 
-    async def last_finished_automatic_slot(self, before: datetime) -> datetime | None:
-        """Hora programada de la última corrida automática que terminó antes de ``before``.
-
-        La corrida siguiente cubre desde ahí (``run_window``): si la anterior
-        falló, no se pierde lo de en medio.
-
-        Args:
-            before: Hora programada de la corrida que se va a armar.
-
-        Returns:
-            Esa hora, o ``None`` si nunca terminó una.
-        """
-        async with self._engine.connect() as conn:
-            found: datetime | None = (
-                await conn.execute(
-                    text(
-                        "SELECT max(scheduled_for) FROM searches WHERE trigger = :automatic "
-                        "AND deleted_at IS NULL AND status IN ('completed', 'partial') "
-                        "AND scheduled_for < :before"
-                    ),
-                    {"automatic": SearchTrigger.AUTOMATIC.value, "before": before},
-                )
-            ).scalar()
-        return found
-
     async def start(self, search_id: UUID) -> None:
         """Ver ``SearchStorePort.start``."""
         async with self._engine.begin() as conn:
