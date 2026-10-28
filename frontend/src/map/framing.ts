@@ -32,6 +32,11 @@ export const PANEL_CLEARANCE_PX = 430;
 export const DESKTOP_EDGE_PX = { top: 80, bottom: 100, side: 80 };
 // En celular: el botón flotante "Búsqueda y noticias" arriba y aire a los lados.
 export const NARROW_EDGE_PX = { top: 72, bottom: 48, side: 24 };
+// Centro de mando: el encabezado y la consola ya quedan fuera del espacio libre
+// (margen de la cámara), así que solo falta un poco de aire para que la orilla
+// del país no toque nada. Con 80/100 px de más, Argentina se veía lejos (Benji,
+// 28/10/2026: «se tiene que hacer el acercamiento a la zona»).
+export const MANDO_EDGE_PX = { top: 28, bottom: 28, side: 56 };
 // Lo mínimo que debe quedar para dibujar la región; si los márgenes dejan
 // menos, se reducen en proporción (MapLibre no vuela si no cabe).
 export const MIN_FRAME_PX = 160;
@@ -92,19 +97,42 @@ function fit(a: number, b: number, total: number): [number, number] {
  *
  * @param screen Ancho y alto del mapa en píxeles.
  * @param panelOpen Si el panel izquierdo está abierto.
+ * @param mando Si se ve el Centro de mando: márgenes cortos (`MANDO_EDGE_PX`).
  * @returns Márgenes que siempre dejan al menos `MIN_FRAME_PX` libres en cada eje.
  *
  * @example
  *   flyPadding({ width: 1366, height: 650 }, true) // left 430, right 80
  *   flyPadding({ width: 375, height: 812 }, true)  // left 24, right 24
  */
-export function flyPadding(screen: ScreenSize, panelOpen: boolean): FlyPadding {
+export function flyPadding(screen: ScreenSize, panelOpen: boolean, mando = false): FlyPadding {
   const narrow = isNarrow(screen);
-  const edge = narrow ? NARROW_EDGE_PX : DESKTOP_EDGE_PX;
+  const desktop = mando ? MANDO_EDGE_PX : DESKTOP_EDGE_PX;
+  const edge = narrow ? NARROW_EDGE_PX : desktop;
   const leftWanted = !narrow && panelOpen ? PANEL_CLEARANCE_PX : edge.side;
   const [left, right] = fit(leftWanted, edge.side, screen.width);
   const [top, bottom] = fit(edge.top, edge.bottom, screen.height);
   return { top, bottom, left, right };
+}
+
+/**
+ * Si al volar a una región hay que dejarle lugar a la columna de búsqueda.
+ *
+ * Solo en el diseño de columna (ADR-0036) y cuando la columna no está ya
+ * descontada del margen de la cámara. En el Centro de mando no hay columna:
+ * antes se seguía apartando porque `panelOpen` empieza en `true`, y el vuelo a
+ * un país quedaba corrido al oeste y más lejos (Benji, 28/10/2026).
+ *
+ * @param options.mando Si se ve el Centro de mando (ADR-0037).
+ * @param options.reservedPx Margen de los lados que la cámara ya reserva.
+ * @param options.panelOpen Si la columna de búsqueda está abierta.
+ * @returns `true` si `flyPadding` debe apartar la columna.
+ */
+export function columnInTheWay(options: {
+  mando: boolean;
+  reservedPx: number;
+  panelOpen: boolean;
+}): boolean {
+  return !options.mando && options.reservedPx === 0 && options.panelOpen;
 }
 
 /**
