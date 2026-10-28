@@ -8,9 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
-- **«Filtro» y una línea del tiempo nueva en el expediente (28/10/2026).**
-  - **«Filtro»:** un solo botón abre una ventana para filtrar por categoría (botones de color, una o varias), estado, ubicación (dentro, fuera o sin lugar) y no relevantes. El botón dice cuántos filtros hay puestos, y lo elegido vale para la cronología, la lista y el globo. Antes, los botones de categoría y las pestañas de ubicación ocupaban el espacio del listado.
-  - **Línea del tiempo:** una barra por hora (o por día), en capas del color de cada categoría, con las horas abajo y el pico arriba. Al pasar el mouse dice el tramo, cuántas notas tiene y de qué categorías; un clic filtra ese tramo y otro clic lo quita.
+- **«Filtro» en una ventana al centro de la pantalla (28/10/2026).** Un solo botón «Filtro» abre la ventana, sobre un fondo oscuro, para filtrar por:
+  - categoría: cuadros de color en una cuadrícula ordenada, una o varias;
+  - estado: lista desplegable;
+  - ubicación: dentro, fuera o sin lugar;
+  - no relevantes.
+
+  El botón dice cuántos filtros hay puestos, y lo elegido vale para la cronología, la lista y el globo. Las pestañas de ubicación de la lista y la línea del tiempo de arriba se quitaron para dejarle el espacio a las noticias.
 - **Cada tipo de noticia tiene su color (28/10/2026, migración 0032).** Las 15 categorías tienen un color propio, el mismo en la barra del expediente, las etiquetas de la lista y de la cronología, los nodos de la cronología y los puntos del globo. Ejemplos: Homicidio en rojo, Huachicol en verde lima, Secuestro en rosa y Otros en gris. Solo se llenan los colores vacíos; si alguien elige uno, se respeta.
 - **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
   - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;
@@ -149,6 +153,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **La entrada del globo llega directo a su lugar (28/10/2026).** Al abrir el sistema la Tierra giraba, se detenía y luego se recorría hacia arriba y cambiaba de tamaño, porque terminaba en un zoom fijo y después se reacomodaba al espacio libre. Ahora la entrada calcula desde el principio el zoom y el margen finales y llega ahí sin segundo ajuste.
 - **Elegir un país o una región en el Centro de mando ya hace zoom directo a él (27/10/2026).** Antes, al llegar a un país (zoom menor a 3), cualquier cambio de alto de la consola volvía a ajustar el globo entero y lo alejaba. Ahora ese ajuste solo aplica en la vista general, sin región ni nota elegida.
 - **El globo siempre llega a la noticia elegida (27/10/2026).** Fallaba en dos casos:
   - si se elegía una nota o se reabría una búsqueda mientras la Tierra hacía su entrada, la entrada seguía moviendo la cámara y aplastaba el vuelo. Ahora cualquier vuelo pedido termina la entrada;

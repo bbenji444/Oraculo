@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
-  bucketSlices,
   mapLead,
   applyTimeline,
   buildTimeline,
@@ -214,27 +213,5 @@ describe('mapLead', () => {
     const lead = note(1, '2026-10-27T10:00:00Z');
     const other = note(2, '2026-10-27T11:00:00Z');
     expect(mapLead({ lead, notes: [lead, other] })).toBe(lead);
-  });
-});
-
-describe('bucketSlices', () => {
-  it('una capa por categoría, de la que más sale a la que menos; sin categoría al final', () => {
-    const armas = { id: 6, name: 'Armas y explosivos', color: '#FACC15', symbol: null };
-    const huachicol = { id: 7, name: 'Huachicol', color: '#A3E635', symbol: null };
-    const notesById = new Map(
-      [
-        note(1, '2026-10-28T10:00:00Z', { category: armas }),
-        note(2, '2026-10-28T10:10:00Z', { category: huachicol }),
-        note(3, '2026-10-28T10:20:00Z', { category: huachicol }),
-        note(4, '2026-10-28T10:30:00Z'),
-      ].map((a) => [a.article_id, a] as const),
-    );
-    expect(
-      bucketSlices({ articleIds: [1, 2, 3, 4] }, notesById).map((s) => [s.name, s.count]),
-    ).toEqual([
-      ['Huachicol', 2],
-      ['Armas y explosivos', 1],
-      ['Sin categoría', 1],
-    ]);
   });
 });

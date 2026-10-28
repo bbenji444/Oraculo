@@ -95,3 +95,9 @@ Benji pidió estos ajustes al elegirlo:
 
 - **«Filtro» en una ventana** (`FilterPopover`). Los botones de color ocupaban mucho del listado; Benji pidió «que solo diga filtro y de ahí seleccionar los parámetros». La ventana tiene categorías (una o varias), estado, ubicación y no relevantes, y el botón dice cuántos filtros hay puestos. La lista ya no lleva sus pestañas de ubicación: el filtro vale para las dos vistas.
 - **Una línea del tiempo de verdad** (`ActivityTimeline`). Benji preguntó «qué onda con la línea del tiempo pro». Son barras por hora en capas del color de cada categoría, con las horas debajo, el pico, un aviso al pasar el mouse y filtro con un clic. Con la ventana por horas de las corridas (ADR-0031) son unas 8 barras, una por hora.
+
+## Sextos ajustes (28/10/2026, tarde)
+
+- **El filtro va al centro de la pantalla**, como ventana sobre un fondo oscuro (portal a `body`). Las categorías van en una cuadrícula de tres columnas con cuadros del mismo alto, y el estado en lista desplegable (`HudSelect`).
+- **Se quitó la línea del tiempo de arriba** (`ActivityTimeline`). Benji: «se ve fea». El expediente queda con las pestañas, el conteo y «Filtro».
+- **La entrada del globo llega directo a su lugar.** Durante la entrada, el margen de los paneles se aplica de una vez (`setPadding`) y el zoom final es el que llena el espacio libre (`fitZoom`, calculado en cada cuadro). Antes terminaba en un zoom fijo y luego se reacomodaba hacia arriba.

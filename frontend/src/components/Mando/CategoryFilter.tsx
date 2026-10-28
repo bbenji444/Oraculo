@@ -30,17 +30,18 @@ export function CategoryFilter({ articles }: CategoryFilterProps) {
   if (categories.length === 0) return null;
   const none = picked.length === 0;
   return (
-    <div role="group" aria-label="Filtrar por categoría" className="flex flex-wrap gap-1.5">
+    // Cuadrícula de tres columnas: siempre ordenada (Benji, 28/10/2026).
+    <div role="group" aria-label="Filtrar por categoría" className="grid grid-cols-3 gap-1.5">
       <button
         type="button"
         aria-pressed={none}
         onClick={() => {
           clear(null);
         }}
-        className="mando-cat"
+        className="mando-cat mando-cat--card"
         style={{ '--cat': '148 163 184' } as CSSProperties}
       >
-        Todas
+        <span className="mando-cat-name">Todas</span>
       </button>
       {categories.map((category) => {
         const on = picked.includes(category.id);
@@ -56,11 +57,11 @@ export function CategoryFilter({ articles }: CategoryFilterProps) {
             title={`${category.name}: ${String(category.count)} notas`}
             // Apagadas se ven tenues cuando hay otra prendida.
             data-dim={!none && !on ? '' : undefined}
-            className="mando-cat"
+            className="mando-cat mando-cat--card"
             style={{ '--cat': hexToRgb(color) } as CSSProperties}
           >
             <span aria-hidden="true" className="mando-cat-dot" />
-            <span className="truncate">{category.name}</span>
+            <span className="mando-cat-name">{category.name}</span>
             <span className="mando-cat-count">{category.count}</span>
           </button>
         );

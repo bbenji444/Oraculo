@@ -439,11 +439,28 @@ export function ExploreGlobe({
     let introDone = !intro;
     let introFrame = 0;
     // Termina la entrada: desde aquí el globo es de la persona (o del giro).
-    const finishIntro = () => {
+    // `landed`: la entrada llegó sola a su lugar final (ya encuadrada), así no
+    // hay un segundo ajuste después.
+    const finishIntro = (landed = false) => {
       if (introDone) return;
       introDone = true;
       cancelAnimationFrame(introFrame);
+      if (landed && clearHeaderRef.current) fittedRef.current = true;
       setIntroFinished(true);
+    };
+    // Zoom en el que debe terminar la entrada. En el Centro de mando es el que
+    // llena el espacio libre (fitZoom): antes la entrada terminaba en el zoom
+    // fijo y luego el globo se reacomodaba hacia arriba, y se veía un brinco
+    // (Benji, 28/10/2026). El radio crece al doble por punto de zoom, así que
+    // el resultado no depende del zoom de cada cuadro.
+    const introTargetZoom = () => {
+      if (!clearHeaderRef.current) return INITIAL_ZOOM;
+      const padding = map.getPadding();
+      const box = map.getContainer();
+      return fitZoom(map.getZoom(), globeRadiusPx(map), {
+        width: box.clientWidth - (padding.left ?? 0) - (padding.right ?? 0),
+        height: box.clientHeight - (padding.top ?? 0) - (padding.bottom ?? 0),
+      });
     };
     const spinStep = () => {
       if (!spinningRef.current || !introDone || !activeRef.current || framingRef.current) return;
@@ -537,13 +554,13 @@ export function ExploreGlobe({
               from.lng - distance * introSpin(t, endSlope),
               from.lat + (INTRO_CENTER[1] - from.lat) * settle,
             ],
-            zoom: fromZoom + (INITIAL_ZOOM - fromZoom) * settle,
+            zoom: fromZoom + (introTargetZoom() - fromZoom) * settle,
           });
           if (t < 1) {
             introFrame = requestAnimationFrame(stepIntro);
             return;
           }
-          finishIntro();
+          finishIntro(true);
           // Ya va a toda velocidad: el giro empieza sin su rampa.
           spinStartRef.current = performance.now() - SPIN_RAMP_MS;
           spinStep();
@@ -789,7 +806,13 @@ export function ExploreGlobe({
     };
     insetsRef.current = next;
     const map = mapRef.current;
-    if (!map || !ready || !introFinished) return;
+    if (!map || !ready) return;
+    if (!introFinished) {
+      // Durante la entrada el margen se pone de una vez (la entrada mueve la
+      // cámara cuadro a cuadro y llega ya encuadrada): sin segundo ajuste.
+      map.setPadding(cameraInsets(next));
+      return;
+    }
     // En el Centro de mando el globo se ajusta también al terminar la entrada.
     const firstFit = clearHeader && !fittedRef.current;
     if (sameInsets(previous, next) && !firstFit) return;
