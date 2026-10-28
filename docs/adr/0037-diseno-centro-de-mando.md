@@ -111,3 +111,12 @@ Benji pidió estos ajustes al elegirlo:
   - el costo en láminas y el botón, que respira cuando la consulta está lista.
 
   El ancho máximo sube de 54 a 62 rem para que quepa el radar.
+
+## Octavos ajustes (28/10/2026, tarde)
+
+- **Nada a medias.** Benji: «necesito que todo aparezca completo». Por eso:
+  - el encabezado va a todo el ancho;
+  - el costo va en renglones con la etiqueta completa;
+  - los resultados anteriores van en un pie a todo el ancho, sin cortar ni desvanecer: la corrida y dos búsquedas (`DOCK_RECENTS`), y si no caben, bajan de renglón.
+- **«Fuente».** La cuarta parte de la frase dice solo «Fuente»; cuántas y de cuáles se lee al pasar el mouse.
+- **Calendario propio** (`HudDatePicker`), con el mismo vidrio y luz que los menús. El del navegador no se puede estilizar.

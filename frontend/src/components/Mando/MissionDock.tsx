@@ -75,6 +75,10 @@ const SCOPE_BLIPS: readonly (readonly [number, number])[] = [
   [302, 0.5],
 ];
 
+// Búsquedas recientes en la consola (además de la corrida): con más, las
+// fichas ya no caben completas en un renglón.
+const DOCK_RECENTS = 2;
+
 // Color (RGB) de cada lámina del costo: los mismos tonos del expediente.
 const COST_TONE = {
   queries: '0 210 255',
@@ -112,11 +116,13 @@ interface TokenProps {
   slot: MissionSlot;
   index: string;
   value: string;
+  /** Lo que se lee al pasar el mouse, si la etiqueta es corta («Fuente»). */
+  detail?: string;
   empty?: boolean;
 }
 
 /** Una parte de la frase: se toca para cambiarla. */
-function Token({ slot, index, value, empty = false }: TokenProps) {
+function Token({ slot, index, value, detail, empty = false }: TokenProps) {
   const open = useMandoStore((s) => s.slot === slot);
   const toggleSlot = useMandoStore((s) => s.toggleSlot);
   return (
@@ -125,7 +131,8 @@ function Token({ slot, index, value, empty = false }: TokenProps) {
       className="mando-token"
       aria-expanded={open}
       aria-controls="mando-editor"
-      aria-label={`${SLOT_TITLE[slot]}: ${value}. Cambiar`}
+      aria-label={`${SLOT_TITLE[slot]}: ${detail ?? value}. Cambiar`}
+      title={detail}
       data-empty={empty ? '' : undefined}
       onClick={() => {
         toggleSlot(slot);
@@ -161,7 +168,9 @@ function MissionSentence({ launcher }: { launcher: Launcher }) {
       <Token
         slot="sources"
         index="04"
-        value={
+        // Benji pidió que dijera solo «Fuente»; el detalle queda al pasar el mouse.
+        value="Fuente"
+        detail={
           launcher.sources.data
             ? sourcesLabel(launcher.sources.data, launcher.providers ?? [])
             : 'las fuentes de siempre'
@@ -241,9 +250,9 @@ function CostFigure({
   format?: (value: number) => string;
 }) {
   return (
-    <div className="mando-kpi mando-cost" style={{ '--tone': tone } as CSSProperties}>
-      <dt className="hud-kpi-label">{label}</dt>
-      <dd className="hud-kpi-value mando-clock">
+    <div className="mando-cost" style={{ '--tone': tone } as CSSProperties}>
+      <dt className="mando-cost-label">{label}</dt>
+      <dd className="mando-clock mando-cost-value">
         {value === undefined ? '—' : <CountUp value={value} format={format} />}
       </dd>
     </div>
@@ -274,7 +283,7 @@ function CostReadout({ launcher }: { launcher: Launcher }) {
   }
   return (
     <div aria-live="polite" className="space-y-1.5">
-      <dl className="grid grid-cols-3 gap-1.5">
+      <dl className="mando-cost-list">
         <CostFigure label="Consultas" value={data?.queries.length} tone={COST_TONE.queries} />
         {/* De pago en violeta: el naranja no va con la consola (Benji, 27/10/2026). */}
         <CostFigure
@@ -283,7 +292,7 @@ function CostReadout({ launcher }: { launcher: Launcher }) {
           tone={data && data.credits > 0 ? COST_TONE.paid : COST_TONE.free}
         />
         <CostFigure
-          label="IA máx."
+          label="IA máximo"
           value={data?.llm.max_cost_usd}
           tone={COST_TONE.llm}
           format={(value) => `$${value.toFixed(3)}`}
@@ -330,7 +339,7 @@ function RecentMissions() {
   const restoreSearch = useExplorerStore((s) => s.restoreSearch);
   const items = history.data?.pages.flatMap((page) => page.items) ?? [];
   const run = latestRun(items);
-  const recents = recentMissions(items);
+  const recents = recentMissions(items, DOCK_RECENTS);
   if (!run && recents.length === 0) return null;
   const reopen = (search: Search) => {
     restoreSearch({
@@ -343,9 +352,9 @@ function RecentMissions() {
     });
   };
   return (
-    // Un renglón propio, debajo de la frase: antes compartía lugar con el costo
-    // y las fichas se encimaban (Benji, 28/10/2026). Si no caben, se desliza
-    // de lado (también con la rueda del mouse) y las orillas se desvanecen.
+    // Un renglón propio a todo el ancho de la consola: antes compartía lugar
+    // con el costo y las fichas se cortaban (Benji, 28/10/2026: «necesito que
+    // todo aparezca completo»). Si no caben, bajan a otro renglón.
     <div className="mando-recents-row">
       <span
         className="hud-kpi-label shrink-0"
@@ -353,15 +362,7 @@ function RecentMissions() {
       >
         Abrir resultados anteriores
       </span>
-      <div
-        className="mando-recents"
-        onWheel={(event) => {
-          // La rueda vertical desliza las fichas de lado.
-          if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-            event.currentTarget.scrollLeft += event.deltaY;
-          }
-        }}
-      >
+      <div className="mando-recents">
         {run && (
           <button
             type="button"
@@ -373,7 +374,7 @@ function RecentMissions() {
             style={{ '--i': 0 } as CSSProperties}
           >
             <span aria-hidden="true" className="hud-dot hud-dot--live" />
-            <span className="truncate">{runLabel(run)}</span>
+            <span>{runLabel(run)}</span>
           </button>
         )}
         {recents.map((search, index) => (
@@ -387,7 +388,7 @@ function RecentMissions() {
             className="mando-recent"
             style={{ '--i': index + 1 } as CSSProperties}
           >
-            <span className="truncate">{recentLabel(search)}</span>
+            <span>{recentLabel(search)}</span>
           </button>
         ))}
       </div>
@@ -564,54 +565,45 @@ export function MissionDock({ active }: MissionDockProps) {
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="mando-console-grid-bg" />
+        <header className="mando-console-head">
+          <span aria-hidden="true" className="hud-dot hud-dot--live" />
+          <span className="mando-kicker whitespace-nowrap">
+            Centro de mando · {editing ? 'Ajustar consulta' : 'Nueva consulta'}
+          </span>
+          <span className="ml-auto">
+            <MissionClock />
+          </span>
+          {editing && (
+            <button
+              type="button"
+              onClick={() => {
+                useMandoStore.getState().setEditing(false);
+              }}
+              title="Volver a los resultados sin buscar de nuevo"
+              className="hud-btn hud-btn--sm shrink-0 px-3 py-1 text-[11px]"
+            >
+              Volver
+            </button>
+          )}
+          <MinimizeButton />
+        </header>
         <div className="mando-console-grid">
           <MissionScope ready={Boolean(launcher.input) && !launcher.blocked} />
-          <div className="min-w-0">
-            <header className="flex items-center gap-3">
-              <span aria-hidden="true" className="hud-dot hud-dot--live" />
-              <span className="mando-kicker truncate">
-                Centro de mando · {editing ? 'Ajustar consulta' : 'Nueva consulta'}
-              </span>
-              <span className="ml-auto shrink-0">
-                <MissionClock />
-              </span>
-              {editing && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    useMandoStore.getState().setEditing(false);
-                  }}
-                  title="Volver a los resultados sin buscar de nuevo"
-                  className="hud-btn hud-btn--sm shrink-0 px-3 py-1 text-[11px]"
-                >
-                  Volver
-                </button>
-              )}
-              <MinimizeButton />
-            </header>
+          <div className="min-w-0 self-center">
             {/* La frase se lee de un jalón, como una orden. */}
-            <div className="mt-1">
-              <MissionSentence launcher={launcher} />
-            </div>
+            <MissionSentence launcher={launcher} />
             {launcher.start.error && (
               <p className="mb-1 text-xs text-rose-300">{launcher.start.error.message}</p>
             )}
-            {/* En celular no cabe: ahí la consola es solo la frase y el botón. */}
-            <div className="mt-1 hidden border-t border-sky-400/10 pt-2 sm:block">
-              <RecentMissions />
-            </div>
           </div>
           <div className="mando-console-launch">
-            <p className="hud-kpi-label" data-wide-only="">
-              Costo estimado
-            </p>
             <CostReadout launcher={launcher} />
             <LaunchButton launcher={launcher} />
-            <p className="mando-shortcuts" data-wide-only="">
-              <kbd className="mando-kbd">/</kbd> región · <kbd className="mando-kbd">Esc</kbd>{' '}
-              cerrar
-            </p>
           </div>
+        </div>
+        {/* En celular no cabe: ahí la consola es solo la frase y el botón. */}
+        <div className="mando-console-foot hidden sm:block">
+          <RecentMissions />
         </div>
       </section>
     </>

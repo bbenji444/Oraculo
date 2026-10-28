@@ -14,12 +14,14 @@
  * renglón; la cronología se pliega aparte con su propio botón (Benji,
  * 26/10/2026).
  */
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useId, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useSearch } from '../../hooks/useSearches';
 import { isFinished } from '../../services/searches';
 import { type RangeKind, useExplorerStore } from '../../store/explorer';
+import { todayInMexico } from '../../ui/calendar';
+import { HudDatePicker } from '../ui/HudDatePicker';
 import { DownloadButtons } from './Controls';
 import { formatRange, formatUsd, stageProgress } from './format';
 import { RegionPicker } from './RegionPicker';
@@ -75,6 +77,8 @@ export function ConceptChips() {
 export function DateRange() {
   const range = useExplorerStore((s) => s.range);
   const setRange = useExplorerStore((s) => s.setRange);
+  const rangeId = useId();
+  const today = todayInMexico();
   return (
     <div className="space-y-2">
       <div
@@ -107,19 +111,32 @@ export function DateRange() {
       </div>
       {range.kind === 'custom' && (
         <div className="hud-reveal grid grid-cols-2 gap-2">
-          {(['from', 'to'] as const).map((field) => (
-            <label key={field} className="hud-label mb-0">
-              {field === 'from' ? 'Desde' : 'Hasta'}
-              <input
-                type="date"
-                value={range[field] ?? ''}
-                onChange={(event) => {
-                  setRange({ ...range, [field]: event.target.value });
-                }}
-                className="hud-input mt-1.5 px-2 py-1.5 font-sans tracking-normal normal-case [color-scheme:dark]"
-              />
-            </label>
-          ))}
+          {(['from', 'to'] as const).map((field) => {
+            const name = field === 'from' ? 'Desde' : 'Hasta';
+            const id = `${rangeId}-${field}`;
+            return (
+              <div key={field}>
+                <label htmlFor={id} className="hud-label mb-1.5 block">
+                  {name}
+                </label>
+                {/* Calendario propio: el del navegador no toma el estilo. No
+                    deja elegir días después de hoy ni un «hasta» antes del
+                    «desde». */}
+                <HudDatePicker
+                  id={id}
+                  label={name}
+                  value={range[field]}
+                  min={field === 'to' ? range.from : undefined}
+                  max={field === 'from' ? (range.to ?? today) : today}
+                  rangeFrom={range.from}
+                  rangeTo={range.to}
+                  onChange={(next) => {
+                    setRange({ ...range, [field]: next });
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
