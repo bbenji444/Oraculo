@@ -708,3 +708,25 @@ async def test_la_corrida_no_trae_una_nota_vieja_que_llega_con_fecha_nueva() -> 
     assert 55 not in {r.article_id for r in articles.rows}
     assert report.articles == 1
     assert [r.title for r in llm.requests] == [IZTA_TITLE]
+
+
+async def test_la_corrida_deja_fuera_lo_que_paso_antes_de_su_periodo() -> None:
+    # Benji, 28/10/2026: nada de otros días. El cateo de ayer publicado hoy
+    # sale; la sentencia de hoy por un delito viejo se queda (la IA da la fecha
+    # de lo que informa la nota, enrich_v3).
+    window = RunWindow(PUBLISHED - timedelta(hours=8), PUBLISHED + timedelta(hours=1))
+    search = replace(stored_search(), time_window=window)
+    # La ventana empieza a las 22:00 del 14/10 en la CDMX: lo del 13/10 es de antes.
+    before_window = (PUBLISHED - timedelta(days=2)).date()
+    replies: dict[str, Enrichment | Exception] = {
+        IZTA_TITLE: enrichment(IZTA_MENTION),
+        MADRID_TITLE: replace(enrichment(MADRID_MENTION), event_date=before_window),
+    }
+    use_case, _searches, articles, _llm, _e = pipeline(search=search, replies=replies)
+
+    report = await use_case.run(uuid4())
+
+    linked = {r.article_id for r in articles.rows}
+    assert articles.ids["https://elpais.com/madrid"] not in linked
+    assert report.articles == 1
+    assert len(linked) == 1

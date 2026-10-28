@@ -185,7 +185,7 @@ def test_prompt_v2_pide_el_municipio_de_colonias_y_calles() -> None:
     # Sin él, "Polanco" no se podía ubicar dentro de la CDMX (ADR-0020).
     prompt = build_prompt(REQUEST)
 
-    assert PROMPT_VERSION == "enrich_v2"
+    assert PROMPT_VERSION == "enrich_v3"
     assert "municipality_hint" in prompt
     assert "Día de Muertos" in prompt
 

@@ -73,7 +73,8 @@ class Enrichment:
         concepts: Un juicio por concepto de la búsqueda.
         summary: Resumen propio, neutral, en español.
         event_type: Tipo de evento ("ransomware", "secuestro"...), si lo hay.
-        event_date: Fecha del hecho, si el texto la dice.
+        event_date: Fecha de lo que informa la nota (la detención, la sentencia),
+            si el texto la dice; desde ``enrich_v3``, no la del delito original.
         locations: Menciones de lugar para el geolocalizador.
     """
 
