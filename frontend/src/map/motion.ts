@@ -68,6 +68,9 @@ export const FLY_MIN_MS = 1200;
 export const FLY_MAX_MS = 4500;
 // Subir por las migas de pan es "volver": más rápido que acercarse.
 export const FLY_UP_FACTOR = 0.6;
+// Ir a una nota es más ágil que ir a una región: el analista salta de una
+// noticia a otra (Benji pidió vuelos «más dinámicos», 27/10/2026).
+export const FLY_ARTICLE_FACTOR = 0.75;
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
 const RADIANS_TO_DEGREES = 180 / Math.PI;
@@ -114,7 +117,8 @@ export function flyDurationMs(
     FLY_MS_PER_DEGREE * greatCircleDegrees(from, to) +
     FLY_MS_PER_ZOOM * Math.abs(to.zoom - from.zoom);
   const clamped = Math.min(FLY_MAX_MS, Math.max(FLY_MIN_MS, raw));
-  return Math.round(clamped * (kind === 'up' ? FLY_UP_FACTOR : 1) * factor);
+  const kindFactor = kind === 'up' ? FLY_UP_FACTOR : kind === 'article' ? FLY_ARTICLE_FACTOR : 1;
+  return Math.round(clamped * kindFactor * factor);
 }
 
 // Inclinación de la cámara al llegar: el país se ve de frente; un estado o un

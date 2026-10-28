@@ -100,6 +100,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **El globo abre más grande y los vuelos a una noticia son más ágiles (27/10/2026).** Benji lo pidió. El zoom inicial pasa de 1.8 a 2, y en el Centro de mando el globo ocupa todo el alto entre el encabezado y la consola. Volar a una noticia tarda 25 % menos y hace más arco. La ficha queda debajo de los controles del globo.
 - **Las corridas automáticas leen hasta 250 notas nuevas con la IA (27/10/2026, ADR-0031).** Antes era el tope general de 150; en la corrida de las 15:00 se alcanzó y 10 notas esperaron a la siguiente. Cuesta unos 0.025 USD más por corrida en el peor caso. Las búsquedas manuales siguen con 150. Se ajusta con `AUTOMATIC_LLM_MAX_ARTICLES`.
 - **Más noticias a la vista en el expediente y una cronología más clara (27/10/2026).** En una pantalla de 920 px de alto pasan de 3 a unas 6 o 7. Cambios:
   - el resumen es más bajo: cifras más chicas, categorías en un renglón, y pestañas y PDF juntos;
@@ -136,6 +137,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El globo siempre llega a la noticia elegida (27/10/2026).** Fallaba en dos casos:
+  - si se elegía una nota o se reabría una búsqueda mientras la Tierra hacía su entrada, la entrada seguía moviendo la cámara y aplastaba el vuelo. Ahora cualquier vuelo pedido termina la entrada;
+  - al aparecer el expediente a media llegada, el ajuste de márgenes cortaba el vuelo. Ahora espera a que aterrice.
 - **Elegir un hecho de la cronología siempre abre su nota en el globo (27/10/2026).** Antes no pasaba nada en dos casos:
   - el hecho se abría con la primera nota publicada, que suele venir de Google News sin texto ni lugar, aunque otro medio del mismo hecho sí dijera dónde pasó. Ahora se abre la nota mejor ubicada del hecho;
   - la nota no tenía lugar (23 de las 161 relevantes de la corrida de las 15:00). Ahora su ficha sale en medio del espacio libre con el aviso «Sin lugar en el mapa», y en la cronología el renglón dice «sin lugar».
