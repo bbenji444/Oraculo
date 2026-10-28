@@ -412,3 +412,20 @@ export function fitZoom(zoom: number, radiusPx: number, free: ScreenSize): numbe
   const fitted = zoom + Math.log2(target / radiusPx);
   return Math.min(GLOBE_FIT_MAX_ZOOM, Math.max(GLOBE_FIT_MIN_ZOOM, fitted));
 }
+
+// Vista general del Centro de mando: de la consola de abajo solo se reserva
+// esta parte de su alto. El globo crece y su orilla pasa por detrás del vidrio
+// de la consola (Benji: «aunque tape un poquito el panel de abajo, que tenga
+// un zoom mayor para dar más presencia», 27/10/2026). Al volar a una región o
+// a una nota se usa el margen completo, para que nada quede tapado.
+export const GLOBE_DOCK_OVERLAP = 0.35;
+
+/**
+ * Márgenes de la cámara en la vista general: los mismos, salvo el de abajo,
+ * que se reduce a `GLOBE_DOCK_OVERLAP` del alto de la consola.
+ *
+ * @example overviewPadding({ left: 0, right: 0, top: 72, bottom: 200 }) // bottom 70
+ */
+export function overviewPadding<T extends { bottom: number }>(insets: T): T {
+  return { ...insets, bottom: Math.round(insets.bottom * GLOBE_DOCK_OVERLAP) };
+}

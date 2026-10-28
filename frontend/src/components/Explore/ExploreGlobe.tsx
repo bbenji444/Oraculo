@@ -71,6 +71,7 @@ import {
   flyPadding,
   fitZoom,
   frameZoom,
+  overviewPadding,
   GLOBE_FRAME_MS,
   globeCamera,
   type ScreenSize,
@@ -375,6 +376,15 @@ export function ExploreGlobe({
   const clearHeaderRef = useRef(clearHeader);
   // Si ya se ajustó el globo al espacio libre al terminar la entrada (diseño 3).
   const fittedRef = useRef(false);
+  // Vista general (el globo entero, sin región ni nota elegida). Solo ahí el
+  // Centro de mando ajusta el zoom al espacio libre: antes, al llegar a un país
+  // (zoom < 3) cualquier cambio de la consola lo volvía a alejar y parecía que
+  // el globo no hacía zoom a la región (Benji, 27/10/2026).
+  const overviewRef = useRef(true);
+  // Márgenes de la cámara: en la vista general del Centro de mando el globo
+  // pasa por detrás de la consola (map/framing.ts, overviewPadding).
+  const cameraInsets = (insets: Insets): Insets =>
+    clearHeaderRef.current && overviewRef.current ? overviewPadding(insets) : insets;
   // Si el globo está acercado por no tener paneles (frameZoom).
   const expandedRef = useRef(false);
   // Mientras se corre el encuadre, el giro espera: el corrimiento ya lo incluye.
@@ -420,7 +430,7 @@ export function ExploreGlobe({
     });
     // El encuadre de los paneles desde el principio: la entrada ya llega corrida.
     if (clearHeaderRef.current) insetsRef.current = { ...insetsRef.current, top: headerInsetPx() };
-    map.setPadding(insetsRef.current);
+    map.setPadding(cameraInsets(insetsRef.current));
     map.addControl(new NavigationControl({ visualizePitch: true }), 'top-right');
     // Créditos plegados al iniciar: solo el botón "i" (ver map/attribution.ts).
     const stopAttribution = collapseAttributionOnStart(map.getContainer());
@@ -460,6 +470,8 @@ export function ExploreGlobe({
         flyingRef.current = true;
         map.once('moveend', () => {
           flyingRef.current = false;
+          // Si volvió a la vista general, se ajusta al espacio libre.
+          if (!fittedRef.current) setFramePending((count) => count + 1);
         });
       });
     };
@@ -794,15 +806,19 @@ export function ExploreGlobe({
       };
     }
     fittedRef.current = true;
+    const padding = cameraInsets(next);
     let zoom: number;
     if (clearHeader) {
-      // Centro de mando: el globo entero cabe entre el encabezado, la consola y
-      // el expediente; crece solo cuando se le deja lugar.
+      // Centro de mando: en la vista general el globo entero llena el espacio
+      // libre; con una región o una nota elegida, el zoom no se toca (solo se
+      // recorre el centro a la parte libre).
       const screen = screenOf(map);
-      zoom = fitZoom(map.getZoom(), globeRadiusPx(map), {
-        width: screen.width - next.left - next.right,
-        height: screen.height - next.top - next.bottom,
-      });
+      zoom = overviewRef.current
+        ? fitZoom(map.getZoom(), globeRadiusPx(map), {
+            width: screen.width - padding.left - padding.right,
+            height: screen.height - padding.top - padding.bottom,
+          })
+        : map.getZoom();
     } else {
       // Solo los paneles de los lados agrandan o achican el globo.
       const open = insetLeft + insetRight > 0;
@@ -817,7 +833,7 @@ export function ExploreGlobe({
       : 0;
     framingRef.current = true;
     map.easeTo({
-      padding: next,
+      padding,
       zoom,
       center: [center.lng - turn, center.lat],
       duration: motionRef.current === 'off' ? 0 : GLOBE_FRAME_MS,
@@ -838,7 +854,10 @@ export function ExploreGlobe({
     if (!spinning || !ready || !map) return;
     spinStartRef.current = performance.now();
     if (spinDegrees(map.getZoom()) === 0) {
-      // De cerca no se gira: primero se aleja a la vista de globo.
+      // De cerca no se gira: primero se aleja a la vista de globo, que vuelve a
+      // ser la vista general (se ajusta al espacio libre al llegar).
+      overviewRef.current = true;
+      fittedRef.current = false;
       const duration = flyDurationMs(
         cameraOf(map),
         { lng: map.getCenter().lng, lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM },
@@ -892,10 +911,14 @@ export function ExploreGlobe({
     if (!map || !ready || homeRequest === 0) return;
     const target = { lng: INITIAL_CENTER[0], lat: INITIAL_CENTER[1], zoom: INITIAL_ZOOM };
     const duration = flyDurationMs(cameraOf(map), target, 'up', motionRef.current);
+    // De vuelta en la vista general: al aterrizar se ajusta al espacio libre.
+    overviewRef.current = true;
+    fittedRef.current = false;
     flyRef.current(duration, () => {
       map.flyTo({
         center: INITIAL_CENTER,
         zoom: INITIAL_ZOOM,
+        padding: cameraInsets(insetsRef.current),
         pitch: 0,
         bearing: GLOBE_BEARING,
         curve: FLY_CURVE,
@@ -922,14 +945,17 @@ export function ExploreGlobe({
     // la esfera y no en el mapa plano (map/framing.ts).
     const box = region.focus_bbox;
     // Con el encuadre de los paneles (padding de la cámara) el centro ya está en
-    // la parte libre: se encuadra en ella y sin volver a apartar el panel.
-    const inset = map.getPadding();
-    const reservedLeft = inset.left ?? 0;
-    const reservedRight = inset.right ?? 0;
+    // la parte libre: se encuadra en ella y sin volver a apartar el panel. Se
+    // usa el margen completo (no el de la vista general, que pasa por detrás
+    // de la consola) y el vuelo lo lleva consigo.
+    overviewRef.current = false;
+    const inset = insetsRef.current;
+    const reservedLeft = inset.left;
+    const reservedRight = inset.right;
     const screen = screenOf(map);
     const free = {
       width: screen.width - reservedLeft - reservedRight,
-      height: screen.height - (inset.top ?? 0) - (inset.bottom ?? 0),
+      height: screen.height - inset.top - inset.bottom,
     };
     const reserved = reservedLeft + reservedRight > 0;
     const padding = flyPadding(free, !reserved && useExplorerStore.getState().panelOpen);
@@ -944,6 +970,7 @@ export function ExploreGlobe({
       map.flyTo({
         center: camera.center,
         zoom,
+        padding: inset,
         bearing: REGION_BEARING,
         pitch: flyPitch(region.level),
         curve: FLY_CURVE,
@@ -996,10 +1023,12 @@ export function ExploreGlobe({
       setCallout({ articleId: article.article_id, x: point.x, y: point.y, visible: true });
     };
     const duration = flyDurationMs(cameraOf(map), { lng, lat, zoom }, 'article', motionRef.current);
+    overviewRef.current = false;
     flyRef.current(duration, () => {
       map.flyTo({
         center: [lng, lat],
         zoom,
+        padding: insetsRef.current,
         offset: articleOffset(screenOf(map)),
         pitch: flyPitch('article'),
         bearing: REGION_BEARING,
