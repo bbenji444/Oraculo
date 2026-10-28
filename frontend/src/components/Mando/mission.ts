@@ -168,12 +168,69 @@ const RUN_CLOCK = new Intl.DateTimeFormat('es-MX', {
   minute: '2-digit',
 });
 
+const SHORT_DAY = new Intl.DateTimeFormat('es-MX', {
+  timeZone: MEXICO_CITY,
+  day: 'numeric',
+  month: 'short',
+});
+
+function shortDay(iso: string): string {
+  return SHORT_DAY.format(new Date(iso)).replace('.', '');
+}
+
 /**
- * Ficha de una corrida automática: «Corrida 07:00 · 305 notas».
+ * Las horas que cubre una corrida automática, en corto: «23:00 – 07:00».
+ *
+ * @returns El texto, o `null` si la búsqueda no tiene ventana por horas
+ *   (las manuales y las corridas de antes del 28/10/2026).
  */
-export function runLabel(search: Pick<Search, 'scheduled_for' | 'results_count'>): string {
-  const hour = search.scheduled_for ? ` ${RUN_CLOCK.format(new Date(search.scheduled_for))}` : '';
-  return `Corrida${hour} · ${String(search.results_count)} notas`;
+export function windowHours(search: Pick<Search, 'window_start' | 'window_end'>): string | null {
+  if (!search.window_start || !search.window_end) return null;
+  return `${RUN_CLOCK.format(new Date(search.window_start))} – ${RUN_CLOCK.format(
+    new Date(search.window_end),
+  )}`;
+}
+
+/**
+ * Las horas que cubre una corrida, con su día: «27 oct 23:00 – 28 oct 07:00»
+ * o «28 oct, 07:00 – 15:00» si es el mismo día.
+ */
+export function windowLabel(search: Pick<Search, 'window_start' | 'window_end'>): string | null {
+  if (!search.window_start || !search.window_end) return null;
+  const from = shortDay(search.window_start);
+  const to = shortDay(search.window_end);
+  const startHour = RUN_CLOCK.format(new Date(search.window_start));
+  const endHour = RUN_CLOCK.format(new Date(search.window_end));
+  return from === to
+    ? `${to}, ${startHour} – ${endHour}`
+    : `${from} ${startHour} – ${to} ${endHour}`;
+}
+
+/**
+ * Ficha de una corrida automática: «Corrida de las 07:00 · 23:00 – 07:00».
+ * Las de antes de la ventana por horas dicen cuántas notas trajeron.
+ */
+export function runLabel(
+  search: Pick<Search, 'scheduled_for' | 'results_count' | 'window_start' | 'window_end'>,
+): string {
+  const hour = search.scheduled_for
+    ? ` de las ${RUN_CLOCK.format(new Date(search.scheduled_for))}`
+    : '';
+  const hours = windowHours(search);
+  return `Corrida${hour} · ${hours ?? `${String(search.results_count)} notas`}`;
+}
+
+/**
+ * Ficha de una búsqueda manual anterior: «Tu búsqueda del 27 oct: FGR en Jalisco».
+ */
+export function recentLabel(
+  search: Pick<Search, 'concepts' | 'region_name' | 'created_at'>,
+): string {
+  // El primer concepto completo («Balacera en Iztapalapa y 2 más»); las siglas
+  // de varios juntos no se entendían («BI + Balacera + JBOH»).
+  const names = search.concepts.map((c) => c.name);
+  const what = names.length === 1 ? shortConcept(names[0] ?? '') : conceptsLabel(names);
+  return `Tu búsqueda del ${shortDay(search.created_at)}: ${what} en ${search.region_name}`;
 }
 
 /** Reloj de la Ciudad de México: «13:42:05». */
@@ -204,10 +261,16 @@ export function spanDays(from: string, to: string): number {
  * Ficha corta de una búsqueda: «FGR · Jalisco · 7 días».
  */
 export function missionLabel(
-  search: Pick<Search, 'concepts' | 'region_name' | 'date_from' | 'date_to'>,
+  search: Pick<
+    Search,
+    'concepts' | 'region_name' | 'date_from' | 'date_to' | 'window_start' | 'window_end'
+  >,
 ): string {
-  const days = spanDays(search.date_from, search.date_to);
   const concepts = search.concepts.map((c) => shortConcept(c.name)).join(' + ');
+  // Corridas automáticas: sus horas, no los días que tocan.
+  const hours = windowHours(search);
+  if (hours) return `${concepts} · ${search.region_name} · ${hours}`;
+  const days = spanDays(search.date_from, search.date_to);
   return `${concepts} · ${search.region_name} · ${String(days)} ${days === 1 ? 'día' : 'días'}`;
 }
 

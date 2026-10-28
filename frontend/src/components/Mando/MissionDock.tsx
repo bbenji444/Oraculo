@@ -48,6 +48,7 @@ import {
   nextAutomaticRun,
   rangeConnector,
   rangeLabel,
+  recentLabel,
   recentMissions,
   runLabel,
   sourcesLabel,
@@ -313,7 +314,12 @@ function RecentMissions() {
   return (
     // Un solo renglón: si no caben todas, las últimas se desvanecen en el borde.
     <div className="mando-recents flex min-w-0 flex-nowrap items-center gap-2">
-      <span className="hud-kpi-label mr-1 shrink-0">Reabrir sin costo</span>
+      <span
+        className="hud-kpi-label mr-1 shrink-0"
+        title="Abre los resultados guardados de una corrida o de una búsqueda anterior, sin volver a buscar ni gastar"
+      >
+        Abrir resultados anteriores
+      </span>
       {run && (
         <button
           type="button"
@@ -337,10 +343,7 @@ function RecentMissions() {
           title={`Reabrir: ${search.concepts.map((c) => c.name).join(', ')} · ${search.region_name}`}
           className="mando-recent"
         >
-          <span aria-hidden="true" className="text-sky-400">
-            ↺
-          </span>
-          <span className="truncate">{missionLabel(search)}</span>
+          <span className="truncate">{recentLabel(search)}</span>
         </button>
       ))}
     </div>

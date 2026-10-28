@@ -98,13 +98,13 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     [articles, showIrrelevant],
   );
   const range = useTimelineStore((s) => s.range);
-  const categoryId = useTimelineStore((s) => s.categoryId);
+  const categoryIds = useTimelineStore((s) => s.categoryIds);
   const stateCode = useTimelineStore((s) => s.stateCode);
   const clearTimeline = useTimelineStore((s) => s.clear);
   // Lo mismo para el globo, la lista y la línea del tiempo: nunca muestran notas distintas.
   const shown = useMemo(
-    () => applyTimeline(relevant, { range, categoryId, stateCode }),
-    [relevant, range, categoryId, stateCode],
+    () => applyTimeline(relevant, { range, categoryIds, stateCode }),
+    [relevant, range, categoryIds, stateCode],
   );
   const hasResults = finished && articles.length > 0;
   const panelOpen = useExplorerStore((s) => s.panelOpen);

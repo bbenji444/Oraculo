@@ -32,6 +32,8 @@ import { GLASS } from '../Explore/ui';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
+import { CategoryFilter } from './CategoryFilter';
+import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
 
 // Categorías en la barra: las que más salen; el resto no se distinguiría.
@@ -142,8 +144,9 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
         <span aria-hidden="true" key={search.search_id} className="hud-scan" />
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
+            {/* Las corridas dicen sus horas: solo lo publicado desde la anterior. */}
             <p className="mando-kicker">
-              Expediente · {formatRange(search.date_from, search.date_to)}
+              Expediente · {windowLabel(search) ?? formatRange(search.date_from, search.date_to)}
             </p>
             <h2
               className="mt-1 truncate text-[14px] leading-snug font-semibold text-slate-50"
@@ -252,7 +255,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
         aria-label="Listado de la consulta"
         className={`${GLASS} pointer-events-auto flex min-h-0 flex-1 flex-col`}
       >
-        <div className="shrink-0 px-3 pt-2.5">
+        <div className="shrink-0 space-y-2 px-3 pt-2.5">
           <HudSegmented
             options={VIEWS}
             value={view}
@@ -261,6 +264,8 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
             }}
             label="Vista del expediente"
           />
+          {/* Los mismos botones para la cronología y la lista. */}
+          <CategoryFilter articles={relevant} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           {listOpen ? (

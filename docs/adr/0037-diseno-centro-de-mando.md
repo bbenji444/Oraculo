@@ -84,3 +84,9 @@ Benji pidió estos ajustes al elegirlo:
 - **Pestañas en el panel de las noticias.** «Cronología | Noticias» van arriba, dentro del mismo panel, para las dos vistas. La cronología y la lista ya no tienen marco ni título propios (`variant="dossier"`).
 - **Muchas más noticias.** Benji insistió: «quiero que en el listado de noticias se vean muchas más». Los renglones del expediente llevan el título en una línea, que se ve completo al elegirlo o al pasar el mouse, y un solo renglón de datos. Ya no se agranda la letra (se quitó el `zoom`). En 900 px de alto caben 9 a 11 noticias.
 - **Un color por categoría** (migración 0032, `categoryColor`). La barra, las etiquetas, los nodos de la cronología y los puntos del globo usan el color de la categoría de cada nota.
+
+## Cuartos ajustes (28/10/2026, tarde)
+
+- **Botones de color por categoría** (`CategoryFilter`): van arriba del listado, para la cronología y la lista. Se prenden uno o varios («Delincuencia organizada» y «Huachicol»), y «Todas» los apaga. El filtro vale también para el globo (`categoryIds` en `useTimelineStore`).
+- **Sin la curva de notas por hora en el expediente.** Benji: «no se entiende e incluso es estorbosa». Con la ventana por horas de las corridas, cada expediente ya cubre solo unas horas. En el diseño de columna sigue.
+- **Atajos más claros.** «Abrir resultados anteriores» en lugar de «Reabrir sin costo». Las corridas dicen sus horas («Corrida de las 07:00 · 23:00 – 07:00») y las búsquedas, su día («Tu búsqueda del 27 oct: FGR en Jalisco»).
