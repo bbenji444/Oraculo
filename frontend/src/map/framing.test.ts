@@ -15,6 +15,7 @@ import {
   frameZoom,
   GLOBE_FIT_MAX_ZOOM,
   GLOBE_FIT_SHARE,
+  overviewPadding,
   GLOBE_FIT_MIN_ZOOM,
   GLOBE_EXPAND_ZOOM,
   GLOBE_FRAME_MAX_ZOOM,
@@ -279,5 +280,16 @@ describe('fitZoom (globo entero en el espacio libre, diseño 3)', () => {
 
   it('de cerca no cambia nada', () => {
     expect(fitZoom(6, 239, { width: 1280, height: 496 })).toBe(6);
+  });
+});
+
+describe('overviewPadding (vista general del Centro de mando)', () => {
+  it('solo reserva una parte de la consola: el globo pasa por detrás de ella', () => {
+    expect(overviewPadding({ left: 0, right: 496, top: 72, bottom: 200 })).toEqual({
+      left: 0,
+      right: 496,
+      top: 72,
+      bottom: 70,
+    });
   });
 });

@@ -100,6 +100,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Vista general más grande al abrir el sistema (27/10/2026).** En el Centro de mando, de la consola de abajo solo se reserva un 35 % de su alto: el globo crece y su orilla pasa por detrás del vidrio, como pidió Benji. Al volar a una región o a una noticia se usa el margen completo, para que nada quede tapado.
 - **El globo abre más grande y los vuelos a una noticia son más ágiles (27/10/2026).** Benji lo pidió. El zoom inicial pasa de 1.8 a 2, y en el Centro de mando el globo ocupa todo el alto entre el encabezado y la consola. Volar a una noticia tarda 25 % menos y hace más arco. La ficha queda debajo de los controles del globo.
 - **Las corridas automáticas leen hasta 250 notas nuevas con la IA (27/10/2026, ADR-0031).** Antes era el tope general de 150; en la corrida de las 15:00 se alcanzó y 10 notas esperaron a la siguiente. Cuesta unos 0.025 USD más por corrida en el peor caso. Las búsquedas manuales siguen con 150. Se ajusta con `AUTOMATIC_LLM_MAX_ARTICLES`.
 - **Más noticias a la vista en el expediente y una cronología más clara (27/10/2026).** En una pantalla de 920 px de alto pasan de 3 a unas 6 o 7. Cambios:
@@ -137,6 +138,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Elegir un país o una región en el Centro de mando ya hace zoom directo a él (27/10/2026).** Antes, al llegar a un país (zoom menor a 3), cualquier cambio de alto de la consola volvía a ajustar el globo entero y lo alejaba. Ahora ese ajuste solo aplica en la vista general, sin región ni nota elegida.
 - **El globo siempre llega a la noticia elegida (27/10/2026).** Fallaba en dos casos:
   - si se elegía una nota o se reabría una búsqueda mientras la Tierra hacía su entrada, la entrada seguía moviendo la cámara y aplastaba el vuelo. Ahora cualquier vuelo pedido termina la entrada;
   - al aparecer el expediente a media llegada, el ajuste de márgenes cortaba el vuelo. Ahora espera a que aterrice.
