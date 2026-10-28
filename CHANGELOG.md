@@ -132,6 +132,22 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **El PDF responde las preguntas del analista (28/10/2026, ADR-0033).** Cada bloque abre con una pregunta numerada, su gráfica y una línea de conclusión:
+  - ¿Qué pasó?
+  - ¿Qué es lo más importante?
+  - ¿De qué delitos se trata?
+  - ¿Qué tipo de actuación hubo?
+  - ¿Dónde pasó?
+  - ¿Qué pasa en cada estado?
+  - ¿Cuándo pasó?
+  - ¿Cómo se desarrollaron los hechos?
+  - ¿Qué tan confiable es?
+
+  También hay novedades de presentación:
+  - una cronología con marcas de hora;
+  - fichas por estado;
+  - un índice por estado con franjas de color;
+  - tipografía formal: Noto Sans en lugar de Orbitron, que solo queda en la marca de la portada.
 - **Consola más chaparrita y ubicación sin ambigüedad (28/10/2026).**
   - La consola del Centro de mando baja de 240 a 179 px de alto con las mismas piezas: el radar, la frase y los márgenes son más chicos, y el costo va en un solo renglón de tres cifras con su nombre completo.
   - En el filtro de ubicación, «Dentro» y «Fuera» ahora dicen «Dentro de zona» y «Fuera de zona», también en el diseño de columna.

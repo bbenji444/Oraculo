@@ -82,8 +82,8 @@ async def test_el_html_lleva_todas_las_secciones_y_escapa_lo_de_la_web(
     assert "IA · INFERENCIA" in page
     assert 'class="ins ins-confidence"' in page
     # Noticias por Estado ▸ Categoría, numeradas de corrido.
-    assert "› Ciudad de México" in page
-    assert "› Sin estado identificado" in page
+    assert 'class="state-title">Ciudad de México' in page
+    assert 'class="state-title">Sin estado identificado' in page
     assert '<span class="number">3</span>' in page
     assert "México › Ciudad de México" in page
     assert "<p>Predomina el cobro de piso.</p>" in page
@@ -188,3 +188,22 @@ async def test_geojson_con_un_punto_por_nota_ubicada(report: ReportData) -> None
     assert feature["geometry"] == {"type": "Point", "coordinates": [-99.1, 19.4]}
     assert feature["properties"]["lugar"] == "Alcaldía Iztapalapa"
     assert "latitud" not in feature["properties"]
+
+
+async def test_el_reporte_responde_las_preguntas_del_analista(report: ReportData) -> None:
+    # Rediseño del 28/10/2026: cada bloque abre con una pregunta numerada.
+    page = ReportRenderer().html(report)
+
+    for question in (
+        "¿Qué pasó en este periodo?",
+        "¿Qué es lo más importante?",
+        "¿De qué delitos se trata?",
+        "¿Qué tipo de actuación hubo?",
+        "¿Dónde pasó?",
+        "¿Qué pasa en cada estado?",
+        "¿Cuándo pasó?",
+        "¿Qué tan confiable es la información?",
+    ):
+        assert question in page
+    # Tipografía formal: Orbitron solo en la marca de la portada.
+    assert '--tech: "Noto Sans Reporte", sans-serif;' in page
