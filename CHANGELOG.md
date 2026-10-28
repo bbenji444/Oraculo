@@ -196,6 +196,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Una nota vieja ya no se cuela en la corrida siguiente con otra fecha (28/10/2026).** En la corrida de las 15:00, el índice local volvió a mandar 6 notas de la madrugada con una fecha dentro de la ventana, y salían repetidas de la corrida de las 07:00. Ahora, después de reconocer una nota ya guardada, se vuelve a filtrar con la fecha con la que se guardó. Las 6 se quitaron de esa corrida.
 - **Cada corrida trae solo las notas de su periodo, aunque la anterior falle (28/10/2026).** Si una corrida no terminaba, la siguiente cubría desde la última que sí, y podía traer notas de otro periodo. Ahora la ventana es siempre la misma (ADR-0031):
   - la de las 07:00, de las 23:00 a las 07:00;
   - la de las 15:00, de 07:00 a 15:00;

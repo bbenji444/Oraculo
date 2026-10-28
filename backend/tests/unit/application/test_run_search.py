@@ -690,3 +690,21 @@ async def test_la_corrida_automatica_solo_toma_lo_publicado_en_sus_horas() -> No
     assert "https://elpais.com/madrid" not in articles.ids
     assert report.enriched == 1
     assert len(llm.requests) == 1
+
+
+async def test_la_corrida_no_trae_una_nota_vieja_que_llega_con_fecha_nueva() -> None:
+    # Corrida de las 15:00 del 28/10/2026: el índice local mandó de nuevo 6
+    # notas de la madrugada con una fecha dentro de la ventana. Pasaban el
+    # filtro y, al reconocerlas como ya guardadas, quedaban con su fecha real
+    # (03:30–06:51), fuera de las horas y repetidas de la corrida anterior.
+    window = RunWindow(PUBLISHED - timedelta(hours=8), PUBLISHED + timedelta(hours=1))
+    search = replace(stored_search(), time_window=window)
+    old = StoredArticle(55, "enrich_v1", frozenset({3}), "09007", PUBLISHED - timedelta(hours=9))
+    articles = Articles(known={"https://elpais.com/madrid": old})
+    use_case, _searches, articles, llm, _e = pipeline(articles=articles, search=search)
+
+    report = await use_case.run(uuid4())
+
+    assert 55 not in {r.article_id for r in articles.rows}
+    assert report.articles == 1
+    assert [r.title for r in llm.requests] == [IZTA_TITLE]

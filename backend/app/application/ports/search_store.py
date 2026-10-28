@@ -233,12 +233,15 @@ class StoredArticle:
             ``None`` si no se ha enriquecido.
         concept_ids: Conceptos que ya tienen juicio de relevancia.
         primary_code: Clave de su ubicación principal, si tiene.
+        published_at: Fecha de publicación con la que se guardó la primera vez
+            (no cambia aunque un proveedor la mande otra vez con otra fecha).
     """
 
     article_id: int
     prompt_version: str | None = None
     concept_ids: frozenset[int] = frozenset()
     primary_code: str | None = None
+    published_at: datetime | None = None
 
     def reusable_for(self, prompt_version: str, concept_ids: frozenset[int]) -> bool:
         """Dice si su enriquecimiento sirve para esta búsqueda (caché de §10).

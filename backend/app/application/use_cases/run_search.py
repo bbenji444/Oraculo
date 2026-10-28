@@ -342,9 +342,24 @@ class RunSearch:
             match = match_known(item, known, self._similarity)
             item.known_id = match.article_id if match else None
         stored = await self._articles.upsert(unique)
-        tally.extra["articles"] = len(unique)
-        tally.extra["known"] = sum(1 for item in unique if item.known_id is not None)
-        return [_Work(item, s) for item, s in zip(unique, stored, strict=True)]
+        work = [_Work(item, s) for item, s in zip(unique, stored, strict=True)]
+        if search.time_window is not None:
+            # Segundo filtro, con la fecha guardada: una nota vieja puede volver
+            # con otra fecha (el índice local mandó en la corrida de las 15:00
+            # del 28/10/2026 seis notas de la madrugada fechadas dentro de la
+            # ventana). Ya guardada conserva su fecha real y era de la corrida
+            # anterior: no le toca a esta.
+            window = search.time_window
+            kept = [
+                w
+                for w in work
+                if window.contains(w.stored.published_at or w.item.article.published_at)
+            ]
+            tally.extra["outside_window"] += len(work) - len(kept)
+            work = kept
+        tally.extra["articles"] = len(work)
+        tally.extra["known"] = sum(1 for w in work if w.item.known_id is not None)
+        return work
 
     async def _extract(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> list[_Work]:
         """Lee el texto de las notas que hay que enriquecer (respetando el tope)."""
