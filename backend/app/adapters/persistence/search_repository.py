@@ -736,7 +736,8 @@ class PostgresArticleStore:
                                     WHERE ac.article_id = a.id), '{}') AS concept_ids,
                                 (SELECT r.code FROM article_locations al
                                     JOIN regions r ON r.id = al.region_id
-                                    WHERE al.article_id = a.id AND al.is_primary) AS primary_code
+                                    WHERE al.article_id = a.id AND al.is_primary) AS primary_code,
+                                a.published_at
                             FROM articles a WHERE a.id = ANY(:ids)
                             """
                         ),
@@ -752,6 +753,7 @@ class PostgresArticleStore:
                 row["prompt_version"],
                 frozenset(row["concept_ids"]),
                 row["primary_code"],
+                row["published_at"],
             )
             for row in known
         }

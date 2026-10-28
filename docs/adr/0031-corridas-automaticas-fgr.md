@@ -61,6 +61,7 @@ Faltaba unirlas sin que una persona lo pida.
   - 23:00, de 15:00 a 23:00.
 - **Aunque la anterior no haya terminado**, cubre solo su periodo (corregido el 28/10/2026, tarde). Antes cubría desde la última que sí terminó, hasta un día atrás, y podía traer notas de otro periodo. Benji: «únicamente deben de salir las noticias del periodo anterior al periodo actual… es lo más importante». Lo que se pierda si una corrida falla se recupera corriendo esa corrida a mano (`make corrida-fgr`), no estirando la siguiente. `AUTOMATIC_WINDOW_DAYS` ya no existe.
 - **El filtro se aplica después de consultar.** A los buscadores se les piden los días que toca la ventana (solo entienden días), y el pipeline descarta lo publicado fuera de las horas antes de guardarlo y antes de la IA. Las notas sin fecha de publicación tampoco entran, porque no se puede saber si ya salieron.
+- **Se filtra dos veces.** Primero con la fecha que manda el proveedor. Después, con la fecha con la que la nota se guardó la primera vez, ya que se reconoció como guardada. El índice local volvió a mandar notas de la madrugada con fecha de la tarde (corrida de las 15:00 del 28/10/2026), y sin el segundo filtro salían repetidas.
 - **Se guarda la ventana.** `searches.window_start` y `window_end` (migración 0033) llevan las horas, y la pantalla y el PDF las muestran («27 oct 23:00 – 28 oct 07:00»).
 - **Es estricto, por decisión de Benji.** `AUTOMATIC_WINDOW_MARGIN_MINUTES` (0) permite mirar unos minutos antes si se nota que se pierden notas que los buscadores muestran tarde.
 

@@ -141,3 +141,19 @@ async def test_google_news_vuelve_a_dar_la_nota_dias_despues_y_se_reconoce(
     match = match_known(later[0], candidates, title_similarity)
 
     assert match is not None and match.article_id == first.article_id
+
+
+async def test_la_nota_guardada_conserva_su_fecha_aunque_vuelva_con_otra(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # El índice local mandó de nuevo notas de la madrugada con otra fecha
+    # (corrida de las 15:00 del 28/10/2026): el pipeline necesita la fecha con
+    # la que se guardó la primera vez para descartarlas.
+    store = PostgresArticleStore(test_engine)
+    [first] = await store.upsert(dedupe([raw(MEDIO, Provider.SEARCHAPI)], title_similarity))
+    later = dedupe([raw(MEDIO, Provider.LOCAL_INDEX, NOON + timedelta(hours=9))], title_similarity)
+
+    [again] = await store.upsert(later)
+
+    assert again.article_id == first.article_id
+    assert again.published_at == first.published_at == NOON
