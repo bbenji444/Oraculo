@@ -5,7 +5,7 @@ de México. Este caso de uso arma su petición, la misma que haría una persona
 en Explorar:
 - **concepto:** «Fiscalia General de la Republica» (con su regla FGR federal);
 - **región:** todo México: la geolocalización reparte las notas por estado;
-- **fechas:** hoy y ayer, para alcanzar lo publicado desde la corrida anterior;
+- **fechas:** solo las horas desde la corrida programada anterior (``run_window``);
 - **fuentes:** solo las gratis, Google News RSS y el índice local.
 
 Lo que ya se vio en otra corrida se reutiliza sin volver a pagar a la IA (caché

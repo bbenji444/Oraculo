@@ -10,9 +10,12 @@
      categoría.
   3. Distribución geográfica: mapa con porcentajes, tabla por estado y
      barras apiladas por categoría.
-  4. Línea del tiempo con sus picos, y medios con más notas.
-  5. Noticias: Estado ▸ Categoría ▸ Noticias, con marcadores plegables en el
-     lector de PDF (los «chevrons») e insignias de confianza.
+  4. Línea del tiempo por hora, de colores por categoría, con sus picos; la
+     cronología de los hechos destacados (con resumen e insignias) y los
+     medios con más notas.
+  5. Índice de noticias: Estado ▸ Categoría ▸ un renglón por hecho, con
+     marcadores plegables en el lector de PDF y un tope (Benji, 28/10/2026:
+     «no quiero saturarlo de noticias»).
   6. Anexo: metodología, fuentes y costo.
 
   Todo el texto se escapa; solo los SVG (mapa y red) van tal cual. Nunca
@@ -75,11 +78,11 @@
     <div class="kpi kpi-unlocated"><strong>{{ data.unlocated }}</strong><span>sin ubicación</span></div>
   </div>
   {% if o.novelty %}
-    {# Cada corrida cubre hoy y ayer: casi todo ya venía en la anterior (ADR-0034). #}
+    {# Un hecho que siguió publicándose después de la corrida anterior ya se reportó ahí (ADR-0034). #}
     <div class="novelty">
       <p class="novelty-title">Novedades desde la corrida {% if o.novelty.previous_at %}de las {{ o.novelty.previous_at | mx_time }} del {{ o.novelty.previous_at | mx_date }}{% else %}anterior{% endif %}</p>
       <p class="novelty-count"><strong>{{ o.novelty.new_facts }}</strong> {{ "hecho nuevo" if o.novelty.new_facts == 1 else "hechos nuevos" }} · <strong>{{ o.novelty.known_facts }}</strong> ya se {{ "había" if o.novelty.known_facts == 1 else "habían" }} reportado y no se repite{{ "" if o.novelty.known_facts == 1 else "n" }}{% if o.novelty.known_with_news %} ({{ o.novelty.known_with_news }} con algún medio más){% endif %}.</p>
-      <p class="muted small">«Noticias por estado» trae solo los hechos nuevos. Los ya reportados están en el reporte de la corrida anterior. El panorama, las gráficas y el mapa cubren toda la ventana de la corrida.</p>
+      <p class="muted small">La cronología y el índice traen solo los hechos nuevos. Los ya reportados están en el reporte de la corrida anterior. El panorama, las gráficas y el mapa cubren toda la ventana de la corrida.</p>
     </div>
   {% endif %}
 
@@ -115,15 +118,25 @@
 
   {% if o.cards %}
     <h2>Notas por categoría <span class="badge-ai">IA · INFERENCIA</span></h2>
-    <div class="cards">
-      {% for card in o.cards %}
-        <div class="card" style="border-top-color: {{ card.color }}">
-          <span class="card-count">{{ card.count }}<small> · {{ card.percent }} %</small></span>
-          <span class="card-name">{{ card.name }}</span>
-          {% if card.top_state %}<span class="card-note">Más en {{ card.top_state }}</span>{% endif %}
-          {% if card.labels %}<span class="card-labels">«{{ card.labels | join("» · «") }}»</span>{% endif %}
-        </div>
-      {% endfor %}
+    <div class="breakdown">
+      {# Dona: los trazos son solo números calculados en oraculo.donut. #}
+      <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Orbitron Reporte, Noto Sans Reporte, sans-serif">
+        {% for slice in o.donut %}<path d="{{ slice.path }}" fill="{{ slice.color }}" stroke="#ffffff" stroke-width="0.8"/>{% endfor %}
+        <text x="60" y="60" text-anchor="middle" font-size="17" font-weight="700" fill="#0f172a">{{ view.total }}</text>
+        <text x="60" y="72" text-anchor="middle" font-size="5.5" letter-spacing="0.8" fill="#64748b">NOTAS</text>
+      </svg>
+      <table class="cat-table">
+        <tbody>
+          {% for card in o.cards %}
+            <tr>
+              <td class="cat-name"><i style="background: {{ card.color }}"></i>{{ card.name }}</td>
+              <td class="cat-bar"><span style="width: {{ card.percent }}%; background: {{ card.color }}"></span></td>
+              <td class="num">{{ card.count }} <small class="pct">{{ card.percent }} %</small></td>
+              <td class="cat-note">{% if card.top_state %}Más en {{ card.top_state }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   {% endif %}
 </section>
@@ -193,7 +206,7 @@
   <h2 class="section">Línea del tiempo</h2>
   {% set bars = o.timeline.bars %}
   {% if bars %}
-    <p class="muted small">Notas por {{ o.timeline.unit }} de publicación (hora de la Ciudad de México). Los picos van resaltados.</p>
+    <p class="muted small">Notas por {{ o.timeline.unit }} de publicación (hora de la Ciudad de México), de colores por categoría como en el monitor. Sobre cada pico va su número de notas.</p>
     {# Lienzo de 520 × 150: base en y = 120, barra más alta de 100. #}
     {% set n = bars | length %}
     {% set slot = 520 / n %}
@@ -202,13 +215,22 @@
         {% set x = slot * loop.index0 %}
         {% set h = 100 * bar.share %}
         {% if bar.count %}
-          <rect x="{{ '%.2f' | format(x + slot * 0.12) }}" y="{{ '%.2f' | format(120 - h) }}" width="{{ '%.2f' | format(slot * 0.76) }}" height="{{ '%.2f' | format(h) }}" rx="1" fill="{{ '#00a8d4' if bar.peak else '#9fd8e6' }}"/>
+          {# Tramos apilados de abajo hacia arriba, del color de cada categoría. #}
+          {% set ns = namespace(top=120) %}
+          {% for segment in bar.segments %}
+            {% set sh = 100 * segment.share %}
+            <rect x="{{ '%.2f' | format(x + slot * 0.12) }}" y="{{ '%.2f' | format(ns.top - sh) }}" width="{{ '%.2f' | format(slot * 0.76) }}" height="{{ '%.2f' | format(sh) }}" fill="{{ segment.color }}"/>
+            {% set ns.top = ns.top - sh %}
+          {% endfor %}
           {% if bar.peak %}<text x="{{ '%.2f' | format(x + slot / 2) }}" y="{{ '%.2f' | format(116 - h) }}" text-anchor="middle" font-size="8" font-weight="700" fill="#005f7f">{{ bar.count }}</text>{% endif %}
         {% endif %}
         {% if bar.label %}<text x="{{ '%.2f' | format(x) }}" y="134" font-size="7" fill="#475569">{{ bar.label }}</text>{% endif %}
       {% endfor %}
       <line x1="0" y1="120.5" x2="520" y2="120.5" stroke="#0f172a" stroke-width="0.8"/>
     </svg>
+    <p class="stack-legend">
+      {% for card in o.cards %}<span class="legend-item"><i style="background: {{ card.color }}"></i>{{ card.name }}</span>{% endfor %}
+    </p>
     <div class="peaks">
       {% for peak in o.timeline.peaks %}
         <div class="peak">
@@ -221,6 +243,27 @@
     </div>
   {% else %}
     <p class="muted">Las notas no traen fecha de publicación.</p>
+  {% endif %}
+
+  {% if o.highlights %}
+    <h2 class="section-sub">Cronología de hechos destacados <span class="badge-ai">IA · INFERENCIA</span></h2>
+    <p class="muted small">Los {{ o.highlights | length }} hechos que más medios publicaron{% if o.novelty %} (solo los nuevos){% endif %}, en orden de hora. El resumen lo escribió la IA a partir de la nota; verifique en la fuente antes de citar.</p>
+    <ol class="timeline">
+      {% for item in o.highlights %}
+        {% set article = item.article %}
+        <li class="tl-item">
+          <span class="tl-dot" style="background: {{ item.color }}; box-shadow: 0 0 0 2pt {{ item.color }}33"></span>
+          <p class="tl-when">{{ article.published_at | mx_time if article.published_at else "Sin hora" }}{% if article.published_at %} · {{ article.published_at | mx_date }}{% endif %} · {{ item.state }}</p>
+          <h4 class="tl-title"><a href="{{ article.url }}">{{ article.title | clean }}</a></h4>
+          <p class="insignias">
+            {% for badge in item.badges %}<span class="ins ins-{{ badge.kind }}"{% if badge.color %} style="border-color: {{ badge.color }}; color: {{ badge.color }}"{% endif %}>{{ badge.text }}</span>{% endfor %}
+            <span class="ins ins-outlets">{{ item.outlets }} {{ "MEDIO" if item.outlets == 1 else "MEDIOS" }}</span>
+          </p>
+          {% if article.summary %}<p class="tl-text">{{ article.summary | clean }}</p>{% endif %}
+          <p class="tl-source"><b>{{ article.source_name or article.source_domain or "Medio sin nombre" }}</b>{% if item.also %} · también {% for other in item.also %}<a href="{{ other.url }}">{{ other.source_name or other.source_domain or "otro medio" }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</p>
+        </li>
+      {% endfor %}
+    </ol>
   {% endif %}
 
   <h3>Medios con más notas</h3>
@@ -240,42 +283,33 @@
 {# ----------------------------------------------------------------- Noticias #}
 <section class="news">
   <h2 class="section">Noticias por estado</h2>
-  <p class="muted small">En el panel de marcadores del lector de PDF cada estado › categoría se despliega o se contrae. Las insignias de cada nota son inferencias de la IA: verifique en la fuente antes de citar.</p>
+  <p class="muted small">Índice de los hechos{% if o.novelty %} nuevos{% endif %}, un renglón por hecho: hora, título (con su link), medio y cuántos medios más lo publicaron. Los resúmenes de los destacados están en la cronología. En el panel de marcadores del lector de PDF cada estado › categoría se despliega o se contrae.</p>
   {% for state in o.groups %}
     <div class="state">
       <h3 class="state-title">› {{ state.name }} <span>{{ state.facts }} {{ "hecho" if state.facts == 1 else "hechos" }} · {{ state.count }} {{ "nota" if state.count == 1 else "notas" }} · {{ state.percent }} %</span></h3>
       {% for category in state.categories %}
         <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
-        {% for item in category.notes %}
-          {% set article = item.article %}
-          <article class="item">
-            <span class="number">{{ item.number }}</span>
-            <div class="body">
-              <h5><a href="{{ article.url }}">{{ article.title | clean }}</a></h5>
-              <p class="meta">
-                <b>{{ article.source_name or article.source_domain or "Medio sin nombre" }}</b>
-                · {{ article.published_at | mx_datetime }}
-                {% if article.primary %} · {{ article.primary.place or "Lugar sin nombre" }}{% if article.primary.precision in ("state", "country") %} <span class="badge badge-{{ article.primary.precision }}">{{ precision_label[article.primary.precision] }}</span>{% endif %}{% endif %}
-              </p>
-              <p class="insignias">
-                {% for badge in item.badges %}<span class="ins ins-{{ badge.kind }}"{% if badge.color %} style="border-color: {{ badge.color }}; color: {{ badge.color }}"{% endif %}>{{ badge.text }}</span>{% endfor %}
-              </p>
-              {% if article.summary %}<p class="text">{{ article.summary | clean }}</p>{% endif %}
-              <p class="link">{{ article.url }}</p>
-              {% if item.also %}
-                {# El mismo hecho en otros medios: solo medio, hora y link (sin repetir el resumen). #}
-                <p class="also"><b>También lo {{ "publicó" if item.also | length == 1 else "publicaron" }} ({{ item.also | length }}):</b>
-                  {% for other in item.also %}<a href="{{ other.url }}">{{ other.source_name or other.source_domain or "Medio sin nombre" }}</a>{% if other.published_at %} {{ other.published_at | mx_time if article.published_at and (other.published_at | mx_date) == (article.published_at | mx_date) else other.published_at | mx_datetime }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
-                </p>
-              {% endif %}
-            </div>
-          </article>
-        {% endfor %}
+        <table class="index">
+          <tbody>
+            {% for item in category.notes %}
+              {% set article = item.article %}
+              <tr>
+                <td class="ix-num"><span class="number">{{ item.number }}</span></td>
+                <td class="ix-time">{{ article.published_at | mx_time if article.published_at else "—" }}</td>
+                <td class="ix-title"><a href="{{ article.url }}">{{ article.title | clean }}</a></td>
+                <td class="ix-src">{{ article.source_name or article.source_domain or "Medio sin nombre" }}{% if item.also %} <b>+{{ item.also | length }}</b>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       {% endfor %}
     </div>
   {% else %}
     <p class="muted">{% if o.novelty %}Sin hechos nuevos desde la corrida anterior: todo lo de esta ventana ya se había reportado.{% else %}La búsqueda no encontró notas relevantes.{% endif %}</p>
   {% endfor %}
+  {% if o.omitted_facts %}
+    <p class="omitted">Y {{ o.omitted_facts }} {{ "hecho más" if o.omitted_facts == 1 else "hechos más" }} con menos notas: se consultan en el monitor o en el CSV de esta búsqueda.</p>
+  {% endif %}
 </section>
 
 {# ------------------------------------------------------------------- Anexo #}
