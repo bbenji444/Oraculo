@@ -1,5 +1,6 @@
 """Catálogo de categorías y categoría de cada nota contra la base de pruebas (F12.4)."""
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -62,7 +63,11 @@ async def test_el_catalogo_sembrado_tiene_15_y_un_solo_otros(
     assert len(categories) == 15
     assert categories[0].name == "Narcotráfico y delitos contra la salud"
     assert other_category(categories).name == "Otros"
-    assert all(c.color is None and c.symbol is None for c in categories)
+    # Cada una con su color desde la 0032, todos distintos; el símbolo sigue sin decidirse.
+    colors = [c.color for c in categories]
+    assert all(color is not None and re.fullmatch(r"#[0-9A-F]{6}", color) for color in colors)
+    assert len(set(colors)) == len(colors)
+    assert all(c.symbol is None for c in categories)
 
 
 async def test_seguridad_nacional_va_justo_antes_de_otros(

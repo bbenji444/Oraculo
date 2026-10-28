@@ -68,3 +68,7 @@ La IA ya devuelve un `event_type`, pero en la búsqueda FGR del 24/10/2026 (189 
 - En las relevantes, «Seguridad nacional» queda con 83 notas en la corrida de las 07:00 y 102 en la de las 15:00.
 - En todo el índice, «Otros» bajó a 834 de 1,689. Casi todas son notas que no son de la FGR (espectáculos, Día de Muertos).
 - Lo que queda en «Otros» dentro de la FGR es lo que no tiene categoría: piratería, una columna sobre el INE y caravanas cuyo título no nombra al acusado.
+
+## Colores (28/10/2026)
+
+La migración 0032 le dio un color a cada categoría, con la paleta de la consola táctica (ADR-0036): rojos y rosas para los delitos violentos, azules y violetas para los de dinero, y gris para «Otros». El símbolo sigue sin decidirse.
