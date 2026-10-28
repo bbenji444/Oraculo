@@ -33,7 +33,6 @@ import { GLASS } from '../Explore/ui';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
-import { ActivityTimeline } from './ActivityTimeline';
 import { FilterPopover } from './FilterPopover';
 import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
@@ -277,7 +276,6 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
             </p>
             <FilterPopover articles={relevant} />
           </div>
-          <ActivityTimeline articles={located} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           {listOpen ? (

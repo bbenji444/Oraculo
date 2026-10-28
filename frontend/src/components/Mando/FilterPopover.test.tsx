@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-/** Línea del tiempo y ventana del filtro del expediente (28/10/2026). */
+/** Ventana «Filtro» del expediente, al centro de la pantalla (28/10/2026). */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
-import { ActivityTimeline } from './ActivityTimeline';
 import { FilterPopover } from './FilterPopover';
 import { activeFilters } from './mission';
 
@@ -48,32 +47,6 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('ActivityTimeline', () => {
-  it('una barra por hora, con su pico y las horas abajo', () => {
-    render(<ActivityTimeline articles={NOTES} />);
-    const bars = within(screen.getByRole('group', { name: 'Notas por tramo' })).getAllByRole(
-      'button',
-    );
-    // De las 23:00 a las 06:00: 8 horas, con huecos vacíos.
-    expect(bars).toHaveLength(8);
-    expect(bars.filter((b) => !(b as HTMLButtonElement).disabled)).toHaveLength(3);
-    expect(screen.getByText('06:00', { selector: 'span.text-slate-200' })).toBeTruthy();
-  });
-
-  it('al pasar el mouse dice el tramo y sus categorías; un clic lo filtra', () => {
-    render(<ActivityTimeline articles={NOTES} />);
-    const bar = screen.getByRole('button', { name: /06:00 – 07:00: 2 notas/ });
-    fireEvent.mouseEnter(bar);
-    const tip = screen.getByRole('tooltip');
-    expect(tip.textContent).toContain('2 notas');
-    expect(tip.textContent).toContain('Delincuencia organizada');
-    fireEvent.click(bar);
-    expect(useTimelineStore.getState().range).not.toBeNull();
-    fireEvent.click(bar);
-    expect(useTimelineStore.getState().range).toBeNull();
-  });
-});
-
 describe('FilterPopover', () => {
   it('«Filtro» abre la ventana y dice cuántos filtros hay puestos', () => {
     render(<FilterPopover articles={NOTES} />);
@@ -84,6 +57,8 @@ describe('FilterPopover', () => {
     expect(useTimelineStore.getState().categoryIds).toEqual([2]);
     expect(useExplorerStore.getState().listFilter).toBe('false');
     expect(screen.getByRole('button', { name: /^Filtro/ }).textContent).toBe('Filtro2');
+    // El estado es una lista desplegable.
+    expect(within(dialog).getByLabelText('Estado').textContent).toBe('Todos los estados');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar filtros' }));
     expect(useTimelineStore.getState().categoryIds).toEqual([]);
     expect(useExplorerStore.getState().listFilter).toBe('all');
