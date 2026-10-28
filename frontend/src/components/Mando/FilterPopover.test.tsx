@@ -53,7 +53,7 @@ describe('FilterPopover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filtro' }));
     const dialog = screen.getByRole('dialog', { name: 'Filtrar el expediente' });
     fireEvent.click(within(dialog).getByRole('button', { name: /Delincuencia organizada/ }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fuera' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fuera de zona' }));
     expect(useTimelineStore.getState().categoryIds).toEqual([2]);
     expect(useExplorerStore.getState().listFilter).toBe('false');
     expect(screen.getByRole('button', { name: /^Filtro/ }).textContent).toBe('Filtro2');

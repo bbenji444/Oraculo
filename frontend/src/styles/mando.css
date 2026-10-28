@@ -239,10 +239,19 @@
 /* Tres zonas que no se pisan (Benji, 28/10/2026: lo de la consulta anterior
    se encimaba con el costo). Se acomodan según el ancho de la propia consola,
    no de la ventana: con el expediente abierto la consola es más angosta. */
+/* Chaparrita (Benji, 28/10/2026: «que no abarque mucho espacio del globo»):
+   de 240 a unos 165 px de alto con las mismas piezas. */
 .mando-console {
   container: mando-console / inline-size;
   overflow: hidden;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.9rem 0.55rem;
+}
+.mando-console .mando-sentence {
+  font-size: 0.92rem;
+  line-height: 2.05;
+}
+.mando-console .mando-token {
+  padding: 0 0.5em 0.05em;
 }
 .mando-console-grid {
   position: relative;
@@ -271,15 +280,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.75rem;
-  margin-bottom: 0.4rem;
+  gap: 0.3rem 0.75rem;
+  margin-bottom: 0.15rem;
 }
 /* Pie a todo el ancho: los resultados anteriores completos. */
 .mando-console-foot {
   position: relative;
   z-index: 1;
-  margin-top: 0.6rem;
-  padding-top: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
   border-top: 1px solid rgb(0 210 255 / 0.1);
 }
 .mando-console-launch {
@@ -309,7 +318,7 @@
 
 @container mando-console (min-width: 40rem) {
   .mando-console-grid {
-    grid-template-columns: minmax(0, 1fr) 15rem;
+    grid-template-columns: minmax(0, 1fr) 16rem;
     align-items: stretch;
   }
   .mando-console-launch {
@@ -327,7 +336,7 @@
 }
 @container mando-console (min-width: 52rem) {
   .mando-console-grid {
-    grid-template-columns: 7.5rem minmax(0, 1fr) 15rem;
+    grid-template-columns: 5.6rem minmax(0, 1fr) 16rem;
   }
   .mando-scope {
     display: grid;
@@ -344,32 +353,33 @@
    derecha, cada una con su color (antes, en láminas, se cortaba «CONSU…»). */
 .mando-cost-list {
   display: grid;
-  gap: 3px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
 .mando-cost {
   --tone: 0 210 255;
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.15rem;
   overflow: hidden;
-  padding: 0.28rem 0.6rem 0.28rem 0.7rem;
+  padding: 0.22rem 0.2rem 0.24rem;
   border: 1px solid rgb(var(--tone) / 0.22);
   border-radius: 8px;
-  background: linear-gradient(90deg, rgb(var(--tone) / 0.14), rgb(var(--tone) / 0.02) 70%);
+  background: linear-gradient(180deg, rgb(var(--tone) / 0.14), rgb(var(--tone) / 0.02) 80%);
   transition:
     border-color 0.3s var(--hud-ease),
     transform 0.3s var(--hud-ease);
 }
-/* Barra de su color a la izquierda. */
+/* Línea de su color arriba. */
 .mando-cost::before {
   content: '';
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 0;
-  width: 2px;
+  top: 0;
+  right: 18%;
+  left: 18%;
+  height: 1px;
   border-radius: 2px;
   background: rgb(var(--tone));
   box-shadow: 0 0 8px rgb(var(--tone));
@@ -397,12 +407,12 @@
 }
 .mando-cost:hover {
   border-color: rgb(var(--tone) / 0.55);
-  transform: translateX(2px);
+  transform: translateY(-2px);
 }
 .mando-cost-label {
   color: rgb(var(--tone) / 0.9);
-  font: 600 9px/1.2 var(--font-display);
-  letter-spacing: 0.16em;
+  font: 600 8px/1.2 var(--font-display);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -433,7 +443,7 @@
 }
 .mando-scope-dish {
   position: relative;
-  width: 6.6rem;
+  width: 4.6rem;
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid rgb(var(--scope-tone) / 0.45);
@@ -530,7 +540,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.28rem 0.7rem;
+  padding: 0.2rem 0.65rem;
   white-space: nowrap;
   border: 1px solid rgb(0 210 255 / 0.18);
   border-radius: 999px;
@@ -899,6 +909,11 @@
   background: rgb(2 6 10 / 0.62);
   animation: hud-fade 0.2s var(--hud-ease) both;
   opacity: 0;
+}
+/* «Dentro de zona» y «Fuera de zona» en un renglón (Benji, 28/10/2026). */
+.mando-modal .hud-seg > button {
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 .mando-modal {
   max-height: calc(100vh - 2rem);

@@ -440,14 +440,16 @@ describe('diseño de columna (?clasico, H1)', () => {
     expect(screen.getByRole('region', { name: 'Búsqueda' })).toBeTruthy();
 
     // Por defecto solo las relevantes, en la lista y en el globo por igual; la
-    // pestaña "Fuera" las separa (§9 paso 7).
+    // pestaña "Fuera de zona" las separa (§9 paso 7).
     const relevant = articles.items.filter((a) => a.concepts.some((c) => c.is_relevant));
     await waitFor(() => {
       expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
     });
     expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
     const outside = relevant.filter((a) => a.in_region === false).length;
-    expect(within(list).getByRole('tab', { name: `Fuera · ${String(outside)}` })).toBeTruthy();
+    expect(
+      within(list).getByRole('tab', { name: `Fuera de zona · ${String(outside)}` }),
+    ).toBeTruthy();
 
     // 5. Elegir una nota en la lista abre su ficha en el globo, con su link.
     const note = relevant[0];

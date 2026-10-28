@@ -322,7 +322,7 @@ function LaunchButton({ launcher }: { launcher: Launcher }) {
           useMandoStore.getState().setEditing(false);
           start.mutate(input);
         }}
-        className="hud-btn hud-btn--solid w-full px-5 py-2.5 text-[11.5px]"
+        className="hud-btn hud-btn--solid w-full px-5 py-2 text-[11px]"
       >
         {busy ? 'Barrido en curso…' : 'Iniciar barrido ›'}
       </button>

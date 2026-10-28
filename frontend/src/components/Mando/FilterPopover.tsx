@@ -32,8 +32,8 @@ import { activeFilters } from './mission';
 
 const LOCATIONS = [
   { value: 'all', label: 'Todas' },
-  { value: 'true', label: 'Dentro' },
-  { value: 'false', label: 'Fuera' },
+  { value: 'true', label: 'Dentro de zona' },
+  { value: 'false', label: 'Fuera de zona' },
   { value: 'none', label: 'Sin lugar' },
 ] as const satisfies readonly { value: ListFilter; label: string }[];
 
