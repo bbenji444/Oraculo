@@ -235,6 +235,7 @@ class StoredArticle:
         primary_code: Clave de su ubicación principal, si tiene.
         published_at: Fecha de publicación con la que se guardó la primera vez
             (no cambia aunque un proveedor la mande otra vez con otra fecha).
+        event_date: Fecha de lo que informa, según la IA, si ya se leyó.
     """
 
     article_id: int
@@ -242,6 +243,7 @@ class StoredArticle:
     concept_ids: frozenset[int] = frozenset()
     primary_code: str | None = None
     published_at: datetime | None = None
+    event_date: date | None = None
 
     def reusable_for(self, prompt_version: str, concept_ids: frozenset[int]) -> bool:
         """Dice si su enriquecimiento sirve para esta búsqueda (caché de §10).

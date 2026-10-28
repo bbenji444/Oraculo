@@ -1,6 +1,6 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v2.md`` para
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v3.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
 caso) y su respuesta se valida con el mismo modelo de Pydantic
@@ -35,7 +35,10 @@ from app.domain.region import RegionLevel
 
 # v2 (21/10/2026): pide el municipio de cada colonia o calle, marca al menos
 # un lugar del hecho y fecha el hecho original en avances de casos (ADR-0020).
-PROMPT_VERSION = "enrich_v2"
+# v3 (28/10/2026): la fecha y el tipo son los de lo que la nota informa (la
+# sentencia de hoy, no el delito de 2019), para que las corridas dejen fuera
+# solo los hechos de otros días (ADR-0031).
+PROMPT_VERSION = "enrich_v3"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 # Respuestas consistentes: se extraen datos, no se escribe creativo.
 TEMPERATURE = 0.2

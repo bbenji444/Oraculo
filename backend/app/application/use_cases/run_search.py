@@ -32,9 +32,11 @@ No hace: no decide cuándo correr (lo lanza la tarea de Celery o el comando
 import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from uuid import UUID
 
 from app.application.audit import Actor
+from app.application.clock import MEXICO_CITY
 from app.application.ports.geocoding import GazetteerPort
 from app.application.ports.llm import (
     ClassificationError,
@@ -304,6 +306,7 @@ class RunSearch:
         work = await self._dedupe(search, tally, execution)
         pending = await self._extract(search, tally, work)
         await self._enrich(search, tally, pending)
+        work = self._drop_older_events(search, tally, work)
         await self._geolocate(search, tally, work, searched)
         return await self._close(search, tally, execution, work, searched)
 
@@ -360,6 +363,39 @@ class RunSearch:
         tally.extra["articles"] = len(work)
         tally.extra["known"] = sum(1 for w in work if w.item.known_id is not None)
         return work
+
+    @staticmethod
+    def _drop_older_events(search: StoredSearch, tally: _Tally, work: list[_Work]) -> list[_Work]:
+        """En una corrida, quita las notas cuyo hecho es de antes de su periodo.
+
+        Benji, 28/10/2026: «no quiero que al ver una corrida me salgan noticias
+        de otros días». La IA dice la fecha de lo que informa la nota
+        (``enrich_v3``): la sentencia que se dictó hoy entra aunque el delito
+        sea de 2019; el cateo de ayer, publicado hoy, no. Se compara por día
+        en la Ciudad de México: la fecha del hecho no trae hora. Sin fecha
+        (la IA no la supo o no leyó la nota), la nota se queda.
+
+        Args:
+            search: La búsqueda; solo filtra si es una corrida con ventana.
+            tally: Conteos (suma ``older_event``).
+            work: Notas ya leídas por la IA.
+
+        Returns:
+            Las notas que le tocan a la corrida.
+        """
+        window = search.time_window
+        if window is None:
+            return work
+        first_day = window.start.astimezone(MEXICO_CITY).date()
+
+        def event_date(w: _Work) -> date | None:
+            if w.result is not None:
+                return w.result.enrichment.event_date
+            return w.stored.event_date
+
+        kept = [w for w in work if (day := event_date(w)) is None or day >= first_day]
+        tally.extra["older_event"] = len(work) - len(kept)
+        return kept
 
     async def _extract(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> list[_Work]:
         """Lee el texto de las notas que hay que enriquecer (respetando el tope)."""
