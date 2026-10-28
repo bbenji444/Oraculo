@@ -652,6 +652,81 @@
   box-shadow: 0 0 12px var(--hud-rose);
 }
 
+/* --- Barrido vivo (28/10/2026) ------------------------------------------------ */
+
+/* Ráfaga de luz que corre por el tramo recorrido hacia la etapa en curso. */
+.mando-rail-flow {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mando-rail-comet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 22%;
+  min-width: 40px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.95), transparent);
+  transform: translateX(-100%);
+  animation: mando-comet 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+/* El nodo en curso: un aro que gira alrededor (conic con un hueco). */
+.mando-node[data-state='active'] .mando-node-dot::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 55%, var(--hud-cyan) 85%, #fff 100%);
+  mask: radial-gradient(circle, transparent 0 calc(50% - 2px), #000 calc(50% - 1.5px));
+  animation: hud-spin 1.1s linear infinite;
+}
+/* Etiqueta de la etapa en curso: con brillo. */
+.mando-node[data-state='active'] {
+  text-shadow: 0 0 10px rgb(0 210 255 / 0.8);
+}
+/* Terminada: la palomita entra con un brinco. */
+.mando-node-check {
+  position: absolute;
+  inset: 2px;
+  color: #04121a;
+  animation: mando-pop 0.5s var(--hud-ease) both;
+}
+.mando-node[data-state='done'] .mando-node-dot {
+  background: var(--hud-cyan);
+  animation: mando-pop 0.5s var(--hud-ease) both;
+}
+/* Las que faltan laten en ola, una tras otra (--i: distancia a la en curso). */
+.mando-node[data-state='todo'] .mando-node-dot {
+  animation: mando-wait 2.4s ease-in-out calc(var(--i, 1) * 0.18s) infinite;
+}
+/* Cursor que parpadea al final del último renglón de la bitácora. */
+.mando-log-line[data-last]::after {
+  content: '▌';
+  margin-left: 2px;
+  color: var(--hud-cyan);
+  animation: mando-blink 1s steps(1) infinite;
+}
+/* Franja de escaneo que recorre la consola mientras busca. */
+.mando-sweeping {
+  overflow: hidden;
+}
+.mando-scanline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  width: 18%;
+  background: linear-gradient(90deg, transparent, rgb(0 210 255 / 0.07), transparent);
+  pointer-events: none;
+  transform: translateX(-100%);
+  animation: mando-scanline 3.8s linear infinite;
+}
+
 /* Renglón nuevo de la bitácora. */
 .mando-log-line {
   animation: mando-type 0.5s var(--hud-ease) both;
@@ -988,6 +1063,48 @@
   }
 }
 
+@keyframes mando-comet {
+  to {
+    transform: translateX(520%);
+  }
+}
+
+@keyframes mando-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mando-wait {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@keyframes mando-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes mando-scanline {
+  to {
+    transform: translateX(650%);
+  }
+}
+
 @keyframes mando-shine {
   0% {
     transform: translateX(-120%);
@@ -1175,6 +1292,13 @@
   .mando-launch-wrap[data-ready] > .hud-btn:not(:disabled),
   .mando-recent,
   .mando-node[data-state='active'] .mando-node-dot::after,
+  .mando-node[data-state='active'] .mando-node-dot::before,
+  .mando-node[data-state='done'] .mando-node-dot,
+  .mando-node[data-state='todo'] .mando-node-dot,
+  .mando-node-check,
+  .mando-rail-comet,
+  .mando-scanline,
+  .mando-log-line[data-last]::after,
   .mando-log-line,
   .mando-scan,
   .mando-scan-sweep,
