@@ -334,7 +334,7 @@ export function stageIndex(search: Pick<Search, 'status' | 'progress'>): number 
  * Bitácora del barrido: un renglón por etapa alcanzada, con los números que
  * ya se conocen. La última línea es la etapa en curso.
  *
- * @example missionLog(busqueda) // ['Plan: 4 consultas', 'Fuentes consultadas: 102 notas', …]
+ * @example missionLog(busqueda) // ['Plan: 4 consultas', 'Notas encontradas: 102 (la IA decide cuáles sirven)', …]
  */
 export function missionLog(
   search: Pick<Search, 'status' | 'progress' | 'queries_planned' | 'results_count'>,
@@ -348,15 +348,19 @@ export function missionLog(
   if (at('query')) {
     lines.push(
       progress.articles !== undefined && STAGES.indexOf('query') < reached
-        ? `Fuentes consultadas: ${String(progress.articles)} notas`
+        ? // Son las que se van a revisar, no los resultados: Benji pensó que
+          // «Fuentes consultadas: 512 notas» eran 512 resultados (28/10/2026).
+          `Notas encontradas: ${String(progress.articles)} (la IA decide cuáles sirven)`
         : 'Consultando fuentes…',
     );
   }
   if (at('extract')) lines.push(STAGE_LABEL.extract ?? 'Leyendo notas');
   if (at('enrich')) {
     const pending = (progress.articles ?? 0) - (progress.reused ?? 0);
-    const reused = progress.reused ? ` · ${String(progress.reused)} ya conocidas` : '';
-    lines.push(`IA: ${String(progress.enriched ?? 0)} de ${String(Math.max(0, pending))}${reused}`);
+    const reused = progress.reused ? ` · ${String(progress.reused)} ya leídas antes` : '';
+    lines.push(
+      `IA leyendo: ${String(progress.enriched ?? 0)} de ${String(Math.max(0, pending))} nuevas${reused}`,
+    );
   }
   if (at('geocode')) lines.push(STAGE_LABEL.geocode ?? 'Ubicando');
   if (at('filter') && progress.in_region !== undefined) {

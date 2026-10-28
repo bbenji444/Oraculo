@@ -189,9 +189,9 @@ describe('avance del barrido', () => {
       ),
     ).toEqual([
       'Plan: 4 consultas',
-      'Fuentes consultadas: 30 notas',
+      'Notas encontradas: 30 (la IA decide cuáles sirven)',
       'Leyendo el texto de las notas',
-      'IA: 5 de 20 · 10 ya conocidas',
+      'IA leyendo: 5 de 20 nuevas · 10 ya leídas antes',
     ]);
     const done = missionLog(
       search({ progress: { articles: 30, in_region: 25, out_of_region: 3, unlocated: 2 } }),

@@ -501,8 +501,13 @@ export function MissionDock({ active }: MissionDockProps) {
 
   if (search && !finished) {
     return (
-      <section aria-label="Centro de mando" className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}>
+      <section
+        aria-label="Centro de mando"
+        className={`${MANDO_GLASS} mando-dock mando-sweeping px-4 pb-3 pt-3`}
+      >
         <span aria-hidden="true" className="mando-beam" />
+        {/* Mientras busca, una franja de luz recorre la consola de lado a lado. */}
+        <span aria-hidden="true" className="mando-scanline" />
         <header className="mb-3 flex items-center gap-3">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />
           <span className="mando-kicker">Barrido en curso · {missionLabel(search)}</span>

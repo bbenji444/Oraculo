@@ -61,7 +61,7 @@ describe('MissionProgress', () => {
   it('escribe en la bitácora lo último que se sabe', () => {
     render(<MissionProgress search={search()} />);
     const log = screen.getByRole('list', { name: 'Bitácora del barrido' });
-    expect(within(log).getByText('IA: 5 de 20 · 10 ya conocidas')).toBeTruthy();
+    expect(within(log).getByText('IA leyendo: 5 de 20 nuevas · 10 ya leídas antes')).toBeTruthy();
   });
 
   it('marca en rojo la etapa donde se cayó el barrido', () => {

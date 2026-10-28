@@ -132,6 +132,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **La espera del barrido, más viva y más clara (28/10/2026).** Mientras se busca:
+  - una ráfaga de luz corre por las etapas ya hechas;
+  - la etapa en curso tiene un aro que gira;
+  - las terminadas se encienden con una palomita;
+  - las que faltan laten en ola;
+  - la bitácora escribe con cursor y una franja de escaneo recorre la consola.
+
+  La bitácora ya no dice «Fuentes consultadas: 512 notas», que parecía 512 resultados. Dice «Notas encontradas: 512 (la IA decide cuáles sirven)» e «IA leyendo: 110 de 295 nuevas · 217 ya leídas antes».
 - **El PDF responde las preguntas del analista (28/10/2026, ADR-0033).** Cada bloque abre con una pregunta numerada, su gráfica y una línea de conclusión:
   - ¿Qué pasó?
   - ¿Qué es lo más importante?

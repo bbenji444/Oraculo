@@ -129,3 +129,13 @@ Benji pidió estos ajustes al elegirlo:
   - el costo en un renglón de tres cifras;
   - márgenes más cortos.
 - **«Dentro de zona» y «Fuera de zona»** en el filtro de ubicación, en un solo renglón.
+
+## Décimos ajustes (28/10/2026, noche)
+
+- **Espera viva.** Benji: «darle un poquito más de animación o dinamismo… que se vea chida la espera».
+  - Una ráfaga de luz corre por el tramo ya recorrido del riel.
+  - El nodo en curso tiene un aro que gira; los terminados entran con una palomita y los pendientes laten en ola.
+  - La bitácora lleva cursor y una franja de escaneo cruza la consola.
+
+  Todo es `transform` y `opacity`, y se apaga con «reducir animaciones».
+- **Bitácora sin confusión.** «Notas encontradas: N (la IA decide cuáles sirven)», en lugar de «Fuentes consultadas: N notas»: Benji entendió que eran N resultados.
