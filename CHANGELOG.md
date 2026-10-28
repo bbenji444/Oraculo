@@ -8,12 +8,23 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
-- **Consola del Centro de mando en tres zonas (28/10/2026).** Las tres zonas ya no se pisan; antes, «Abrir resultados anteriores» se encimaba con el costo y no dejaba elegir las fichas:
-  - a la izquierda, un radar grande: cian mientras se arma la consulta, verde y más rápido cuando ya se puede lanzar;
-  - al centro, la frase y, en su propio renglón, los resultados anteriores, que se deslizan de lado si no caben (también con la rueda del mouse);
-  - a la derecha, el costo en tres láminas de color y «Iniciar barrido», que respira cuando la consulta está lista.
+- **Calendario con el estilo del sistema (28/10/2026, `HudDatePicker`).** «Desde» y «Hasta» ya no abren el calendario gris del navegador. Ahora el calendario es propio:
+  - vidrio oscuro y días que se iluminan al pasar el mouse;
+  - hoy con un punto, el día elegido brillando y una banda entre las dos fechas;
+  - el mes cambia deslizándose;
+  - no deja elegir días después de hoy, ni un «hasta» antes del «desde».
 
-  Si la consola es angosta (con el expediente abierto), el radar se oculta y el lanzamiento baja.
+  Se usa con el mouse o con el teclado.
+- **Consola del Centro de mando en tres zonas, sin textos cortados (28/10/2026).** Antes, «Abrir resultados anteriores» se encimaba con el costo, y había textos a medias: «CENTRO DE MAND…», «CONSU…», «Tu búsqueda del 27…». Ahora:
+  - arriba, a todo el ancho, el título completo, la próxima corrida y el reloj;
+  - en medio:
+    - un radar grande, cian mientras se arma la consulta y verde cuando ya se puede lanzar;
+    - la frase;
+    - el costo en renglones con su nombre completo (consultas, créditos, IA máximo) y «Iniciar barrido», que respira cuando está lista;
+  - abajo, a todo el ancho, la última corrida y las dos búsquedas más recientes, completas.
+
+  La fuente de la frase dice solo «Fuente»; el detalle sale al pasar el mouse.
+
 - **«Filtro» en una ventana al centro de la pantalla (28/10/2026).** Un solo botón «Filtro» abre la ventana, sobre un fondo oscuro, para filtrar por:
   - categoría: cuadros de color en una cuadrícula ordenada, una o varias;
   - estado: lista desplegable;

@@ -9,6 +9,7 @@ Son las piezas visuales que comparten todas las pantallas del monitor. Los estil
 | `HudChip`        | Estados y etiquetas (abierto, reservado, categoría)                     | Se enciende; con `live`, su punto late como radar                              |
 | `HudSegmented`   | Elegir una opción de pocas (Hoy · 7 días · 30 días)                     | Una pastilla de luz se desliza a la elegida                                    |
 | `HudSelect`      | Todos los menús desplegables (en lugar de `<select>`)                   | La lista se despliega, la opción activa se ilumina y la elegida lleva palomita |
+| `HudDatePicker`  | Fechas (en lugar de `<input type="date">`)                              | Los días se iluminan; el elegido brilla y el mes cambia deslizándose           |
 | `HudSwitch`      | Encender o apagar (fuentes)                                             | El punto viaja y se enciende                                                   |
 | `HudTabs`        | Pestañas del encabezado                                                 | Una barra de luz sigue al mouse; los nombres se descifran                      |
 | `CountUp`        | Cifras                                                                  | Corren hasta su valor al aparecer o cambiar                                    |

@@ -784,6 +784,141 @@
   background: rgb(0 210 255 / 0.35);
 }
 
+/* Calendario (HudDatePicker): el mismo vidrio oscuro del menú desplegable,
+   con días que se iluminan, hoy con un aro y el elegido brillando. */
+.hud-date {
+  font-variant-numeric: tabular-nums;
+}
+.hud-calendar {
+  position: fixed;
+  z-index: 70;
+  display: grid;
+  gap: 0.55rem;
+  border: 1px solid rgb(0 210 255 / 0.35);
+  border-radius: 14px;
+  padding: 0.75rem;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgb(0 210 255 / 0.1), transparent 60%),
+    linear-gradient(180deg, rgb(8 22 30 / 0.98), rgb(3 9 12 / 0.98));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    0 0 30px rgb(0 210 255 / 0.2),
+    0 22px 44px -16px rgb(0 0 0 / 0.9);
+  transform-origin: top left;
+  animation: hud-menu-in 0.24s var(--hud-ease) both;
+}
+.hud-calendar[data-above='true'] {
+  transform-origin: bottom left;
+  animation-name: hud-menu-in-up;
+}
+.hud-calendar-title {
+  color: var(--hud-ink);
+  font: 600 11px/1 var(--font-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgb(0 210 255 / 0.5);
+  animation: hud-calendar-title 0.45s var(--hud-ease) both;
+}
+.hud-calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  color: rgb(0 210 255 / 0.7);
+  font: 600 9.5px/1 var(--font-display);
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+/* Al cambiar de mes, los días entran del lado al que se va (--dir: 1 o -1). */
+.hud-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  animation: hud-calendar-slide 0.35s var(--hud-ease) both;
+}
+.hud-calendar-day {
+  position: relative;
+  display: grid;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #c4e3e8;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--hud-ease),
+    background-color 0.2s var(--hud-ease),
+    border-color 0.2s var(--hud-ease),
+    box-shadow 0.2s var(--hud-ease),
+    color 0.2s var(--hud-ease);
+}
+.hud-calendar-day[data-outside] {
+  color: rgb(148 163 184 / 0.4);
+}
+.hud-calendar-day:hover:not(:disabled),
+.hud-calendar-day:focus-visible {
+  border-color: rgb(0 210 255 / 0.55);
+  background: rgb(0 210 255 / 0.12);
+  box-shadow: 0 0 14px rgb(0 210 255 / 0.3);
+  color: #fff;
+  outline: none;
+  transform: translateY(-1px);
+}
+.hud-calendar-day:disabled {
+  color: rgb(100 116 139 / 0.35);
+  cursor: not-allowed;
+}
+/* Los días entre «desde» y «hasta»: una banda tenue. */
+.hud-calendar-day[data-band] {
+  border-radius: 4px;
+  background: rgb(0 210 255 / 0.08);
+}
+.hud-calendar-day[data-edge] {
+  border-color: rgb(0 210 255 / 0.45);
+  background: rgb(0 210 255 / 0.14);
+}
+.hud-calendar-day[data-today]::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--hud-cyan);
+  box-shadow: 0 0 6px var(--hud-cyan);
+  translate: -50% 0;
+}
+.hud-calendar-day[aria-pressed='true'] {
+  border-color: var(--hud-cyan);
+  background: linear-gradient(180deg, rgb(0 210 255 / 0.55), rgb(0 150 200 / 0.4));
+  box-shadow:
+    0 0 0 1px rgb(0 210 255 / 0.35),
+    0 0 18px rgb(0 210 255 / 0.55);
+  color: #fff;
+  font-weight: 700;
+  animation: hud-calendar-pick 0.4s var(--hud-ease);
+}
+.hud-calendar-link {
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  color: rgb(125 211 252);
+  font-size: 11.5px;
+  transition:
+    color 0.2s var(--hud-ease),
+    background-color 0.2s var(--hud-ease);
+}
+.hud-calendar-link:hover:not(:disabled),
+.hud-calendar-link:focus-visible {
+  background: rgb(0 210 255 / 0.1);
+  color: #fff;
+  outline: none;
+}
+.hud-calendar-link:disabled {
+  opacity: 0.4;
+}
+
 /* Cada opción: al pasar el mouse (o con las flechas) se ilumina, aparece una
    barra de luz a la izquierda y el texto se recorre un poco. */
 .hud-menu-option {
@@ -1157,6 +1292,39 @@
   }
 }
 
+@keyframes hud-calendar-slide {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 1) * 18px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hud-calendar-title {
+  from {
+    opacity: 0;
+    letter-spacing: 0.45em;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hud-calendar-pick {
+  0% {
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
+}
+
 @keyframes hud-menu-in {
   from {
     opacity: 0;
@@ -1238,6 +1406,7 @@
   .hud-select,
   .hud-select-chevron,
   .hud-menu-option,
+  .hud-calendar-day,
   .hud-trow,
   .hud-subtab,
   .hud-subtab::after {
@@ -1258,6 +1427,10 @@
   .hud-empty,
   .hud-menu,
   .hud-menu-option,
+  .hud-calendar,
+  .hud-calendar-title,
+  .hud-calendar-grid,
+  .hud-calendar-day[aria-pressed='true'],
   .hud-progress::after {
     animation: none;
   }
