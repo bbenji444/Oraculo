@@ -86,7 +86,6 @@ _DEFAULT_NGRAMS_DELAY_MINUTES = 3
 _DEFAULT_AUTOMATIC_RUN_HOURS = "7,15,23"
 _DEFAULT_AUTOMATIC_CONCEPT = "Fiscalia General de la Republica"
 _DEFAULT_AUTOMATIC_REGION_CODE = "MEX"
-_DEFAULT_AUTOMATIC_WINDOW_DAYS = 1
 _DEFAULT_AUTOMATIC_USER = "monitor-automatico"
 # Tope de notas nuevas que la IA lee en cada corrida automática. La de las 15:00
 # del 27/10/2026 llegó al tope general de 150 y 10 notas esperaron a la
@@ -256,11 +255,6 @@ class Settings(BaseSettings):
     automatic_concept: str = _DEFAULT_AUTOMATIC_CONCEPT
     automatic_region_code: str = _DEFAULT_AUTOMATIC_REGION_CODE
     automatic_sources: str = "google_news_rss,indice_local"
-    # Cada corrida cubre solo desde la anterior (de 23:00 a 07:00, de 07:00 a
-    # 15:00 y de 15:00 a 23:00; Benji, 28/10/2026). Si las anteriores no
-    # terminaron, cubre desde la última que sí, pero nunca más atrás que estos
-    # días.
-    automatic_window_days: int = Field(default=_DEFAULT_AUTOMATIC_WINDOW_DAYS, ge=1, le=7)
     # Minutos extra antes del inicio, para notas que los buscadores muestran
     # tarde. 0 = estricto, lo que pidió Benji.
     automatic_window_margin_minutes: int = Field(default=0, ge=0, le=120)

@@ -170,6 +170,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Cada corrida trae solo las notas de su periodo, aunque la anterior falle (28/10/2026).** Si una corrida no terminaba, la siguiente cubría desde la última que sí, y podía traer notas de otro periodo. Ahora la ventana es siempre la misma (ADR-0031):
+  - la de las 07:00, de las 23:00 a las 07:00;
+  - la de las 15:00, de 07:00 a 15:00;
+  - la de las 23:00, de 15:00 a 23:00.
+
+  Se quitó `AUTOMATIC_WINDOW_DAYS`.
 - **Al elegir un país, el globo se acerca a él (28/10/2026).** En el Centro de mando, el vuelo seguía apartando la columna de búsqueda del diseño 2, que ahí no existe. Por eso Estados Unidos o Argentina quedaban corridos al oeste y más lejos que antes. Ahora el país queda al centro del espacio libre y lo llena, con poco margen.
 - **La entrada del globo llega directo a su lugar (28/10/2026).** Al abrir el sistema la Tierra giraba, se detenía y luego se recorría hacia arriba y cambiaba de tamaño, porque terminaba en un zoom fijo y después se reacomodaba al espacio libre. Ahora la entrada calcula desde el principio el zoom y el margen finales y llega ahí sin segundo ajuste.
 - **Elegir un país o una región en el Centro de mando ya hace zoom directo a él (27/10/2026).** Antes, al llegar a un país (zoom menor a 3), cualquier cambio de alto de la consola volvía a ajustar el globo entero y lo alejaba. Ahora ese ajuste solo aplica en la vista general, sin región ni nota elegida.

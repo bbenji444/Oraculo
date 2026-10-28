@@ -742,5 +742,3 @@ async def test_la_corrida_guarda_sus_horas_y_sabe_desde_cuando_cubrir(
     assert loaded is not None
     assert loaded.time_window == window
     assert (detail.window_start, detail.window_end) == (night, morning)
-    # La que falló no cuenta: la siguiente cubre desde la última que terminó.
-    assert await searches.last_finished_automatic_slot(morning + timedelta(hours=16)) == morning

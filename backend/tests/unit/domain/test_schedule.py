@@ -67,7 +67,6 @@ def test_las_horas_de_la_cdmx_en_utc() -> None:
 
 
 HOURS = (7, 15, 23)
-DAY = timedelta(days=1)
 
 
 def cdmx(day: int, hour: int, minute: int = 0) -> datetime:
@@ -85,25 +84,20 @@ def cdmx(day: int, hour: int, minute: int = 0) -> datetime:
 )
 def test_cada_corrida_cubre_solo_desde_la_anterior(slot: datetime, start: datetime) -> None:
     assert previous_slot(slot, HOURS) == start
-    assert run_window(slot, HOURS, start, DAY) == RunWindow(start, slot)
+    assert run_window(slot, HOURS) == RunWindow(start, slot)
 
 
-def test_si_la_anterior_fallo_cubre_desde_la_ultima_que_termino() -> None:
-    # La de las 15:00 no terminó: la de las 23:00 cubre desde las 07:00.
-    window = run_window(cdmx(28, 23), HOURS, cdmx(28, 7), DAY)
-    assert window.start == cdmx(28, 7)
-
-
-def test_nunca_mira_mas_atras_del_tope() -> None:
-    # El servidor estuvo apagado tres días: se mira solo un día hacia atrás.
-    window = run_window(cdmx(28, 15), HOURS, cdmx(25, 7), DAY)
-    assert window.start == cdmx(27, 15)
-    # Sin ninguna corrida terminada, desde la programada anterior.
-    assert run_window(cdmx(28, 15), HOURS, None, DAY).start == cdmx(28, 7)
+def test_aunque_la_anterior_haya_fallado_cubre_solo_su_periodo() -> None:
+    # Antes, si la de las 15:00 fallaba, la de las 23:00 cubría desde las 07:00
+    # y salían notas de otro periodo (Benji, 28/10/2026: «únicamente deben de
+    # salir las noticias del periodo anterior al periodo actual»).
+    window = run_window(cdmx(28, 23), HOURS)
+    assert window == RunWindow(cdmx(28, 15), cdmx(28, 23))
+    assert not window.contains(cdmx(28, 14, 59))
 
 
 def test_el_margen_es_opcional() -> None:
-    window = run_window(cdmx(28, 15), HOURS, cdmx(28, 7), DAY, timedelta(minutes=30))
+    window = run_window(cdmx(28, 15), HOURS, timedelta(minutes=30))
     assert window.start == cdmx(28, 6, 30)
 
 

@@ -50,8 +50,6 @@ class AutomaticProfile:
         concept: Nombre del concepto que se busca.
         region_code: Clave de la región (``MEX``: todo México).
         sources: Fuentes, siempre las mismas para que las corridas se comparen.
-        window_days: Lo más que mira hacia atrás una corrida, en días, si las
-            anteriores no terminaron (normalmente cubre solo desde la anterior).
         user_id: Firma de las corridas en la bitácora.
         run_hours: Horarios de las corridas (``parse_run_hours``).
         margin_minutes: Minutos extra antes del inicio de la ventana; 0 es
@@ -61,7 +59,6 @@ class AutomaticProfile:
     concept: str
     region_code: str
     sources: tuple[Provider, ...]
-    window_days: int
     user_id: str
     run_hours: tuple[int, ...] = (7, 15, 23)
     margin_minutes: int = 0
@@ -87,9 +84,7 @@ class PrepareAutomaticRun:
         self._regions = regions
         self._profile = profile
 
-    async def request(
-        self, scheduled_for: datetime, last_finished: datetime | None = None
-    ) -> SearchRequest:
+    async def request(self, scheduled_for: datetime) -> SearchRequest:
         """La petición de la corrida programada para ``scheduled_for``.
 
         Cubre solo las horas desde la corrida anterior (``run_window``): la de
@@ -98,7 +93,6 @@ class PrepareAutomaticRun:
 
         Args:
             scheduled_for: Hora programada de la corrida (CDMX).
-            last_finished: Hora programada de la última corrida que terminó.
 
         Returns:
             La petición, marcada como automática.
@@ -116,8 +110,6 @@ class PrepareAutomaticRun:
         hours = run_window(
             scheduled_for,
             self._profile.run_hours,
-            last_finished,
-            timedelta(days=self._profile.window_days),
             timedelta(minutes=self._profile.margin_minutes),
         )
         local_start = hours.start.astimezone(MEXICO_CITY)

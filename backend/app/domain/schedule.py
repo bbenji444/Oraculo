@@ -134,22 +134,19 @@ def previous_slot(slot: datetime, hours: tuple[int, ...]) -> datetime:
 def run_window(
     slot: datetime,
     hours: tuple[int, ...],
-    last_finished: datetime | None,
-    max_back: timedelta,
     margin: timedelta = timedelta(0),
 ) -> RunWindow:
     """Las horas que cubre la corrida programada para ``slot``.
 
-    Empieza en la corrida programada anterior. Si esa no terminó (el
-    servidor estaba apagado o falló), empieza en la última que sí terminó,
-    para no perder lo de en medio, pero nunca más atrás que ``max_back``.
+    Siempre de la corrida programada anterior a esta, aunque la anterior no
+    haya terminado. Antes, si una fallaba, la siguiente cubría desde la
+    última que sí terminó y traía notas de otro periodo; Benji pidió que cada
+    corrida muestre solo «el periodo anterior al periodo actual»
+    (28/10/2026).
 
     Args:
         slot: Hora programada de esta corrida.
         hours: Horarios de las corridas (``parse_run_hours``).
-        last_finished: Hora programada de la última corrida automática que
-            terminó, o ``None`` si nunca ha terminado una.
-        max_back: Lo más que se mira hacia atrás.
         margin: Tiempo extra antes del inicio, para notas que los buscadores
             muestran tarde (0 = estricto, la decisión de Benji).
 
@@ -157,12 +154,7 @@ def run_window(
         La ventana de la corrida.
 
     Example:
-        >>> run_window(datetime(2026, 10, 28, 15), (7, 15, 23), datetime(2026, 10, 28, 7),
-        ...            timedelta(days=1)).start
-        datetime.datetime(2026, 10, 28, 7, 0)
+        >>> run_window(datetime(2026, 10, 28, 7), (7, 15, 23)).start
+        datetime.datetime(2026, 10, 27, 23, 0)
     """
-    start = previous_slot(slot, hours)
-    if last_finished is not None and last_finished < start:
-        start = last_finished
-    start = max(start, slot - max_back)
-    return RunWindow(start - margin, slot)
+    return RunWindow(previous_slot(slot, hours) - margin, slot)
