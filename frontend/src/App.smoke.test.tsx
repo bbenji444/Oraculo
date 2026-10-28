@@ -193,13 +193,13 @@ afterEach(() => {
 const POLL_WAIT = { timeout: 5000 };
 
 describe('flujo principal (H1, Centro de mando)', () => {
-  it('armar la misión en Jalisco, seguir el barrido y abrir una nota', async () => {
+  it('armar la consulta en Jalisco, seguir el barrido y abrir una nota', async () => {
     renderApp();
 
     // 1. Región: «/» abre su tarjeta con el cursor en el buscador.
     expect(screen.getByRole('button', { name: /^Dónde: elige una región/ })).toBeTruthy();
     fireEvent.keyDown(window, { key: '/' });
-    const where = screen.getByRole('dialog', { name: 'Ajustar la misión: Dónde' });
+    const where = screen.getByRole('dialog', { name: 'Ajustar la consulta: Dónde' });
     const finder = within(where).getByRole('combobox', {
       name: 'Buscar estado, municipio o localidad',
     });
@@ -218,7 +218,7 @@ describe('flujo principal (H1, Centro de mando)', () => {
 
     // 3. El costo se ve antes de gastar: 2 consultas y 1 crédito. Mientras la
     //    cifra corre, el número real queda para el lector de pantalla.
-    const dock = screen.getByRole('region', { name: 'Consola de misión' });
+    const dock = screen.getByRole('region', { name: 'Centro de mando' });
     const figure = (label: string) => {
       const value = within(dock).getByText(label).nextElementSibling;
       if (!(value instanceof HTMLElement)) throw new Error(label);
@@ -235,17 +235,25 @@ describe('flujo principal (H1, Centro de mando)', () => {
     expect(screen.getByRole('listitem', { current: 'step' }).textContent).toBe('IA');
     expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
 
-    // 5. Al terminar: letrero sobre el globo, renglón de la misión y expediente.
+    // 5. Al terminar: letrero sobre el globo, renglón de la consulta y expediente.
     const dossier = await screen.findByRole(
       'complementary',
-      { name: 'Expediente de la misión' },
+      { name: 'Expediente de la consulta' },
       POLL_WAIT,
     );
     expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
-    expect(screen.getByRole('region', { name: 'Consola de misión' }).textContent).toContain(
+    expect(screen.getByRole('region', { name: 'Centro de mando' }).textContent).toContain(
       '18 notas',
     );
-    expect(within(dossier).getByRole('region', { name: 'Cronología' })).toBeTruthy();
+    // Elegir un hecho de la cronología abre su nota en el globo (Benji vio que
+    // a veces no pasaba nada, 27/10/2026).
+    const chronology = within(dossier).getByRole('region', { name: 'Cronología' });
+    const [firstDay] = within(chronology).getAllByRole('list', { name: /^Hechos del/ });
+    if (!firstDay) throw new Error('La cronología debería tener al menos un día.');
+    const [firstFact] = within(firstDay).getAllByRole('button', { expanded: false });
+    if (!firstFact) throw new Error('El día debería tener al menos un hecho.');
+    fireEvent.click(firstFact);
+    expect(await within(screen.getByTestId('globo')).findByRole('article')).toBeTruthy();
 
     // 6. «Noticias» cambia la cronología por la lista; globo y lista, las mismas.
     fireEvent.click(within(dossier).getByRole('button', { name: 'Noticias' }));
@@ -256,10 +264,12 @@ describe('flujo principal (H1, Centro de mando)', () => {
       expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
     });
 
-    // 7. El resumen se pliega aparte para dar todo el alto a la lista.
-    expect(within(dossier).getByRole('button', { name: 'Reporte (PDF)' })).toBeTruthy();
+    // 7. El resumen se pliega aparte para dar todo el alto a la lista; el PDF
+    //    sigue a la mano junto a las pestañas.
+    expect(within(dossier).getByText('Estados')).toBeTruthy();
     fireEvent.click(within(dossier).getByRole('button', { name: 'Plegar el resumen' }));
-    expect(within(dossier).queryByRole('button', { name: 'Reporte (PDF)' })).toBeNull();
+    expect(within(dossier).queryByText('Estados')).toBeNull();
+    expect(within(dossier).getByRole('button', { name: 'Reporte (PDF)' })).toBeTruthy();
     expect(within(dossier).getByRole('region', { name: 'Noticias' })).toBe(list);
     fireEvent.click(within(dossier).getByRole('button', { name: 'Desplegar el resumen' }));
 
@@ -288,9 +298,9 @@ describe('flujo principal (H1, Centro de mando)', () => {
 
     // 10. «›» oculta el expediente y una pestaña en el borde lo regresa.
     fireEvent.click(within(dossier).getByRole('button', { name: 'Ocultar el expediente' }));
-    expect(screen.queryByRole('complementary', { name: 'Expediente de la misión' })).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Expediente de la consulta' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Expediente ·/ }));
-    expect(screen.getByRole('complementary', { name: 'Expediente de la misión' })).toBeTruthy();
+    expect(screen.getByRole('complementary', { name: 'Expediente de la consulta' })).toBeTruthy();
   }, 15000);
 
   it('reabrir una búsqueda del Historial no gasta nada', async () => {
@@ -300,7 +310,8 @@ describe('flujo principal (H1, Centro de mando)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Abrir en el globo' }));
 
     expect(await screen.findByRole('region', { name: 'Cronología' }, POLL_WAIT)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
+    // En el Centro de mando la lista va en una pestaña del expediente.
+    fireEvent.click(screen.getByRole('button', { name: 'Noticias' }));
     expect(await screen.findByRole('region', { name: 'Noticias' })).toBeTruthy();
     expect(window.location.hash).toBe('#/explorar');
     expect(startBodies).toEqual([]);

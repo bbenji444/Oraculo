@@ -1,6 +1,6 @@
 /**
  * Lógica pura del diseño «Centro de mando» (diseño 3, 27/10/2026): la frase
- * de la misión, la hora de la próxima corrida automática, las misiones
+ * de la consulta, la hora de la próxima corrida automática, las consultas
  * recientes y la bitácora del barrido.
  *
  * Benji pidió una búsqueda «muy personalizada» que se sienta de un sistema
@@ -37,7 +37,7 @@ const SIGLA_SKIP = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'en', 'y', 'e
 const SHORT_NAME_MAX = 18;
 
 /**
- * Nombre corto de un concepto, para las fichas de misiones recientes.
+ * Nombre corto de un concepto, para las fichas de consultas recientes.
  *
  * @example shortConcept('Fiscalía General de la República') // 'FGR'
  * @example shortConcept('Extorsión') // 'Extorsión'
@@ -211,7 +211,7 @@ export function missionLabel(
   return `${concepts} · ${search.region_name} · ${String(days)} ${days === 1 ? 'día' : 'días'}`;
 }
 
-// Cuántas misiones recientes caben en la consola sin saturarla.
+// Cuántas consultas recientes caben en la consola sin saturarla.
 export const RECENT_MISSIONS = 3;
 
 /**

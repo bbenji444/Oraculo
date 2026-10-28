@@ -13,7 +13,12 @@
  * - **La línea**: una línea vertical luminosa con la hora a la izquierda y
  *   cada hecho a la derecha, del más reciente al más viejo, agrupados por
  *   día. El mismo hecho en varios medios es una sola entrada («+7 medios»).
- *   Un clic vuela el globo hacia la nota.
+ *   Un clic vuela el globo hacia la nota del hecho mejor ubicada
+ *   (`mapLead`); si ninguna dice dónde pasó, el renglón lo avisa («sin
+ *   lugar») y la ficha se abre sin vuelo.
+ * - **Dos acomodos**: el panel de la columna (`variant="column"`) y el
+ *   expediente del Centro de mando (`variant="dossier"`), más compacto para
+ *   que quepan más noticias (Benji, 27/10/2026).
  *
  * Los filtros viven en `useTimelineStore` y `ExplorePage` los aplica a la lista
  * que usa el globo, así todo queda sincronizado. El globo queda libre en el
@@ -26,16 +31,19 @@ import { type Ref, useEffect, useMemo, useRef, useState } from 'react';
 import type { Article } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
+import { hasMapPoint } from '../../map/newsLayers';
 import {
   applyTimeline,
   buildTimeline,
   categoriesIn,
+  mapLead,
   statesIn,
   type StoryItem,
   storyItems,
   type TimelineBucket,
   type TimelineUnit,
 } from './timelineData';
+import { CategoryTag } from './CategoryTag';
 import { eventDateNote } from './format';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
@@ -63,6 +71,9 @@ const SHORT_DAY = new Intl.DateTimeFormat('es-MX', {
 /** Lienzo de la curva pequeña (se estira al ancho del panel). */
 const SPARK_WIDTH = 300;
 const SPARK_HEIGHT = 38;
+// En el expediente del Centro de mando la curva es más baja: deja lugar a las
+// noticias (Benji: «que tenga un buen margen de visión», 27/10/2026).
+const SPARK_HEIGHT_COMPACT = 26;
 /** Aire arriba del hecho elegido al desplazar la lista (deja ver el encabezado del día). */
 const SCROLL_MARGIN_PX = 36;
 /** Vidrio homologado con OSINT (`--vidrio`, `--borde`, desenfoque de 14 px). */
@@ -98,59 +109,78 @@ interface SparkProps {
   max: number;
   range: readonly [number, number] | null;
   onPick: (range: readonly [number, number]) => void;
+  height?: number;
+  /** Texto del centro, entre la primera y la última hora (por defecto, qué mide). */
+  caption?: string;
 }
 
-/** La curva pequeña de notas por hora: barras finas que brillan en los picos. */
-function Spark({ buckets, unit, max, range, onPick }: SparkProps) {
+/**
+ * La curva pequeña de notas por hora: barras finas que brillan en los picos.
+ * Debajo dice de cuándo a cuándo va, para leerla sin pasar el mouse.
+ */
+function Spark({ buckets, unit, max, range, onPick, height = SPARK_HEIGHT, caption }: SparkProps) {
   const n = buckets.length;
   const slot = SPARK_WIDTH / Math.max(1, n);
+  const first = buckets[0];
+  const last = buckets[n - 1];
   return (
-    <div className="relative" style={{ height: `${String(SPARK_HEIGHT)}px` }}>
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${String(SPARK_WIDTH)} ${String(SPARK_HEIGHT)}`}
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {buckets.map((bucket, index) => {
-          const count = bucket.articleIds.length;
-          const h = max ? Math.max(count ? 2 : 0.6, (count / max) * (SPARK_HEIGHT - 4)) : 0;
-          const selected = range !== null && range[0] === bucket.start;
-          const dim = range !== null && !selected;
-          return (
-            <rect
-              key={bucket.start}
-              x={index * slot + slot * 0.18}
-              y={SPARK_HEIGHT - h}
-              width={slot * 0.64}
-              height={h}
-              rx={Math.min(1.5, slot * 0.3)}
-              fill="#00d2ff"
-              fillOpacity={dim ? 0.15 : bucket.peak || selected ? 0.95 : 0.4}
-            />
-          );
-        })}
-      </svg>
-      {/* Botones invisibles por tramo: un clic filtra esa hora. */}
-      <div className="absolute inset-0 flex">
-        {buckets.map((bucket) => {
-          const count = bucket.articleIds.length;
-          return (
-            <button
-              key={bucket.start}
-              type="button"
-              disabled={count === 0}
-              aria-pressed={range !== null && range[0] === bucket.start}
-              aria-label={`${bucketLabel(bucket, unit)}: ${String(count)} notas${bucket.peak ? ' (pico)' : ''}`}
-              title={`${bucketLabel(bucket, unit)} · ${String(count)} notas`}
-              onClick={() => {
-                onPick([bucket.start, bucket.end]);
-              }}
-              className="h-full flex-1 focus-visible:outline-1 focus-visible:outline-sky-300 disabled:cursor-default"
-            />
-          );
-        })}
+    <div>
+      <div className="relative" style={{ height: `${String(height)}px` }}>
+        <svg
+          className="absolute inset-0 h-full w-full"
+          viewBox={`0 0 ${String(SPARK_WIDTH)} ${String(height)}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {buckets.map((bucket, index) => {
+            const count = bucket.articleIds.length;
+            const h = max ? Math.max(count ? 2 : 0.6, (count / max) * (height - 4)) : 0;
+            const selected = range !== null && range[0] === bucket.start;
+            const dim = range !== null && !selected;
+            return (
+              <rect
+                key={bucket.start}
+                x={index * slot + slot * 0.18}
+                y={height - h}
+                width={slot * 0.64}
+                height={h}
+                rx={Math.min(1.5, slot * 0.3)}
+                fill="#00d2ff"
+                fillOpacity={dim ? 0.15 : bucket.peak || selected ? 0.95 : 0.4}
+              />
+            );
+          })}
+        </svg>
+        {/* Botones invisibles por tramo: un clic filtra esa hora. */}
+        <div className="absolute inset-0 flex">
+          {buckets.map((bucket) => {
+            const count = bucket.articleIds.length;
+            return (
+              <button
+                key={bucket.start}
+                type="button"
+                disabled={count === 0}
+                aria-pressed={range !== null && range[0] === bucket.start}
+                aria-label={`${bucketLabel(bucket, unit)}: ${String(count)} notas${bucket.peak ? ' (pico)' : ''}`}
+                title={`${bucketLabel(bucket, unit)} · ${String(count)} notas`}
+                onClick={() => {
+                  onPick([bucket.start, bucket.end]);
+                }}
+                className="h-full flex-1 focus-visible:outline-1 focus-visible:outline-sky-300 disabled:cursor-default"
+              />
+            );
+          })}
+        </div>
       </div>
+      {first && last && (
+        <p className="mt-1 flex justify-between gap-2 text-[9.5px] tabular-nums text-slate-500">
+          <span>{bucketLabel(first, unit)}</span>
+          <span className="truncate text-slate-400">
+            {caption ?? `notas por ${unit === 'hour' ? 'hora' : 'día'} · clic para filtrar`}
+          </span>
+          <span>{bucketLabel(last, unit)}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -166,11 +196,14 @@ interface EntryProps {
 
 function Entry({ item, selected, selectedRef, onSelect, showDay = false }: EntryProps) {
   const article = item.lead;
+  // Al elegirlo se abre la nota mejor ubicada del hecho (timelineData.mapLead).
+  const target = mapLead(item);
+  const located = hasMapPoint(target);
   const others = item.articleIds.length - 1;
   // Igual que la ficha: solo si se aleja de la publicación, y sin decir que
   // «ocurrió» ese día (la IA suele dar la fecha de los antecedentes).
   const background = eventDateNote(article.event_date, article.published_at);
-  const place = article.primary_location?.place;
+  const place = target.primary_location?.place;
   return (
     // Dentro de un tema no hay columna de hora ni nodo (no cabrían dos
     // sangrías en el panel): el día y la hora van en el renglón de datos.
@@ -195,31 +228,52 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
         </>
       )}
       <div
-        className={`rounded-lg transition-colors ${selected ? 'bg-sky-400/[0.1] ring-1 ring-sky-400/30' : ''}`}
+        className={`rounded-xl border transition-colors duration-300 ${
+          selected
+            ? 'border-sky-300/40 bg-sky-400/[0.1] shadow-[0_0_18px_-6px_rgb(0_210_255/0.6)]'
+            : 'border-transparent'
+        }`}
       >
         <button
           ref={selected ? selectedRef : undefined}
           type="button"
           aria-expanded={selected}
           onClick={() => {
-            onSelect(article.article_id);
+            onSelect(target.article_id);
           }}
-          className={`w-full rounded-lg px-2 py-1.5 text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
-            selected ? '' : 'hover:translate-x-0.5 hover:bg-sky-400/[0.07]'
+          className={`w-full rounded-xl px-2.5 py-1.5 text-left transition-all duration-300 focus-visible:outline-2 focus-visible:outline-sky-400 ${
+            selected ? '' : 'hover:translate-x-0.5 hover:bg-white/[0.045]'
           }`}
         >
-          <span className="line-clamp-2 text-[12.5px] leading-snug text-slate-100">
+          <span className="line-clamp-2 text-[12.5px] font-medium leading-snug text-slate-50">
             {article.title}
           </span>
-          <span className="mt-0.5 block truncate text-[10.5px] text-slate-400">
-            {showDay && `${shortDay(item.at)} ${HOUR.format(new Date(item.at))} · `}
-            {others > 0 && (
-              <span className="text-sky-300">
-                +{others} medio{others === 1 ? '' : 's'} ·{' '}
+          {/* Los datos como etiquetas: medio, lugar, categoría y cuántos medios. */}
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-slate-400">
+            {showDay && (
+              <span className="tabular-nums">
+                {shortDay(item.at)} {HOUR.format(new Date(item.at))}
               </span>
             )}
-            {place ?? article.source_name ?? article.source_domain ?? ''}
-            {article.category ? ` · ${article.category.name}` : ''}
+            <span className="max-w-[12rem] truncate text-sky-200/90">
+              {article.source_name ?? article.source_domain ?? 'Medio sin nombre'}
+            </span>
+            {located ? (
+              place && <span className="max-w-[11rem] truncate">⌖ {place}</span>
+            ) : (
+              <span
+                className="rounded border border-white/10 px-1 text-slate-500"
+                title="La nota no dice dónde pasó: su ficha se abre sin volar el globo"
+              >
+                sin lugar
+              </span>
+            )}
+            <CategoryTag article={article} />
+            {others > 0 && (
+              <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-1.5 text-sky-200">
+                +{others} medio{others === 1 ? '' : 's'}
+              </span>
+            )}
           </span>
           {background && (
             <span className="mt-0.5 block text-[10.5px] text-amber-200/80">◆ {background}</span>
@@ -345,9 +399,17 @@ function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProp
 interface ChronologyProps {
   /** Notas que se ven (ya sin las no relevantes si así lo pidió), antes de estos filtros. */
   articles: Article[];
+  /**
+   * `column`: el panel del diseño de columna, con su título y «☰ Lista».
+   * `dossier`: dentro del expediente del Centro de mando, que ya dice
+   * «Cronología» en sus pestañas: sin título repetido, sin plegarse y con la
+   * curva más baja, para dejarle el alto a las noticias.
+   */
+  variant?: 'column' | 'dossier';
 }
 
-export function Chronology({ articles }: ChronologyProps) {
+export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
+  const dossier = variant === 'dossier';
   const {
     open,
     listOpen,
@@ -404,7 +466,7 @@ export function Chronology({ articles }: ChronologyProps) {
     }
   }, [selectedId]);
 
-  if (!open) {
+  if (!open && !dossier) {
     return (
       <button
         type="button"
@@ -425,24 +487,30 @@ export function Chronology({ articles }: ChronologyProps) {
       aria-label="Cronología"
       className={`${GLASS_OSINT} flex max-h-full w-full min-w-0 flex-col`}
     >
-      <div className="space-y-2 border-b border-sky-400/10 px-4 pb-3 pt-3">
-        <div className="flex items-center gap-2">
-          <h2 className={`${PANEL_TITLE} drop-shadow-[0_0_8px_rgb(0_210_255/0.55)]`}>Cronología</h2>
-          <span className="text-[11px] text-slate-400">
-            {items.length} hechos · {notes} notas
-          </span>
-          <button
-            type="button"
-            aria-expanded
-            onClick={() => {
-              setOpen(false);
-            }}
-            title="Ocultar la cronología"
-            className="hud-icon-btn ml-auto size-7 text-sm"
-          >
-            ›
-          </button>
-        </div>
+      <div
+        className={`space-y-2 border-b border-sky-400/10 px-4 ${dossier ? 'pb-2.5 pt-2.5' : 'pb-3 pt-3'}`}
+      >
+        {!dossier && (
+          <div className="flex items-center gap-2">
+            <h2 className={`${PANEL_TITLE} drop-shadow-[0_0_8px_rgb(0_210_255/0.55)]`}>
+              Cronología
+            </h2>
+            <span className="text-[11px] text-slate-400">
+              {items.length} hechos · {notes} notas
+            </span>
+            <button
+              type="button"
+              aria-expanded
+              onClick={() => {
+                setOpen(false);
+              }}
+              title="Ocultar la cronología"
+              className="hud-icon-btn ml-auto size-7 text-sm"
+            >
+              ›
+            </button>
+          </div>
+        )}
         {timeline.buckets.length > 0 && (
           <div>
             <Spark
@@ -451,11 +519,12 @@ export function Chronology({ articles }: ChronologyProps) {
               max={timeline.max}
               range={range}
               onPick={toggleRange}
+              height={dossier ? SPARK_HEIGHT_COMPACT : SPARK_HEIGHT}
+              // En el expediente no hay título: el conteo va en medio de la curva.
+              caption={
+                dossier ? `${String(items.length)} hechos · ${String(notes)} notas` : undefined
+              }
             />
-            <p className="mt-1 text-[10px] text-slate-500">
-              Notas publicadas por {timeline.unit === 'hour' ? 'hora' : 'día'} (CDMX) · un clic
-              filtra ese momento
-            </p>
           </div>
         )}
         <div className="flex flex-wrap gap-1.5">
@@ -493,17 +562,20 @@ export function Chronology({ articles }: ChronologyProps) {
               ✕ Quitar
             </button>
           )}
-          <button
-            type="button"
-            aria-pressed={listOpen}
-            onClick={() => {
-              setListOpen(!listOpen);
-            }}
-            title="Mostrar u ocultar la lista de noticias del panel izquierdo"
-            className={`${PILL} ${listOpen ? 'border-sky-400/50 text-sky-200' : ''}`}
-          >
-            ☰ Lista
-          </button>
+          {/* En el expediente, la lista va en sus pestañas. */}
+          {!dossier && (
+            <button
+              type="button"
+              aria-pressed={listOpen}
+              onClick={() => {
+                setListOpen(!listOpen);
+              }}
+              title="Mostrar u ocultar la lista de noticias del panel izquierdo"
+              className={`${PILL} ${listOpen ? 'border-sky-400/50 text-sky-200' : ''}`}
+            >
+              ☰ Lista
+            </button>
+          )}
         </div>
       </div>
 
@@ -515,6 +587,9 @@ export function Chronology({ articles }: ChronologyProps) {
           <div key={group.day} className="relative">
             <p className="sticky top-0 z-10 -mx-3 border-b border-sky-400/10 bg-[#050505]/95 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90">
               {DAY.format(new Date(group.at))}
+              <span className="ml-2 font-sans text-[10px] font-normal normal-case tracking-normal text-slate-500">
+                {group.rows.length} {group.rows.length === 1 ? 'entrada' : 'entradas'}
+              </span>
             </p>
             {/* La línea vertical luminosa que une los hechos del día. */}
             <span

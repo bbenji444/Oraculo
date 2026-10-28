@@ -140,8 +140,9 @@ export function searchInput(
 }
 
 // localStorage puede no existir o fallar (modo privado, almacenamiento lleno):
-// entonces la preferencia vale solo mientras dura la página.
-const safeStorage: StateStorage = {
+// entonces la preferencia vale solo mientras dura la página. También lo usa el
+// estado del Centro de mando (store/mando.ts).
+export const safeStorage: StateStorage = {
   getItem: (name) => {
     try {
       return window.localStorage.getItem(name);

@@ -100,6 +100,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Más noticias a la vista en el expediente y una cronología más clara (27/10/2026).** En una pantalla de 920 px de alto pasan de 3 a unas 6 o 7. Cambios:
+  - el resumen es más bajo: cifras más chicas, categorías en un renglón, y pestañas y PDF juntos;
+  - si se pliega, el resumen se queda plegado en las siguientes visitas;
+  - dentro del expediente, la cronología no repite su título y la curva es más baja;
+  - la curva dice de qué hora a qué hora va;
+  - cada renglón muestra el medio, el lugar, la categoría y cuántos medios lo publicaron como etiquetas, y cada día dice cuántas entradas tiene.
+- **«Consulta» en lugar de «misión» en el Centro de mando (27/10/2026).** Por ejemplo: «Consulta activa», «Ajustar consulta» y «Nueva consulta». Benji pidió un término más profesional.
 - **El Centro de mando es el diseño principal (27/10/2026, ADR-0037).** Explorar abre con él sin nada en la URL. El diseño de columna sigue con `?clasico#/explorar` y quedó guardado en la etiqueta `diseno-consola-tactica-v2`. Al elegirlo, Benji pidió estos ajustes:
   - **la consola:** más chica, de vidrio translúcido (se ve el globo detrás) y sin naranja; lo que falta elegir late en cian;
   - **el expediente:** más ancho (30 rem), y el resumen de arriba se pliega aparte para que la lista tenga casi todo el alto;
@@ -127,6 +134,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **God's Eye View** (27/10/2026, ADR-0035): se probó el mismo día como módulo aparte, con su pestaña «God's Eye». Benji lo retiró porque no le sirve para el monitor, y además era lento y no combinaba con el diseño. Se quitaron la pestaña, el servicio de `make up` y los comandos `gev-*`.
 
 ### Corregido
+
+- **Elegir un hecho de la cronología siempre abre su nota en el globo (27/10/2026).** Antes no pasaba nada en dos casos:
+  - el hecho se abría con la primera nota publicada, que suele venir de Google News sin texto ni lugar, aunque otro medio del mismo hecho sí dijera dónde pasó. Ahora se abre la nota mejor ubicada del hecho;
+  - la nota no tenía lugar (23 de las 161 relevantes de la corrida de las 15:00). Ahora su ficha sale en medio del espacio libre con el aviso «Sin lugar en el mapa», y en la cronología el renglón dice «sin lugar».
 
 - **Las pestañas responden al clic aunque sus letras se estén descifrando** (27/10/2026). Mientras dura la animación, el texto vive en partes internas que se crean al empezar y se borran al terminar. Un clic que empezaba sobre una de ellas y acababa cuando ya no existía se perdía, y había que esperar a que la animación terminara. Esas partes ya no reciben el mouse: el clic cae siempre en la pestaña. Lo mismo para las cifras que corren.
 - **El globo deja de cargar la tarjeta de video con desenfoques** (27/10/2026): trece paneles y avisos usaban `backdrop-blur`, que obliga a volver a dibujar lo de atrás cada cuadro. Ahora son paneles oscuros sin desenfoque.

@@ -1,5 +1,5 @@
 /**
- * Expediente de la misión (Centro de mando): los resultados a la derecha,
+ * Expediente de la consulta (Centro de mando): los resultados a la derecha,
  * para que el globo quede a la izquierda con las notas.
  *
  * Arriba va el resumen, de vidrio y con color:
@@ -36,6 +36,9 @@ import { MANDO_GLASS } from './ui';
 
 // Categorías en la barra: las que más salen; el resto no se distinguiría.
 const TOP_CATEGORIES = 5;
+// Las que se nombran debajo de la barra, en un solo renglón (el resto se ve al
+// pasar el mouse por la barra): así el resumen ocupa menos alto.
+const NAMED_CATEGORIES = 3;
 // Colores de la consola para los tramos de la barra: cian, verde, violeta,
 // azul cielo y turquesa. Sin ámbar ni naranja (Benji, 27/10/2026).
 const CATEGORY_COLORS = ['#00d2ff', '#2cf5a0', '#9b8cff', '#38bdf8', '#5eead4'];
@@ -86,7 +89,7 @@ function Kpi({ label, value, tone, order, format }: KpiProps) {
   return (
     <div className="mando-kpi hud-reveal" style={style}>
       <dt className="hud-kpi-label">{label}</dt>
-      <dd className="hud-kpi-value mt-1.5">
+      <dd className="hud-kpi-value">
         <CountUp value={value} format={format} />
       </dd>
     </div>
@@ -103,7 +106,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   const listOpen = useTimelineStore((s) => s.listOpen);
   const setListOpen = useTimelineStore((s) => s.setListOpen);
 
-  // Cada misión abre su cronología desplegada.
+  // Cada consulta abre su cronología desplegada.
   useEffect(() => {
     useTimelineStore.getState().setOpen(true);
   }, [search.search_id]);
@@ -115,7 +118,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
         onClick={() => {
           setOpen(true);
         }}
-        title="Abrir el expediente de la misión"
+        title="Abrir el expediente de la consulta"
         className="hud-btn hud-btn--sm mando-edge-tab pointer-events-auto absolute right-0 top-1/2 -translate-y-1/2 bg-[#050d12]/90 px-2 py-4"
       >
         ‹ Expediente · {shown.length}
@@ -129,32 +132,27 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   const title = `${search.concepts.map((c) => c.name).join(', ')} · ${search.region_name}`;
   return (
     <aside
-      aria-label="Expediente de la misión"
+      aria-label="Expediente de la consulta"
       className="mando-dossier pointer-events-none absolute inset-y-4 right-4 flex w-[calc(100%-2rem)] flex-col gap-3 sm:w-[30rem]"
     >
       <section
-        aria-label="Resumen de la misión"
-        className={`${MANDO_GLASS} pointer-events-auto shrink-0 space-y-3 p-4`}
+        aria-label="Resumen de la consulta"
+        className={`${MANDO_GLASS} pointer-events-auto shrink-0 space-y-2.5 px-4 py-3`}
       >
         {/* Un haz recorre el resumen al llegar los resultados. */}
         <span aria-hidden="true" key={search.search_id} className="hud-scan" />
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <p className="mando-kicker">Expediente</p>
+            <p className="mando-kicker">
+              Expediente · {formatRange(search.date_from, search.date_to)}
+            </p>
             <h2
               className="mt-1.5 truncate text-[15px] leading-snug font-semibold text-slate-50"
-              title={title}
+              title={`${title}${search.providers && search.providers.length > 0 ? ` · ${providersLabel(search.providers)}` : ''}`}
             >
               <DecodeText text={title} />
             </h2>
-            {summaryOpen ? (
-              <p className="mt-1 text-[11px] text-slate-400">
-                {formatRange(search.date_from, search.date_to)}
-                {search.providers && search.providers.length > 0
-                  ? ` · ${providersLabel(search.providers)}`
-                  : ''}
-              </p>
-            ) : (
+            {!summaryOpen && (
               // Plegado: las cifras en un renglón, para no perderlas de vista.
               <p className="mt-1 text-[11px] text-slate-300">
                 <span className="text-sky-300">{shown.length}</span> relevantes ·{' '}
@@ -199,7 +197,11 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
 
             {categories.length > 0 && (
               <div className="space-y-2">
-                <div className="mando-meter" aria-hidden="true">
+                <div
+                  className="mando-meter"
+                  aria-hidden="true"
+                  title={categories.map((c) => `${c.name}: ${String(c.count)}`).join(' · ')}
+                >
                   {categories.map((category, i) => (
                     <span
                       key={category.id}
@@ -215,12 +217,12 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
                 </div>
                 <ul
                   aria-label="Categorías que más salen"
-                  className="flex flex-wrap gap-x-3 gap-y-1"
+                  className="flex flex-nowrap gap-x-3 overflow-hidden"
                 >
-                  {categories.map((category, i) => (
+                  {categories.slice(0, NAMED_CATEGORIES).map((category, i) => (
                     <li
                       key={category.id}
-                      className="flex items-center gap-1.5 text-[10.5px] text-slate-300"
+                      className="flex min-w-0 shrink items-center gap-1.5 truncate text-[10.5px] text-slate-300"
                     >
                       <span
                         aria-hidden="true"
@@ -236,18 +238,25 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
                 </ul>
               </div>
             )}
-            <DownloadButtons searchId={search.search_id} />
           </div>
         )}
 
-        <HudSegmented
-          options={VIEWS}
-          value={view}
-          onChange={(next) => {
-            setListOpen(next === 'list');
-          }}
-          label="Vista del expediente"
-        />
+        {/* Pestañas y PDF en un renglón: siempre a la mano, aun plegado. */}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <HudSegmented
+              options={VIEWS}
+              value={view}
+              onChange={(next) => {
+                setListOpen(next === 'list');
+              }}
+              label="Vista del expediente"
+            />
+          </div>
+          <div className="w-[11.5rem] shrink-0">
+            <DownloadButtons searchId={search.search_id} />
+          </div>
+        </div>
       </section>
 
       {/* Más grande y con letra más clara que en la columna (styles/mando.css). */}
@@ -255,7 +264,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
         {listOpen ? (
           <ResultsList articles={shown} total={articles.length} colors={colors} />
         ) : (
-          <Chronology articles={relevant} />
+          <Chronology articles={relevant} variant="dossier" />
         )}
       </div>
     </aside>
