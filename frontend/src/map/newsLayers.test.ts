@@ -4,6 +4,7 @@ import type { Article } from '../services/searches';
 import {
   calloutPlacement,
   dashedRingPixels,
+  hasMapPoint,
   isOnVisibleSide,
   keepNewsLayers,
   NEWS_DEFAULT_COLOR,
@@ -84,6 +85,14 @@ describe('notas como puntos', () => {
     expect(geojson.features[1]?.properties.coarse).toBe(true);
     expect(geojson.features[1]?.properties.color).toBe(NEWS_DEFAULT_COLOR);
     expect(geojson.features[0]?.geometry.coordinates).toEqual([-103.3, 20.7]);
+  });
+});
+
+describe('punto en el mapa', () => {
+  it('solo las notas con coordenadas tienen a dónde volar', () => {
+    expect(hasMapPoint(article(1, {}))).toBe(true);
+    expect(hasMapPoint(article(2, null))).toBe(false);
+    expect(hasMapPoint(article(3, { lon: null, lat: null }))).toBe(false);
   });
 });
 

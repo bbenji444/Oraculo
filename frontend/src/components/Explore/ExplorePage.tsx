@@ -4,7 +4,7 @@
  * translúcidos a los lados.
  *
  * Tiene dos acomodos de los paneles, que comparten el globo y los datos:
- * - «Centro de mando» (el principal, ADR-0037): consola de misión abajo y
+ * - «Centro de mando» (el principal, ADR-0037): consola de consulta abajo y
  *   expediente a la derecha (components/Mando);
  * - de columna (`?clasico` en la URL, ADR-0036): lo que se describe abajo.
  *
@@ -272,7 +272,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           </>
         )}
 
-        {/* En el Centro de mando lo hace «Nueva misión», en la consola. */}
+        {/* En el Centro de mando lo hace «Nueva consulta», en la consola. */}
         {somethingOnGlobe && !inWall && !mando && (
           <button
             type="button"

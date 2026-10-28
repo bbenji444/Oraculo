@@ -1,5 +1,5 @@
 /**
- * Avance del barrido en la consola de misión (diseño «Centro de mando»): la
+ * Avance del barrido en la consola de consulta (diseño «Centro de mando»): la
  * etapa en curso descifrándose, el porcentaje, un cronómetro, un riel con las
  * ocho etapas del pipeline que se van encendiendo y una bitácora con los
  * números que ya se conocen.

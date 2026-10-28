@@ -1,5 +1,5 @@
 /**
- * Consola de misión (diseño «Centro de mando», 27/10/2026): la búsqueda abajo
+ * Centro de mando (diseño «Centro de mando», 27/10/2026): la búsqueda abajo
  * al centro, escrita como una orden que se lee de corrido:
  *
  *   Rastrear [01 FGR] en [02 Jalisco] durante [03 los últimos 7 días] vía [04 2 fuentes gratis]
@@ -7,14 +7,14 @@
  * Cada parte entre corchetes se toca y sube una tarjeta para cambiarla (los
  * mismos controles del diseño 2). A la derecha, el costo estimado con cifras
  * que corren y el botón «Iniciar barrido» con aro de carga y onda expansiva.
- * Abajo, las misiones recientes y la última corrida automática para
+ * Abajo, las consultas recientes y la última corrida automática para
  * reabrirlas sin costo, y arriba el reloj de la Ciudad de México con la cuenta
  * regresiva a la próxima corrida automática.
  *
- * La consola cambia según la misión:
- * - sin búsqueda (o «Ajustar misión»): la frase para armar la misión;
+ * La consola cambia según la consulta:
+ * - sin búsqueda (o «Ajustar consulta»): la frase para armar la consulta;
  * - buscando: el avance por etapas (MissionProgress);
- * - con resultados: un renglón con la misión activa, para que el globo y el
+ * - con resultados: un renglón con la consulta activa, para que el globo y el
  *   expediente tengan espacio;
  * - minimizada: una pastilla.
  *
@@ -154,7 +154,7 @@ function MissionSentence({ launcher }: { launcher: Launcher }) {
   );
 }
 
-/** La tarjeta que sube de la consola para cambiar una parte de la misión. */
+/** La tarjeta que sube de la consola para cambiar una parte de la consulta. */
 function SlotEditor({ launcher }: { launcher: Launcher }) {
   const slot = useMandoStore((s) => s.slot);
   const setSlot = useMandoStore((s) => s.setSlot);
@@ -172,7 +172,7 @@ function SlotEditor({ launcher }: { launcher: Launcher }) {
       ref={ref}
       id="mando-editor"
       role="dialog"
-      aria-label={`Ajustar la misión: ${SLOT_TITLE[slot]}`}
+      aria-label={`Ajustar la consulta: ${SLOT_TITLE[slot]}`}
       className={`${MANDO_GLASS} mando-editor space-y-3 p-4`}
     >
       <div className="flex items-center gap-2">
@@ -210,13 +210,13 @@ function SlotEditor({ launcher }: { launcher: Launcher }) {
   );
 }
 
-/** Lo que costaría la misión, con cifras que corren al cambiar. */
+/** Lo que costaría la consulta, con cifras que corren al cambiar. */
 function CostReadout({ launcher }: { launcher: Launcher }) {
   const { input, estimate, noSources } = launcher;
   if (!input) {
     return (
       <p className="max-w-[12rem] text-[11px] text-sky-200" aria-live="polite">
-        {noSources ? 'Enciende al menos una fuente.' : 'Completa la misión: qué y dónde.'}
+        {noSources ? 'Enciende al menos una fuente.' : 'Falta elegir qué y dónde.'}
       </p>
     );
   }
@@ -292,7 +292,7 @@ function LaunchButton({ launcher }: { launcher: Launcher }) {
   );
 }
 
-/** Misiones recientes y la última corrida automática, para reabrirlas sin costo. */
+/** Consultas recientes y la última corrida automática, para reabrirlas sin costo. */
 function RecentMissions() {
   const history = useSearchHistory();
   const restoreSearch = useExplorerStore((s) => s.restoreSearch);
@@ -421,10 +421,7 @@ export function MissionDock({ active }: MissionDockProps) {
 
   if (search && !finished) {
     return (
-      <section
-        aria-label="Consola de misión"
-        className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}
-      >
+      <section aria-label="Centro de mando" className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}>
         <span aria-hidden="true" className="mando-beam" />
         <header className="mb-3 flex items-center gap-3">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />
@@ -442,12 +439,12 @@ export function MissionDock({ active }: MissionDockProps) {
   if (search && !composing) {
     return (
       <section
-        aria-label="Consola de misión"
+        aria-label="Centro de mando"
         className={`${MANDO_GLASS} mando-dock flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="hud-dot hud-dot--live" />
-        <span className="mando-kicker">Misión activa</span>
+        <span className="mando-kicker">Consulta activa</span>
         <p className="min-w-0 flex-1 truncate text-[13px] text-slate-100">
           {missionLabel(search)} · {search.results_count} notas
         </p>
@@ -456,20 +453,20 @@ export function MissionDock({ active }: MissionDockProps) {
           onClick={() => {
             useMandoStore.getState().setEditing(true);
           }}
-          title="Cambiar qué, dónde, cuándo o fuentes y lanzar otra misión"
+          title="Cambiar qué, dónde, cuándo o fuentes y lanzar otra consulta"
           className="hud-btn hud-btn--sm"
         >
-          Ajustar misión
+          Ajustar consulta
         </button>
         <button
           type="button"
           onClick={() => {
             useExplorerStore.getState().clearGlobe();
           }}
-          title="Quitar los resultados del globo y armar otra misión (esta queda en Historial)"
+          title="Quitar los resultados del globo y armar otra consulta (esta queda en Historial)"
           className="hud-btn hud-btn--sm"
         >
-          Nueva misión
+          Nueva consulta
         </button>
         <MinimizeButton />
       </section>
@@ -479,15 +476,12 @@ export function MissionDock({ active }: MissionDockProps) {
   return (
     <>
       <SlotEditor launcher={launcher} />
-      <section
-        aria-label="Consola de misión"
-        className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}
-      >
+      <section aria-label="Centro de mando" className={`${MANDO_GLASS} mando-dock px-4 pb-3 pt-3`}>
         <span aria-hidden="true" className="mando-beam" />
         <header className="flex items-center gap-3">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />
           <span className="mando-kicker">
-            Centro de mando · {editing ? 'Ajustar misión' : 'Nueva misión'}
+            Centro de mando · {editing ? 'Ajustar consulta' : 'Nueva consulta'}
           </span>
           <span className="ml-auto hidden shrink-0 text-[10.5px] text-slate-500 2xl:inline">
             <kbd className="mando-kbd">/</kbd> elegir región · <kbd className="mando-kbd">Esc</kbd>{' '}

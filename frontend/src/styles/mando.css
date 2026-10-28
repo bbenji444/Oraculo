@@ -1,6 +1,6 @@
 /*
  * Diseño «Centro de mando» (diseño 3, 27/10/2026): la búsqueda como una
- * consola de misión abajo, el globo flotando encima, un radar que barre el
+ * consola de consulta abajo, el globo flotando encima, un radar que barre el
  * globo mientras se busca y un expediente de resultados a la derecha.
  *
  * Usa los colores, letras y piezas de la consola táctica (hud.css) y sigue
@@ -12,7 +12,7 @@
  * clases solo aparecen con `?mando` en la URL.
  */
 
-/* --- Consola de misión -------------------------------------------------------- */
+/* --- Centro de mando -------------------------------------------------------- */
 
 .mando-dock {
   border-radius: 18px;
@@ -68,7 +68,7 @@
   letter-spacing: 0.16em;
 }
 
-/* La frase de la misión: los verbos tenues y las partes tocables brillantes. */
+/* La frase de la consulta: los verbos tenues y las partes tocables brillantes. */
 .mando-sentence {
   color: rgb(203 213 225);
   font-size: 0.98rem;
@@ -156,7 +156,7 @@
   animation: mando-flash 0.7s var(--hud-ease);
 }
 
-/* La tarjeta que sube de la consola para ajustar una parte de la misión. */
+/* La tarjeta que sube de la consola para ajustar una parte de la consulta. */
 .mando-editor {
   position: absolute;
   bottom: calc(100% + 12px);
@@ -234,7 +234,7 @@
   animation: mando-shock 0.9s var(--hud-ease) forwards;
 }
 
-/* --- Misiones recientes -------------------------------------------------------- */
+/* --- Consultas recientes -------------------------------------------------------- */
 
 /* Si no caben, las últimas fichas se desvanecen en el borde en lugar de
    aplastarse (una máscara fija: no se vuelve a calcular al moverse nada). */
@@ -448,7 +448,7 @@
   --tone: 0 210 255;
   position: relative;
   overflow: hidden;
-  padding: 0.7rem 0.75rem 0.65rem;
+  padding: 0.5rem 0.65rem 0.45rem;
   border: 1px solid rgb(var(--tone) / 0.3);
   border-radius: 12px;
   background:
@@ -504,7 +504,8 @@
   white-space: nowrap;
 }
 .mando-kpi .hud-kpi-value {
-  font-size: 1.35rem;
+  margin-top: 0.3rem;
+  font-size: 1.12rem;
   text-shadow: 0 0 16px rgb(var(--tone) / 0.55);
 }
 

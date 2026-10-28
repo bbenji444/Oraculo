@@ -70,3 +70,11 @@ Benji pidió estos ajustes al elegirlo:
   - el resumen de arriba se pliega aparte («▴») a un renglón con sus cifras;
   - la cronología y la lista se ven 10 % más grandes (`zoom` en `.mando-feed`), sin tocar los componentes que comparten los dos diseños.
 - **Más color y animación en el resumen.** Cada cifra es una lámina de vidrio de su color: cian, verde, violeta y azul cielo. Un brillo cruza cada lámina a destiempo, la barra de categorías brilla y un haz recorre el resumen al llegar los resultados. La barra de categorías ya no usa ámbar.
+
+## Segundos ajustes (27/10/2026, tarde)
+
+- **«Consulta» en lugar de «misión».** «Misión» le sonaba poco profesional a Benji. La frase sigue igual («Rastrear… en… durante… vía…»), pero los botones dicen «Ajustar consulta» y «Nueva consulta», y la consola, «Consulta activa».
+- **Más noticias a la vista.** Benji veía solo 3. Ahora son unas 6 o 7 en 920 px de alto:
+  - el resumen es más bajo y se puede dejar plegado; la preferencia se recuerda;
+  - dentro del expediente, la cronología no repite su título (`variant="dossier"`).
+- **Un clic en la cronología siempre hace algo.** Se abre la nota del hecho mejor ubicada (`mapLead`). Si ninguna tiene lugar, la ficha sale sin vuelo y con aviso.

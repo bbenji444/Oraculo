@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Article } from '../../services/searches';
 import {
+  mapLead,
   applyTimeline,
   buildTimeline,
   categoriesIn,
@@ -190,5 +191,21 @@ describe('storyItems', () => {
       [3, [3], '2026-10-25'],
       [1, [1, 2], '2026-10-25'],
     ]);
+  });
+});
+
+describe('mapLead', () => {
+  it('vuela a la nota del hecho mejor ubicada, aunque no sea la primera', () => {
+    const lead = note(1, '2026-10-27T10:00:00Z');
+    const state = note(2, '2026-10-27T11:00:00Z', { regionCode: '29' });
+    const town = note(3, '2026-10-27T12:00:00Z', { regionCode: '29001' });
+    if (state.primary_location) state.primary_location.precision = 'state';
+    expect(mapLead({ lead, notes: [lead, state, town] }).article_id).toBe(3);
+  });
+
+  it('sin ninguna ubicada, se queda con la principal', () => {
+    const lead = note(1, '2026-10-27T10:00:00Z');
+    const other = note(2, '2026-10-27T11:00:00Z');
+    expect(mapLead({ lead, notes: [lead, other] })).toBe(lead);
   });
 });

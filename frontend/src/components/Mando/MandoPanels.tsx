@@ -2,7 +2,7 @@
  * Paneles de Explorar en el diseño «Centro de mando» (diseño 3, 27/10/2026,
  * con `?mando` en la URL). Sustituyen la columna de la izquierda del diseño 2:
  *
- * - abajo al centro, la consola de misión (MissionDock); mide su alto para que
+ * - abajo al centro, la consola de consulta (MissionDock); mide su alto para que
  *   el globo flote encima;
  * - a la derecha, el expediente con los resultados (Dossier);
  * - arriba a la izquierda, los controles del globo y «Mis casos».
@@ -76,7 +76,7 @@ export function MandoPanels({
     };
   }, []);
 
-  // Cada misión nueva abre su expediente y deja la consola en su renglón.
+  // Cada consulta nueva abre su expediente y deja la consola en su renglón.
   const searchId = search?.search_id;
   useEffect(() => {
     useMandoStore.getState().setDossierOpen(true);

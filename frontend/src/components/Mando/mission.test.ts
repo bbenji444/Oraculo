@@ -1,4 +1,4 @@
-/** Lógica del Centro de mando (diseño 3): frase, horario, misiones y bitácora. */
+/** Lógica del Centro de mando (diseño 3): frase, horario, consultas y bitácora. */
 import { describe, expect, it } from 'vitest';
 
 import type { Search } from '../../services/searches';
@@ -72,7 +72,7 @@ describe('isMandoMode', () => {
   });
 });
 
-describe('frase de la misión', () => {
+describe('frase de la consulta', () => {
   it('usa la sigla de los conceptos largos', () => {
     expect(shortConcept('Fiscalía General de la República')).toBe('FGR');
     expect(shortConcept('Extorsión')).toBe('Extorsión');
@@ -132,7 +132,7 @@ describe('corridas automáticas y relojes', () => {
   });
 });
 
-describe('misiones recientes', () => {
+describe('consultas recientes', () => {
   it('arma la ficha de la corrida automática con su hora de la Ciudad de México', () => {
     expect(runLabel({ scheduled_for: '2026-10-27T13:00:00Z', results_count: 305 })).toBe(
       'Corrida 07:00 · 305 notas',
