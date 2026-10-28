@@ -15,11 +15,13 @@ import {
   rangeConnector,
   rangeLabel,
   runLabel,
+  recentLabel,
   recentMissions,
   shortConcept,
   sourcesLabel,
   spanDays,
   stageIndex,
+  windowLabel,
 } from './mission';
 
 function search(overrides: Partial<Search> = {}): Search {
@@ -134,8 +136,9 @@ describe('corridas automáticas y relojes', () => {
 
 describe('consultas recientes', () => {
   it('arma la ficha de la corrida automática con su hora de la Ciudad de México', () => {
+    // Las de antes de la ventana por horas dicen cuántas notas trajeron.
     expect(runLabel({ scheduled_for: '2026-10-27T13:00:00Z', results_count: 305 })).toBe(
-      'Corrida 07:00 · 305 notas',
+      'Corrida de las 07:00 · 305 notas',
     );
     expect(runLabel({ scheduled_for: null, results_count: 3 })).toBe('Corrida · 3 notas');
   });
@@ -197,5 +200,41 @@ describe('avance del barrido', () => {
       '25 dentro · 3 fuera · 2 sin ubicar',
       'Barrido completo: 40 notas',
     ]);
+  });
+});
+
+describe('ventana por horas de las corridas (28/10/2026)', () => {
+  const night = { window_start: '2026-10-28T05:00:00Z', window_end: '2026-10-28T13:00:00Z' };
+  const day = { window_start: '2026-10-28T13:00:00Z', window_end: '2026-10-28T21:00:00Z' };
+
+  it('dice las horas que cubre, con el día', () => {
+    expect(windowLabel(night)).toBe('27 oct 23:00 – 28 oct 07:00');
+    expect(windowLabel(day)).toBe('28 oct, 07:00 – 15:00');
+    expect(windowLabel({ window_start: null, window_end: null })).toBeNull();
+  });
+
+  it('la ficha de la corrida dice sus horas, no un total', () => {
+    expect(runLabel({ scheduled_for: '2026-10-28T13:00:00Z', results_count: 357, ...night })).toBe(
+      'Corrida de las 07:00 · 23:00 – 07:00',
+    );
+    expect(missionLabel(search(night))).toBe('FGR · Jalisco · 23:00 – 07:00');
+  });
+
+  it('una búsqueda anterior se nombra por su día, qué y dónde', () => {
+    expect(recentLabel(search({ created_at: '2026-10-27T19:49:00Z' }))).toBe(
+      'Tu búsqueda del 27 oct: FGR en Jalisco',
+    );
+    expect(
+      recentLabel(
+        search({
+          created_at: '2026-10-24T20:15:00Z',
+          concepts: [
+            { id: 1, name: 'Balacera en Iztapalapa' },
+            { id: 2, name: 'Balacera' },
+            { id: 3, name: 'Jose Benjamin Oviedo Herrera' },
+          ],
+        }),
+      ),
+    ).toBe('Tu búsqueda del 24 oct: Balacera en Iztapalapa y 2 más en Jalisco');
   });
 });

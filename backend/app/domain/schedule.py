@@ -8,6 +8,7 @@ No hace: no programa nada (eso es el reloj de Celery) ni sabe de zonas
 horarias: recibe y devuelve horas locales de la Ciudad de México.
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.domain.errors import InvalidRequestError
@@ -84,3 +85,84 @@ def utc_hours(hours: tuple[int, ...], utc_offset_hours: int) -> tuple[int, ...]:
         (5, 13, 21)
     """
     return tuple(sorted((h - utc_offset_hours) % HOURS_PER_DAY for h in hours))
+
+
+@dataclass(frozen=True, slots=True)
+class RunWindow:
+    """Las horas que cubre una corrida automática: de ``start`` a ``end``.
+
+    Benji, 28/10/2026: cada corrida busca «estrictamente» lo publicado desde
+    la corrida anterior. La de las 07:00 cubre de las 23:00 de ayer a las
+    07:00; la de las 15:00, de 07:00 a 15:00; la de las 23:00, de 15:00 a
+    23:00. Antes cada corrida pedía «hoy y ayer» y volvía a traer lo de un día
+    entero.
+
+    Attributes:
+        start: Primer momento incluido.
+        end: Hora programada de la corrida (no incluida: lo publicado justo
+            a esa hora es de la corrida siguiente).
+    """
+
+    start: datetime
+    end: datetime
+
+    def contains(self, moment: datetime | None) -> bool:
+        """Si una nota publicada en ``moment`` le toca a esta corrida.
+
+        Una nota sin fecha de publicación no le toca a ninguna: no se puede
+        saber si ya salió en otra corrida.
+
+        Args:
+            moment: Fecha de publicación (con zona horaria), o ``None``.
+
+        Returns:
+            ``True`` si cae dentro de la ventana.
+        """
+        return moment is not None and self.start <= moment < self.end
+
+
+def previous_slot(slot: datetime, hours: tuple[int, ...]) -> datetime:
+    """La corrida programada anterior a ``slot``.
+
+    Example:
+        >>> previous_slot(datetime(2026, 10, 28, 7, 0), (7, 15, 23))
+        datetime.datetime(2026, 10, 27, 23, 0)
+    """
+    return run_slot(slot - timedelta(minutes=1), hours)
+
+
+def run_window(
+    slot: datetime,
+    hours: tuple[int, ...],
+    last_finished: datetime | None,
+    max_back: timedelta,
+    margin: timedelta = timedelta(0),
+) -> RunWindow:
+    """Las horas que cubre la corrida programada para ``slot``.
+
+    Empieza en la corrida programada anterior. Si esa no terminó (el
+    servidor estaba apagado o falló), empieza en la última que sí terminó,
+    para no perder lo de en medio, pero nunca más atrás que ``max_back``.
+
+    Args:
+        slot: Hora programada de esta corrida.
+        hours: Horarios de las corridas (``parse_run_hours``).
+        last_finished: Hora programada de la última corrida automática que
+            terminó, o ``None`` si nunca ha terminado una.
+        max_back: Lo más que se mira hacia atrás.
+        margin: Tiempo extra antes del inicio, para notas que los buscadores
+            muestran tarde (0 = estricto, la decisión de Benji).
+
+    Returns:
+        La ventana de la corrida.
+
+    Example:
+        >>> run_window(datetime(2026, 10, 28, 15), (7, 15, 23), datetime(2026, 10, 28, 7),
+        ...            timedelta(days=1)).start
+        datetime.datetime(2026, 10, 28, 7, 0)
+    """
+    start = previous_slot(slot, hours)
+    if last_finished is not None and last_finished < start:
+        start = last_finished
+    start = max(start, slot - max_back)
+    return RunWindow(start - margin, slot)

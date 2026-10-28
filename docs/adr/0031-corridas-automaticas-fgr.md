@@ -49,3 +49,19 @@ Faltaba unirlas sin que una persona lo pida.
 - **Costo:** 0 créditos; solo la IA para las notas nuevas (~0.0002 USD por nota leída y ~0.00002 por nota clasificada).
 - **Si la PC está apagada a la hora de la corrida, esa corrida no ocurre.** La siguiente cubre hoy y ayer. Se resuelve de fondo con la migración a Proxmox (F12.9).
 - **El reporte de cada corrida queda listo** en disco y se puede volver a pedir desde Explorar. Los envíos (WhatsApp o correo) quedan para la F12.11.
+
+## Ventana por horas (28/10/2026)
+
+**Antes**, cada corrida pedía «hoy y ayer» por días completos (`AUTOMATIC_WINDOW_DAYS=1`). La de las 07:00 del 28/10 trajo 356 notas: de sus 160 relevantes, 140 eran del día anterior y solo 23 eran nuevas. Benji: «debe buscar estrictamente en el día vigente, y únicamente en el lapso de horas desde que se hizo la última corrida».
+
+**Ahora**:
+- **Cada corrida cubre desde la anterior** (`run_window`, `app/domain/schedule.py`):
+  - 07:00, de las 23:00 de ayer a las 07:00;
+  - 15:00, de 07:00 a 15:00;
+  - 23:00, de 15:00 a 23:00.
+- **Si la anterior no terminó**, cubre desde la última que sí, pero nunca más de `AUTOMATIC_WINDOW_DAYS` hacia atrás.
+- **El filtro se aplica después de consultar.** A los buscadores se les piden los días que toca la ventana (solo entienden días), y el pipeline descarta lo publicado fuera de las horas antes de guardarlo y antes de la IA. Las notas sin fecha de publicación tampoco entran, porque no se puede saber si ya salieron.
+- **Se guarda la ventana.** `searches.window_start` y `window_end` (migración 0033) llevan las horas, y la pantalla y el PDF las muestran («27 oct 23:00 – 28 oct 07:00»).
+- **Es estricto, por decisión de Benji.** `AUTOMATIC_WINDOW_MARGIN_MINUTES` (0) permite mirar unos minutos antes si se nota que se pierden notas que los buscadores muestran tarde.
+
+**Medido** con los datos reales de la corrida de las 07:00 del 28/10: con la ventana habría traído 73 notas en lugar de 356, y 22 relevantes en lugar de 160.

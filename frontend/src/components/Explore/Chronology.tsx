@@ -72,9 +72,6 @@ const SHORT_DAY = new Intl.DateTimeFormat('es-MX', {
 /** Lienzo de la curva pequeña (se estira al ancho del panel). */
 const SPARK_WIDTH = 300;
 const SPARK_HEIGHT = 38;
-// En el expediente del Centro de mando la curva es más baja: deja lugar a las
-// noticias (Benji: «que tenga un buen margen de visión», 27/10/2026).
-const SPARK_HEIGHT_COMPACT = 26;
 /** Aire arriba del hecho elegido al desplazar la lista (deja ver el encabezado del día). */
 const SCROLL_MARGIN_PX = 36;
 /** Vidrio homologado con OSINT (`--vidrio`, `--borde`, desenfoque de 14 px). */
@@ -441,7 +438,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
     open,
     listOpen,
     range,
-    categoryId,
+    categoryIds,
     stateCode,
     setOpen,
     setListOpen,
@@ -457,13 +454,13 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
 
   // La curva respeta categoría y estado; la lista, además, el tramo elegido.
   const forSpark = useMemo(
-    () => applyTimeline(articles, { range: null, categoryId, stateCode }),
-    [articles, categoryId, stateCode],
+    () => applyTimeline(articles, { range: null, categoryIds, stateCode }),
+    [articles, categoryIds, stateCode],
   );
   const timeline = useMemo(() => buildTimeline(forSpark), [forSpark]);
   const items = useMemo(
-    () => storyItems(applyTimeline(articles, { range, categoryId, stateCode })),
-    [articles, range, categoryId, stateCode],
+    () => storyItems(applyTimeline(articles, { range, categoryIds, stateCode })),
+    [articles, range, categoryIds, stateCode],
   );
   // Los hechos de la misma persona o caso se juntan en un tema (themes.ts).
   const days = useMemo(() => {
@@ -477,7 +474,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
   }, [items]);
   const categories = useMemo(() => categoriesIn(articles), [articles]);
   const states = useMemo(() => statesIn(articles), [articles]);
-  const filtered = range !== null || categoryId !== null || stateCode !== null;
+  const filtered = range !== null || categoryIds.length > 0 || stateCode !== null;
   const notes = items.reduce((total, item) => total + item.articleIds.length, 0);
 
   // Solo se desplaza la lista: `scrollIntoView` también movía la página entera
@@ -539,7 +536,14 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
             </button>
           </div>
         )}
-        {timeline.buckets.length > 0 && (
+        {/* En el expediente no va la curva (Benji: «no se entiende», 28/10/2026):
+            solo el conteo, y las categorías van en sus botones de color. */}
+        {dossier && (
+          <p className="text-[11px] text-slate-400">
+            <span className="text-slate-200">{items.length} hechos</span> · {notes} notas
+          </p>
+        )}
+        {!dossier && timeline.buckets.length > 0 && (
           <div>
             <Spark
               buckets={timeline.buckets}
@@ -547,31 +551,28 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               max={timeline.max}
               range={range}
               onPick={toggleRange}
-              height={dossier ? SPARK_HEIGHT_COMPACT : SPARK_HEIGHT}
-              // En el expediente no hay título: el conteo va en medio de la curva.
-              caption={
-                dossier ? `${String(items.length)} hechos · ${String(notes)} notas` : undefined
-              }
             />
           </div>
         )}
         <div className="flex flex-wrap gap-1.5">
-          <HudSelect
-            label="Filtrar por categoría"
-            size="sm"
-            className="w-auto max-w-[11rem] rounded-full"
-            value={categoryId === null ? '' : String(categoryId)}
-            options={[
-              { value: '', label: 'Todas las categorías' },
-              ...categories.map((c) => ({
-                value: String(c.id),
-                label: `${c.name} (${String(c.count)})`,
-              })),
-            ]}
-            onChange={(next) => {
-              setCategory(next ? Number(next) : null);
-            }}
-          />
+          {!dossier && (
+            <HudSelect
+              label="Filtrar por categoría"
+              size="sm"
+              className="w-auto max-w-[11rem] rounded-full"
+              value={categoryIds.length === 1 ? String(categoryIds[0]) : ''}
+              options={[
+                { value: '', label: 'Todas las categorías' },
+                ...categories.map((c) => ({
+                  value: String(c.id),
+                  label: `${c.name} (${String(c.count)})`,
+                })),
+              ]}
+              onChange={(next) => {
+                setCategory(next ? Number(next) : null);
+              }}
+            />
+          )}
           <HudSelect
             label="Filtrar por estado"
             size="sm"

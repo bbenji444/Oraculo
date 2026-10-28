@@ -8,6 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Botones de color por categoría en el expediente (28/10/2026).** Un botón por cada tipo de noticia de la consulta, con su color y cuántas notas tiene. Se prenden uno o varios y la cronología, la lista y el globo muestran solo esas categorías; «Todas» los apaga.
 - **Cada tipo de noticia tiene su color (28/10/2026, migración 0032).** Las 15 categorías tienen un color propio, el mismo en la barra del expediente, las etiquetas de la lista y de la cronología, los nodos de la cronología y los puntos del globo. Ejemplos: Homicidio en rojo, Huachicol en verde lima, Secuestro en rosa y Otros en gris. Solo se llenan los colores vacíos; si alguien elige uno, se respeta.
 - **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
   - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;
@@ -101,6 +102,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Cada corrida automática trae solo lo publicado desde la anterior (28/10/2026, ADR-0031, migración 0033).** La de las 07:00 cubre de las 23:00 de ayer a las 07:00, la de las 15:00 de 07:00 a 15:00 y la de las 23:00 de 15:00 a 23:00. Antes pedía «hoy y ayer» y la de las 07:00 del 28/10 trajo 356 notas: 160 relevantes, de las que solo 23 eran nuevas. Con la ventana habrían sido 73 notas y 22 relevantes. Lo de fuera ni se guarda ni se paga a la IA. La pantalla y el PDF dicen las horas que cubre cada corrida.
+- **En el expediente, sin la curva de notas por hora; los atajos de la consola se entienden mejor (28/10/2026).** Las corridas dicen sus horas y las búsquedas anteriores, su día: «Tu búsqueda del 27 oct: FGR en Jalisco».
 - **El expediente muestra muchas más noticias (28/10/2026).** En una pantalla de 900 px de alto caben 9 a 11, antes 2 o 3. Cambios:
   - las pestañas «Cronología | Noticias» están dentro del panel de noticias, en el mismo lugar para las dos vistas;
   - el resumen es más bajo y el PDF es un botón chico junto al título;

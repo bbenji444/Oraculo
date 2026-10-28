@@ -42,7 +42,8 @@
     <h1 class="doc-title">{{ view.title }}</h1>
     <p class="region doc-region">{{ data.breadcrumb }}</p>
     <table class="cover-meta">
-      <tr><th>Periodo</th><td>{{ data.search.date_from | mx_date }} – {{ data.search.date_to | mx_date }}</td></tr>
+      {# Corridas automáticas: las horas exactas desde la corrida anterior (28/10/2026). #}
+      <tr><th>Periodo</th><td>{% if data.search.window_start %}{{ data.search.window_start | mx_datetime }} – {{ data.search.window_end | mx_datetime }}{% else %}{{ data.search.date_from | mx_date }} – {{ data.search.date_to | mx_date }}{% endif %}</td></tr>
       <tr><th>Emitido</th><td class="generated">{{ data.generated_at | mx_datetime }} (Ciudad de México)</td></tr>
       <tr><th>Origen</th><td>{% if o.automatic %}Corrida programada de las {{ data.search.scheduled_for | mx_time }}{% else %}Búsqueda de {{ data.generated_by }}{% endif %}</td></tr>
       <tr><th>Fuentes</th><td>{{ data.search.providers | map("provider_name") | join(" · ") or "todas las configuradas" }}</td></tr>
@@ -284,7 +285,7 @@
     <div>
       <h3>Cómo se hizo</h3>
       <ol>
-        <li>{% if o.automatic %}El monitor automático consultó{% else %}Se consultaron{% endif %} los proveedores de noticias con las palabras clave de {{ view.title }} y el nombre de la región, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.</li>
+        <li>{% if o.automatic %}El monitor automático consultó{% else %}Se consultaron{% endif %} los proveedores de noticias con las palabras clave de {{ view.title }} y el nombre de la región, {% if data.search.window_start %}solo con lo publicado desde la corrida anterior: del {{ data.search.window_start | mx_datetime }} al {{ data.search.window_end | mx_datetime }}{% else %}del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}{% endif %}.</li>
         <li>Una IA leyó cada nota, decidió si es relevante para el concepto y escribió un resumen propio. En la FGR solo cuentan las notas donde actúa la FGR federal, no las fiscalías estatales. Este reporte solo incluye las relevantes.</li>
         <li>La IA clasificó cada nota por delito (categoría) y dijo quién actúa en el hecho. Ambas son inferencias.</li>
         <li>Los lugares que menciona cada nota se ubicaron en el catálogo geográfico de INEGI. La ubicación principal decide el estado de la nota.</li>

@@ -33,6 +33,7 @@ from app.domain.errors import (
     RegionNotFoundError,
 )
 from app.domain.queries import DateWindow, PlannedQuery, Provider, place_for
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchTrigger
 from app.domain.sources import SOURCES, Source, resolve_sources, source_of
 
@@ -50,6 +51,8 @@ class SearchRequest:
             ``None`` para usar las de por defecto.
         trigger: Quién la lanza (F12.8): una persona o el reloj.
         scheduled_for: Hora programada de una corrida automática.
+        time_window: Horas que cubre una corrida automática (``run_window``);
+            ``None`` en las manuales.
     """
 
     user_id: str
@@ -59,6 +62,7 @@ class SearchRequest:
     providers: tuple[Provider, ...] | None = None
     trigger: SearchTrigger = SearchTrigger.MANUAL
     scheduled_for: datetime | None = None
+    time_window: RunWindow | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +264,7 @@ class PlanSearch:
                 providers=sources,
                 trigger=request.trigger,
                 scheduled_for=request.scheduled_for,
+                time_window=request.time_window,
             ),
             breadcrumb=" › ".join([*(a.name for a in ancestors), region.name]),
             queries=queries,

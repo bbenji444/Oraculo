@@ -63,6 +63,8 @@ class SearchDetail:
             antes de F12.2, que usaron todas las configuradas.
         trigger: Quién la lanzó (F12.8): una persona o el reloj.
         scheduled_for: Hora programada de una corrida automática.
+        window_start: Inicio de las horas que cubre una corrida automática.
+        window_end: Fin de esas horas (la hora de la corrida).
     """
 
     search_id: UUID
@@ -88,6 +90,8 @@ class SearchDetail:
     providers: tuple[str, ...] = ()
     trigger: SearchTrigger = SearchTrigger.MANUAL
     scheduled_for: datetime | None = None
+    window_start: datetime | None = None
+    window_end: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

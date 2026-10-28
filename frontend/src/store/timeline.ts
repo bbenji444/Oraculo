@@ -23,7 +23,10 @@ export interface TimelineState extends TimelineFilters {
   setListOpen: (listOpen: boolean) => void;
   /** Elige un tramo; elegir el mismo otra vez lo quita. */
   toggleRange: (range: readonly [number, number]) => void;
+  /** Una sola categoría (el menú del diseño de columna), o `null` = todas. */
   setCategory: (categoryId: number | null) => void;
+  /** Prende o apaga una categoría (los botones de color del expediente). */
+  toggleCategory: (categoryId: number) => void;
   setState: (stateCode: string | null) => void;
   clear: () => void;
 }
@@ -44,7 +47,14 @@ export const useTimelineStore = create<TimelineState>()((set) => ({
     }));
   },
   setCategory: (categoryId) => {
-    set({ categoryId });
+    set({ categoryIds: categoryId === null ? [] : [categoryId] });
+  },
+  toggleCategory: (categoryId) => {
+    set((state) => ({
+      categoryIds: state.categoryIds.includes(categoryId)
+        ? state.categoryIds.filter((id) => id !== categoryId)
+        : [...state.categoryIds, categoryId],
+    }));
   },
   setState: (stateCode) => {
     set({ stateCode });

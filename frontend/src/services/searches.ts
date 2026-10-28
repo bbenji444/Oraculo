@@ -96,6 +96,12 @@ export interface Search {
   trigger?: 'manual' | 'automatic';
   /** Hora programada de una corrida automática (UTC). */
   scheduled_for?: string | null;
+  /**
+   * Horas que cubre una corrida automática: desde la corrida anterior hasta
+   * su hora (28/10/2026). Vacías en las manuales y en las corridas de antes.
+   */
+  window_start?: string | null;
+  window_end?: string | null;
 }
 
 export interface Judgement {

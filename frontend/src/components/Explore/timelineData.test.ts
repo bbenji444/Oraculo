@@ -123,17 +123,23 @@ describe('filtros', () => {
     note(4, '2026-10-26T02:00:00Z', { regionCode: 'MEX' }),
   ];
 
+  it('varias categorías a la vez: las notas de cualquiera de ellas (28/10/2026)', () => {
+    const picked = applyTimeline(notes, { ...NO_FILTERS, categoryIds: [6, 7] });
+    expect(new Set(picked.map((a) => a.category?.id))).toEqual(new Set([6, 7]));
+    expect(applyTimeline(notes, { ...NO_FILTERS, categoryIds: [] })).toHaveLength(notes.length);
+  });
+
   it('el estado sale de la clave INEGI de la ubicación principal', () => {
     expect(notes.map(stateCodeOf)).toEqual(['08', '19', '08', null]);
   });
 
   it('filtra por tramo, categoría y estado a la vez', () => {
     expect(applyTimeline(notes, NO_FILTERS).map((a) => a.article_id)).toEqual([1, 2, 3, 4]);
-    expect(applyTimeline(notes, { ...NO_FILTERS, categoryId: 6 }).map((a) => a.article_id)).toEqual(
-      [2, 3],
-    );
     expect(
-      applyTimeline(notes, { range: null, categoryId: 6, stateCode: '08' }).map(
+      applyTimeline(notes, { ...NO_FILTERS, categoryIds: [6] }).map((a) => a.article_id),
+    ).toEqual([2, 3]);
+    expect(
+      applyTimeline(notes, { range: null, categoryIds: [6], stateCode: '08' }).map(
         (a) => a.article_id,
       ),
     ).toEqual([3]);

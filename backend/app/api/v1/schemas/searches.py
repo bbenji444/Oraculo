@@ -193,6 +193,16 @@ class SearchOut(BaseModel):
     scheduled_for: datetime | None = Field(
         default=None, description="Hora programada de una corrida automática (UTC)."
     )
+    window_start: datetime | None = Field(
+        default=None,
+        description=(
+            "Corridas automáticas: desde cuándo cubre (la corrida anterior). Solo cuentan las "
+            "notas publicadas entre window_start y window_end. Vacío en las manuales."
+        ),
+    )
+    window_end: datetime | None = Field(
+        default=None, description="Corridas automáticas: hasta cuándo cubre (su hora)."
+    )
 
     @classmethod
     def from_detail(cls, detail: SearchDetail) -> "SearchOut":
@@ -228,6 +238,8 @@ class SearchOut(BaseModel):
             providers=list(detail.providers),
             trigger=detail.trigger,
             scheduled_for=detail.scheduled_for,
+            window_start=detail.window_start,
+            window_end=detail.window_end,
         )
 
 

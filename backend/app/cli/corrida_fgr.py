@@ -58,7 +58,8 @@ async def run(settings: Settings, ask: Callable[[str], str] = input) -> int:
     heading(logger, "Corrida del monitor FGR (todavía no se ha gastado nada)")
     logger.info(
         f"Concepto: {settings.automatic_concept} · región: {settings.automatic_region_code} · "
-        f"últimos {settings.automatic_window_days} días · fuentes: {settings.automatic_sources}"
+        "solo lo publicado desde la corrida anterior · "
+        f"fuentes: {settings.automatic_sources}"
     )
     logger.info("0 créditos de SearchApi; la IA solo lee las notas que no ha visto.")
     if ask(f'Escribe "{CONFIRMATION}" para correrla: ').strip().lower() != CONFIRMATION:

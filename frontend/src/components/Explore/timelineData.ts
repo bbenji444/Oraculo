@@ -102,12 +102,16 @@ export interface Timeline {
 export interface TimelineFilters {
   /** Tramo elegido: `[inicio, fin)` en milisegundos UTC. */
   range: readonly [number, number] | null;
-  categoryId: number | null;
+  /**
+   * Categorías elegidas (una o varias: «Delincuencia organizada» y
+   * «Huachicol»); vacía = todas (Benji, 28/10/2026).
+   */
+  categoryIds: readonly number[];
   /** Clave INEGI del estado (`08`). */
   stateCode: string | null;
 }
 
-export const NO_FILTERS: TimelineFilters = { range: null, categoryId: null, stateCode: null };
+export const NO_FILTERS: TimelineFilters = { range: null, categoryIds: [], stateCode: null };
 
 /**
  * Cuándo ocurrió una nota: la fecha del hecho si la hay, si no la de publicación.
@@ -204,12 +208,12 @@ export function stateCodeOf(article: Pick<Article, 'primary_location'>): string 
 
 /** Aplica los filtros de la línea del tiempo (los mismos para el globo y la lista). */
 export function applyTimeline(articles: readonly Article[], filters: TimelineFilters): Article[] {
-  const { range, categoryId, stateCode } = filters;
-  if (!range && categoryId === null && stateCode === null) {
+  const { range, categoryIds, stateCode } = filters;
+  if (!range && categoryIds.length === 0 && stateCode === null) {
     return [...articles];
   }
   return articles.filter((article) => {
-    if (categoryId !== null && article.category?.id !== categoryId) return false;
+    if (categoryIds.length > 0 && !categoryIds.includes(article.category?.id ?? -1)) return false;
     if (stateCode !== null && stateCodeOf(article) !== stateCode) return false;
     if (range) {
       // El tramo es de publicación, igual que las barras.

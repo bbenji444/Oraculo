@@ -256,10 +256,14 @@ class Settings(BaseSettings):
     automatic_concept: str = _DEFAULT_AUTOMATIC_CONCEPT
     automatic_region_code: str = _DEFAULT_AUTOMATIC_REGION_CODE
     automatic_sources: str = "google_news_rss,indice_local"
-    # 1 = hoy y ayer (``DateWindow.last_days`` incluye ambos extremos): la
-    # corrida de las 07:00 alcanza lo de la noche anterior. Lo
-    # que ya se vio en otra corrida se reutiliza sin volver a pagar a la IA.
+    # Cada corrida cubre solo desde la anterior (de 23:00 a 07:00, de 07:00 a
+    # 15:00 y de 15:00 a 23:00; Benji, 28/10/2026). Si las anteriores no
+    # terminaron, cubre desde la última que sí, pero nunca más atrás que estos
+    # días.
     automatic_window_days: int = Field(default=_DEFAULT_AUTOMATIC_WINDOW_DAYS, ge=1, le=7)
+    # Minutos extra antes del inicio, para notas que los buscadores muestran
+    # tarde. 0 = estricto, lo que pidió Benji.
+    automatic_window_margin_minutes: int = Field(default=0, ge=0, le=120)
     automatic_user: str = Field(default=_DEFAULT_AUTOMATIC_USER, min_length=1)
     # Notas nuevas que la IA lee por corrida (en lugar de LLM_MAX_ARTICLES_PER_SEARCH).
     automatic_llm_max_articles: int = Field(default=_DEFAULT_AUTOMATIC_LLM_MAX_ARTICLES, ge=1)

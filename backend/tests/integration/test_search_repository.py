@@ -8,7 +8,7 @@ import argparse
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
@@ -37,6 +37,7 @@ from app.domain.authority import Authority
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.queries import Provider
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus, SearchTrigger
 from tests.integration.geo_fixture import load_fixture_catalog
 from tests.unit.application.test_execute_queries import FakeCache, FakeLog
@@ -693,3 +694,53 @@ async def test_la_corrida_anterior_es_la_ultima_automatica_terminada_y_viva(
     assert previous.scheduled_for == datetime(2026, 10, 26, 13, 0, tzinfo=UTC)
     assert await searches.previous_automatic_run(morning) is None
     assert (await searches.previous_automatic_run(manual)) is not None
+
+
+async def test_la_corrida_guarda_sus_horas_y_sabe_desde_cuando_cubrir(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # Benji, 28/10/2026: cada corrida cubre solo desde la anterior que terminó.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        mexico = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    # Un año sin otras corridas en la base de pruebas.
+    night = datetime(2031, 3, 4, 5, 0, tzinfo=UTC)
+    morning = datetime(2031, 3, 4, 13, 0, tzinfo=UTC)
+
+    async def automatic(slot: datetime, status: str, window: RunWindow | None) -> UUID:
+        found = await searches.create(
+            NewSearch(
+                user_id="monitor-automatico",
+                region_id=mexico,
+                date_from=date(2031, 3, 3),
+                date_to=date(2031, 3, 4),
+                concepts=(SearchConcept(concept_id, CONCEPT_NAME, "", ("FGR",)),),
+                queries_planned=2,
+                credits_estimated=0,
+                providers=(Provider.GOOGLE_NEWS_RSS,),
+                trigger=SearchTrigger.AUTOMATIC,
+                scheduled_for=slot,
+                time_window=window,
+            )
+        )
+        async with test_engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE searches SET status = :status WHERE id = :id"),
+                {"status": status, "id": found},
+            )
+        return found
+
+    window = RunWindow(night, morning)
+    done = await automatic(morning, "completed", window)
+    await automatic(morning + timedelta(hours=8), "failed", None)
+
+    loaded = await searches.load(done)
+    [detail] = [s for s in await searches.history("prueba", None, 200) if s.search_id == done]
+
+    assert loaded is not None
+    assert loaded.time_window == window
+    assert (detail.window_start, detail.window_end) == (night, morning)
+    # La que falló no cuenta: la siguiente cubre desde la última que terminó.
+    assert await searches.last_finished_automatic_slot(morning + timedelta(hours=16)) == morning
