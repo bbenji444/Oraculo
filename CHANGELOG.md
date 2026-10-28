@@ -8,6 +8,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Consola del Centro de mando en tres zonas (28/10/2026).** Las tres zonas ya no se pisan; antes, «Abrir resultados anteriores» se encimaba con el costo y no dejaba elegir las fichas:
+  - a la izquierda, un radar grande: cian mientras se arma la consulta, verde y más rápido cuando ya se puede lanzar;
+  - al centro, la frase y, en su propio renglón, los resultados anteriores, que se deslizan de lado si no caben (también con la rueda del mouse);
+  - a la derecha, el costo en tres láminas de color y «Iniciar barrido», que respira cuando la consulta está lista.
+
+  Si la consola es angosta (con el expediente abierto), el radar se oculta y el lanzamiento baja.
 - **«Filtro» en una ventana al centro de la pantalla (28/10/2026).** Un solo botón «Filtro» abre la ventana, sobre un fondo oscuro, para filtrar por:
   - categoría: cuadros de color en una cuadrícula ordenada, una o varias;
   - estado: lista desplegable;
@@ -153,6 +159,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Al elegir un país, el globo se acerca a él (28/10/2026).** En el Centro de mando, el vuelo seguía apartando la columna de búsqueda del diseño 2, que ahí no existe. Por eso Estados Unidos o Argentina quedaban corridos al oeste y más lejos que antes. Ahora el país queda al centro del espacio libre y lo llena, con poco margen.
 - **La entrada del globo llega directo a su lugar (28/10/2026).** Al abrir el sistema la Tierra giraba, se detenía y luego se recorría hacia arriba y cambiaba de tamaño, porque terminaba en un zoom fijo y después se reacomodaba al espacio libre. Ahora la entrada calcula desde el principio el zoom y el margen finales y llega ahí sin segundo ajuste.
 - **Elegir un país o una región en el Centro de mando ya hace zoom directo a él (27/10/2026).** Antes, al llegar a un país (zoom menor a 3), cualquier cambio de alto de la consola volvía a ajustar el globo entero y lo alejaba. Ahora ese ajuste solo aplica en la vista general, sin región ni nota elegida.
 - **El globo siempre llega a la noticia elegida (27/10/2026).** Fallaba en dos casos:

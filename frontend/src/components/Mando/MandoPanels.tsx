@@ -99,7 +99,7 @@ export function MandoPanels({
         className="pointer-events-none absolute bottom-4 left-4 flex justify-center"
         style={{ right: rightReserve + DOCK_MARGIN_PX }}
       >
-        <div ref={dockRef} className="pointer-events-auto relative w-full max-w-[54rem]">
+        <div ref={dockRef} className="pointer-events-auto relative w-full max-w-[62rem]">
           <MissionDock active={active} />
         </div>
       </div>

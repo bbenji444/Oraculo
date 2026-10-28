@@ -101,3 +101,13 @@ Benji pidió estos ajustes al elegirlo:
 - **El filtro va al centro de la pantalla**, como ventana sobre un fondo oscuro (portal a `body`). Las categorías van en una cuadrícula de tres columnas con cuadros del mismo alto, y el estado en lista desplegable (`HudSelect`).
 - **Se quitó la línea del tiempo de arriba** (`ActivityTimeline`). Benji: «se ve fea». El expediente queda con las pestañas, el conteo y «Filtro».
 - **La entrada del globo llega directo a su lugar.** Durante la entrada, el margen de los paneles se aplica de una vez (`setPadding`) y el zoom final es el que llena el espacio libre (`fitZoom`, calculado en cada cuadro). Antes terminaba en un zoom fijo y luego se reacomodaba hacia arriba.
+
+## Séptimos ajustes (28/10/2026, tarde)
+
+- **El vuelo a un país acerca y centra.** Benji: «en vez de acercarse a Estados Unidos, se aleja». El encuadre de regiones seguía apartando la columna del diseño 2 (`panelOpen` empieza en `true`), que en el Centro de mando no existe. El vuelo a Argentina caía 25° al oeste y con zoom 2.3. Ahora `columnInTheWay` la ignora aquí, y el margen extra es corto (`MANDO_EDGE_PX`), porque el encabezado y la consola ya quedan fuera del espacio libre.
+- **La consola en tres zonas** (radar, consulta y lanzamiento) que se acomodan según el ancho de la propia consola (`@container`):
+  - el radar grande a la izquierda, con ecos que se encienden al pasar el haz;
+  - los resultados anteriores en su propio renglón, deslizable;
+  - el costo en láminas y el botón, que respira cuando la consulta está lista.
+
+  El ancho máximo sube de 54 a 62 rem para que quepa el radar.
