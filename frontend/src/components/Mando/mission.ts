@@ -10,7 +10,7 @@
  *
  * No hace: no dibuja ni pide datos; recibe lo que ya trajeron los hooks.
  */
-import type { DateRange } from '../../store/explorer';
+import type { DateRange, ListFilter } from '../../store/explorer';
 import { isFinished, type Search } from '../../services/searches';
 import type { SourceOption } from '../../services/sources';
 import { formatRange, STAGE_LABEL, STAGES } from '../Explore/format';
@@ -374,4 +374,19 @@ export function missionLog(
     );
   }
   return lines;
+}
+
+/** Cuántos filtros hay puestos, para el número del botón. */
+export function activeFilters(
+  categoryIds: readonly number[],
+  stateCode: string | null,
+  listFilter: ListFilter,
+  showIrrelevant: boolean,
+): number {
+  return (
+    categoryIds.length +
+    (stateCode === null ? 0 : 1) +
+    (listFilter === 'all' ? 0 : 1) +
+    (showIrrelevant ? 1 : 0)
+  );
 }

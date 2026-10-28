@@ -90,3 +90,8 @@ Benji pidió estos ajustes al elegirlo:
 - **Botones de color por categoría** (`CategoryFilter`): van arriba del listado, para la cronología y la lista. Se prenden uno o varios («Delincuencia organizada» y «Huachicol»), y «Todas» los apaga. El filtro vale también para el globo (`categoryIds` en `useTimelineStore`).
 - **Sin la curva de notas por hora en el expediente.** Benji: «no se entiende e incluso es estorbosa». Con la ventana por horas de las corridas, cada expediente ya cubre solo unas horas. En el diseño de columna sigue.
 - **Atajos más claros.** «Abrir resultados anteriores» en lugar de «Reabrir sin costo». Las corridas dicen sus horas («Corrida de las 07:00 · 23:00 – 07:00») y las búsquedas, su día («Tu búsqueda del 27 oct: FGR en Jalisco»).
+
+## Quintos ajustes (28/10/2026, tarde)
+
+- **«Filtro» en una ventana** (`FilterPopover`). Los botones de color ocupaban mucho del listado; Benji pidió «que solo diga filtro y de ahí seleccionar los parámetros». La ventana tiene categorías (una o varias), estado, ubicación y no relevantes, y el botón dice cuántos filtros hay puestos. La lista ya no lleva sus pestañas de ubicación: el filtro vale para las dos vistas.
+- **Una línea del tiempo de verdad** (`ActivityTimeline`). Benji preguntó «qué onda con la línea del tiempo pro». Son barras por hora en capas del color de cada categoría, con las horas debajo, el pico, un aviso al pasar el mouse y filtro con un clic. Con la ventana por horas de las corridas (ADR-0031) son unas 8 barras, una por hora.

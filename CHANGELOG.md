@@ -8,7 +8,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
-- **Botones de color por categoría en el expediente (28/10/2026).** Un botón por cada tipo de noticia de la consulta, con su color y cuántas notas tiene. Se prenden uno o varios y la cronología, la lista y el globo muestran solo esas categorías; «Todas» los apaga.
+- **«Filtro» y una línea del tiempo nueva en el expediente (28/10/2026).**
+  - **«Filtro»:** un solo botón abre una ventana para filtrar por categoría (botones de color, una o varias), estado, ubicación (dentro, fuera o sin lugar) y no relevantes. El botón dice cuántos filtros hay puestos, y lo elegido vale para la cronología, la lista y el globo. Antes, los botones de categoría y las pestañas de ubicación ocupaban el espacio del listado.
+  - **Línea del tiempo:** una barra por hora (o por día), en capas del color de cada categoría, con las horas abajo y el pico arriba. Al pasar el mouse dice el tramo, cuántas notas tiene y de qué categorías; un clic filtra ese tramo y otro clic lo quita.
 - **Cada tipo de noticia tiene su color (28/10/2026, migración 0032).** Las 15 categorías tienen un color propio, el mismo en la barra del expediente, las etiquetas de la lista y de la cronología, los nodos de la cronología y los puntos del globo. Ejemplos: Homicidio en rojo, Huachicol en verde lima, Secuestro en rosa y Otros en gris. Solo se llenan los colores vacíos; si alguien elige uno, se respeta.
 - **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
   - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;

@@ -325,3 +325,19 @@ export const PROVIDER_LABEL: Readonly<Record<string, string>> = {
 export function providersLabel(providers: readonly string[]): string {
   return providers.map((p) => PROVIDER_LABEL[p] ?? p).join(' · ');
 }
+
+/**
+ * Si una nota entra en el filtro de ubicación: todas, dentro de la región,
+ * fuera o sin ubicación (§9 paso 7). Lo usan la lista y el filtro del
+ * expediente del Centro de mando.
+ *
+ * @example matchesListFilter(nota, 'false') // true si cayó fuera de la región
+ */
+export function matchesListFilter(
+  article: Pick<Article, 'in_region'>,
+  filter: 'all' | 'true' | 'false' | 'none',
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'none') return article.in_region === null;
+  return article.in_region === (filter === 'true');
+}

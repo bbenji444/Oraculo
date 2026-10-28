@@ -512,10 +512,9 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
       // En el expediente ya va dentro de un panel: sin marco propio.
       className={`${dossier ? 'min-h-0 flex-1' : `${GLASS_OSINT} max-h-full`} flex w-full min-w-0 flex-col`}
     >
-      <div
-        className={`space-y-2 border-b border-sky-400/10 px-4 ${dossier ? 'pb-2.5 pt-2.5' : 'pb-3 pt-3'}`}
-      >
-        {!dossier && (
+      {/* En el expediente, los filtros van en «Filtro» y la línea del tiempo arriba. */}
+      {!dossier && (
+        <div className="space-y-2 border-b border-sky-400/10 px-4 pb-3 pt-3">
           <div className="flex items-center gap-2">
             <h2 className={`${PANEL_TITLE} drop-shadow-[0_0_8px_rgb(0_210_255/0.55)]`}>
               Cronología
@@ -535,27 +534,18 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               ›
             </button>
           </div>
-        )}
-        {/* En el expediente no va la curva (Benji: «no se entiende», 28/10/2026):
-            solo el conteo, y las categorías van en sus botones de color. */}
-        {dossier && (
-          <p className="text-[11px] text-slate-400">
-            <span className="text-slate-200">{items.length} hechos</span> · {notes} notas
-          </p>
-        )}
-        {!dossier && timeline.buckets.length > 0 && (
-          <div>
-            <Spark
-              buckets={timeline.buckets}
-              unit={timeline.unit}
-              max={timeline.max}
-              range={range}
-              onPick={toggleRange}
-            />
-          </div>
-        )}
-        <div className="flex flex-wrap gap-1.5">
-          {!dossier && (
+          {timeline.buckets.length > 0 && (
+            <div>
+              <Spark
+                buckets={timeline.buckets}
+                unit={timeline.unit}
+                max={timeline.max}
+                range={range}
+                onPick={toggleRange}
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5">
             <HudSelect
               label="Filtrar por categoría"
               size="sm"
@@ -572,27 +562,24 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
                 setCategory(next ? Number(next) : null);
               }}
             />
-          )}
-          <HudSelect
-            label="Filtrar por estado"
-            size="sm"
-            className="w-auto max-w-[9rem] rounded-full"
-            value={stateCode ?? ''}
-            options={[
-              { value: '', label: 'Todos los estados' },
-              ...states.map((s) => ({ value: s.code, label: `${s.name} (${String(s.count)})` })),
-            ]}
-            onChange={(next) => {
-              setState(next || null);
-            }}
-          />
-          {filtered && (
-            <button type="button" onClick={clear} className={`${PILL} text-sky-300`}>
-              ✕ Quitar
-            </button>
-          )}
-          {/* En el expediente, la lista va en sus pestañas. */}
-          {!dossier && (
+            <HudSelect
+              label="Filtrar por estado"
+              size="sm"
+              className="w-auto max-w-[9rem] rounded-full"
+              value={stateCode ?? ''}
+              options={[
+                { value: '', label: 'Todos los estados' },
+                ...states.map((s) => ({ value: s.code, label: `${s.name} (${String(s.count)})` })),
+              ]}
+              onChange={(next) => {
+                setState(next || null);
+              }}
+            />
+            {filtered && (
+              <button type="button" onClick={clear} className={`${PILL} text-sky-300`}>
+                ✕ Quitar
+              </button>
+            )}
             <button
               type="button"
               aria-pressed={listOpen}
@@ -604,9 +591,9 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
             >
               ☰ Lista
             </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <DenseRows.Provider value={dossier}>
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">

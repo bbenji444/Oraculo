@@ -20,19 +20,21 @@
 import { type CSSProperties, useEffect } from 'react';
 
 import type { Article, Search } from '../../services/searches';
+import { useExplorerStore } from '../../store/explorer';
 import { useMandoStore } from '../../store/mando';
 import { useTimelineStore } from '../../store/timeline';
 import { categoryColor } from '../Explore/categoryColor';
 import { Chronology } from '../Explore/Chronology';
 import { DownloadButtons } from '../Explore/Controls';
-import { formatRange, providersLabel } from '../Explore/format';
+import { formatRange, matchesListFilter, providersLabel } from '../Explore/format';
 import { ResultsList } from '../Explore/ResultsList';
 import { categoriesIn, statesIn } from '../Explore/timelineData';
 import { GLASS } from '../Explore/ui';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
-import { CategoryFilter } from './CategoryFilter';
+import { ActivityTimeline } from './ActivityTimeline';
+import { FilterPopover } from './FilterPopover';
 import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
 
@@ -104,6 +106,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   const setSummaryOpen = useMandoStore((s) => s.setSummaryOpen);
   const listOpen = useTimelineStore((s) => s.listOpen);
   const setListOpen = useTimelineStore((s) => s.setListOpen);
+  const listFilter = useExplorerStore((s) => s.listFilter);
 
   // Cada consulta abre su cronología desplegada.
   useEffect(() => {
@@ -126,6 +129,9 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   }
 
   const states = statesIn(relevant);
+  // El filtro de ubicación de «Filtro» vale para la cronología y la lista.
+  const located = relevant.filter((a) => matchesListFilter(a, listFilter));
+  const listed = shown.filter((a) => matchesListFilter(a, listFilter));
   const categories = categoriesIn(relevant).slice(0, TOP_CATEGORIES);
   const view: DossierView = listOpen ? 'list' : 'chrono';
   const title = `${search.concepts.map((c) => c.name).join(', ')} · ${search.region_name}`;
@@ -264,8 +270,14 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
             }}
             label="Vista del expediente"
           />
-          {/* Los mismos botones para la cronología y la lista. */}
-          <CategoryFilter articles={relevant} />
+          {/* Cuántas se ven y el botón «Filtro»: los mismos para las dos vistas. */}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">
+              <span className="text-slate-200">{listed.length}</span> de {articles.length} notas
+            </p>
+            <FilterPopover articles={relevant} />
+          </div>
+          <ActivityTimeline articles={located} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
           {listOpen ? (
@@ -276,7 +288,7 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
               variant="dossier"
             />
           ) : (
-            <Chronology articles={relevant} variant="dossier" />
+            <Chronology articles={located} variant="dossier" />
           )}
         </div>
       </section>
