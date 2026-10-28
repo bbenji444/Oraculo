@@ -591,6 +591,88 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Línea del tiempo del expediente (ActivityTimeline): barras por hora en
+   capas de color por categoría. Crecen al aparecer; al pasar el mouse, la
+   barra se ilumina y las demás bajan un poco. */
+.mando-activity-bar {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: flex-end;
+  padding: 0;
+  border-radius: 3px;
+  background: rgb(0 210 255 / 0.04);
+  transition:
+    background-color 0.2s var(--hud-ease),
+    opacity 0.2s var(--hud-ease);
+}
+.mando-activity-bar:disabled {
+  cursor: default;
+}
+.mando-activity-bar:not(:disabled):hover,
+.mando-activity-bar:focus-visible {
+  background: rgb(0 210 255 / 0.12);
+  outline: none;
+}
+.mando-activity-bar[data-dim] {
+  opacity: 0.35;
+}
+.mando-activity-bar[data-picked] {
+  background: rgb(0 210 255 / 0.16);
+  box-shadow: inset 0 0 0 1px rgb(0 210 255 / 0.7);
+}
+.mando-activity-stack {
+  display: flex;
+  width: 100%;
+  height: var(--h);
+  flex-direction: column-reverse;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 3px 3px 1px 1px;
+  transform-origin: bottom;
+  animation: mando-bar-grow 0.7s var(--hud-ease) both;
+  animation-delay: inherit;
+}
+.mando-activity-stack > span {
+  min-height: 2px;
+}
+.mando-activity-bar:not(:disabled):hover .mando-activity-stack {
+  box-shadow: 0 0 10px rgb(0 210 255 / 0.5);
+}
+.mando-activity-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: 13rem;
+  translate: -50% 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgb(0 210 255 / 0.35);
+  border-radius: 10px;
+  background: rgb(5 14 20 / 0.96);
+  box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.9);
+  pointer-events: none;
+  animation: hud-rise 0.18s var(--hud-ease) both;
+}
+
+/* Número de filtros puestos en el botón «Filtro». */
+.mando-filter-count {
+  display: inline-grid;
+  min-width: 1.15rem;
+  place-items: center;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--hud-cyan);
+  color: #021018;
+  font: 700 10px/1.4 var(--font-display);
+}
+
+/* La ventana del filtro entra con un despliegue corto. */
+.mando-popover {
+  animation: hud-menu-in 0.22s var(--hud-ease) both;
+}
+
 /* Pestaña en el borde para volver a abrir el expediente. */
 .mando-edge-tab {
   writing-mode: vertical-rl;
@@ -616,6 +698,15 @@
   30%,
   100% {
     transform: translateX(120%);
+  }
+}
+
+@keyframes mando-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
   }
 }
 
@@ -788,6 +879,9 @@
   .mando-dossier,
   .mando-kpi::after,
   .mando-meter::after,
+  .mando-activity-stack,
+  .mando-activity-tip,
+  .mando-popover,
   .mando-summary,
   .mando-meter > span,
   .mando-banner {
