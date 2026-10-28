@@ -37,9 +37,17 @@ interface ResultsListProps {
   /** Todas las notas de la búsqueda, relevantes o no. */
   total: number;
   colors: ReadonlyMap<number, string>;
+  /**
+   * `column`: el panel del diseño de columna. `dossier`: dentro del expediente
+   * del Centro de mando, que ya tiene las pestañas «Cronología | Noticias»:
+   * sin marco ni título propios, con tarjetas compactas para que quepan muchas
+   * más noticias (Benji, 28/10/2026).
+   */
+  variant?: 'column' | 'dossier';
 }
 
-export function ResultsList({ articles, total, colors }: ResultsListProps) {
+export function ResultsList({ articles, total, colors, variant = 'column' }: ResultsListProps) {
+  const dossier = variant === 'dossier';
   const filter = useExplorerStore((s) => s.listFilter);
   const setFilter = useExplorerStore((s) => s.setListFilter);
   const articleId = useExplorerStore((s) => s.articleId);
@@ -58,21 +66,36 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
   }, [articleId]);
 
   return (
-    <section aria-label="Noticias" className={`${GLASS} flex min-h-0 flex-col p-4`}>
+    <section
+      aria-label="Noticias"
+      className={
+        dossier
+          ? 'flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2'
+          : `${GLASS} flex min-h-0 flex-col p-4`
+      }
+    >
       <div className="flex items-center justify-between">
-        <h2 className={PANEL_TITLE} title={count.hint}>
-          {count.label}
-        </h2>
-        <button
-          type="button"
-          onClick={() => {
-            useTimelineStore.getState().setListOpen(false);
-          }}
-          title="Volver a la cronología"
-          className="ml-auto mr-3 rounded-full border border-sky-400/20 px-2 py-0.5 text-[11px] text-sky-200 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-sky-400"
-        >
-          ◷ Cronología
-        </button>
+        {dossier ? (
+          <p className="text-[11px] text-slate-400" title={count.hint}>
+            {count.label.toLowerCase()}
+          </p>
+        ) : (
+          <h2 className={PANEL_TITLE} title={count.hint}>
+            {count.label}
+          </h2>
+        )}
+        {!dossier && (
+          <button
+            type="button"
+            onClick={() => {
+              useTimelineStore.getState().setListOpen(false);
+            }}
+            title="Volver a la cronología"
+            className="ml-auto mr-3 rounded-full border border-sky-400/20 px-2 py-0.5 text-[11px] text-sky-200 hover:border-sky-400/50 focus-visible:outline-2 focus-visible:outline-sky-400"
+          >
+            ◷ Cronología
+          </button>
+        )}
         <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <input
             type="checkbox"
@@ -86,7 +109,7 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
         </label>
       </div>
       <div
-        className="hud-seg mt-3"
+        className={`hud-seg ${dossier ? 'mt-2' : 'mt-3'}`}
         role="tablist"
         aria-label="Filtrar por región"
         style={
@@ -114,12 +137,14 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
           </button>
         ))}
       </div>
-      {groups.length < shown.length && (
+      {!dossier && groups.length < shown.length && (
         <p className="mt-2 text-[11px] text-slate-500">
           {shown.length} notas en {groups.length} tarjetas: las del mismo hecho van juntas.
         </p>
       )}
-      <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+      <ul
+        className={`min-h-0 flex-1 overflow-y-auto pr-1 ${dossier ? 'mt-2 space-y-1' : 'mt-3 space-y-1.5'}`}
+      >
         {shown.length === 0 && <li className="text-xs text-slate-500">Nada en esta pestaña.</li>}
         {groups.map((group) => (
           <li key={group.lead.article_id}>
@@ -129,6 +154,7 @@ export function ResultsList({ articles, total, colors }: ResultsListProps) {
               selectedId={articleId}
               selectedRef={selectedRef}
               onSelect={selectArticle}
+              dense={dossier}
             />
           </li>
         ))}

@@ -249,13 +249,17 @@ export function statesIn(
 /** Categorías presentes en las notas, con cuántas tiene cada una (de más a menos). */
 export function categoriesIn(
   articles: readonly Article[],
-): { id: number; name: string; count: number }[] {
-  const counts = new Map<number, { name: string; count: number }>();
+): { id: number; name: string; color: string | null; count: number }[] {
+  const counts = new Map<number, { name: string; color: string | null; count: number }>();
   for (const article of articles) {
     const category = article.category;
     if (!category) continue;
     const current = counts.get(category.id);
-    counts.set(category.id, { name: category.name, count: (current?.count ?? 0) + 1 });
+    counts.set(category.id, {
+      name: category.name,
+      color: category.color,
+      count: (current?.count ?? 0) + 1,
+    });
   }
   return [...counts.entries()]
     .map(([id, value]) => ({ id, ...value }))

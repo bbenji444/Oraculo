@@ -448,7 +448,7 @@
   --tone: 0 210 255;
   position: relative;
   overflow: hidden;
-  padding: 0.5rem 0.65rem 0.45rem;
+  padding: 0.38rem 0.6rem 0.36rem;
   border: 1px solid rgb(var(--tone) / 0.3);
   border-radius: 12px;
   background:
@@ -504,8 +504,8 @@
   white-space: nowrap;
 }
 .mando-kpi .hud-kpi-value {
-  margin-top: 0.3rem;
-  font-size: 1.12rem;
+  margin-top: 0.22rem;
+  font-size: 1rem;
   text-shadow: 0 0 16px rgb(var(--tone) / 0.55);
 }
 
@@ -537,14 +537,6 @@
   background: linear-gradient(90deg, transparent 40%, rgb(255 255 255 / 0.55) 50%, transparent 60%);
   transform: translateX(-100%);
   animation: mando-shine 4.5s var(--hud-ease) 1.2s infinite;
-}
-
-/* Noticias del expediente: más grandes y claras que en la columna. `zoom`
-   agranda letra, renglones y espacios por igual sin tocar los componentes,
-   que comparten los dos diseños (Benji: «que las noticias se vean más
-   claras… un listado mucho más grande», 27/10/2026). */
-.mando-feed {
-  zoom: 1.1;
 }
 
 /* Pestaña en el borde para volver a abrir el expediente. */

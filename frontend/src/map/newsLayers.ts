@@ -68,7 +68,10 @@ export function newsFeatures(
       geometry: { type: 'Point', coordinates: [lon, lat] },
       properties: {
         id: article.article_id,
+        // El color de su categoría (el delito), como en la lista y la
+        // cronología; sin categoría, el de su concepto (28/10/2026).
         color:
+          article.category?.color ??
           (firstRelevant === undefined ? undefined : colors.get(firstRelevant.concept_id)) ??
           NEWS_DEFAULT_COLOR,
         coarse: location.precision === 'country' || location.precision === 'state',

@@ -147,8 +147,8 @@ describe('filtros', () => {
       { code: '19', name: 'Nuevo León', count: 1 },
     ]);
     expect(categoriesIn(notes)).toEqual([
-      { id: 6, name: 'Armas y explosivos', count: 2 },
-      { id: 7, name: 'Huachicol y delitos contra hidrocarburos', count: 1 },
+      { id: 6, name: 'Armas y explosivos', color: null, count: 2 },
+      { id: 7, name: 'Huachicol y delitos contra hidrocarburos', color: null, count: 1 },
     ]);
   });
 

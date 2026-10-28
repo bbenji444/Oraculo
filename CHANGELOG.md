@@ -8,6 +8,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Cada tipo de noticia tiene su color (28/10/2026, migración 0032).** Las 15 categorías tienen un color propio, el mismo en la barra del expediente, las etiquetas de la lista y de la cronología, los nodos de la cronología y los puntos del globo. Ejemplos: Homicidio en rojo, Huachicol en verde lima, Secuestro en rosa y Otros en gris. Solo se llenan los colores vacíos; si alguien elige uno, se respeta.
 - **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
   - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;
   - **«Iniciar barrido»:** botón con aro de carga y onda expansiva; antes de lanzar, el costo se ve con cifras que corren;
@@ -100,6 +101,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **El expediente muestra muchas más noticias (28/10/2026).** En una pantalla de 900 px de alto caben 9 a 11, antes 2 o 3. Cambios:
+  - las pestañas «Cronología | Noticias» están dentro del panel de noticias, en el mismo lugar para las dos vistas;
+  - el resumen es más bajo y el PDF es un botón chico junto al título;
+  - cada renglón muestra el título en una línea; al elegirlo o al pasar el mouse se ve completo;
+  - en cada renglón, el medio, el lugar, la categoría y «+N» van en un solo renglón de datos.
 - **Vista general más grande al abrir el sistema (27/10/2026).** En el Centro de mando, de la consola de abajo solo se reserva un 35 % de su alto: el globo crece y su orilla pasa por detrás del vidrio, como pidió Benji. Al volar a una región o a una noticia se usa el margen completo, para que nada quede tapado.
 - **El globo abre más grande y los vuelos a una noticia son más ágiles (27/10/2026).** Benji lo pidió. El zoom inicial pasa de 1.8 a 2, y en el Centro de mando el globo ocupa todo el alto entre el encabezado y la consola. Volar a una noticia tarda 25 % menos y hace más arco. La ficha queda debajo de los controles del globo.
 - **Las corridas automáticas leen hasta 250 notas nuevas con la IA (27/10/2026, ADR-0031).** Antes era el tope general de 150; en la corrida de las 15:00 se alcanzó y 10 notas esperaron a la siguiente. Cuesta unos 0.025 USD más por corrida en el peor caso. Las búsquedas manuales siguen con 150. Se ajusta con `AUTOMATIC_LLM_MAX_ARTICLES`.
