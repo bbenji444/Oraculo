@@ -33,32 +33,6 @@ Para homologar el reporte con Oráculo, los títulos, las cifras y el número de
 
 Licencia: SIL Open Font License 1.1 (Copyright 2018 The Orbitron Project Authors), la misma de `OFL.txt`.
 
-## IBM Plex (tipografía del reporte desde el 30/10/2026)
-
-Benji pidió «una tipografía más pro, que no parezca hecha en un documento de Word»: Noto Serif se parecía a Cambria o Georgia. El reporte usa **IBM Plex**, la familia corporativa de IBM, hecha para documentos técnicos:
-
-- **IBM Plex Sans:** el texto, justificado;
-- **IBM Plex Sans Condensed:** títulos, preguntas, titulares y cifras;
-- **IBM Plex Mono:** horas, número de expediente y numeración.
-
-Es el subconjunto latino en WOFF2 de `@fontsource` 5.3.0. Trae la Ñ, los acentos, «», las rayas y las comillas; si falta una letra, el PDF usa Noto Sans. Licencia SIL Open Font License 1.1 (`LICENSE-IBMPlex.txt`).
-
-Descargadas el 30/10/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>@5.3.0/files/<archivo>`.
-
-| Archivo | SHA-256 |
-|---|---|
-| `ibm-plex-sans-latin-400-normal.woff2` | `3b646991d30055a93a4ecc499713d4347953a74a947ecab435ab72070cbdab0e` |
-| `ibm-plex-sans-latin-400-italic.woff2` | `6de912e531b6c98084f1b2d5e5a91bad77be4e68bc4e396e43c46fc435e5f3d9` |
-| `ibm-plex-sans-latin-600-normal.woff2` | `8960851d691c054ed38e259bdcf1a6190d157b4203ed5bb32c632a863fb8ec2f` |
-| `ibm-plex-sans-latin-700-normal.woff2` | `42e7b0c143c19df9d99fd896e76b48f846edf0902d200bc29796b34d12c33aa7` |
-| `ibm-plex-sans-condensed-latin-600-normal.woff2` | `3d72a0923c5830358b0a8e25b258aecadbecbf542b6ee9a25f387803e37d56b9` |
-| `ibm-plex-sans-condensed-latin-700-normal.woff2` | `4768878c107d92c528a65bba206a87cdcf2c694514e75907fb91772cf8a388a5` |
-| `ibm-plex-mono-latin-400-normal.woff2` | `08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7` |
-| `ibm-plex-mono-latin-600-normal.woff2` | `0d1f0b8d0722224e32e9f28261bdc86c79115be73444ae5eceb73976a1bcdf83` |
-| `LICENSE-IBMPlex.txt` | `d0283623ef57e722fd0eb688a8041589670c608ab780cd3612d06ba6f153d3fd` |
-
-Antes de IBM Plex, el reporte usó unas horas Noto Serif y Noto Sans seminegrita. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
-
 ## Exo 2 e Inter (tipografía del reporte desde el 30/10/2026, noche)
 
 Benji pidió «algo que se vea más moderno pero tampoco tan exagerado, algo acorde al sistema». El reporte usa la misma pareja que la interfaz del monitor:
@@ -79,4 +53,4 @@ Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 30/10/2026 de 
 | `LICENSE-Exo2.txt` | `7644b74e07215f62af4ebbfcf2b0f06a428d70d32c41e751fba93763a683c3f5` |
 | `LICENSE-Inter.txt` | `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345` |
 
-Los archivos de IBM Plex (sección anterior) ya no los usa la plantilla. Siguen en la carpeta hasta que Benji apruebe borrarlos.
+Antes de Exo 2 e Inter, el reporte usó unas horas Noto Serif y luego IBM Plex. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
