@@ -30,7 +30,7 @@ import {
   easeOutCubic,
   flyDurationMs,
   flyPitch,
-  IDLE_RESUME_MS,
+  idleResumeMs,
   INTRO_DURATION_MS,
   INTRO_FROM_ZOOM,
   INTRO_LNG_OFFSET_DEGREES,
@@ -906,26 +906,36 @@ export function ExploreGlobe({
     }
   }, [spinning, ready]);
 
-  // Reanudar el giro tras un rato sin uso, si no hay nada elegido.
+  // Elegir o soltar una nota, una región o el muro cuenta como uso: el giro
+  // no arranca en cuanto se cierra la ficha.
   useEffect(() => {
-    if (
-      spinning ||
-      regionId !== null ||
-      articleId !== null ||
-      wallCaseId !== null ||
-      motion === 'off'
-    ) {
-      return;
-    }
+    lastInteractionRef.current = performance.now();
+  }, [regionId, articleId, wallCaseId]);
+
+  // Reanudar el giro tras un rato sin uso, si no se está viendo nada.
+  // En el Centro de mando la región de la consulta (casi siempre México) no
+  // cuenta: el globo gira con los resultados a la vista y se detiene al abrir
+  // una nota, el muro o la lista de un grupo (Benji, 30/10/2026: «que la
+  // tierra gire automáticamente cuando no estoy representando nada»).
+  const stackOpen = stack !== null;
+  useEffect(() => {
+    const idleMs = idleResumeMs({
+      mando: clearHeader,
+      regionId,
+      articleId,
+      wallCaseId,
+      stackOpen,
+    });
+    if (spinning || idleMs === null || motion === 'off') return;
     const timer = window.setInterval(() => {
-      if (performance.now() - lastInteractionRef.current > IDLE_RESUME_MS) {
+      if (performance.now() - lastInteractionRef.current > idleMs) {
         useExplorerStore.getState().setSpinning(true);
       }
     }, IDLE_CHECK_MS);
     return () => {
       window.clearInterval(timer);
     };
-  }, [spinning, regionId, articleId, wallCaseId, motion]);
+  }, [spinning, regionId, articleId, wallCaseId, stackOpen, motion, clearHeader]);
 
   // El muro y «Mis casos» dibujan sobre este mismo mapa (9.6).
   useEffect(() => {
