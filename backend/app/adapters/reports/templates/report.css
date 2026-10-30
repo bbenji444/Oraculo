@@ -40,13 +40,6 @@
   font-weight: 700;
 }
 
-/* Títulos, cifras y etiquetas: seminegrita, más fina que la negrita. */
-@font-face {
-  font-family: "Noto Sans Reporte";
-  src: url("NotoSans-SemiBold.ttf");
-  font-weight: 600;
-}
-
 /* IBM Plex (30/10/2026): la tipografía corporativa de IBM, hecha para
    documentos técnicos. Benji pidió «una tipografía más pro, que no parezca
    hecha en un documento de Word». Subconjunto latino en WOFF2 (@fontsource
@@ -1708,13 +1701,11 @@ td.ix-num {
 }
 
 /* --- Tipografía formal y texto justificado (30/10/2026) ---------------------
-   Benji: «texto justificado… y unas tipografías más pro». Como un informe
-   formal: el texto de lectura en Noto Serif, justificado y con división de
-   palabras en español (el documento es lang="es"); los titulares de las
-   notas y el título de la portada en Noto Serif negrita; preguntas, títulos
-   de sección, cifras, tablas y etiquetas en Noto Sans seminegrita. Las
-   listas, tablas y renglones cortos siguen alineados a la izquierda: en un
-   renglón corto, justificar abre huecos. */
+   Benji: «texto justificado… y unas tipografías más pro». El texto de
+   lectura va justificado y con división de palabras en español (el
+   documento es lang="es"); las letras de cada parte están en la sección de
+   IBM Plex, al final. Las listas, tablas y renglones cortos siguen
+   alineados a la izquierda: en un renglón corto, justificar abre huecos. */
 
 .summary p,
 .top-text,
