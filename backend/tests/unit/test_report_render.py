@@ -207,3 +207,6 @@ async def test_el_reporte_responde_las_preguntas_del_analista(report: ReportData
         assert question in page
     # Tipografía formal: Orbitron solo en la marca de la portada.
     assert '--tech: "Noto Sans Reporte", sans-serif;' in page
+    # Texto de lectura en serif, justificado y con división de palabras (30/10/2026).
+    assert 'font-family: "Noto Serif Reporte";' in page
+    assert "text-align: justify;" in page
