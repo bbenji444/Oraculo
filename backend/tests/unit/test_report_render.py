@@ -206,8 +206,8 @@ async def test_el_reporte_responde_las_preguntas_del_analista(report: ReportData
     ):
         assert question in page
     # Tipografía formal: Orbitron solo en la marca de la portada.
-    assert '--tech: "Plex Condensed Reporte", "Noto Sans Reporte", sans-serif;' in page
-    # IBM Plex, texto justificado y con división de palabras (30/10/2026).
-    assert 'font-family: "Plex Sans Reporte";' in page
-    assert 'font-family: "Plex Mono Reporte";' in page
+    assert '--tech: "Exo Reporte", "Inter Reporte", "Noto Sans Reporte", sans-serif;' in page
+    # Exo 2 e Inter, como la interfaz; texto justificado y dividido (30/10/2026).
+    assert 'font-family: "Exo Reporte";' in page
+    assert 'font-family: "Inter Reporte";' in page
     assert "text-align: justify;" in page

@@ -6,6 +6,10 @@
  * cian #00d2ff, texto #e0f7fa, títulos en Orbitron y texto en Roboto. Las
  * fuentes van autoalojadas (src/assets/fonts): nada se descarga de internet.
  *
+ * Desde el 30/10/2026 (Benji: «algo que se vea más moderno pero tampoco tan
+ * exagerado»): títulos, botones y etiquetas en Exo 2 y el texto en Inter.
+ * Orbitron queda solo en el logo, como marca de Oráculo.
+ *
  * En lugar de tocar cada componente, se redefinen las escalas `slate` (fondos
  * y textos) y `sky` (acento) de Tailwind con los tonos de Oráculo: toda la
  * interfaz cambia de una vez y sigue usando las mismas clases.
@@ -37,6 +41,57 @@
   font-display: swap;
   src: url('../assets/fonts/orbitron-700.woff2') format('woff2');
 }
+/* Exo 2 e Inter: subconjunto latino de @fontsource 5.3.0 (OFL), con su
+   SHA-256 en src/assets/fonts/README.md. */
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/exo-2-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/exo-2-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/exo-2-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/inter-latin-700-normal.woff2') format('woff2');
+}
 @font-face {
   font-family: 'Roboto';
   font-style: normal;
@@ -60,9 +115,11 @@
 }
 
 @theme {
-  --font-sans: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  /* Títulos y cifras «técnicas», como en OSINT (--fuente-tec). */
-  --font-display: 'Orbitron', 'Roboto', sans-serif;
+  --font-sans: 'Inter', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Títulos, botones, etiquetas y cifras: técnica pero sobria. */
+  --font-display: 'Exo 2', 'Inter', sans-serif;
+  /* La marca de Oráculo (el logo): la única que sigue en Orbitron. */
+  --font-brand: 'Orbitron', 'Exo 2', sans-serif;
 
   /* Fondos y textos de Oráculo (--fondo, --papel-solido, --texto, --texto-2,
      --texto-3), con los pasos intermedios interpolados. */
@@ -121,7 +178,7 @@ select optgroup {
   color: #e0f7fa;
 }
 
-/* Títulos de sección: Orbitron con el espaciado de OSINT. */
+/* Títulos de sección: letra técnica con el espaciado de OSINT. */
 .titulo-oraculo {
   font-family: var(--font-display);
   letter-spacing: 0.14em;
@@ -196,7 +253,7 @@ select optgroup {
   animation: marca-giro 6s linear infinite;
 }
 .marca-nombre {
-  font: 700 15px/1 var(--font-display);
+  font: 700 15px/1 var(--font-brand);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: #fff;

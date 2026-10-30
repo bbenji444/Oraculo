@@ -128,3 +128,12 @@ Benji: «una tipografía más pro, que no parezca hecha en un documento de Word�
 - **Mono:** horas, expediente y numeración.
 
 El conjunto da la apariencia de un informe técnico. Son 8 archivos WOFF2 que pesan 165 KB en total; Noto Sans queda de respaldo para las letras fuera del subconjunto latino. Orbitron sigue solo en la marca.
+
+### Cambio: Exo 2 e Inter, como la interfaz (30/10/2026, noche)
+
+Benji: «algo que se vea más moderno pero tampoco tan exagerado, algo acorde al sistema». El reporte deja IBM Plex y usa la misma pareja que el monitor:
+
+- **Exo 2:** títulos, preguntas, titulares y cifras;
+- **Inter:** el texto justificado, y también horas y numeración, con cifras tabulares.
+
+Así el PDF se reconoce como parte del mismo sistema. Orbitron sigue solo en la marca.
