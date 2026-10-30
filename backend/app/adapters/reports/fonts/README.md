@@ -33,19 +33,6 @@ Para homologar el reporte con Oráculo, los títulos, las cifras y el número de
 
 Licencia: SIL Open Font License 1.1 (Copyright 2018 The Orbitron Project Authors), la misma de `OFL.txt`.
 
-## Noto Serif y Noto Sans seminegrita (tipografía formal, 30/10/2026)
-
-Benji pidió «texto justificado y tipografías más pro». El texto de lectura (resumen ejecutivo, resúmenes de las notas, metodología) va en **Noto Serif**, justificado y con división de palabras en español. Los titulares de las notas y el título de la portada van en **Noto Serif negrita**. Las preguntas, los títulos, las cifras y las etiquetas van en **Noto Sans seminegrita**. Son de la misma familia Noto: tienen la Ñ y todos los acentos, y la misma licencia (`OFL.txt`; su SHA-256 es idéntico al de Noto Serif en google/fonts).
-
-Descargadas el 30/10/2026.
-
-| Archivo | Origen | SHA-256 |
-|---|---|---|
-| `NotoSerif-Regular.ttf` | <https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf> | `19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88` |
-| `NotoSerif-Italic.ttf` | <https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerif/hinted/ttf/NotoSerif-Italic.ttf> | `749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f` |
-| `NotoSerif-Bold.ttf` | <https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerif/hinted/ttf/NotoSerif-Bold.ttf> | `96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce` |
-| `NotoSans-SemiBold.ttf` | <https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSans/hinted/ttf/NotoSans-SemiBold.ttf> | `a4e91fd530ac2b4ef5367240144ff37d7d65d66cf76f2e9a2187b93c676f92d0` |
-
 ## IBM Plex (tipografía del reporte desde el 30/10/2026)
 
 Benji pidió «una tipografía más pro, que no parezca hecha en un documento de Word»: Noto Serif se parecía a Cambria o Georgia. El reporte usa **IBM Plex**, la familia corporativa de IBM, hecha para documentos técnicos:
@@ -70,4 +57,4 @@ Descargadas el 30/10/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>
 | `ibm-plex-mono-latin-600-normal.woff2` | `0d1f0b8d0722224e32e9f28261bdc86c79115be73444ae5eceb73976a1bcdf83` |
 | `LICENSE-IBMPlex.txt` | `d0283623ef57e722fd0eb688a8041589670c608ab780cd3612d06ba6f153d3fd` |
 
-Los archivos de Noto Serif y Noto Sans seminegrita (sección anterior) ya no los usa la plantilla. Siguen en la carpeta hasta que Benji apruebe borrarlos.
+Antes de IBM Plex, el reporte usó unas horas Noto Serif y Noto Sans seminegrita. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
