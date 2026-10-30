@@ -132,6 +132,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **El globo gira solo mientras no se ve nada en particular (30/10/2026).** En el Centro de mando, con los resultados a la vista, el globo vuelve a girar a los 10 segundos sin uso. Se detiene al abrir una nota, el muro o la lista de un grupo.
+- **PDF en IBM Plex (30/10/2026).** La tipografía ya no parece de procesador de textos:
+  - IBM Plex Sans en el texto, justificado;
+  - IBM Plex Sans Condensed en títulos, titulares y cifras;
+  - IBM Plex Mono en horas y número de expediente.
+
+  Reemplaza a Noto Serif.
 - **PDF con tipografía formal y texto justificado (30/10/2026).** Se cambió la tipografía:
   - el texto de lectura (resumen ejecutivo, resúmenes de los hechos, metodología) va en Noto Serif, justificado y con división de palabras en español;
   - los titulares de las notas y el título de la portada, en Noto Serif negrita;
