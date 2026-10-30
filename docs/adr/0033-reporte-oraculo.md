@@ -108,3 +108,13 @@ Al final va el índice por estado, con una franja de colores por estado y un fil
 **Resultado** con la corrida de las 07:00 del 28/10/2026: 10 páginas, sin hojas casi vacías.
 
 **Alternativa descartada:** que la IA escriba las conclusiones de cada pregunta. Costaría una llamada más por reporte, y una cifra mal redactada por la IA sería más grave que una frase sencilla calculada.
+
+## Ajuste: tipografía de informe formal (30/10/2026)
+
+Benji: «pon texto justificado en el PDF y con unas tipografías más pro». Se usa la pareja serif para leer y sans para títulos de los informes formales, toda de la familia Noto: tiene la Ñ, todos los acentos y la misma licencia OFL. Las fuentes y sus SHA-256 están en `backend/app/adapters/reports/fonts/README.md`.
+
+- **Noto Serif**, justificada y con división de palabras en español, en el texto de lectura. WeasyPrint divide con `pyphen`, que ya instala.
+- **Noto Serif negrita** en los titulares y el título de la portada.
+- **Noto Sans seminegrita** en las preguntas, los títulos, las cifras y las etiquetas. Las tablas, las listas y los renglones cortos siguen alineados a la izquierda, porque justificar un renglón corto abre huecos.
+- Las direcciones web no se dividen (`.nohyphen`).
+- Orbitron queda solo en la marca «ORÁCULO».

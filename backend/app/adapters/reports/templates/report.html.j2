@@ -424,7 +424,7 @@
       {% endfor %}
     </tbody>
   </table>
-  <p class="small">Créditos de SearchApi: <b>{{ data.search.credits_used }}</b> · Costo estimado de la IA en la búsqueda: <b>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</b>{% if view.uses_gdelt %} · Incluye datos de The GDELT Project (gdeltproject.org){% endif %}.</p>
+  <p class="small">Créditos de SearchApi: <b>{{ data.search.credits_used }}</b> · Costo estimado de la IA en la búsqueda: <b>{{ "%.4f" | format(data.search.llm_cost_usd) }} USD</b>{% if view.uses_gdelt %} · Incluye datos de The GDELT Project (<span class="nohyphen">gdeltproject.org</span>){% endif %}.</p>
   <p class="small muted">Los resúmenes, las categorías, quién actúa y las ubicaciones se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link. Documento de uso interno · {{ o.code }}.</p>
 </section>
 

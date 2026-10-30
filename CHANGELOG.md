@@ -132,6 +132,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **PDF con tipografía formal y texto justificado (30/10/2026).** Se cambió la tipografía:
+  - el texto de lectura (resumen ejecutivo, resúmenes de los hechos, metodología) va en Noto Serif, justificado y con división de palabras en español;
+  - los titulares de las notas y el título de la portada, en Noto Serif negrita;
+  - las preguntas, los títulos, las cifras y las etiquetas, en Noto Sans seminegrita;
+  - las conclusiones de cada pregunta, en cursiva.
+
+  Las fuentes van incluidas en el repositorio con su manifiesto y su SHA-256.
 - **Las corridas dejan fuera los hechos de otros días, no las sentencias de hoy (28/10/2026, `enrich_v3`, ADR-0031).** La IA ahora da la fecha y el tipo de lo que la nota informa (la detención, la sentencia, el cateo) en lugar de la fecha del delito original. Con esa fecha, cada corrida quita las notas cuyo hecho es de antes de su periodo: el cateo de ayer publicado hoy sale; la sentencia de hoy por un delito de 2019 se queda. La cronología también acomoda cada nota en la fecha de lo que informa.
 - **«Nueva consulta» y «Ajustar consulta» regresan el globo al Atlántico y lo ponen a girar (28/10/2026).** Al tocar cualquiera de los dos botones, el globo vuela a la vista del Atlántico, la misma con la que abre el sistema, y al llegar empieza a girar solo. «Limpiar globo», en el diseño de columna, sigue volviendo a México.
 - **La espera del barrido, más viva y más clara (28/10/2026).** Mientras se busca:

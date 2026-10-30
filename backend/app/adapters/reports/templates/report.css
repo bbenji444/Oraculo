@@ -40,6 +40,33 @@
   font-weight: 700;
 }
 
+/* Títulos, cifras y etiquetas: seminegrita, más fina que la negrita. */
+@font-face {
+  font-family: "Noto Sans Reporte";
+  src: url("NotoSans-SemiBold.ttf");
+  font-weight: 600;
+}
+
+/* Texto de lectura y titulares: Noto Serif (30/10/2026). */
+@font-face {
+  font-family: "Noto Serif Reporte";
+  src: url("NotoSerif-Regular.ttf");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Noto Serif Reporte";
+  src: url("NotoSerif-Italic.ttf");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Noto Serif Reporte";
+  src: url("NotoSerif-Bold.ttf");
+  font-weight: 700;
+}
+
 :root {
   --navy: #0b1f3a;
   --ink: #0f172a;
@@ -63,6 +90,7 @@
      Orbitron, que se veía de videojuego; ahora solo va en la marca. */
   --tech: "Noto Sans Reporte", sans-serif;
   --brand: "Orbitron Reporte", "Noto Sans Reporte", sans-serif;
+  --serif: "Noto Serif Reporte", "Noto Serif", serif;
 }
 
 /* ---------------------------------------------------------------- Páginas */
@@ -1641,4 +1669,88 @@ table.hbars td.num {
 
 td.ix-num {
   border-left: 2pt solid var(--line);
+}
+
+/* --- Tipografía formal y texto justificado (30/10/2026) ---------------------
+   Benji: «texto justificado… y unas tipografías más pro». Como un informe
+   formal: el texto de lectura en Noto Serif, justificado y con división de
+   palabras en español (el documento es lang="es"); los titulares de las
+   notas y el título de la portada en Noto Serif negrita; preguntas, títulos
+   de sección, cifras, tablas y etiquetas en Noto Sans seminegrita. Las
+   listas, tablas y renglones cortos siguen alineados a la izquierda: en un
+   renglón corto, justificar abre huecos. */
+
+.summary p,
+.top-text,
+.tl-text,
+.method p,
+.method li,
+.novelty-count,
+.omitted,
+.annex > p {
+  font-family: var(--serif);
+  text-align: justify;
+  hyphens: auto;
+}
+
+.summary p {
+  font-size: 9.8pt;
+  line-height: 1.6;
+}
+
+.top-text,
+.tl-text {
+  font-size: 8.6pt;
+  line-height: 1.55;
+}
+
+.sc-headline {
+  font-family: var(--serif);
+}
+
+/* Titulares de las notas, como en un periódico. */
+.top-title,
+.tl-title,
+.cover h1.doc-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.cover h1.doc-title {
+  font-size: 28pt;
+  line-height: 1.15;
+}
+
+/* Preguntas y títulos de sección: seminegrita, con aire entre letras. */
+h2.q-title {
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+h2.section {
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+h3,
+h3.sub,
+.kpi strong,
+.fact-value,
+.top-rank,
+.top-outlets strong {
+  font-weight: 600;
+}
+
+/* Conclusión de cada pregunta: cursiva de la serif, como un subtítulo. */
+.q-answer {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 9.4pt;
+}
+
+
+/* Direcciones web: no se dividen con guion. */
+.nohyphen {
+  hyphens: manual;
 }
