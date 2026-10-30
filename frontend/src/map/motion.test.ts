@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  IDLE_RESUME_MS,
+  idleResumeMs,
+  MANDO_IDLE_RESUME_MS,
   durationFactor,
   easeInOutCubic,
   easeOutCubic,
@@ -134,5 +137,24 @@ describe('vuelo a una nota', () => {
     expect(flyDurationMs(from, to, 'article', 'normal')).toBe(
       Math.round(region * FLY_ARTICLE_FACTOR),
     );
+  });
+});
+
+describe('vuelve a girar solo', () => {
+  const nothing = { regionId: null, articleId: null, wallCaseId: null, stackOpen: false };
+
+  it('en el Centro de mando gira con la región de la consulta puesta', () => {
+    expect(idleResumeMs({ ...nothing, mando: true, regionId: 1 })).toBe(MANDO_IDLE_RESUME_MS);
+  });
+
+  it('se queda quieto con una nota, el muro o un grupo abiertos', () => {
+    expect(idleResumeMs({ ...nothing, mando: true, articleId: 7 })).toBeNull();
+    expect(idleResumeMs({ ...nothing, mando: true, wallCaseId: 'caso' })).toBeNull();
+    expect(idleResumeMs({ ...nothing, mando: true, stackOpen: true })).toBeNull();
+  });
+
+  it('en el diseño de columna la región elegida lo detiene, como antes', () => {
+    expect(idleResumeMs({ ...nothing, mando: false, regionId: 1 })).toBeNull();
+    expect(idleResumeMs({ ...nothing, mando: false })).toBe(IDLE_RESUME_MS);
   });
 });

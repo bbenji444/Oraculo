@@ -118,3 +118,13 @@ Benji: «pon texto justificado en el PDF y con unas tipografías más pro». Se 
 - **Noto Sans seminegrita** en las preguntas, los títulos, las cifras y las etiquetas. Las tablas, las listas y los renglones cortos siguen alineados a la izquierda, porque justificar un renglón corto abre huecos.
 - Las direcciones web no se dividen (`.nohyphen`).
 - Orbitron queda solo en la marca «ORÁCULO».
+
+### Cambio: IBM Plex en lugar de Noto Serif (30/10/2026)
+
+Benji: «una tipografía más pro, que no parezca hecha en un documento de Word». Noto Serif se veía de procesador de textos. Ahora el reporte va en IBM Plex:
+
+- **Sans:** el texto, justificado y con división de palabras;
+- **Sans Condensed:** títulos, preguntas, titulares y cifras;
+- **Mono:** horas, expediente y numeración.
+
+El conjunto da la apariencia de un informe técnico. Son 8 archivos WOFF2 que pesan 165 KB en total; Noto Sans queda de respaldo para las letras fuera del subconjunto latino. Orbitron sigue solo en la marca.

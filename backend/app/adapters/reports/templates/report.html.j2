@@ -150,7 +150,7 @@
     <h3 class="sub">Notas por categoría</h3>
     <div class="breakdown">
       {# Dona: los trazos son solo números calculados en oraculo.donut. #}
-      <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Noto Sans Reporte, sans-serif">
+      <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Plex Sans Reporte, Noto Sans Reporte, sans-serif">
         {% for slice in o.donut %}<path d="{{ slice.path }}" fill="{{ slice.color }}" stroke="#ffffff" stroke-width="0.8"/>{% endfor %}
         <text x="60" y="62" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">{{ view.total }}</text>
         <text x="60" y="74" text-anchor="middle" font-size="6" letter-spacing="0.8" fill="#64748b">NOTAS</text>
@@ -258,7 +258,7 @@
     {# Lienzo de 520 × 150: base en y = 120, barra más alta de 100. #}
     {% set n = bars | length %}
     {% set slot = 520 / n %}
-    <svg class="time-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" width="520" height="150" font-family="Noto Sans Reporte, sans-serif">
+    <svg class="time-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" width="520" height="150" font-family="Plex Sans Reporte, Noto Sans Reporte, sans-serif">
       {% for level in [0.25, 0.5, 0.75, 1] %}<line x1="0" y1="{{ 120 - 100 * level }}" x2="520" y2="{{ 120 - 100 * level }}" stroke="#e2e8f0" stroke-width="0.5"/>{% endfor %}
       {% for bar in bars %}
         {% set x = slot * loop.index0 %}

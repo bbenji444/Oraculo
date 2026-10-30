@@ -47,24 +47,57 @@
   font-weight: 600;
 }
 
-/* Texto de lectura y titulares: Noto Serif (30/10/2026). */
+/* IBM Plex (30/10/2026): la tipografía corporativa de IBM, hecha para
+   documentos técnicos. Benji pidió «una tipografía más pro, que no parezca
+   hecha en un documento de Word». Subconjunto latino en WOFF2 (@fontsource
+   5.3.0); si falta una letra, se usa Noto Sans. */
 @font-face {
-  font-family: "Noto Serif Reporte";
-  src: url("NotoSerif-Regular.ttf");
+  font-family: "Plex Sans Reporte";
+  src: url("ibm-plex-sans-latin-400-normal.woff2") format("woff2");
   font-weight: 400;
 }
 
 @font-face {
-  font-family: "Noto Serif Reporte";
-  src: url("NotoSerif-Italic.ttf");
+  font-family: "Plex Sans Reporte";
+  src: url("ibm-plex-sans-latin-400-italic.woff2") format("woff2");
   font-weight: 400;
   font-style: italic;
 }
 
 @font-face {
-  font-family: "Noto Serif Reporte";
-  src: url("NotoSerif-Bold.ttf");
+  font-family: "Plex Sans Reporte";
+  src: url("ibm-plex-sans-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "Plex Sans Reporte";
+  src: url("ibm-plex-sans-latin-700-normal.woff2") format("woff2");
   font-weight: 700;
+}
+
+@font-face {
+  font-family: "Plex Condensed Reporte";
+  src: url("ibm-plex-sans-condensed-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "Plex Condensed Reporte";
+  src: url("ibm-plex-sans-condensed-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Plex Mono Reporte";
+  src: url("ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Plex Mono Reporte";
+  src: url("ibm-plex-mono-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
 }
 
 :root {
@@ -88,9 +121,12 @@
   --oraculo-text: #e0f7fa;
   /* Títulos, cifras e insignias: Noto Sans, formal (28/10/2026). Antes era
      Orbitron, que se veía de videojuego; ahora solo va en la marca. */
-  --tech: "Noto Sans Reporte", sans-serif;
-  --brand: "Orbitron Reporte", "Noto Sans Reporte", sans-serif;
-  --serif: "Noto Serif Reporte", "Noto Serif", serif;
+  --tech: "Plex Condensed Reporte", "Noto Sans Reporte", sans-serif;
+  --mono: "Plex Mono Reporte", "Noto Sans Reporte", monospace;
+  --brand: "Orbitron Reporte", "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
+  /* Texto de lectura: Plex Sans justificado (antes Noto Serif, que se veía de
+     procesador de textos). */
+  --serif: "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
 }
 
 /* ---------------------------------------------------------------- Páginas */
@@ -101,7 +137,7 @@
 
   @top-left {
     content: string(doccode) " · " string(doctitle) " · " string(docregion);
-    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
     padding-bottom: 4mm;
@@ -110,7 +146,7 @@
   @top-right {
     content: "USO INTERNO · CONFIDENCIAL";
     letter-spacing: 0.08em;
-    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
     padding-bottom: 4mm;
@@ -118,13 +154,13 @@
 
   @bottom-left {
     content: string(docdate);
-    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
   }
 
   @bottom-right {
     content: "Página " counter(page) " de " counter(pages);
-    font: 7.5pt "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
   }
 }
@@ -152,7 +188,7 @@
 }
 
 html {
-  font: 9.5pt/1.5 "Noto Sans Reporte", "Noto Sans", sans-serif;
+  font: 9.5pt/1.5 "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
   color: var(--text);
 }
 
@@ -1008,7 +1044,7 @@ table.stacks td.num {
 
 .state-title span {
   float: right;
-  font: 400 7.5pt "Noto Sans Reporte", sans-serif;
+  font: 400 7.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
   color: #a8c5cb;
 }
 
@@ -1394,7 +1430,7 @@ h2.q-title {
   margin: 14pt 0 2pt;
   padding: 0;
   border: 0;
-  font: 700 12.5pt "Noto Sans Reporte", sans-serif;
+  font: 700 12.5pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink);
@@ -1414,7 +1450,7 @@ h2.section + h2.q-title {
   border-radius: 2pt;
   background: var(--oraculo-a1);
   color: #ffffff;
-  font: 700 8pt "Noto Sans Reporte", sans-serif;
+  font: 700 8pt "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
   text-align: center;
   vertical-align: 1.5pt;
 }
@@ -1456,7 +1492,7 @@ h3.sub {
 .top-rank {
   width: 26pt;
   padding: 6pt 0 0;
-  font: 700 22pt/1 "Noto Sans Reporte", sans-serif;
+  font: 700 22pt/1 "Plex Sans Reporte", "Noto Sans Reporte", sans-serif;
   text-align: center;
 }
 
@@ -1753,4 +1789,63 @@ h3.sub,
 /* Direcciones web: no se dividen con guion. */
 .nohyphen {
   hyphens: manual;
+}
+
+/* --- IBM Plex: jerarquía (30/10/2026) -----------------------------------------
+   Plex Sans Condensed en títulos, preguntas, titulares y cifras; Plex Sans en
+   el texto; Plex Mono en horas, número de expediente y numeración, como en un
+   informe de inteligencia. */
+.cover h1.doc-title,
+.top-title,
+.tl-title {
+  font-family: var(--tech);
+  font-weight: 700;
+}
+
+.cover h1.doc-title {
+  font-size: 31pt;
+  letter-spacing: -0.005em;
+}
+
+h2.q-title,
+h2.section,
+h3,
+h3.sub,
+.kpi strong,
+.fact-value,
+.top-rank,
+.top-outlets strong,
+.sc-head b,
+.state-title,
+.category-title {
+  font-family: var(--tech);
+}
+
+h2.q-title {
+  font-size: 13.5pt;
+}
+
+.kpi strong,
+.fact-value {
+  font-weight: 700;
+}
+
+.q-num,
+.tl-hour span,
+.tl-when b,
+td.ix-time,
+td.ix-num .number,
+.cover-code,
+.peak-rank,
+.num {
+  font-family: var(--mono);
+}
+
+.summary p {
+  font-size: 9.6pt;
+  line-height: 1.62;
+}
+
+.q-answer {
+  font-size: 9.2pt;
 }
