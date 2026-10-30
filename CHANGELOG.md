@@ -132,6 +132,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Letra más moderna en la interfaz y en el PDF (30/10/2026).** Títulos, botones, etiquetas y cifras van en Exo 2, técnica pero sobria, y el texto en Inter. Orbitron queda solo en el logo. El PDF usa la misma pareja, en lugar de IBM Plex, para que se vea del mismo sistema.
 - **El globo gira solo mientras no se ve nada en particular (30/10/2026).** En el Centro de mando, con los resultados a la vista, el globo vuelve a girar a los 10 segundos sin uso. Se detiene al abrir una nota, el muro o la lista de un grupo.
 - **PDF en IBM Plex (30/10/2026).** La tipografía ya no parece de procesador de textos:
   - IBM Plex Sans en el texto, justificado;

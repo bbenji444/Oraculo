@@ -58,3 +58,25 @@ Descargadas el 30/10/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>
 | `LICENSE-IBMPlex.txt` | `d0283623ef57e722fd0eb688a8041589670c608ab780cd3612d06ba6f153d3fd` |
 
 Antes de IBM Plex, el reporte usó unas horas Noto Serif y Noto Sans seminegrita. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
+
+## Exo 2 e Inter (tipografía del reporte desde el 30/10/2026, noche)
+
+Benji pidió «algo que se vea más moderno pero tampoco tan exagerado, algo acorde al sistema». El reporte usa la misma pareja que la interfaz del monitor:
+
+- **Exo 2** (600 y 700): títulos, preguntas, titulares y cifras;
+- **Inter** (400, cursiva, 600 y 700): el texto, justificado; también las horas, el expediente y la numeración, con cifras tabulares.
+
+Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 30/10/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>@5.3.0/files/<archivo>`. Trae la Ñ, los acentos, «», las rayas y las comillas. Licencia SIL Open Font License 1.1 (`LICENSE-Exo2.txt`, `LICENSE-Inter.txt`).
+
+| Archivo | SHA-256 |
+|---|---|
+| `exo-2-latin-600-normal.woff2` | `fd2112e53440975a4885179f3d09058787b97b711e7e141c55fcaecaf48fbcb6` |
+| `exo-2-latin-700-normal.woff2` | `96c87b1597aed754e0ad45970883774e851a390788e7fba7b3f49f8d1f6e5a6b` |
+| `inter-latin-400-normal.woff2` | `8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc` |
+| `inter-latin-400-italic.woff2` | `7ea9d2f1274cebee837f0c6eebb426c18fbb2333a6b6da4d02ec5cf47db7fb8e` |
+| `inter-latin-600-normal.woff2` | `f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a` |
+| `inter-latin-700-normal.woff2` | `6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491` |
+| `LICENSE-Exo2.txt` | `7644b74e07215f62af4ebbfcf2b0f06a428d70d32c41e751fba93763a683c3f5` |
+| `LICENSE-Inter.txt` | `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345` |
+
+Los archivos de IBM Plex (sección anterior) ya no los usa la plantilla. Siguen en la carpeta hasta que Benji apruebe borrarlos.
