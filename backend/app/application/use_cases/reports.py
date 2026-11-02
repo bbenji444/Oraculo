@@ -110,6 +110,8 @@ class ReportData:
         generated_by: Quién lo pidió.
         previous_run: En una corrida automática, la anterior, para separar
             lo nuevo de lo ya reportado (ADR-0034); ``None`` en las demás.
+        previous_articles: Notas relevantes de esa corrida anterior, para
+            «¿Qué cambió desde la corrida anterior?»; ``None`` si no hay.
     """
 
     search: SearchDetail
@@ -129,6 +131,7 @@ class ReportData:
     generated_at: datetime
     generated_by: str
     previous_run: PreviousRun | None = None
+    previous_articles: tuple[ArticleItem, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +279,7 @@ class BuildReport:
             if a.primary and a.primary.lon is not None and a.primary.lat is not None
         ]
         summary, notice = await self._summary(search, breadcrumb, articles, actor)
+        previous = await self._previous(search)
         data = ReportData(
             search=search,
             region=region,
@@ -293,7 +297,10 @@ class BuildReport:
             map_svg=await self._map.render(area, level, counts, points),
             generated_at=self._clock(),
             generated_by=actor.user_id,
-            previous_run=await self._previous(search),
+            previous_run=previous,
+            previous_articles=(
+                await _relevant_articles(self._articles, previous.search_id) if previous else None
+            ),
         )
         await self._store.record_generated(search_id, report_format.value, actor)
         return data

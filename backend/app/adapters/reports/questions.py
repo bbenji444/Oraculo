@@ -6,17 +6,19 @@ pregunta con una representación visual y una línea de conclusión:
 
 - ``top_facts``: ¿qué es lo más importante? (los hechos que más medios
   publicaron).
-- ``actions``: ¿qué tipo de actuación hubo? (detenciones, aseguramientos,
-  procesos, sentencias, investigaciones, denuncias).
+- ``changes``: ¿qué cambió desde la corrida anterior? (qué delitos y qué
+  estados subieron o bajaron, y qué focos son nuevos). Reemplaza a «¿qué tipo
+  de actuación hubo?» (Benji, 02/11/2026: «haz otra que aporte un valor
+  mayor»): quien recibe un reporte cada 8 horas quiere saber qué se movió.
 - ``state_cards``: ¿qué pasa en cada estado?
 - ``reliability``: ¿qué tan confiable es? (confianza de la IA y precisión
   del lugar).
 - ``takeaways``: la conclusión de una línea de cada pregunta.
 
 Todo se calcula de los datos guardados, sin IA y sin red. El tipo de
-actuación sale del tipo de hecho que escribió la IA al leer la nota
-(``event_type``) y del título, agrupados por palabras clave: es una
-clasificación automática y así se rotula en el PDF.
+actuación (en las fichas por estado y en los hechos destacados) sale del tipo
+de hecho que escribió la IA al leer la nota (``event_type``) y del título,
+agrupados por palabras clave: es una clasificación automática.
 
 No hace: no dibuja (eso es la plantilla) ni decide qué notas entran.
 """
@@ -25,8 +27,10 @@ import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.adapters.reports.oraculo import (
+    NO_CATEGORY,
     NO_STATE,
     Badge,
     Segment,
@@ -68,7 +72,6 @@ ACTION_RULES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Investigaciones", "#0090b8", ("investig", "indaga", "carpeta", "descarta", "deslind")),
     ("Denuncias", "#e0a100", ("denunci", "querella", "senalamiento", "acusa")),
 )
-OTHER_ACTION_COLOR = "#8a9aa3"
 
 
 def _fold(text: str) -> str:
@@ -123,25 +126,6 @@ class Bar:
 
 def _percent(count: int, total: int) -> int:
     return round(PERCENT * count / total) if total else 0
-
-
-def actions(articles: Sequence[ArticleItem]) -> tuple[Bar, ...]:
-    """¿Qué tipo de actuación hubo? Una barra por tipo, de más a menos notas.
-
-    Args:
-        articles: Notas relevantes.
-
-    Returns:
-        Las barras («Otros hechos» al final); vacío sin notas.
-    """
-    counts = Counter(action_of(a) for a in articles)
-    colors = {name: color for name, color, _ in ACTION_RULES} | {OTHER_ACTION: OTHER_ACTION_COLOR}
-    top = max(counts.values(), default=0)
-    ranked = sorted(counts.items(), key=lambda item: (item[0] == OTHER_ACTION, -item[1], item[0]))
-    return tuple(
-        Bar(name, colors[name], count, _percent(count, len(articles)), count / top)
-        for name, count in ranked
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,14 +310,12 @@ class Takeaways:
 
     Attributes:
         crimes: ¿De qué delitos se trata?
-        actions: ¿Qué tipo de actuación hubo?
         places: ¿Dónde pasó?
         timing: ¿Cuándo pasó?
         trust: ¿Qué tan confiable es?
     """
 
     crimes: str = ""
-    actions: str = ""
     places: str = ""
     timing: str = ""
     trust: str = ""
@@ -341,7 +323,6 @@ class Takeaways:
 
 def takeaways(
     articles: Sequence[ArticleItem],
-    action_bars: Sequence[Bar],
     cards: Sequence[StateCard],
     line: Timeline,
     trust: Reliability,
@@ -350,7 +331,6 @@ def takeaways(
 
     Args:
         articles: Notas relevantes.
-        action_bars: ``actions``.
         cards: ``state_cards``.
         line: La línea del tiempo (``oraculo.timeline``).
         trust: ``reliability``.
@@ -366,13 +346,6 @@ def takeaways(
     if named:
         name, count = named.most_common(1)[0]
         crimes = f"{name} concentra {_percent(count, total)} % de las notas ({count} de {total})."
-    acted = [b for b in action_bars if b.name != OTHER_ACTION]
-    actions_line = (
-        f"Lo más reportado: {acted[0].name.lower()} ({acted[0].count} "
-        f"{'nota' if acted[0].count == 1 else 'notas'})."
-        if acted
-        else ""
-    )
     places = _places_line(cards)
     timing = (
         f"El momento con más notas fue {line.peaks[0].when.lower()}: {line.peaks[0].count}."
@@ -381,7 +354,7 @@ def takeaways(
     )
     high = trust.confidence[0].count
     trust_line = f"{high} de {total} notas con confianza alta; {trust.outlets} medios distintos."
-    return Takeaways(crimes, actions_line, places, timing, trust_line)
+    return Takeaways(crimes, places, timing, trust_line)
 
 
 def _notes(count: int) -> str:
@@ -405,13 +378,154 @@ def no_state_share(articles: Sequence[ArticleItem]) -> int:
     return _percent(sum(1 for a in articles if state_name(a) == NO_STATE), len(articles))
 
 
+# Renglones de cada tabla de «¿Qué cambió?»: los que más se movieron (con 6,
+# la sección no cabía en la hoja y quedaban dos renglones solos en otra).
+MAX_CHANGES = 5
+# Color de las barras de los estados (los delitos llevan el de su categoría).
+STATE_COLOR = "#0090b8"
+
+
+@dataclass(frozen=True, slots=True)
+class Change:
+    """Un delito o un estado, ahora y en la corrida anterior.
+
+    Attributes:
+        name: Delito o estado.
+        color: Color de su barra.
+        before: Notas en la corrida anterior.
+        now: Notas en esta.
+        share_before: Largo de la barra de antes, respecto al mayor (0 a 1).
+        share_now: Largo de la barra de ahora, respecto al mayor (0 a 1).
+    """
+
+    name: str
+    color: str
+    before: int
+    now: int
+    share_before: float
+    share_now: float
+
+    @property
+    def delta(self) -> int:
+        """Cuánto subió (positivo) o bajó (negativo)."""
+        return self.now - self.before
+
+
+@dataclass(frozen=True, slots=True)
+class ChangesView:
+    """¿Qué cambió desde la corrida anterior?
+
+    Attributes:
+        previous_at: Hora programada de la corrida anterior, si la tiene.
+        before_total: Notas relevantes de la anterior.
+        now_total: Notas relevantes de esta.
+        crimes: Los delitos que más se movieron.
+        states: Los estados que más se movieron.
+        new_states: Estados con notas ahora y ninguna antes (focos nuevos).
+        quiet_states: Estados con notas antes y ninguna ahora.
+        line: La conclusión de una línea.
+    """
+
+    previous_at: datetime | None
+    before_total: int
+    now_total: int
+    crimes: tuple[Change, ...]
+    states: tuple[Change, ...]
+    new_states: tuple[str, ...]
+    quiet_states: tuple[str, ...]
+    line: str
+
+
+def _moves(now: Counter[str], before: Counter[str], colors: dict[str, str]) -> tuple[Change, ...]:
+    """Los renglones que más se movieron, del mayor cambio al menor."""
+    names = set(now) | set(before)
+    top = max([*now.values(), *before.values(), 1])
+    ranked = sorted(names, key=lambda n: (-abs(now[n] - before[n]), -now[n], n))[:MAX_CHANGES]
+    return tuple(
+        Change(n, colors.get(n, STATE_COLOR), before[n], now[n], before[n] / top, now[n] / top)
+        for n in ranked
+    )
+
+
+def _signed(value: int) -> str:
+    return f"+{value}" if value > 0 else f"−{abs(value)}"
+
+
+def _names(items: Sequence[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + f" y {items[-1]}"
+
+
+def changes(
+    articles: Sequence[ArticleItem],
+    previous: Sequence[ArticleItem],
+    previous_at: datetime | None,
+) -> ChangesView:
+    """Compara esta corrida con la anterior por delito y por estado.
+
+    Args:
+        articles: Notas relevantes de esta corrida.
+        previous: Notas relevantes de la anterior.
+        previous_at: Hora programada de la anterior.
+
+    Returns:
+        Los cambios, con su línea de conclusión.
+
+    Example:
+        >>> changes(ahora, antes, siete).line  # doctest: +NORMALIZE_WHITESPACE
+        'Esta corrida trae 48 notas (+12). Sube Narcotráfico (+5);
+         baja Huachicol (−3). Focos nuevos: Tabasco.'
+    """
+    colors = {category_name(a): category_color(a) for a in (*previous, *articles)}
+    # «Otros» y «Sin clasificar» no dicen qué delito se movió.
+    vague = {"Otros", NO_CATEGORY}
+    crimes = _moves(
+        Counter(category_name(a) for a in articles if category_name(a) not in vague),
+        Counter(category_name(a) for a in previous if category_name(a) not in vague),
+        colors,
+    )
+    now_states = Counter(state_name(a) for a in articles if state_code(a))
+    before_states = Counter(state_name(a) for a in previous if state_code(a))
+    states = _moves(now_states, before_states, {})
+    new_states = tuple(sorted(n for n in now_states if not before_states[n]))
+    quiet_states = tuple(sorted(n for n in before_states if not now_states[n]))
+
+    delta = len(articles) - len(previous)
+    parts = [
+        f"Esta corrida trae {_notes(len(articles))}"
+        + (f" ({_signed(delta)})." if delta else ", las mismas que la anterior.")
+    ]
+    rises = [c for c in crimes if c.delta > 0]
+    falls = [c for c in crimes if c.delta < 0]
+    moves = []
+    if rises:
+        moves.append(f"sube {rises[0].name} ({_signed(rises[0].delta)})")
+    if falls:
+        moves.append(f"baja {falls[0].name} ({_signed(falls[0].delta)})")
+    if moves:
+        text = "; ".join(moves)
+        parts.append(text[0].upper() + text[1:] + ".")
+    if new_states:
+        parts.append(f"Focos nuevos: {_names(new_states[:3])}.")
+    return ChangesView(
+        previous_at=previous_at,
+        before_total=len(previous),
+        now_total=len(articles),
+        crimes=crimes,
+        states=states,
+        new_states=new_states,
+        quiet_states=quiet_states,
+        line=" ".join(parts),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class QuestionsView:
     """Las respuestas que muestra el reporte, pregunta por pregunta.
 
     Attributes:
         top: ¿Qué es lo más importante?
-        actions: ¿Qué tipo de actuación hubo?
+        changes: ¿Qué cambió desde la corrida anterior? ``None`` si no hay
+            con qué comparar (búsquedas manuales y la primera corrida).
         states: ¿Qué pasa en cada estado?
         trust: ¿Qué tan confiable es?
         lines: La conclusión de una línea de cada pregunta.
@@ -419,31 +533,37 @@ class QuestionsView:
     """
 
     top: tuple[TopFact, ...]
-    actions: tuple[Bar, ...]
+    changes: ChangesView | None
     states: tuple[StateCard, ...]
     trust: Reliability
     lines: Takeaways
     no_state_percent: int
 
 
-def build_questions(articles: Sequence[ArticleItem], line: Timeline) -> QuestionsView:
+def build_questions(
+    articles: Sequence[ArticleItem],
+    line: Timeline,
+    previous: Sequence[ArticleItem] | None = None,
+    previous_at: datetime | None = None,
+) -> QuestionsView:
     """Responde las preguntas del analista con las notas relevantes.
 
     Args:
         articles: Notas relevantes.
         line: La línea del tiempo ya calculada (``oraculo.timeline``).
+        previous: Notas relevantes de la corrida anterior, o ``None`` si no hay.
+        previous_at: Hora programada de la corrida anterior.
 
     Returns:
         Las respuestas listas para la plantilla.
     """
-    action_bars = actions(articles)
     cards = state_cards(articles)
     trust = reliability(articles)
     return QuestionsView(
         top=top_facts(articles),
-        actions=action_bars,
+        changes=changes(articles, previous, previous_at) if previous is not None else None,
         states=cards,
         trust=trust,
-        lines=takeaways(articles, action_bars, cards, line, trust),
+        lines=takeaways(articles, cards, line, trust),
         no_state_percent=no_state_share(articles),
     )

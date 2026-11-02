@@ -54,3 +54,26 @@ Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 30/10/2026 de 
 | `LICENSE-Inter.txt` | `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345` |
 
 Antes de Exo 2 e Inter, el reporte usó unas horas Noto Serif y luego IBM Plex. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
+
+## Barlow (tipografía del reporte desde el 02/11/2026)
+
+Benji pidió «una más pro acorde al sistema» y eligió entre tres muestras del mismo reporte: Rajdhani, Barlow y Space Grotesk. Eligió **Barlow**, la familia de los tableros de tránsito y defensa:
+
+- **Barlow Semi Condensed** (600 y 700): títulos, preguntas, titulares y cifras;
+- **Barlow** (400, cursiva, 600 y 700): el texto, justificado; también las horas y la numeración, con cifras tabulares.
+
+Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 02/11/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>@5.3.0/files/<archivo>`. Licencia SIL Open Font License 1.1 (`LICENSE-Barlow.txt`).
+
+| Archivo | SHA-256 |
+|---|---|
+| `barlow-latin-400-normal.woff2` | `b0a8ad37ac45f5fb22ced461576db72e44e295107aad7a9c8a7a4bad728fd03b` |
+| `barlow-latin-400-italic.woff2` | `7a306c56f630df002deeafbd521738e20795d765feea65030def2e80f9a3d62f` |
+| `barlow-latin-600-normal.woff2` | `4b52ddd4836b592df0e4832b8286956883cdc651b015126bdd18f184b7f90cc3` |
+| `barlow-latin-700-normal.woff2` | `2d797dd8b35dcb3413e1af9d7052b3f4f8c341a147cdcb01f4f06af80db53289` |
+| `barlow-semi-condensed-latin-600-normal.woff2` | `f158417e9207b5362f9b71a2fe779ce5bb836ad972f38445c3163af39d2c998d` |
+| `barlow-semi-condensed-latin-700-normal.woff2` | `fb958c8c20a05552ac8a85d925d96028d52565792650e941a5fe96b6997aa5cb` |
+| `LICENSE-Barlow.txt` | `4877e0c1b66f0b16cc3ebc4801c4def24c06252f618b9229428b20c7387aa0c0` |
+
+Ni Barlow ni Noto Sans traen las flechas (↑ ↓ →). La plantilla dibuja con bordes los triángulos de «¿Qué cambió?» y usa «›» en lugar de «→». Así el PDF no toma letras de las fuentes del sistema.
+
+Los archivos de Exo 2 e Inter de esta carpeta (sección anterior) ya no los usa el PDF; la interfaz sí, desde su propia carpeta. Siguen aquí hasta que Benji apruebe borrarlos.

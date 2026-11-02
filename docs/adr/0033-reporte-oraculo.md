@@ -137,3 +137,14 @@ Benji: «algo que se vea más moderno pero tampoco tan exagerado, algo acorde al
 - **Inter:** el texto justificado, y también horas y numeración, con cifras tabulares.
 
 Así el PDF se reconoce como parte del mismo sistema. Orbitron sigue solo en la marca.
+
+## Ajuste: «¿Qué cambió?» y Barlow (02/11/2026)
+
+- **«¿Qué cambió desde la corrida anterior?»** reemplaza a «¿Qué tipo de actuación hubo?». Benji pidió «otra que aporte un valor mayor»: quien recibe un reporte cada 8 horas quiere saber qué se movió. La sección trae:
+  - la conclusión, por ejemplo «Esta corrida trae 48 notas (+25). Sube Homicidio (+7). Focos nuevos: Baja California, Chihuahua y Oaxaca»;
+  - el total de antes frente al de ahora;
+  - los 5 delitos y los 5 estados que más se movieron, con la barra de antes y la de ahora;
+  - los focos nuevos y los estados que se quedaron sin notas.
+
+  Solo sale en las corridas automáticas, que tienen una anterior (`ReportData.previous_articles`). Las preguntas se numeran solas, así no queda un hueco en las búsquedas manuales. El tipo de actuación sigue en las fichas por estado y en los hechos destacados.
+- **Barlow.** Benji la eligió entre tres muestras del mismo reporte: Barlow Semi Condensed en títulos y cifras, y Barlow en el texto. Ver `fonts/README.md`.

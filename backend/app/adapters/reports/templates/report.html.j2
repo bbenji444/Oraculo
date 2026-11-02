@@ -10,7 +10,8 @@
      confidencialidad.
   2. Panorama: 01 ¿Qué pasó? (cifras, resumen ejecutivo, datos clave) y
      02 ¿Qué es lo más importante? (los 3 hechos más publicados).
-  3. 03 ¿De qué delitos se trata? (dona) y 04 ¿Qué tipo de actuación hubo?
+  3. ¿De qué delitos se trata? (dona) y ¿Qué cambió desde la corrida
+     anterior? (solo en las corridas automáticas).
   4. Distribución geográfica: 05 ¿Dónde pasó? (mapa y tabla) y 06 ¿Qué pasa
      en cada estado? (fichas).
   5. Línea del tiempo: 07 ¿Cuándo pasó? (barras por hora y categoría) y
@@ -24,6 +25,10 @@
   lleva el texto completo de una nota (§8).
 #}
 {% set o = view.oraculo %}
+{# Numeración de las preguntas: corre sola, así una que no aplica (como «¿Qué
+   cambió?» en una búsqueda manual) no deja un hueco. #}
+{% set qn = namespace(n=0) %}
+{% macro qnum() %}{% set qn.n = qn.n + 1 %}<span class="q-num">{{ "%02d" | format(qn.n) }}</span>{% endmacro %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -78,7 +83,7 @@
   {# Cada bloque responde una pregunta del analista (Benji, 28/10/2026: «¿qué
      sería lo primero que él se preguntaría?»), con su gráfica y una línea de
      conclusión calculada sin IA. #}
-  <h2 class="q-title"><span class="q-num">01</span>¿Qué pasó en este periodo?</h2>
+  <h2 class="q-title">{{ qnum() }}¿Qué pasó en este periodo?</h2>
   <div class="kpis">
     <div class="kpi kpi-main"><strong>{{ view.total }}</strong><span>notas relevantes</span></div>
     <div class="kpi kpi-inside"><strong>{{ view.inside }}</strong><span>en {{ data.region.name }} · {{ view.inside_percent }} %</span></div>
@@ -118,7 +123,7 @@
   </div>
 
   {% if q.top %}
-    <h2 class="q-title"><span class="q-num">02</span>¿Qué es lo más importante?</h2>
+    <h2 class="q-title">{{ qnum() }}¿Qué es lo más importante?</h2>
     <p class="q-answer">Los {{ q.top | length }} hechos que más medios publicaron en el periodo.</p>
     {% for fact in q.top %}
       {% set article = fact.article %}
@@ -145,12 +150,12 @@
 {# -------------------------------------------------------- Qué y cómo #}
 <section class="what">
   {% if o.cards %}
-    <h2 class="q-title"><span class="q-num">03</span>¿De qué delitos se trata? <span class="badge-ai">IA · INFERENCIA</span></h2>
+    <h2 class="q-title">{{ qnum() }}¿De qué delitos se trata? <span class="badge-ai">IA · INFERENCIA</span></h2>
     {% if q.lines.crimes %}<p class="q-answer">{{ q.lines.crimes }}</p>{% endif %}
     <h3 class="sub">Notas por categoría</h3>
     <div class="breakdown">
       {# Dona: los trazos son solo números calculados en oraculo.donut. #}
-      <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Inter Reporte, Noto Sans Reporte, sans-serif">
+      <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Barlow Reporte, Noto Sans Reporte, sans-serif">
         {% for slice in o.donut %}<path d="{{ slice.path }}" fill="{{ slice.color }}" stroke="#ffffff" stroke-width="0.8"/>{% endfor %}
         <text x="60" y="62" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">{{ view.total }}</text>
         <text x="60" y="74" text-anchor="middle" font-size="6" letter-spacing="0.8" fill="#64748b">NOTAS</text>
@@ -170,28 +175,57 @@
     </div>
   {% endif %}
 
-  {% if q.actions %}
-    <h2 class="q-title"><span class="q-num">04</span>¿Qué tipo de actuación hubo? <span class="badge-ai">CLASIFICACIÓN AUTOMÁTICA</span></h2>
-    {% if q.lines.actions %}<p class="q-answer">{{ q.lines.actions }}</p>{% endif %}
-    <table class="hbars">
-      <tbody>
-        {% for bar in q.actions %}
-          <tr>
-            <td class="name">{{ bar.name }}</td>
-            <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%; background: {{ bar.color }}"></span></td>
-            <td class="num">{{ bar.count }} <small class="pct">{{ bar.percent }} %</small></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p class="muted small">Se agrupa por el tipo de hecho que anotó la IA al leer cada nota y por las palabras del título (detiene, asegura, vincula, sentencia, investiga, denuncia).</p>
+  {% if q.changes %}
+    {% set ch = q.changes %}
+    <div class="change-block">
+    {# Reemplaza a «¿Qué tipo de actuación hubo?» (Benji, 02/11/2026): quien
+       recibe un reporte cada 8 horas quiere saber qué se movió. #}
+    <h2 class="q-title">{{ qnum() }}¿Qué cambió desde la corrida anterior?</h2>
+    <p class="q-answer">{{ ch.line }}</p>
+    {# Hasta 6 nombres por lista: con más, el renglón se iba a otra hoja. #}
+    {% for label, names, kind in [("Focos nuevos", ch.new_states, "new"), ("Sin notas ahora", ch.quiet_states, "quiet")] if names %}
+      <p class="change-chips"><b>{{ label }}:</b> {% for name in names[:6] %}<span class="chip chip-{{ kind }}">{{ name }}</span>{% endfor %}{% if names | length > 6 %}<span class="chip-more">y {{ names | length - 6 }} más</span>{% endif %}</p>
+    {% endfor %}
+    <p class="change-head">
+      <span>Corrida anterior{% if ch.previous_at %} · {{ ch.previous_at | mx_time }}{% endif %}</span>
+      <b>{{ ch.before_total }}</b>
+      <i>›</i>
+      <span>Esta corrida</span>
+      <b>{{ ch.now_total }}</b>
+      {% set d = ch.now_total - ch.before_total %}
+      <em class="delta {{ 'up' if d > 0 else ('down' if d < 0 else 'same') }}">{{ ('+' ~ d) if d > 0 else (('−' ~ (0 - d)) if d < 0 else '= igual') }}</em>
+    </p>
+    <div class="change-grid">
+      {% for title, rows in [("Delitos", ch.crimes), ("Estados", ch.states)] %}
+        <div>
+          <h3 class="sub">{{ title }} que más se movieron</h3>
+          <table class="changes">
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  <td class="name">{% if title == "Delitos" %}<i style="background: {{ row.color }}"></i>{% endif %}{{ row.name }}</td>
+                  <td class="pair">
+                    <span class="was" style="width: {{ (row.share_before * 100) | round(1) }}%"></span>
+                    <span class="now" style="width: {{ (row.share_now * 100) | round(1) }}%; background: {{ row.color }}"></span>
+                  </td>
+                  <td class="num">{{ row.before }} › {{ row.now }}</td>
+                  <td class="delta {{ 'up' if row.delta > 0 else ('down' if row.delta < 0 else 'same') }}">{{ ('+' ~ row.delta) if row.delta > 0 else (('−' ~ (0 - row.delta)) if row.delta < 0 else '=') }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="stack-legend"><span class="legend-item"><i class="was-key"></i>Corrida anterior</span><span class="legend-item"><i class="now-key"></i>Esta corrida</span></p>
+    </div>
   {% endif %}
 </section>
 
 {# ----------------------------------------------------------------- Dónde #}
 <section class="analysis">
   <h2 class="section">Distribución geográfica</h2>
-  <h2 class="q-title"><span class="q-num">05</span>¿Dónde pasó?</h2>
+  <h2 class="q-title">{{ qnum() }}¿Dónde pasó?</h2>
   {% if q.lines.places %}<p class="q-answer">{{ q.lines.places }}{% if q.no_state_percent %} {{ q.no_state_percent }} % de las notas no dice en qué estado ocurrió.{% endif %}</p>{% endif %}
   <div class="geo">
     <figure class="map">
@@ -232,7 +266,7 @@
   </div>
 
   {% if q.states %}
-    <h2 class="q-title"><span class="q-num">06</span>¿Qué pasa en cada estado?</h2>
+    <h2 class="q-title">{{ qnum() }}¿Qué pasa en cada estado?</h2>
     <p class="q-answer">Los {{ q.states | length }} estados con más notas: de qué delitos, qué actuación y el hecho más publicado.</p>
     <div class="state-cards">
       {% for card in q.states %}
@@ -251,14 +285,14 @@
 {# ----------------------------------------------------------------- Cuándo #}
 <section class="chrono">
   <h2 class="section">Línea del tiempo</h2>
-  <h2 class="q-title"><span class="q-num">07</span>¿Cuándo pasó?</h2>
+  <h2 class="q-title">{{ qnum() }}¿Cuándo pasó?</h2>
   {% set bars = o.timeline.bars %}
   {% if bars %}
     {% if q.lines.timing %}<p class="q-answer">{{ q.lines.timing }}</p>{% endif %}
     {# Lienzo de 520 × 150: base en y = 120, barra más alta de 100. #}
     {% set n = bars | length %}
     {% set slot = 520 / n %}
-    <svg class="time-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" width="520" height="150" font-family="Inter Reporte, Noto Sans Reporte, sans-serif">
+    <svg class="time-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" width="520" height="150" font-family="Barlow Reporte, Noto Sans Reporte, sans-serif">
       {% for level in [0.25, 0.5, 0.75, 1] %}<line x1="0" y1="{{ 120 - 100 * level }}" x2="520" y2="{{ 120 - 100 * level }}" stroke="#e2e8f0" stroke-width="0.5"/>{% endfor %}
       {% for bar in bars %}
         {% set x = slot * loop.index0 %}
@@ -295,7 +329,7 @@
   {% endif %}
 
   {% if o.highlights %}
-    <h2 class="q-title"><span class="q-num">08</span>¿Cómo se desarrollaron los hechos? <span class="badge-ai">IA · INFERENCIA</span></h2>
+    <h2 class="q-title">{{ qnum() }}¿Cómo se desarrollaron los hechos? <span class="badge-ai">IA · INFERENCIA</span></h2>
     <p class="q-answer">Cronología de los {{ o.highlights | length }} hechos más publicados{% if o.novelty %} (solo los nuevos){% endif %}, hora por hora. El resumen lo escribió la IA a partir de la nota.</p>
     <h3 class="sub">Cronología de hechos destacados</h3>
     {# Los 3 de «¿Qué es lo más importante?» ya llevan su resumen allá: aquí
@@ -325,7 +359,7 @@
 
 {# ------------------------------------------------------------ Confianza #}
 <section class="trust">
-  <h2 class="q-title"><span class="q-num">09</span>¿Qué tan confiable es la información?</h2>
+  <h2 class="q-title">{{ qnum() }}¿Qué tan confiable es la información?</h2>
   {% if q.lines.trust %}<p class="q-answer">{{ q.lines.trust }}</p>{% endif %}
   <div class="trust-grid">
     <div>
