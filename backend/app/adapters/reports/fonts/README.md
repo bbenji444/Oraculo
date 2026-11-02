@@ -33,28 +33,6 @@ Para homologar el reporte con Oráculo, los títulos, las cifras y el número de
 
 Licencia: SIL Open Font License 1.1 (Copyright 2018 The Orbitron Project Authors), la misma de `OFL.txt`.
 
-## Exo 2 e Inter (tipografía del reporte desde el 30/10/2026, noche)
-
-Benji pidió «algo que se vea más moderno pero tampoco tan exagerado, algo acorde al sistema». El reporte usa la misma pareja que la interfaz del monitor:
-
-- **Exo 2** (600 y 700): títulos, preguntas, titulares y cifras;
-- **Inter** (400, cursiva, 600 y 700): el texto, justificado; también las horas, el expediente y la numeración, con cifras tabulares.
-
-Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 30/10/2026 de `https://cdn.jsdelivr.net/npm/@fontsource/<familia>@5.3.0/files/<archivo>`. Trae la Ñ, los acentos, «», las rayas y las comillas. Licencia SIL Open Font License 1.1 (`LICENSE-Exo2.txt`, `LICENSE-Inter.txt`).
-
-| Archivo | SHA-256 |
-|---|---|
-| `exo-2-latin-600-normal.woff2` | `fd2112e53440975a4885179f3d09058787b97b711e7e141c55fcaecaf48fbcb6` |
-| `exo-2-latin-700-normal.woff2` | `96c87b1597aed754e0ad45970883774e851a390788e7fba7b3f49f8d1f6e5a6b` |
-| `inter-latin-400-normal.woff2` | `8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc` |
-| `inter-latin-400-italic.woff2` | `7ea9d2f1274cebee837f0c6eebb426c18fbb2333a6b6da4d02ec5cf47db7fb8e` |
-| `inter-latin-600-normal.woff2` | `f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a` |
-| `inter-latin-700-normal.woff2` | `6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491` |
-| `LICENSE-Exo2.txt` | `7644b74e07215f62af4ebbfcf2b0f06a428d70d32c41e751fba93763a683c3f5` |
-| `LICENSE-Inter.txt` | `3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345` |
-
-Antes de Exo 2 e Inter, el reporte usó unas horas Noto Serif y luego IBM Plex. Se borraron el 30/10/2026, con la aprobación de Benji, porque ya nada las usaba.
-
 ## Barlow (tipografía del reporte desde el 02/11/2026)
 
 Benji pidió «una más pro acorde al sistema» y eligió entre tres muestras del mismo reporte: Rajdhani, Barlow y Space Grotesk. Eligió **Barlow**, la familia de los tableros de tránsito y defensa:
@@ -76,4 +54,4 @@ Subconjunto latino en WOFF2 de `@fontsource` 5.3.0, descargado el 02/11/2026 de 
 
 Ni Barlow ni Noto Sans traen las flechas (↑ ↓ →). La plantilla dibuja con bordes los triángulos de «¿Qué cambió?» y usa «›» en lugar de «→». Así el PDF no toma letras de las fuentes del sistema.
 
-Los archivos de Exo 2 e Inter de esta carpeta (sección anterior) ya no los usa el PDF; la interfaz sí, desde su propia carpeta. Siguen aquí hasta que Benji apruebe borrarlos.
+Antes de Barlow, el reporte usó Noto Serif, IBM Plex y luego Exo 2 con Inter. Se borraron de esta carpeta, con la aprobación de Benji, porque ya nada las usaba. La interfaz conserva Exo 2 e Inter en `frontend/src/assets/fonts`.
