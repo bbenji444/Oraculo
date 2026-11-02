@@ -5,6 +5,7 @@ import io
 import json
 from dataclasses import replace
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from pypdf import PdfReader
@@ -13,7 +14,7 @@ from pypdf.generic import DictionaryObject
 from app.adapters.reports.exports import CSV_COLUMNS, to_csv, to_geojson
 from app.adapters.reports.render import ReportRenderer, paragraphs
 from app.application.ports.reports import ProviderUsage
-from app.application.ports.search_reads import JudgementView
+from app.application.ports.search_reads import JudgementView, PreviousRun
 from app.application.use_cases.reports import ExportData, ReportData, ReportFormat
 from tests.unit.application.test_reports_use_case import (
     ACTOR,
@@ -198,7 +199,6 @@ async def test_el_reporte_responde_las_preguntas_del_analista(report: ReportData
         "¿Qué pasó en este periodo?",
         "¿Qué es lo más importante?",
         "¿De qué delitos se trata?",
-        "¿Qué tipo de actuación hubo?",
         "¿Dónde pasó?",
         "¿Qué pasa en cada estado?",
         "¿Cuándo pasó?",
@@ -206,8 +206,24 @@ async def test_el_reporte_responde_las_preguntas_del_analista(report: ReportData
     ):
         assert question in page
     # Tipografía formal: Orbitron solo en la marca de la portada.
-    assert '--tech: "Exo Reporte", "Inter Reporte", "Noto Sans Reporte", sans-serif;' in page
-    # Exo 2 e Inter, como la interfaz; texto justificado y dividido (30/10/2026).
-    assert 'font-family: "Exo Reporte";' in page
-    assert 'font-family: "Inter Reporte";' in page
+    assert '--tech: "Barlow SC Reporte", "Barlow Reporte", "Noto Sans Reporte", sans-serif;' in page
+    # Barlow, elegida por Benji; texto justificado y dividido (02/11/2026).
+    assert 'font-family: "Barlow SC Reporte";' in page
+    assert 'font-family: "Barlow Reporte";' in page
     assert "text-align: justify;" in page
+
+
+async def test_la_corrida_compara_con_la_anterior(report: ReportData) -> None:
+    # Con la corrida anterior, el reporte trae «¿Qué cambió?» (02/11/2026).
+    previous = PreviousRun(uuid4(), None, frozenset())
+    page = ReportRenderer().html(
+        replace(report, previous_run=previous, previous_articles=report.articles[:1])
+    )
+
+    assert "¿Qué cambió desde la corrida anterior?</h2>" in page
+    assert "Esta corrida trae" in page
+    # Sin corrida anterior no sale, y las preguntas se numeran sin huecos.
+    plain = ReportRenderer().html(report)
+    assert "¿Qué cambió desde la corrida anterior?</h2>" not in plain
+    assert '<span class="q-num">08</span>' in plain
+    assert '<span class="q-num">09</span>' not in plain

@@ -7,8 +7,8 @@ from app.adapters.reports.oraculo import timeline
 from app.adapters.reports.questions import (
     OTHER_ACTION,
     action_of,
-    actions,
     build_questions,
+    changes,
     reliability,
     state_cards,
     top_facts,
@@ -36,21 +36,36 @@ def test_sin_tipo_de_hecho_se_lee_el_titulo() -> None:
     )
 
 
-def test_las_actuaciones_van_de_mas_a_menos_y_otros_al_final() -> None:
-    notes = (
-        replace(NOTES[0], event_type="detención"),
-        replace(NOTES[1], event_type="detenciones"),
-        replace(NOTES[2], event_type="asalto"),
-        replace(NOTES[3], event_type="sentencia"),
-    )
-    bars = actions(notes)
+def test_que_cambio_desde_la_corrida_anterior() -> None:
+    # Antes: 1 de armas en Chihuahua y 1 sin estado. Ahora: NOTES (2 de armas,
+    # Chihuahua 2, Nuevo León 1). Nuevo León es foco nuevo.
+    before = (NOTES[0], NOTES[3])
 
-    assert [(b.name, b.count) for b in bars] == [
-        ("Detenciones", 2),
-        ("Sentencias", 1),
-        (OTHER_ACTION, 1),
-    ]
-    assert bars[0].share == 1.0
+    view = changes(NOTES, before, AT_15)
+
+    assert (view.before_total, view.now_total) == (2, 4)
+    armas = next(c for c in view.crimes if c.name == "Armas y explosivos")
+    assert (armas.before, armas.now, armas.delta) == (1, 2, 1)
+    assert view.new_states == ("Nuevo León",)
+    assert view.quiet_states == ()
+    assert view.line.startswith("Esta corrida trae 4 notas (+2).")
+    assert "Sube Armas y explosivos (+1)" in view.line
+    assert "Focos nuevos: Nuevo León." in view.line
+
+
+def test_lo_que_ya_no_aparece_y_lo_que_baja() -> None:
+    view = changes(NOTES[:1], NOTES, None)
+
+    assert view.quiet_states == ("Nuevo León",)
+    assert view.line.startswith("Esta corrida trae 1 nota (−3).")
+    assert "Baja Armas y explosivos (−1)" in view.line
+    # Las barras se miden contra el mayor de las dos corridas.
+    assert max(c.share_before for c in view.crimes) == 1.0
+
+
+def test_sin_corrida_anterior_no_hay_comparacion() -> None:
+    assert build_questions(NOTES, timeline(NOTES)).changes is None
+    assert build_questions(NOTES, timeline(NOTES), (), None).changes is not None
 
 
 def test_lo_mas_importante_es_lo_que_mas_medios_publicaron() -> None:
@@ -97,5 +112,6 @@ def test_sin_notas_no_hay_conclusiones() -> None:
     view = build_questions((), timeline(()))
 
     assert view.lines.crimes == view.lines.places == view.lines.trust == ""
-    assert view.top == view.actions == view.states == ()
+    assert view.top == view.states == ()
+    assert view.changes is None
     assert OTROS.name == "Otros"

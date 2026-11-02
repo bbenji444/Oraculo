@@ -1090,7 +1090,9 @@
   position: relative;
   border-radius: 8px;
   padding: 0.75rem 0.85rem;
-  color: #809699;
+  color: #8fb3ba;
+  /* Neón apagado: un resplandor tenue aun sin elegir (02/11/2026). */
+  text-shadow: 0 0 6px rgb(0 210 255 / 0.22);
   font: 600 11px/1 var(--font-display);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -1103,10 +1105,18 @@
 .hud-tab:hover {
   background: rgb(0 210 255 / 0.06);
   color: var(--hud-ink);
+  text-shadow:
+    0 0 4px rgb(255 255 255 / 0.5),
+    0 0 12px rgb(0 210 255 / 0.6);
 }
+/* La pestaña elegida, encendida como letrero de neón. */
 .hud-tab[aria-current='page'] {
-  color: var(--hud-ink);
-  text-shadow: 0 0 12px rgb(0 210 255 / 0.6);
+  color: #effeff;
+  text-shadow:
+    0 0 1px #fff,
+    0 0 5px rgb(255 255 255 / 0.7),
+    0 0 10px rgb(0 210 255 / 0.9),
+    0 0 22px rgb(0 210 255 / 0.55);
 }
 
 /* --- Entradas ------------------------------------------------------------------ */

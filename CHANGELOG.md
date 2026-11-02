@@ -132,6 +132,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Encabezado con luz de neón (02/11/2026).** El nombre del monitor brilla como letrero de neón: se enciende parpadeando al cargar y luego respira. Las pestañas también brillan, más la elegida.
+- **El PDF pregunta «¿Qué cambió desde la corrida anterior?» (02/11/2026, ADR-0033).** En lugar de «¿Qué tipo de actuación hubo?», compara la corrida con la anterior:
+  - el total de antes y el de ahora;
+  - los delitos y los estados que más subieron o bajaron;
+  - los focos nuevos y los estados que se quedaron sin notas.
+- **PDF en Barlow (02/11/2026).** Benji la eligió entre tres muestras: Barlow Semi Condensed en títulos y cifras, y Barlow en el texto. Las flechas se dibujan para no depender de fuentes del sistema.
 - **Letra más moderna en la interfaz y en el PDF (30/10/2026).** Títulos, botones, etiquetas y cifras van en Exo 2, técnica pero sobria, y el texto en Inter. Orbitron queda solo en el logo. El PDF usa la misma pareja, en lugar de IBM Plex, para que se vea del mismo sistema.
 - **El globo gira solo mientras no se ve nada en particular (30/10/2026).** En el Centro de mando, con los resultados a la vista, el globo vuelve a girar a los 10 segundos sin uso. Se detiene al abrir una nota, el muro o la lista de un grupo.
 - **PDF en IBM Plex (30/10/2026).** La tipografía ya no parece de procesador de textos:

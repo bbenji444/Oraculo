@@ -40,44 +40,44 @@
   font-weight: 700;
 }
 
-/* Exo 2 e Inter (30/10/2026): la misma pareja que la interfaz del monitor.
-   Benji pidió «algo que se vea más moderno pero tampoco tan exagerado, algo
-   acorde al sistema». Subconjunto latino en WOFF2 (@fontsource 5.3.0); si
-   falta una letra, se usa Noto Sans. */
+/* Barlow (02/11/2026): la familia de los tableros de tránsito y defensa,
+   sobria y técnica. Benji la eligió entre tres muestras («una más pro acorde
+   al sistema»). Subconjunto latino en WOFF2 (@fontsource 5.3.0); si falta
+   una letra, se usa Noto Sans. */
 @font-face {
-  font-family: "Exo Reporte";
-  src: url("exo-2-latin-600-normal.woff2") format("woff2");
-  font-weight: 600;
-}
-
-@font-face {
-  font-family: "Exo Reporte";
-  src: url("exo-2-latin-700-normal.woff2") format("woff2");
-  font-weight: 700;
-}
-
-@font-face {
-  font-family: "Inter Reporte";
-  src: url("inter-latin-400-normal.woff2") format("woff2");
+  font-family: "Barlow Reporte";
+  src: url("barlow-latin-400-normal.woff2") format("woff2");
   font-weight: 400;
 }
 
 @font-face {
-  font-family: "Inter Reporte";
-  src: url("inter-latin-400-italic.woff2") format("woff2");
+  font-family: "Barlow Reporte";
+  src: url("barlow-latin-400-italic.woff2") format("woff2");
   font-weight: 400;
   font-style: italic;
 }
 
 @font-face {
-  font-family: "Inter Reporte";
-  src: url("inter-latin-600-normal.woff2") format("woff2");
+  font-family: "Barlow Reporte";
+  src: url("barlow-latin-600-normal.woff2") format("woff2");
   font-weight: 600;
 }
 
 @font-face {
-  font-family: "Inter Reporte";
-  src: url("inter-latin-700-normal.woff2") format("woff2");
+  font-family: "Barlow Reporte";
+  src: url("barlow-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Barlow SC Reporte";
+  src: url("barlow-semi-condensed-latin-600-normal.woff2") format("woff2");
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "Barlow SC Reporte";
+  src: url("barlow-semi-condensed-latin-700-normal.woff2") format("woff2");
   font-weight: 700;
 }
 
@@ -102,12 +102,12 @@
   --oraculo-text: #e0f7fa;
   /* Títulos, cifras e insignias: Noto Sans, formal (28/10/2026). Antes era
      Orbitron, que se veía de videojuego; ahora solo va en la marca. */
-  --tech: "Exo Reporte", "Inter Reporte", "Noto Sans Reporte", sans-serif;
-  /* Horas, expediente y numeración: Inter con cifras del mismo ancho. */
-  --mono: "Inter Reporte", "Noto Sans Reporte", sans-serif;
-  --brand: "Orbitron Reporte", "Inter Reporte", "Noto Sans Reporte", sans-serif;
-  /* Texto de lectura: Inter justificado (antes Noto Serif e IBM Plex). */
-  --serif: "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  --tech: "Barlow SC Reporte", "Barlow Reporte", "Noto Sans Reporte", sans-serif;
+  /* Horas, expediente y numeración: Barlow con cifras del mismo ancho. */
+  --mono: "Barlow Reporte", "Noto Sans Reporte", sans-serif;
+  --brand: "Orbitron Reporte", "Barlow Reporte", "Noto Sans Reporte", sans-serif;
+  /* Texto de lectura: Barlow justificado (antes Noto Serif, IBM Plex e Inter). */
+  --serif: "Barlow Reporte", "Noto Sans Reporte", sans-serif;
 }
 
 /* ---------------------------------------------------------------- Páginas */
@@ -118,7 +118,7 @@
 
   @top-left {
     content: string(doccode) " · " string(doctitle) " · " string(docregion);
-    font: 7.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
     padding-bottom: 4mm;
@@ -127,7 +127,7 @@
   @top-right {
     content: "USO INTERNO · CONFIDENCIAL";
     letter-spacing: 0.08em;
-    font: 7.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
     vertical-align: bottom;
     padding-bottom: 4mm;
@@ -135,13 +135,13 @@
 
   @bottom-left {
     content: string(docdate);
-    font: 7.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
   }
 
   @bottom-right {
     content: "Página " counter(page) " de " counter(pages);
-    font: 7.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+    font: 7.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
     color: #64748b;
   }
 }
@@ -169,7 +169,7 @@
 }
 
 html {
-  font: 9.5pt/1.5 "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  font: 9.5pt/1.5 "Barlow Reporte", "Noto Sans Reporte", sans-serif;
   color: var(--text);
 }
 
@@ -1025,7 +1025,7 @@ table.stacks td.num {
 
 .state-title span {
   float: right;
-  font: 400 7.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  font: 400 7.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
   color: #a8c5cb;
 }
 
@@ -1411,7 +1411,7 @@ h2.q-title {
   margin: 14pt 0 2pt;
   padding: 0;
   border: 0;
-  font: 700 12.5pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  font: 700 12.5pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink);
@@ -1431,7 +1431,7 @@ h2.section + h2.q-title {
   border-radius: 2pt;
   background: var(--oraculo-a1);
   color: #ffffff;
-  font: 700 8pt "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  font: 700 8pt "Barlow Reporte", "Noto Sans Reporte", sans-serif;
   text-align: center;
   vertical-align: 1.5pt;
 }
@@ -1473,7 +1473,7 @@ h3.sub {
 .top-rank {
   width: 26pt;
   padding: 6pt 0 0;
-  font: 700 22pt/1 "Inter Reporte", "Noto Sans Reporte", sans-serif;
+  font: 700 22pt/1 "Barlow Reporte", "Noto Sans Reporte", sans-serif;
   text-align: center;
 }
 
@@ -1692,7 +1692,7 @@ td.ix-num {
    Benji: «texto justificado… y unas tipografías más pro». El texto de
    lectura va justificado y con división de palabras en español (el
    documento es lang="es"); las letras de cada parte están en la sección de
-   Exo 2 e Inter, al final. Las listas, tablas y renglones cortos siguen
+   Barlow, al final. Las listas, tablas y renglones cortos siguen
    alineados a la izquierda: en un renglón corto, justificar abre huecos. */
 
 .summary p,
@@ -1770,10 +1770,10 @@ h3.sub,
   hyphens: manual;
 }
 
-/* --- Exo 2 e Inter: jerarquía (30/10/2026) ------------------------------------
-   Exo 2 en títulos, preguntas, titulares y cifras, como los títulos y botones
-   del monitor; Inter en el texto; las horas, el expediente y la numeración en
-   Inter con cifras tabulares, para que se alineen. */
+/* --- Barlow: jerarquía (02/11/2026) -------------------------------------------
+   Barlow Semi Condensed en títulos, preguntas, titulares y cifras; Barlow en
+   el texto; las horas, el expediente y la numeración en Barlow con cifras
+   tabulares, para que se alineen. */
 .cover h1.doc-title,
 .top-title,
 .tl-title {
@@ -1828,4 +1828,195 @@ td.ix-num .number,
 
 .q-answer {
   font-size: 9.2pt;
+}
+
+/* --- ¿Qué cambió desde la corrida anterior? (02/11/2026) ----------------------- */
+
+/* La sección va entera en una hoja: partida, dejaba renglones sueltos. */
+.change-block {
+  break-inside: avoid;
+}
+
+.change-head {
+  margin: 0 0 8pt;
+  padding: 6pt 10pt;
+  border: 0.75pt solid var(--line);
+  border-radius: 3pt;
+  background: var(--soft);
+  font-size: 8.5pt;
+  color: var(--muted);
+}
+
+.change-head b {
+  margin: 0 8pt 0 3pt;
+  font: 700 13pt var(--tech);
+  color: var(--ink);
+}
+
+.change-head i {
+  margin-right: 8pt;
+  font-style: normal;
+  color: var(--muted);
+}
+
+.change-grid {
+  display: table;
+  width: 100%;
+}
+
+.change-grid > div {
+  display: table-cell;
+  width: 50%;
+  padding-right: 10pt;
+  vertical-align: top;
+}
+
+.change-grid > div + div {
+  padding: 0 0 0 10pt;
+}
+
+table.changes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7.8pt;
+}
+
+table.changes td {
+  padding: 2.4pt 0;
+  border-bottom: 0.5pt solid var(--line);
+  vertical-align: middle;
+}
+
+table.changes td.name {
+  width: 40%;
+  padding-right: 4pt;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+table.changes td.name i {
+  display: inline-block;
+  width: 6pt;
+  height: 6pt;
+  margin-right: 4pt;
+  border-radius: 1.5pt;
+}
+
+/* Dos barras por renglón: la de antes, gris y delgada; la de ahora, de color. */
+table.changes td.pair {
+  width: 30%;
+  padding-right: 6pt;
+}
+
+table.changes td.pair span {
+  display: block;
+  border-radius: 2pt;
+}
+
+table.changes td.pair .was {
+  height: 3pt;
+  margin-bottom: 1.5pt;
+  background: #cbd5e1;
+}
+
+table.changes td.pair .now {
+  height: 5pt;
+}
+
+table.changes td.num {
+  width: 14%;
+  color: var(--muted);
+}
+
+td.delta,
+em.delta {
+  font-family: var(--mono);
+  font-style: normal;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.delta.up {
+  color: #be123c;
+}
+
+.delta.down {
+  color: #15803d;
+}
+
+/* Flechas dibujadas con bordes: las fuentes del reporte no traen ↑ ↓ y el
+   PDF las tomaba de una fuente del sistema (DejaVu), que otro servidor podría
+   no tener. */
+.delta.up::before,
+.delta.down::before {
+  content: "";
+  display: inline-block;
+  margin-right: 2.5pt;
+  border-right: 3pt solid transparent;
+  border-left: 3pt solid transparent;
+  vertical-align: 0.5pt;
+}
+
+.delta.up::before {
+  border-bottom: 5pt solid currentColor;
+}
+
+.delta.down::before {
+  border-top: 5pt solid currentColor;
+}
+
+.delta.same {
+  color: var(--muted);
+}
+
+.was-key,
+.now-key {
+  display: inline-block;
+  width: 10pt;
+  height: 4pt;
+  margin-right: 3pt;
+  border-radius: 2pt;
+  vertical-align: 1pt;
+}
+
+.was-key {
+  background: #cbd5e1;
+}
+
+.now-key {
+  background: var(--oraculo-a2);
+}
+
+.change-chips {
+  margin: 0 0 4pt;
+  font-size: 8pt;
+  color: var(--ink);
+}
+
+.chip-more {
+  font-size: 7.5pt;
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-block;
+  margin: 0 3pt 3pt 0;
+  padding: 1pt 6pt;
+  border-radius: 8pt;
+  font-size: 7.5pt;
+  font-weight: 600;
+}
+
+.chip-new {
+  border: 0.6pt solid #be123c;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.chip-quiet {
+  border: 0.6pt solid #94a3b8;
+  background: #f8fafc;
+  color: #475569;
 }

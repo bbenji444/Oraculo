@@ -336,5 +336,10 @@ def build_view(data: ReportData) -> ReportView:
         legend=tuple(legend(max((c.count for c in data.counts), default=0))),
         uses_gdelt=any(p.provider in GDELT_PROVIDERS and p.queries > 0 for p in data.providers),
         oraculo=oraculo,
-        questions=build_questions(articles, oraculo.timeline),
+        questions=build_questions(
+            articles,
+            oraculo.timeline,
+            data.previous_articles,
+            data.previous_run.scheduled_for if data.previous_run else None,
+        ),
     )
