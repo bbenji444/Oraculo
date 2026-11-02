@@ -252,27 +252,23 @@ select optgroup {
   transform-origin: center;
   animation: marca-giro 6s linear infinite;
 }
+/* Letrero de neón (Benji, 02/11/2026: «ponle luz neón a las letras»): el
+   tubo blanco con halo cian en capas. Al cargar se enciende parpadeando y
+   luego respira apenas. Solo se anima la opacidad. */
 .marca-nombre {
   font: 700 15px/1 var(--font-brand);
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #fff;
+  color: #effeff;
   text-shadow:
-    0 0 10px rgb(255 255 255 / 0.35),
-    0 0 22px rgb(0 210 255 / 0.35);
-  background: linear-gradient(
-    105deg,
-    #fff 0%,
-    #fff 38%,
-    rgb(0 210 255 / 0.95) 50%,
-    #fff 62%,
-    #fff 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: marca-shimmer 4.5s ease-in-out infinite;
+    0 0 1px #fff,
+    0 0 4px rgb(255 255 255 / 0.85),
+    0 0 9px rgb(0 210 255 / 0.95),
+    0 0 18px rgb(0 210 255 / 0.75),
+    0 0 34px rgb(0 210 255 / 0.45);
+  animation:
+    neon-encendido 1.6s steps(1) 0.3s both,
+    neon-respira 5s ease-in-out 2s infinite;
 }
 .marca-linea {
   position: relative;
@@ -286,7 +282,11 @@ select optgroup {
   font: 600 9px/1 var(--font-display);
   letter-spacing: 0.36em;
   text-transform: uppercase;
-  color: var(--color-slate-400);
+  color: rgb(150 225 240 / 0.85);
+  /* Brillo suave: el subtítulo acompaña al letrero sin competir. */
+  text-shadow:
+    0 0 6px rgb(0 210 255 / 0.45),
+    0 0 14px rgb(0 210 255 / 0.2);
   white-space: nowrap;
   transition:
     color 0.35s,
@@ -332,14 +332,42 @@ select optgroup {
     transform: none;
   }
 }
-@keyframes marca-shimmer {
-  0%,
-  70%,
-  100% {
-    background-position: 120% 0;
+/* El tubo de neón se enciende con un par de parpadeos, como en la calle. */
+@keyframes neon-encendido {
+  0% {
+    opacity: 0.15;
   }
-  85% {
-    background-position: -20% 0;
+  12% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.35;
+  }
+  26% {
+    opacity: 1;
+  }
+  34% {
+    opacity: 0.6;
+  }
+  40%,
+  100% {
+    opacity: 1;
+  }
+}
+/* Respira apenas, con un titubeo corto de vez en cuando. */
+@keyframes neon-respira {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.86;
+  }
+  47% {
+    opacity: 0.7;
+  }
+  49% {
+    opacity: 0.92;
   }
 }
 @keyframes marca-scan {
@@ -387,8 +415,7 @@ select optgroup {
 /* Sin el destello, el nombre se queda blanco (el texto no es transparente). */
 @media (prefers-reduced-motion: reduce) {
   .marca-nombre {
-    background: none;
-    -webkit-text-fill-color: #fff;
+    animation: none;
   }
   .marca-scan,
   .marca-meridiano,
