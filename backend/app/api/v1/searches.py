@@ -128,6 +128,7 @@ def _request(body: SearchIn, actor: Actor) -> SearchRequest:
         body.region_id,
         body.window(mexico_city_today()),
         tuple(body.providers) if body.providers is not None else None,
+        category_ids=tuple(body.category_ids),
     )
 
 

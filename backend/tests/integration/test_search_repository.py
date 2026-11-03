@@ -530,6 +530,52 @@ async def test_la_busqueda_guarda_y_lee_sus_fuentes(
     assert stored.providers == (Provider.SEARCHAPI, Provider.LOCAL_INDEX)
 
 
+async def test_la_subdivision_se_guarda_con_la_busqueda_y_se_lee_igual(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # «FGR + Homicidio» (02/11/2026): la copia del concepto lleva las palabras del tema.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        cdmx = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    copied = SearchConcept(
+        concept_id,
+        CONCEPT_NAME,
+        "",
+        ("FGR",),
+        ("película",),
+        ("homicidio", "asesinato"),
+        (5,),
+    )
+    search_id = await searches.create(
+        NewSearch(
+            user_id="prueba",
+            region_id=cdmx,
+            date_from=date(2026, 11, 1),
+            date_to=date(2026, 11, 2),
+            concepts=(copied,),
+            queries_planned=1,
+            credits_estimated=0,
+            providers=(Provider.LOCAL_INDEX,),
+        )
+    )
+
+    stored = await searches.load(search_id)
+    [detail] = [s for s in await searches.history("prueba", None, 200) if s.search_id == search_id]
+
+    assert stored is not None
+    # La descripción se lee del concepto vigente; lo demás es la copia.
+    [loaded] = stored.concepts
+    assert (loaded.keywords, loaded.exclude_terms, loaded.topic_terms, loaded.category_ids) == (
+        ("FGR",),
+        ("película",),
+        ("homicidio", "asesinato"),
+        (5,),
+    )
+    assert [(c.id, c.subdivision_ids) for c in detail.concepts] == [(concept_id, (5,))]
+
+
 async def _izta(
     articles: PostgresArticleStore, search_id: UUID, *, relevant_only: bool
 ) -> ArticleItem | None:

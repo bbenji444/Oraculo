@@ -28,10 +28,12 @@ class ConceptRef:
     Attributes:
         id: Id del concepto.
         name: Nombre al momento de buscar.
+        subdivision_ids: Subdivisiones con que se buscó («FGR + Homicidio»).
     """
 
     id: int
     name: str
+    subdivision_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

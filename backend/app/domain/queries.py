@@ -247,6 +247,9 @@ class PlannedQuery:
         place: Lugar ya resuelto, por la misma razón. ``None`` solo en
             consultas armadas a mano (diagnóstico): equivale a no filtrar
             por lugar.
+        topic_terms: Palabras de la subdivisión (02/11/2026): si no está
+            vacío, la nota debe traer también una de ellas. «FGR + Homicidio»
+            pide las palabras de la FGR y, además, las de Homicidio.
     """
 
     provider: Provider
@@ -258,3 +261,4 @@ class PlannedQuery:
     estimated_credits: int
     exclude_terms: tuple[str, ...] = ()
     place: QueryPlace | None = None
+    topic_terms: tuple[str, ...] = ()

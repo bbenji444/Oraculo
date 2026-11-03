@@ -80,20 +80,29 @@ def group(terms: Sequence[str]) -> str:
     return parts[0] if len(parts) == 1 else f"({' OR '.join(parts)})"
 
 
-def base_query(keywords: Sequence[str], place: QueryPlace, exclusions: Sequence[str]) -> list[str]:
+def base_query(
+    keywords: Sequence[str],
+    place: QueryPlace,
+    exclusions: Sequence[str],
+    topic: Sequence[str] = (),
+) -> list[str]:
     """Partes comunes a los tres proveedores, en orden.
 
     Args:
         keywords: Palabras clave de esta consulta.
         place: Cómo se nombra el lugar.
         exclusions: Términos de exclusión del concepto.
+        topic: Palabras de la subdivisión, que también deben aparecer (un
+            segundo grupo: los buscadores unen los grupos con «y»).
 
     Returns:
-        Las partes del texto: palabras clave, lugar, estado y exclusiones.
-        VERIFICAR en F3 que GDELT acepte varios bloques OR hermanos (su
-        documentación solo prohíbe anidarlos).
+        Las partes del texto: palabras clave, subdivisión, lugar, estado y
+        exclusiones. VERIFICAR en F3 que GDELT acepte varios bloques OR
+        hermanos (su documentación solo prohíbe anidarlos).
     """
     parts = [group(keywords)]
+    if topic:
+        parts.append(group(topic))
     if place.terms:
         parts.append(group(place.terms))
     if place.required_terms:
@@ -157,6 +166,7 @@ def local_index_text(
     place: QueryPlace,
     exclusions: Sequence[str],
     window: DateWindow,
+    topic: Sequence[str] = (),
 ) -> str:
     """Describe en palabras lo que filtrará el índice local.
 
@@ -165,12 +175,15 @@ def local_index_text(
         place: Lugar.
         exclusions: Exclusiones.
         window: Rango (va aparte, en los filtros de la vista previa).
+        topic: Palabras de la subdivisión, que también deben aparecer.
 
     Returns:
         Por ejemplo ``contiene: hackeo o ciberataque · lugar: Iztapalapa ·
         sin: curso``.
     """
     parts = [f"contiene: {_in_words(keywords)}"]
+    if topic:
+        parts.append(f"y también: {_in_words(topic)}")
     if place.terms:
         where = _in_words(place.terms)
         if place.required_terms:
@@ -210,7 +223,9 @@ class QueryDialect:
     suffix: Callable[[QueryPlace, DateWindow], list[str]]
     cacheable: bool = True
     split_up_to: int | None = None
-    writer: Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow], str] | None = None
+    writer: (
+        Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow, Sequence[str]], str] | None
+    ) = None
 
     def render(
         self,
@@ -218,6 +233,7 @@ class QueryDialect:
         place: QueryPlace,
         exclusions: Sequence[str],
         window: DateWindow,
+        topic: Sequence[str] = (),
     ) -> str:
         """Escribe el texto completo de una consulta.
 
@@ -226,13 +242,16 @@ class QueryDialect:
             place: Cómo se nombra el lugar.
             exclusions: Términos de exclusión.
             window: Rango de fechas.
+            topic: Palabras de la subdivisión, que también deben aparecer.
 
         Returns:
             El texto exacto que se enviará.
         """
         if self.writer is not None:
-            return self.writer(keywords, place, exclusions, window)
-        return " ".join([*base_query(keywords, place, exclusions), *self.suffix(place, window)])
+            return self.writer(keywords, place, exclusions, window, topic)
+        return " ".join(
+            [*base_query(keywords, place, exclusions, topic), *self.suffix(place, window)]
+        )
 
     def fits(self, text: str) -> bool:
         """Dice si el texto cabe en los límites del proveedor.

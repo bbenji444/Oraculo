@@ -46,6 +46,15 @@ class SearchIn(BaseModel):
         ),
         examples=[["google_news_rss", "indice_local"]],
     )
+    category_ids: list[int] = Field(
+        default_factory=list,
+        max_length=_MAX_CONCEPTS,
+        description=(
+            "Subdivisiones (``/categories``) para los conceptos como la FGR: cada nota "
+            "debe traer las palabras del concepto y las de una subdivisión."
+        ),
+        examples=[[5]],
+    )
 
     def window(self, today: date) -> DateWindow:
         """Rango de fechas pedido.
@@ -72,6 +81,10 @@ class ConceptRefOut(BaseModel):
 
     id: int
     name: str = Field(examples=["Extorsión"])
+    subdivision_ids: list[int] = Field(
+        default_factory=list,
+        description="Subdivisiones con que se buscó (``/categories``), p. ej. FGR + Homicidio.",
+    )
 
 
 class LLMEstimateOut(BaseModel):
@@ -116,7 +129,10 @@ class EstimateOut(BaseModel):
         """
         search = estimate.search
         return cls(
-            concepts=[ConceptRefOut(id=c.concept_id, name=c.name) for c in search.concepts],
+            concepts=[
+                ConceptRefOut(id=c.concept_id, name=c.name, subdivision_ids=list(c.category_ids))
+                for c in search.concepts
+            ],
             region_id=search.region_id,
             region=estimate.breadcrumb,
             date_from=search.date_from,
@@ -222,7 +238,10 @@ class SearchOut(BaseModel):
             region_name=detail.region_name,
             date_from=detail.date_from,
             date_to=detail.date_to,
-            concepts=[ConceptRefOut(id=c.id, name=c.name) for c in detail.concepts],
+            concepts=[
+                ConceptRefOut(id=c.id, name=c.name, subdivision_ids=list(c.subdivision_ids))
+                for c in detail.concepts
+            ],
             progress=dict(detail.progress),
             queries_planned=detail.queries_planned,
             credits_estimated=detail.credits_estimated,

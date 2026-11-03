@@ -163,7 +163,11 @@ def plan_queries(
         ConceptValidationError: Si un concepto no tiene palabras clave.
         QueryTooLongError: Si una palabra clave no cabe en el límite.
     """
-    return [q for c in concepts for q in build_queries(c, place, window, providers)]
+    return [
+        q
+        for c in concepts
+        for q in build_queries(c, place, window, providers, topic_terms=c.topic_terms)
+    ]
 
 
 @dataclass(slots=True)

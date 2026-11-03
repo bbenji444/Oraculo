@@ -131,6 +131,29 @@ async def test_la_enie_se_conserva_y_es_letra(provider: LocalIndexProvider) -> N
     assert sin_enie.articles == ()
 
 
+async def test_con_subdivision_tambien_debe_aparecer_una_de_sus_palabras(
+    provider: LocalIndexProvider,
+) -> None:
+    # «FGR + tema» (02/11/2026): «hackeo» y además «alcaldía» o «gobierno».
+    planned = PlannedQuery(
+        Provider.LOCAL_INDEX,
+        "t",
+        ("hackeo",),
+        MEXICO,
+        "es",
+        WINDOW,
+        0,
+        ("curso",),
+        QueryPlace((), (), MEXICO),
+        ("alcaldía", "gobierno"),
+    )
+
+    response = await provider.search(planned)
+
+    assert set(slugs([a.url for a in response.articles])) == {"a", "jalisco"}
+    assert response.params["subdivision"] == "ALCALDIA | GOBIERNO"
+
+
 def test_los_caracteres_especiales_se_escapan() -> None:
     assert word_pattern(["C.D.M.X.", "A|B"]) == r"\m(?:C\.D\.M\.X\.|A\|B)\M"
     assert word_pattern([]) is None

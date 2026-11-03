@@ -39,15 +39,35 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 ## Categorías de noticias
 
-`GET /categories`. El catálogo con que la IA clasifica cada nota por delito (F12.4, ADR-0029), en su orden, con «Otros» (`is_other: true`) al final. `color` y `symbol` vienen en `null` hasta que se definan con datos reales.
+`GET /categories`. El catálogo con que la IA clasifica cada nota por delito (F12.4, ADR-0029), en su orden, con «Otros» (`is_other: true`) al final. Son también las **subdivisiones** de la FGR (ADR-0038):
+
+- `topic_concept_id` es su tema general, el concepto con sus palabras clave para buscarla (`/concepts`); «Otros» no tiene;
+- `?include_inactive=true` trae también las apagadas (`is_active: false`), para el editor.
+
+`symbol` sigue en `null`.
 
 ```json
 {
   "items": [
-    { "id": 1, "name": "Narcotráfico y delitos contra la salud", "description": "Producción, transporte o venta de drogas…", "is_other": false, "color": null, "symbol": null },
-    { "id": 14, "name": "Otros", "description": "Cualquier tema que no encaje…", "is_other": true, "color": null, "symbol": null }
+    { "id": 1, "name": "Narcotráfico y delitos contra la salud", "description": "Producción, transporte o venta de drogas…", "is_other": false, "color": "#2CF5A0", "symbol": null, "is_active": true, "topic_concept_id": 15 },
+    { "id": 14, "name": "Otros", "description": "Cualquier tema que no encaje…", "is_other": true, "color": "#94A3B8", "symbol": null, "is_active": true, "topic_concept_id": null }
   ]
 }
+```
+
+`PATCH /categories/{id}` edita una subdivisión. Lo que no se manda queda igual:
+
+| Campo | Qué es |
+|---|---|
+| `name` | Nombre; su tema general toma el mismo |
+| `description` | Lo que debe entender la IA por ella (máx. 400 caracteres) |
+| `color` | `#RRGGBB` |
+| `is_active` | Prenderla o apagarla, junto con su tema; «Otros» no se apaga |
+
+Responde la subdivisión como quedó. Si no existe, `404 category_not_found`. Si no cumple las reglas, `422 invalid_category`, con `details.problemas`. Si otra subdivisión o concepto ya usa el nombre, `409 category_name_taken`. Cada cambio queda en la bitácora (`category.updated`). Lo editado vale para las notas que se clasifiquen después.
+
+```bash
+curl -s -X PATCH http://localhost:8080/api/v1/categories/5 -H 'Content-Type: application/json' -d '{"color":"#FF4D6D"}'
 ```
 
 ## Fuentes de la búsqueda (switches)
@@ -71,6 +91,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 | Campo | Qué es |
 |---|---|
 | `concept_ids` | Conceptos (al menos uno, activos, sin repetir) |
+| `category_ids` | Subdivisiones (opcional, ADR-0038): a los conceptos que no son tema general, como la FGR, se les exige **además** una palabra del tema de cada subdivisión («FGR · Homicidio»). Sin un concepto así, o con una subdivisión sin tema activo, responde `422` |
 | `region_id` | Región (de `/regions`) |
 | `days` | Últimos N días (1 a 90; por defecto 7) |
 | `date_from` y `date_to` | Rango fijo, en lugar de `days`; deben ir los dos |
@@ -82,7 +103,7 @@ curl -s -X POST http://localhost:8080/api/v1/searches/estimate -H 'Content-Type:
 
 ```json
 {
-  "concepts": [{ "id": 3, "name": "Extorsión" }],
+  "concepts": [{ "id": 3, "name": "Extorsión", "subdivision_ids": [] }],
   "region_id": 272,
   "region": "México › Jalisco",
   "date_from": "2026-10-10",
@@ -158,7 +179,7 @@ curl -s http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d
   "region_name": "Jalisco",
   "date_from": "2026-10-10",
   "date_to": "2026-10-17",
-  "concepts": [{ "id": 3, "name": "Extorsión" }],
+  "concepts": [{ "id": 3, "name": "Extorsión", "subdivision_ids": [] }],
   "progress": {
     "stage": "close",
     "articles": 18, "reused": 0, "enriched": 18, "fallback": 5, "skipped_by_cap": 0,

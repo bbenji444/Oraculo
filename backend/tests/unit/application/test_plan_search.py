@@ -196,3 +196,91 @@ def test_probar_concepto_no_muestra_fuentes_ocultas() -> None:
 
     assert Provider.BROWSERWORK_BING in plan.available_providers()
     assert plan.offered_providers() == (Provider.SEARCHAPI, Provider.LOCAL_INDEX)
+
+
+# --- Subdivisiones (02/11/2026) ---
+
+HOMICIDIO_ID = 5
+
+
+def topic(name: str, keywords: tuple[str, ...], *, active: bool = True) -> ConceptDraft:
+    return ConceptDraft.validated(
+        name=name,
+        description=f"Tema general: {name.lower()}",
+        keywords=keywords,
+        exclude_terms=("película",),
+        color="#FF4D6D",
+        is_active=active,
+    )
+
+
+async def test_fgr_con_subdivision_pide_ambas_palabras() -> None:
+    repo = FakeConceptRepository()
+    fgr = repo.add(concept("FGR"))
+    repo.add(topic("Homicidio", ("homicidio", "asesinato")), category_id=HOMICIDIO_ID)
+
+    estimate = await planner(repo).estimate(
+        SearchRequest("benji", (fgr.id,), IZTAPALAPA.id, WEEK, category_ids=(HOMICIDIO_ID,))
+    )
+
+    [copied] = estimate.search.concepts
+    assert copied.keywords == ("fgr",)
+    assert copied.topic_terms == ("homicidio", "asesinato")
+    assert copied.category_ids == (HOMICIDIO_ID,)
+    # Las exclusiones del tema también se aplican.
+    assert copied.exclude_terms == ("simulacro", "película")
+    assert {q.topic_terms for q in estimate.queries} == {("homicidio", "asesinato")}
+
+
+async def test_un_tema_general_se_busca_solo_y_no_se_le_agrega_otra_subdivision() -> None:
+    repo = FakeConceptRepository()
+    fgr = repo.add(concept("FGR"))
+    homicidio = repo.add(topic("Homicidio", ("homicidio",)), category_id=HOMICIDIO_ID)
+    repo.add(topic("Secuestro", ("secuestro",)), category_id=3)
+    use = planner(repo)
+
+    solo = await use.estimate(SearchRequest("benji", (homicidio.id,), IZTAPALAPA.id, WEEK))
+    mixed = await use.estimate(
+        SearchRequest("benji", (fgr.id, homicidio.id), IZTAPALAPA.id, WEEK, category_ids=(3,))
+    )
+
+    assert [(c.keywords, c.topic_terms) for c in solo.search.concepts] == [(("homicidio",), ())]
+    assert [(c.name, c.topic_terms) for c in mixed.search.concepts] == [
+        ("FGR", ("secuestro",)),
+        ("Homicidio", ()),
+    ]
+
+
+async def test_varias_subdivisiones_se_juntan_sin_repetir_palabras() -> None:
+    repo = FakeConceptRepository()
+    fgr = repo.add(concept("FGR"))
+    repo.add(topic("Homicidio", ("homicidio", "ataque armado")), category_id=HOMICIDIO_ID)
+    repo.add(topic("Armas", ("ataque armado", "granada")), category_id=6)
+
+    estimate = await planner(repo).estimate(
+        SearchRequest("benji", (fgr.id,), IZTAPALAPA.id, WEEK, category_ids=(HOMICIDIO_ID, 6))
+    )
+
+    [copied] = estimate.search.concepts
+    assert copied.topic_terms == ("homicidio", "ataque armado", "granada")
+    assert copied.exclude_terms == ("simulacro", "película")
+
+
+async def test_subdivisiones_invalidas() -> None:
+    repo = FakeConceptRepository()
+    fgr = repo.add(concept("FGR"))
+    homicidio = repo.add(topic("Homicidio", ("homicidio",)), category_id=HOMICIDIO_ID)
+    repo.add(topic("Apagada", ("apagada",), active=False), category_id=9)
+    use = planner(repo)
+
+    def request(ids: tuple[int, ...], categories: tuple[int, ...]) -> SearchRequest:
+        return SearchRequest("benji", ids, IZTAPALAPA.id, WEEK, category_ids=categories)
+
+    with pytest.raises(InvalidRequestError, match="repetida"):
+        await use.estimate(request((fgr.id,), (HOMICIDIO_ID, HOMICIDIO_ID)))
+    with pytest.raises(InvalidRequestError, match="no tiene palabras clave"):
+        await use.estimate(request((fgr.id,), (999,)))
+    with pytest.raises(InvalidRequestError, match="no tiene palabras clave"):
+        await use.estimate(request((fgr.id,), (9,)))
+    with pytest.raises(InvalidRequestError, match="no solas"):
+        await use.estimate(request((homicidio.id,), (HOMICIDIO_ID,)))

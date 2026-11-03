@@ -155,7 +155,8 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO search_concepts (search_id, concept_id, concept_name, "
-                        "keywords, exclude_terms) VALUES (:s, :c, :name, :kw, :ex)"
+                        "keywords, exclude_terms, topic_terms, category_ids) "
+                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats)"
                     ),
                     {
                         "s": search_id,
@@ -163,6 +164,8 @@ class PostgresSearchStore:
                         "name": concept.name,
                         "kw": list(concept.keywords),
                         "ex": list(concept.exclude_terms),
+                        "topic": list(concept.topic_terms),
+                        "cats": list(concept.category_ids),
                     },
                 )
         return search_id
@@ -192,7 +195,8 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT sc.concept_id, sc.concept_name, c.description, sc.keywords, "
-                            "sc.exclude_terms FROM search_concepts sc "
+                            "sc.exclude_terms, sc.topic_terms, sc.category_ids "
+                            "FROM search_concepts sc "
                             "JOIN concepts c ON c.id = sc.concept_id "
                             "WHERE sc.search_id = :id ORDER BY sc.concept_id"
                         ),
@@ -217,6 +221,8 @@ class PostgresSearchStore:
                     c["description"],
                     tuple(c["keywords"]),
                     tuple(c["exclude_terms"]),
+                    tuple(c["topic_terms"]),
+                    tuple(c["category_ids"]),
                 )
                 for c in concepts
             ),
@@ -345,7 +351,7 @@ class PostgresSearchStore:
                             f"""
                             SELECT s.*, r.code AS region_code, r.name AS region_name,
                                 COALESCE((SELECT json_agg(json_build_array(sc.concept_id,
-                                    sc.concept_name) ORDER BY sc.concept_id)
+                                    sc.concept_name, sc.category_ids) ORDER BY sc.concept_id)
                                     FROM search_concepts sc WHERE sc.search_id = s.id),
                                     '[]') AS concepts
                             FROM searches s JOIN regions r ON r.id = s.region_id
@@ -370,7 +376,7 @@ class PostgresSearchStore:
                 region_name=row["region_name"],
                 date_from=row["date_from"],
                 date_to=row["date_to"],
-                concepts=tuple(ConceptRef(c[0], c[1]) for c in row["concepts"]),
+                concepts=tuple(ConceptRef(c[0], c[1], tuple(c[2] or ())) for c in row["concepts"]),
                 progress=dict(row["progress"]),
                 queries_planned=row["queries_planned"],
                 credits_estimated=row["credits_estimated"],
