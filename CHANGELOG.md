@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Subdivisiones editables y temas generales (02/11/2026, ADR-0038).** Benji pidió ver y editar todas las subdivisiones, no solo las 8 que salían en las notas, y poder buscar «solo homicidios en general, sin la FGR».
+  - Cada subdivisión, menos «Otros», tiene su **tema general**: un concepto con palabras clave que se busca solo. `make seed` siembra los 14 desde `temas.json`.
+  - **FGR · Homicidio** trae solo notas con **ambas** palabras: la consulta lleva un segundo grupo con las palabras del tema (`category_ids` en `POST /searches`).
+  - En el Centro de mando, «Qué rastrear» abre una ventana al centro con dos bloques: la FGR con sus subdivisiones («Todas» o las que elijas) y los temas generales. La frase dice, por ejemplo, «FGR · Homicidio».
+  - En «Conceptos», el panel **Subdivisiones** muestra las 15, también las apagadas. Cada una se edita con su nombre, color, lo que lee la IA, si está prendida y las palabras de su tema.
+  - `PATCH /categories/{id}` cambia nombre, descripción, color y si está prendida, con bitácora. `GET /categories?include_inactive=true` trae también las apagadas.
+  - La corrida automática no cambia, y `make retirar-conceptos` ya no retira los temas.
 - **PDF más visual y sin listados interminables (28/10/2026, ADR-0033).** Benji: «prefiero resúmenes, gráficas, datos importantes». El reporte trae:
   - una dona por delito;
   - la línea del tiempo por hora de colores por categoría, como el globo;
