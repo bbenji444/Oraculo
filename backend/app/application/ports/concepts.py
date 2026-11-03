@@ -43,6 +43,17 @@ class ConceptRepositoryPort(Protocol):
         """
         ...
 
+    async def for_category(self, category_id: int) -> Concept | None:
+        """El tema general vigente de una subdivisión (02/11/2026).
+
+        Args:
+            category_id: La categoría («Homicidio»).
+
+        Returns:
+            Su concepto, o ``None`` si todavía no tiene.
+        """
+        ...
+
     async def name_taken(self, name_norm: str, except_id: int | None) -> bool:
         """Dice si otro concepto vigente ya usa ese nombre.
 

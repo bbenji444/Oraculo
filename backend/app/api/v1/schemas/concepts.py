@@ -94,6 +94,13 @@ class ConceptOut(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    category_id: int | None = Field(
+        default=None,
+        description=(
+            "Si es el tema general de una subdivisión, su categoría (``/categories``); "
+            "``null`` en la FGR y en los conceptos de cada analista."
+        ),
+    )
 
     @classmethod
     def from_domain(cls, concept: Concept) -> "ConceptOut":
@@ -117,6 +124,7 @@ class ConceptOut(BaseModel):
             created_by=concept.created_by,
             created_at=concept.created_at,
             updated_at=concept.updated_at,
+            category_id=concept.category_id,
         )
 
 

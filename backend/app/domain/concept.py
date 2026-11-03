@@ -296,6 +296,9 @@ class Concept:
         created_by: Usuario que lo creó.
         created_at: Fecha de creación (UTC).
         updated_at: Fecha de la última edición (UTC).
+        category_id: Si es el tema general de una subdivisión (02/11/2026),
+            la categoría que representa («Homicidio»); ``None`` en los demás
+            (la FGR y los que crea cada analista).
     """
 
     id: int
@@ -303,6 +306,7 @@ class Concept:
     created_by: str
     created_at: datetime
     updated_at: datetime
+    category_id: int | None = None
 
     @property
     def keywords(self) -> tuple[str, ...]:

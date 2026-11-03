@@ -299,6 +299,9 @@ class RetireConcepts:
     borrado siempre es lógico (``deleted_at``), aunque el concepto no tenga
     búsquedas. Así el historial, los casos y los reportes siguen intactos y
     cualquiera se puede recuperar. Cada retiro queda en la bitácora.
+
+    Los temas generales de las subdivisiones (``category_id``, 02/11/2026)
+    nunca se retiran: son parte del catálogo, no conceptos sueltos.
     """
 
     # Conceptos por página al recorrer la lista (paginación por cursor).
@@ -320,7 +323,8 @@ class RetireConcepts:
                 mayúsculas ni acentos).
 
         Returns:
-            ``(se quedan, se retiran)``, en orden alfabético.
+            ``(se quedan, se retiran)``, en orden alfabético. Los temas de las
+            subdivisiones siempre se quedan.
         """
         wanted = {normalize_name(name) for name in keep}
         kept: list[Concept] = []
@@ -328,7 +332,8 @@ class RetireConcepts:
         after: NameCursor | None = None
         while page := await self._repository.list_concepts(None, after, self._PAGE):
             for concept in page:
-                (kept if concept.data.name_norm in wanted else retired).append(concept)
+                stays = concept.data.name_norm in wanted or concept.category_id is not None
+                (kept if stays else retired).append(concept)
             last = page[-1]
             after = NameCursor(last.data.name_norm, last.id)
         return kept, retired
