@@ -118,6 +118,41 @@ describe('TrackPicker', () => {
     expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
   });
 
+  it('la FGR y los temas generales no se mezclan', () => {
+    // Benji, 03/11/2026: con la FGR elegida no quiere homicidios en general.
+    // FGR + el tema «Homicidio» sumaría toda la FGR y todos los homicidios.
+    useExplorerStore.setState({ conceptIds: [FGR.id], subdivisionIds: [5] });
+    render(<TrackPicker onClose={vi.fn()} />);
+    const { subdivisions, topics } = groups();
+
+    fireEvent.click(within(topics).getByRole('button', { name: 'Homicidio' }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
+
+    // Varios temas sí van juntos.
+    fireEvent.click(within(topics).getByRole('button', { name: 'Secuestro' }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id, SECUESTRO.id]);
+
+    // Y volver a la FGR apaga los temas.
+    fireEvent.click(within(subdivisions).getByRole('button', { name: 'Homicidio' }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([5]);
+
+    fireEvent.click(within(topics).getByRole('button', { name: 'Secuestro' }));
+    fireEvent.click(screen.getByRole('button', { name: FGR.name }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+  });
+
+  it('una búsqueda reabierta con FGR y un tema suelto se corrige al elegir subdivisión', () => {
+    useExplorerStore.setState({ conceptIds: [FGR.id, HOMICIDIO.id], subdivisionIds: [] });
+    render(<TrackPicker onClose={vi.fn()} />);
+
+    fireEvent.click(within(groups().subdivisions).getByRole('button', { name: 'Secuestro' }));
+
+    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([3]);
+  });
+
   it('se cierra con Esc y con «Listo»', () => {
     const onClose = vi.fn();
     render(<TrackPicker onClose={onClose} />);
