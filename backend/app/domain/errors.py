@@ -241,3 +241,25 @@ class RelationshipValidationError(InvalidRequestError):
     """El vínculo no cumple sus reglas (por ejemplo, una entidad sin confirmar)."""
 
     code = "invalid_relationship"
+
+
+class CategoryNotFoundError(NotFoundError):
+    """No existe esa subdivisión (categoría)."""
+
+    code = "category_not_found"
+
+
+class CategoryValidationError(InvalidRequestError):
+    """La subdivisión no cumple sus reglas.
+
+    ``details["problemas"]`` lista cada problema con el campo al que
+    pertenece, como en los conceptos.
+    """
+
+    code = "invalid_category"
+
+
+class CategoryNameTakenError(ConflictError):
+    """Otra subdivisión, o el concepto de otro tema, ya usa ese nombre."""
+
+    code = "category_name_taken"

@@ -11,14 +11,43 @@ la IA solo título y resumen (o el fragmento del medio si no hay resumen).
 No hace: no decide la categoría.
 """
 
+import json
 from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.engine import Row
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.application.audit import AuditEntry
 from app.application.ports.llm import ClassificationNote
 from app.domain.categories import Category, CategoryChoice
+from app.domain.errors import CategoryNameTakenError, CategoryNotFoundError
+from app.domain.names import normalize_name
+
+# Entidad de la bitácora para las ediciones del catálogo (02/11/2026).
+ENTITY_TYPE = "category"
+_CATALOG = """
+    SELECT c.id, c.name, c.description, c.is_other, c.color, c.symbol, c.is_active,
+        (SELECT k.id FROM concepts k
+         WHERE k.category_id = c.id AND k.deleted_at IS NULL) AS topic_concept_id
+    FROM categories c
+"""
+
+
+def _to_category(row: Row) -> Category:
+    return Category(
+        row.id,
+        row.name,
+        row.description,
+        row.is_other,
+        row.color,
+        row.symbol,
+        row.is_active,
+        row.topic_concept_id,
+    )
+
 
 _PENDING = """
     SELECT a.id, a.title, COALESCE(a.summary, a.snippet) AS summary,
@@ -43,14 +72,84 @@ class PostgresCategoryStore:
         """Ver ``CategoryStorePort.active_categories``."""
         async with self._engine.connect() as conn:
             rows = await conn.execute(
-                text(
-                    "SELECT id, name, description, is_other, color, symbol FROM categories "
-                    "WHERE is_active ORDER BY sort_order, id"
-                )
+                text(_CATALOG + " WHERE c.is_active ORDER BY c.sort_order, c.id")
             )
-            return [
-                Category(r.id, r.name, r.description, r.is_other, r.color, r.symbol) for r in rows
-            ]
+            return [_to_category(r) for r in rows]
+
+    async def all_categories(self) -> list[Category]:
+        """Ver ``CategoryStorePort.all_categories``."""
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(text(_CATALOG + " ORDER BY c.sort_order, c.id"))
+            return [_to_category(r) for r in rows]
+
+    async def get_category(self, category_id: int) -> Category | None:
+        """Ver ``CategoryStorePort.get_category``."""
+        async with self._engine.connect() as conn:
+            row = (
+                await conn.execute(text(_CATALOG + " WHERE c.id = :id"), {"id": category_id})
+            ).first()
+        return _to_category(row) if row else None
+
+    async def update_category(self, category: Category, audit: AuditEntry) -> Category:
+        """Ver ``CategoryStorePort.update_category``."""
+        name_norm = normalize_name(category.name)
+        try:
+            async with self._engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "UPDATE categories SET name = :name, name_norm = :norm, "
+                        "description = :description, color = :color, is_active = :active, "
+                        "updated_at = now() WHERE id = :id"
+                    ),
+                    {
+                        "id": category.category_id,
+                        "name": category.name,
+                        "norm": name_norm,
+                        "description": category.description,
+                        "color": category.color,
+                        "active": category.is_active,
+                    },
+                )
+                # Su tema general se llama igual y se prende o apaga con ella.
+                await conn.execute(
+                    text(
+                        "UPDATE concepts SET name = :name, name_norm = :norm, "
+                        "is_active = :active WHERE category_id = :id AND deleted_at IS NULL"
+                    ),
+                    {
+                        "id": category.category_id,
+                        "name": category.name,
+                        "norm": name_norm,
+                        "active": category.is_active,
+                    },
+                )
+                await conn.execute(
+                    text(
+                        "INSERT INTO audit_log "
+                        "(user_id, action, entity_type, entity_id, payload, ip) "
+                        "VALUES (:user_id, :action, :entity_type, :entity_id, "
+                        "CAST(:payload AS jsonb), CAST(:ip AS inet))"
+                    ),
+                    {
+                        "user_id": audit.actor.user_id,
+                        "action": audit.action,
+                        "entity_type": ENTITY_TYPE,
+                        "entity_id": str(category.category_id),
+                        "payload": json.dumps(dict(audit.payload), ensure_ascii=False),
+                        "ip": audit.actor.ip,
+                    },
+                )
+        except IntegrityError as error:
+            raise CategoryNameTakenError(
+                f'Ya existe una subdivisión o un concepto llamado "{category.name}".',
+                {"name": category.name},
+            ) from error
+        saved = await self.get_category(category.category_id)
+        if saved is None:
+            raise CategoryNotFoundError(
+                "La subdivisión ya no existe.", {"id": category.category_id}
+            )
+        return saved
 
     async def pending_notes(
         self, article_ids: Sequence[int], version: str

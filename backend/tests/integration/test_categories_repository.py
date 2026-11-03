@@ -11,9 +11,11 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.categories_repository import PostgresCategoryStore
+from app.application.audit import Actor, AuditEntry
 from app.core.config import Settings
 from app.domain.authority import Authority
-from app.domain.categories import CategoryChoice, other_category
+from app.domain.categories import CategoryChanges, CategoryChoice, other_category
+from app.domain.errors import CategoryNameTakenError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -122,3 +124,109 @@ async def test_pendientes_guardar_y_volver_a_pedir(
             {"id": armas},
         ).one()
     assert tuple(row) == (weapons.category_id, "tráfico de armas", "classify_v1", "fgr")
+
+
+# --- Editor de subdivisiones (02/11/2026) ---
+
+HOMICIDIO_ID = 5
+TOPIC_BY = "prueba-subdivisiones"
+
+
+@pytest.fixture
+def topic_concept(sync_engine: Engine) -> Iterator[int]:
+    """Un tema general ligado a «Homicidio»; al final se borra y la categoría se restaura."""
+    with sync_engine.begin() as conn:
+        original = conn.execute(
+            text("SELECT name, name_norm, color, is_active FROM categories WHERE id = :id"),
+            {"id": HOMICIDIO_ID},
+        ).one()
+        concept_id = int(
+            conn.execute(
+                text(
+                    "INSERT INTO concepts (name, name_norm, keywords, color, created_by, "
+                    "category_id) VALUES ('Tema de prueba 0034', 'TEMA DE PRUEBA 0034', "
+                    "ARRAY['homicidio'], '#FF4D6D', :by, :category) RETURNING id"
+                ),
+                {"by": TOPIC_BY, "category": HOMICIDIO_ID},
+            ).scalar_one()
+        )
+    yield concept_id
+    with sync_engine.begin() as conn:
+        conn.execute(text("DELETE FROM concepts WHERE created_by = :by"), {"by": TOPIC_BY})
+        conn.execute(
+            text(
+                "UPDATE categories SET name = :name, name_norm = :name_norm, color = :color, "
+                "is_active = :is_active WHERE id = :id"
+            ),
+            {**original._asdict(), "id": HOMICIDIO_ID},
+        )
+
+
+async def test_el_catalogo_completo_trae_su_tema_general(
+    topic_concept: int, test_engine: AsyncEngine
+) -> None:
+    store = PostgresCategoryStore(test_engine)
+
+    homicidio = await store.get_category(HOMICIDIO_ID)
+    everything = await store.all_categories()
+
+    assert homicidio is not None and homicidio.topic_concept_id == topic_concept
+    assert [c.category_id for c in everything] == [
+        c.category_id for c in await store.active_categories()
+    ]
+    assert await store.get_category(9999) is None
+
+
+async def test_editar_renombra_su_tema_apaga_ambos_y_queda_en_la_bitacora(
+    sync_engine: Engine, topic_concept: int, test_engine: AsyncEngine
+) -> None:
+    store = PostgresCategoryStore(test_engine)
+    current = await store.get_category(HOMICIDIO_ID)
+    assert current is not None
+    edited = CategoryChanges(name="Homicidio doloso", color="#ff0000", is_active=False)
+
+    saved = await store.update_category(
+        edited.apply_to(current),
+        AuditEntry(Actor(TOPIC_BY), "category.updated", {"changed": ["name"]}),
+    )
+
+    assert (saved.name, saved.color, saved.is_active, saved.topic_concept_id) == (
+        "Homicidio doloso",
+        "#FF0000",
+        False,
+        topic_concept,
+    )
+    assert HOMICIDIO_ID not in [c.category_id for c in await store.active_categories()]
+    assert HOMICIDIO_ID in [c.category_id for c in await store.all_categories()]
+    with sync_engine.connect() as conn:
+        concept = conn.execute(
+            text("SELECT name, name_norm, is_active FROM concepts WHERE id = :id"),
+            {"id": topic_concept},
+        ).one()
+        audit = conn.execute(
+            text(
+                "SELECT action, payload FROM audit_log WHERE entity_type = 'category' "
+                "AND entity_id = :id AND user_id = :by ORDER BY id DESC LIMIT 1"
+            ),
+            {"id": str(HOMICIDIO_ID), "by": TOPIC_BY},
+        ).one()
+    assert tuple(concept) == ("Homicidio doloso", "HOMICIDIO DOLOSO", False)
+    assert (audit.action, audit.payload) == ("category.updated", {"changed": ["name"]})
+
+
+async def test_editar_con_el_nombre_de_otra_subdivision_es_conflicto(
+    topic_concept: int, test_engine: AsyncEngine
+) -> None:
+    store = PostgresCategoryStore(test_engine)
+    current = await store.get_category(HOMICIDIO_ID)
+    assert current is not None
+
+    with pytest.raises(CategoryNameTakenError):
+        await store.update_category(
+            CategoryChanges(name="secuestro").apply_to(current),
+            AuditEntry(Actor(TOPIC_BY), "category.updated", {}),
+        )
+
+    # Nada se guardó a medias: ni la categoría ni su tema.
+    after = await store.get_category(HOMICIDIO_ID)
+    assert after is not None and after.name == current.name

@@ -8,15 +8,27 @@ respaldo («Otros») y la etiqueta se conserva para el análisis de frecuencias.
 Esta categoría es el **delito**. Lo que hizo la autoridad (detención, cateo,
 sentencia) sigue en ``articles.event_type``.
 
+Desde el 02/11/2026 el catálogo se edita en pantalla (Conceptos ›
+Subdivisiones): ``CategoryChanges`` valida lo que cambia. Lo que se edita
+vale para las notas que se clasifiquen después; las ya clasificadas no
+cambian.
+
 No hace: no llama a la IA ni lee la base.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.domain.authority import Authority
-from app.domain.errors import DomainError
+from app.domain.errors import CategoryValidationError, DomainError
 from app.domain.names import normalize_name
+
+# Mismo formato que los colores de los conceptos.
+_COLOR = re.compile(r"^#[0-9A-F]{6}$")
+# La IA lee la descripción en cada lote: más larga solo encarece sin ayudar.
+MAX_CATEGORY_DESCRIPTION_CHARS = 400
+MAX_CATEGORY_NAME_CHARS = 60
 
 # Una etiqueta libre más larga no aporta para el análisis y llenaría la base.
 MAX_RAW_LABEL_CHARS = 80
@@ -43,6 +55,9 @@ class Category:
         is_other: Si es la de respaldo («Otros»).
         color: Color en pantalla (``#RRGGBB``), cuando se decida.
         symbol: Símbolo en pantalla, cuando se decida.
+        is_active: Si la IA la usa al clasificar (las apagadas no se ofrecen).
+        topic_concept_id: Su tema general para buscar sin la FGR, si tiene
+            (``concepts.category_id``, 02/11/2026).
     """
 
     category_id: int
@@ -51,6 +66,91 @@ class Category:
     is_other: bool = False
     color: str | None = None
     symbol: str | None = None
+    is_active: bool = True
+    topic_concept_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryChanges:
+    """Lo que cambia de una subdivisión; ``None`` deja el campo igual.
+
+    Attributes:
+        name: Nombre nuevo.
+        description: Lo que debe entender la IA por ella.
+        color: Color en ``#RRGGBB``.
+        is_active: Prenderla o apagarla.
+    """
+
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    is_active: bool | None = None
+
+    def apply_to(self, current: Category) -> Category:
+        """Aplica y valida los cambios.
+
+        Args:
+            current: La subdivisión como está.
+
+        Returns:
+            La subdivisión como quedaría.
+
+        Raises:
+            CategoryValidationError: Si el nombre queda vacío o muy largo, la
+                descripción es muy larga, el color no es ``#RRGGBB`` o se
+                intenta apagar «Otros» (toda nota debe tener a dónde ir).
+
+        Example:
+            >>> CategoryChanges(color="#ff4d6d").apply_to(homicidio).color
+            '#FF4D6D'
+        """
+        problems: list[dict[str, str]] = []
+        name = " ".join((current.name if self.name is None else self.name).split())
+        if not name:
+            problems.append({"campo": "name", "mensaje": "Escribe el nombre."})
+        elif len(name) > MAX_CATEGORY_NAME_CHARS:
+            problems.append(
+                {"campo": "name", "mensaje": f"Máximo {MAX_CATEGORY_NAME_CHARS} caracteres."}
+            )
+        description = current.description if self.description is None else self.description
+        description = description.strip()
+        if len(description) > MAX_CATEGORY_DESCRIPTION_CHARS:
+            problems.append(
+                {
+                    "campo": "description",
+                    "mensaje": f"Máximo {MAX_CATEGORY_DESCRIPTION_CHARS} caracteres.",
+                }
+            )
+        color = current.color if self.color is None else self.color.strip().upper()
+        if color is not None and not _COLOR.match(color):
+            problems.append({"campo": "color", "mensaje": "Usa un color como #FF4D6D."})
+        is_active = current.is_active if self.is_active is None else self.is_active
+        if current.is_other and not is_active:
+            problems.append(
+                {
+                    "campo": "is_active",
+                    "mensaje": "«Otros» no se apaga: es a donde va lo que no encaja.",
+                }
+            )
+        if problems:
+            raise CategoryValidationError(
+                "La subdivisión no cumple sus reglas.", {"problemas": problems}
+            )
+        return Category(
+            category_id=current.category_id,
+            name=name,
+            description=description,
+            is_other=current.is_other,
+            color=color,
+            symbol=current.symbol,
+            is_active=is_active,
+            topic_concept_id=current.topic_concept_id,
+        )
+
+    @property
+    def name_norm(self) -> str | None:
+        """El nombre nuevo para comparar, o ``None`` si no cambia."""
+        return normalize_name(self.name) if self.name is not None else None
 
 
 @dataclass(frozen=True, slots=True)
