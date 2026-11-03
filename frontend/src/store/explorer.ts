@@ -88,6 +88,8 @@ export interface ExplorerState {
   homeTarget: HomeTarget;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
+  /** Deja exactamente estos conceptos (la ventana «¿Qué rastrear?»). */
+  setConcepts: (conceptIds: number[]) => void;
   toggleSubdivision: (categoryId: number) => void;
   /** Deja estas subdivisiones (vacía = «Todas»). */
   setSubdivisions: (categoryIds: number[]) => void;
@@ -233,6 +235,9 @@ export const useExplorerStore = create<ExplorerState>()(
             ? state.conceptIds.filter((id) => id !== conceptId)
             : [...state.conceptIds, conceptId],
         }));
+      },
+      setConcepts: (conceptIds) => {
+        set({ conceptIds });
       },
       toggleSubdivision: (categoryId) => {
         set((state) => ({

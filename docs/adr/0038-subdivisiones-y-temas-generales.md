@@ -34,6 +34,7 @@ Los conceptos (ADR-0009) sí tienen palabras clave, y de ellas salen las consult
      - En Google News RSS el grupo va en cada consulta partida por día.
      - Si las palabras del tema no caben con la palabra clave más larga, se reparten en grupos y cada grupo se cruza con todas las palabras clave. No se pierde ninguna combinación.
    - A un tema general no se le agrega otra subdivisión: ya es una. Pedir subdivisiones sin un concepto como la FGR es un error claro.
+   - **En la ventana, la FGR y los temas generales no se mezclan** (Benji, 03/11/2026: «es una súper obligación que tenga que cumplir con ambas condiciones»). Elegir la FGR junto con el tema «Homicidio» sumaría dos búsquedas: toda la FGR más todos los homicidios. Por eso elegir un tema apaga la FGR y sus subdivisiones, y elegir la FGR o una subdivisión apaga los temas. Varios temas sí se eligen juntos. La API sigue aceptando la mezcla para otros sistemas; el diseño de columna (`?clasico`) no ofrece subdivisiones.
 3. **Las subdivisiones se editan en pantalla** con `PATCH /categories/{id}`: nombre, descripción (lo que lee la IA), color y si está prendida.
    - Su tema toma el mismo nombre y se prende o apaga con ella.
    - «Otros» no se apaga: es a donde va lo que no encaja.

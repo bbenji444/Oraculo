@@ -10,8 +10,14 @@
  * - **Temas generales**: cada subdivisión por su cuenta, sin la FGR
  *   («solo homicidios en general»).
  *
- * Se puede elegir de los dos bloques a la vez. Se cierra con «Listo», con Esc
- * o con un clic en el fondo oscuro.
+ * Los dos bloques **no se mezclan** (Benji, 03/11/2026: «es una súper
+ * obligación que tenga que cumplir con ambas condiciones»). Prender la FGR
+ * junto con el tema «Homicidio» sumaría dos búsquedas: toda la FGR más
+ * todos los homicidios. Por eso elegir un tema apaga la FGR y sus
+ * subdivisiones, y elegir la FGR apaga los temas. Para homicidios de la FGR
+ * se usa «Homicidio» de arriba. Varios temas sí se eligen juntos.
+ *
+ * Se cierra con «Listo», con Esc o con un clic en el fondo oscuro.
  *
  * Todo sale de los conceptos: el tema general de una subdivisión trae su id
  * (`category_id`), su nombre y su color. El catálogo de subdivisiones solo da
@@ -93,7 +99,7 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
   const categories = useCategories().data;
   const conceptIds = useExplorerStore((s) => s.conceptIds);
   const subdivisionIds = useExplorerStore((s) => s.subdivisionIds);
-  const toggleConcept = useExplorerStore((s) => s.toggleConcept);
+  const setConcepts = useExplorerStore((s) => s.setConcepts);
   const toggleSubdivision = useExplorerStore((s) => s.toggleSubdivision);
   const setSubdivisions = useExplorerStore((s) => s.setSubdivisions);
 
@@ -116,17 +122,34 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
   const baseOn = bases.some((c) => conceptIds.includes(c.id));
   const loading = !concepts;
 
-  // Elegir una subdivisión prende la FGR: sola no se puede buscar.
+  const baseIds = new Set(bases.map((c) => c.id));
+  const chosenBases = conceptIds.filter((id) => baseIds.has(id));
+  const chosenTopics = conceptIds.filter((id) => !baseIds.has(id));
+
+  // Elegir una subdivisión prende la FGR (sola no se puede buscar) y apaga
+  // los temas generales: los bloques no se mezclan.
   const ensureBase = () => {
     const first = bases[0];
-    if (!baseOn && first) toggleConcept(first.id);
+    setConcepts(chosenBases.length > 0 || !first ? chosenBases : [first.id]);
   };
   const toggleBase = (concept: Concept) => {
-    const leaving = conceptIds.includes(concept.id);
-    toggleConcept(concept.id);
-    // Sin ninguna FGR prendida, sus subdivisiones ya no aplican.
-    const othersOn = bases.some((c) => c.id !== concept.id && conceptIds.includes(c.id));
-    if (leaving && !othersOn) setSubdivisions([]);
+    if (chosenBases.includes(concept.id)) {
+      const rest = chosenBases.filter((id) => id !== concept.id);
+      setConcepts([...rest, ...chosenTopics]);
+      // Sin ninguna FGR prendida, sus subdivisiones ya no aplican.
+      if (rest.length === 0) setSubdivisions([]);
+      return;
+    }
+    setConcepts([...chosenBases, concept.id]);
+  };
+  // Un tema general va sin la FGR: prenderlo la apaga, con sus subdivisiones.
+  const toggleTopic = (concept: Concept) => {
+    if (chosenTopics.includes(concept.id)) {
+      setConcepts(conceptIds.filter((id) => id !== concept.id));
+      return;
+    }
+    setConcepts([...chosenTopics, concept.id]);
+    setSubdivisions([]);
   };
 
   return createPortal(
@@ -212,6 +235,8 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
                         title={`FGR y ${topic.name}`}
                         onClick={() => {
                           if (baseOn) {
+                            // Una búsqueda reabierta podía traer temas sueltos: se apagan.
+                            ensureBase();
                             toggleSubdivision(topic.category_id);
                             return;
                           }
@@ -237,6 +262,7 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
               <p className="hud-label mb-0">Temas generales</p>
               <p className="text-[11px] leading-snug text-slate-400">
                 Cada tema por su cuenta, sin la FGR: «Homicidio» trae los homicidios en general.
+                Elegir uno apaga la FGR; para homicidios de la FGR usa «Homicidio» de arriba.
               </p>
             </div>
             <div
@@ -253,7 +279,7 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
                   pressed={conceptIds.includes(concept.id)}
                   title={`${concept.name}: ${concept.keywords.slice(0, TITLE_KEYWORDS).join(', ')}…`}
                   onClick={() => {
-                    toggleConcept(concept.id);
+                    toggleTopic(concept);
                   }}
                 />
               ))}
