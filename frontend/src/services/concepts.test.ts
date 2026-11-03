@@ -20,6 +20,7 @@ const secuestro: Concept = {
   exclude_terms: ['simulacro'],
   color: '#E74C3C',
   is_active: true,
+  category_id: null,
   created_by: 'semilla',
   created_at: '2026-10-16T18:00:00Z',
   updated_at: '2026-10-16T18:00:00Z',

@@ -29,16 +29,17 @@ import { useConcepts } from '../../hooks/useConcepts';
 import { useNow } from '../../hooks/useNow';
 import { useRegionDetail } from '../../hooks/useRegions';
 import { useSearchHistory } from '../../hooks/useSearches';
-import { isFinished, type Search } from '../../services/searches';
+import { isFinished, type Search, subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { type MissionSlot, useMandoStore } from '../../store/mando';
 import { latestRun, stageProgress } from '../Explore/format';
 import { RegionPicker } from '../Explore/RegionPicker';
-import { ConceptChips, DateRange } from '../Explore/SearchPanel';
+import { DateRange } from '../Explore/SearchPanel';
 import { SourceSwitches } from '../Explore/SourceSwitches';
 import { useSearchLauncher } from '../Explore/useSearchLauncher';
 import { CountUp } from '../ui/CountUp';
 import { MissionProgress } from './MissionProgress';
+import { TrackPicker } from './TrackPicker';
 import { MANDO_GLASS } from './ui';
 import {
   clockLabel,
@@ -52,6 +53,7 @@ import {
   recentMissions,
   runLabel,
   sourcesLabel,
+  trackNames,
 } from './mission';
 
 type Launcher = ReturnType<typeof useSearchLauncher>;
@@ -151,11 +153,20 @@ function Token({ slot, index, value, detail, empty = false }: TokenProps) {
 
 function MissionSentence({ launcher }: { launcher: Launcher }) {
   const conceptIds = useExplorerStore((s) => s.conceptIds);
+  const subdivisionIds = useExplorerStore((s) => s.subdivisionIds);
   const regionId = useExplorerStore((s) => s.regionId);
   const range = useExplorerStore((s) => s.range);
   const concepts = useConcepts().data;
   const region = useRegionDetail(regionId).data;
-  const names = (concepts ?? []).filter((c) => conceptIds.includes(c.id)).map((c) => c.name);
+  // «FGR · Homicidio» cuando la FGR va con subdivisiones (ADR-0038): el tema
+  // general de cada subdivisión se llama como ella.
+  const subdivisionNames = (concepts ?? [])
+    .filter((c) => c.category_id !== null && subdivisionIds.includes(c.category_id))
+    .map((c) => c.name);
+  const names = trackNames(
+    (concepts ?? []).filter((c) => conceptIds.includes(c.id)),
+    subdivisionNames,
+  );
   const connector = rangeConnector(range);
   const regionName = regionId === null ? 'elige una región' : (region?.display_name ?? '…');
   return (
@@ -193,6 +204,17 @@ function SlotEditor({ launcher }: { launcher: Launcher }) {
   }, [slot]);
 
   if (!slot) return null;
+  // «Qué rastrear» es una ventana al centro: la FGR con sus subdivisiones y
+  // los temas generales no caben en la tarjeta (Benji, 02/11/2026).
+  if (slot === 'concepts') {
+    return (
+      <TrackPicker
+        onClose={() => {
+          setSlot(null);
+        }}
+      />
+    );
+  }
   return (
     <div
       key={slot}
@@ -217,7 +239,6 @@ function SlotEditor({ launcher }: { launcher: Launcher }) {
       {/* El desplazamiento va adentro: en el panel, las esquinas de mira
           (que salen 1 px) sacaban barras de desplazamiento. */}
       <div className="mando-editor-body" data-slot={slot}>
-        {slot === 'concepts' && <ConceptChips />}
         {slot === 'region' && <RegionPicker />}
         {slot === 'range' && <DateRange />}
         {slot === 'sources' &&
@@ -349,6 +370,7 @@ function RecentMissions() {
       dateFrom: search.date_from,
       dateTo: search.date_to,
       providers: search.providers,
+      subdivisionIds: subdivisionsOf(search),
     });
   };
   return (

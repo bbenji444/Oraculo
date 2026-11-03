@@ -9,6 +9,7 @@
  * su cuenta: usa el mismo historial que la pestaña Historial.
  */
 import { useSearchHistory } from '../../hooks/useSearches';
+import { subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { automaticRunLabel, latestRun } from './format';
 import { GLASS } from './ui';
@@ -31,6 +32,7 @@ export function LatestRunCard() {
           dateFrom: run.date_from,
           dateTo: run.date_to,
           providers: run.providers,
+          subdivisionIds: subdivisionsOf(run),
         });
       }}
       className={`${GLASS} hud-panel--interactive group flex w-full items-center gap-3 border-sky-400/35 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-sky-400`}

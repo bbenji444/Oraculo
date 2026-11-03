@@ -223,3 +223,39 @@ describe('muro y limpiar globo (9.6)', () => {
     ]);
   });
 });
+
+describe('subdivisiones (ADR-0038)', () => {
+  it('van ordenadas en el cuerpo solo si hay', () => {
+    const state = { regionId: 272, conceptIds: [13], range: { kind: '7' as const } };
+
+    expect(searchInput(state, undefined, [5, 3])?.category_ids).toEqual([3, 5]);
+    expect(searchInput(state, undefined, [])).not.toHaveProperty('category_ids');
+  });
+
+  it('se prenden, se apagan y se reabren con la búsqueda', () => {
+    const store = useExplorerStore.getState();
+    store.toggleSubdivision(5);
+    store.toggleSubdivision(3);
+    store.toggleSubdivision(5);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([3]);
+
+    store.restoreSearch({
+      searchId: 'b1',
+      regionId: 1,
+      conceptIds: [13],
+      dateFrom: '2026-11-01',
+      dateTo: '2026-11-02',
+      subdivisionIds: [5],
+    });
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([5]);
+
+    store.restoreSearch({
+      searchId: 'b2',
+      regionId: 1,
+      conceptIds: [13],
+      dateFrom: '2026-11-01',
+      dateTo: '2026-11-02',
+    });
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
+  });
+});

@@ -14,7 +14,7 @@ import type { CSSProperties } from 'react';
 
 import type { Article } from '../../services/searches';
 import { useTimelineStore } from '../../store/timeline';
-import { categoryColor } from '../Explore/categoryColor';
+import { categoryColor, hexToRgb } from '../Explore/categoryColor';
 import { categoriesIn } from '../Explore/timelineData';
 
 interface CategoryFilterProps {
@@ -68,11 +68,4 @@ export function CategoryFilter({ articles }: CategoryFilterProps) {
       })}
     </div>
   );
-}
-
-/** «#A3E635» → «163 230 53», para usarlo con transparencia en el CSS. */
-function hexToRgb(hex: string): string {
-  const value = hex.replace('#', '');
-  const parts = [0, 2, 4].map((i) => Number.parseInt(value.slice(i, i + 2), 16));
-  return parts.every((n) => Number.isFinite(n)) ? parts.join(' ') : '148 163 184';
 }

@@ -62,6 +62,41 @@ export function conceptsLabel(names: readonly string[]): string {
   return `${names[0] ?? ''} y ${String(names.length - 1)} más`;
 }
 
+// Con más subdivisiones que estas, la frase dice cuántas en lugar de nombrarlas.
+const SUBDIVISIONS_NAMED = 2;
+
+/**
+ * Las subdivisiones elegidas, como se leen junto a la FGR.
+ *
+ * @example subdivisionsLabel(['Homicidio']) // 'Homicidio'
+ * @example subdivisionsLabel(['Homicidio', 'Secuestro', 'Extorsión']) // '3 subdivisiones'
+ */
+export function subdivisionsLabel(names: readonly string[]): string {
+  if (names.length <= SUBDIVISIONS_NAMED) return names.join(' y ');
+  return `${String(names.length)} subdivisiones`;
+}
+
+/**
+ * Lo que se va a rastrear, un nombre por concepto elegido. A la FGR (un
+ * concepto que no es tema general) se le pegan sus subdivisiones: «FGR ·
+ * Homicidio» (ADR-0038).
+ *
+ * @param chosen Conceptos elegidos, en orden.
+ * @param subdivisionNames Nombres de las subdivisiones elegidas.
+ * @example trackNames([{ name: 'Fiscalía General de la República', category_id: null }], ['Homicidio'])
+ * // ['FGR · Homicidio']
+ */
+export function trackNames(
+  chosen: readonly { name: string; category_id: number | null }[],
+  subdivisionNames: readonly string[],
+): string[] {
+  return chosen.map((concept) =>
+    concept.category_id === null && subdivisionNames.length > 0
+      ? `${shortConcept(concept.name)} · ${subdivisionsLabel(subdivisionNames)}`
+      : concept.name,
+  );
+}
+
 /**
  * El rango de fechas, como se lee en la frase.
  *

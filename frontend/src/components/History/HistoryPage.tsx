@@ -13,7 +13,7 @@
 import { type CSSProperties, useCallback, useState } from 'react';
 
 import { useDeleteSearch, useRestoreSearch, useSearchHistory } from '../../hooks/useSearches';
-import type { Search } from '../../services/searches';
+import { type Search, subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import {
   automaticRunLabel,
@@ -50,6 +50,7 @@ function reopen(search: Search) {
     dateFrom: search.date_from,
     dateTo: search.date_to,
     providers: search.providers,
+    subdivisionIds: subdivisionsOf(search),
   });
   window.location.hash = '#/explorar';
 }

@@ -8,6 +8,7 @@
  *
  * No hace: no dibuja nada ni decide textos; eso es de cada diseño.
  */
+import { useConcepts } from '../../hooks/useConcepts';
 import { useEstimate, useSearch, useStartSearch } from '../../hooks/useSearches';
 import { useSources } from '../../hooks/useSources';
 import { isFinished } from '../../services/searches';
@@ -27,6 +28,7 @@ import { searchInput, useExplorerStore } from '../../store/explorer';
 export function useSearchLauncher() {
   const regionId = useExplorerStore((s) => s.regionId);
   const conceptIds = useExplorerStore((s) => s.conceptIds);
+  const subdivisionIds = useExplorerStore((s) => s.subdivisionIds);
   const range = useExplorerStore((s) => s.range);
   const searchId = useExplorerStore((s) => s.searchId);
   const openSearch = useExplorerStore((s) => s.openSearch);
@@ -37,7 +39,17 @@ export function useSearchLauncher() {
   // y el servidor usa las de por defecto (F12.2).
   const providers = sources.data ? chosenSources(sources.data, storedSources) : undefined;
   const noSources = providers?.length === 0;
-  const input = searchInput({ regionId, conceptIds, range }, providers);
+  // Las subdivisiones van con la FGR (un concepto que no es tema general);
+  // si se quitó, no se mandan (ADR-0038).
+  const concepts = useConcepts().data;
+  const withBase = (concepts ?? []).some(
+    (c) => conceptIds.includes(c.id) && c.category_id === null,
+  );
+  const input = searchInput(
+    { regionId, conceptIds, range },
+    providers,
+    withBase ? subdivisionIds : [],
+  );
   const estimate = useEstimate(input);
   const start = useStartSearch(openSearch);
   const running = useSearch(searchId).data;

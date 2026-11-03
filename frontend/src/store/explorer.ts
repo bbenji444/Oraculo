@@ -34,6 +34,11 @@ export type ListFilter = 'all' | InRegionFilter;
 export interface ExplorerState {
   regionId: number | null;
   conceptIds: number[];
+  /**
+   * Subdivisiones elegidas para la FGR («FGR · Homicidio», ADR-0038); vacía =
+   * la FGR completa.
+   */
+  subdivisionIds: number[];
   range: DateRange;
   searchId: string | null;
   articleId: number | null;
@@ -83,6 +88,9 @@ export interface ExplorerState {
   homeTarget: HomeTarget;
   selectRegion: (regionId: number | null) => void;
   toggleConcept: (conceptId: number) => void;
+  toggleSubdivision: (categoryId: number) => void;
+  /** Deja estas subdivisiones (vacía = «Todas»). */
+  setSubdivisions: (categoryIds: number[]) => void;
   setRange: (range: DateRange) => void;
   openSearch: (searchId: string | null) => void;
   /** Reabre una búsqueda guardada con su región, conceptos y fechas (Historial). */
@@ -94,6 +102,8 @@ export interface ExplorerState {
     dateTo: string;
     /** Fuentes con las que se hizo; vacía en búsquedas de antes de F12.2. */
     providers?: string[];
+    /** Subdivisiones con que se buscó (ADR-0038). */
+    subdivisionIds?: number[];
   }) => void;
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
@@ -132,12 +142,19 @@ const RANGE_DAYS: Record<Exclude<RangeKind, 'custom'>, number> = { today: 1, '7'
 /**
  * Cuerpo para estimar o lanzar la búsqueda, o `null` si aún falta algo.
  *
+ * Las subdivisiones solo se mandan si van con un concepto que no es tema
+ * general (la FGR): solas, el servidor las rechaza.
+ *
+ * @param state Lo elegido en el formulario.
+ * @param providers Fuentes encendidas (sin mandar: las de por defecto).
+ * @param subdivisions Subdivisiones para la FGR (`subdivisionIds`).
  * @example searchInput({ regionId: 272, conceptIds: [3], range: { kind: '7' } })
  * // { region_id: 272, concept_ids: [3], days: 7 }
  */
 export function searchInput(
   state: Pick<ExplorerState, 'regionId' | 'conceptIds' | 'range'>,
   providers?: string[],
+  subdivisions: readonly number[] = [],
 ): SearchInput | null {
   if (state.regionId === null || state.conceptIds.length === 0) return null;
   // Sin ninguna fuente encendida no hay nada que estimar (F12.2).
@@ -146,6 +163,7 @@ export function searchInput(
     region_id: state.regionId,
     concept_ids: [...state.conceptIds].sort((a, b) => a - b),
     ...(providers ? { providers } : {}),
+    ...(subdivisions.length > 0 ? { category_ids: [...subdivisions].sort((a, b) => a - b) } : {}),
   };
   if (state.range.kind !== 'custom') return { ...base, days: RANGE_DAYS[state.range.kind] };
   if (!state.range.from || !state.range.to) return null;
@@ -184,6 +202,7 @@ export const useExplorerStore = create<ExplorerState>()(
     (set) => ({
       regionId: null,
       conceptIds: [],
+      subdivisionIds: [],
       range: { kind: '7' },
       searchId: null,
       articleId: null,
@@ -215,6 +234,16 @@ export const useExplorerStore = create<ExplorerState>()(
             : [...state.conceptIds, conceptId],
         }));
       },
+      toggleSubdivision: (categoryId) => {
+        set((state) => ({
+          subdivisionIds: state.subdivisionIds.includes(categoryId)
+            ? state.subdivisionIds.filter((id) => id !== categoryId)
+            : [...state.subdivisionIds, categoryId],
+        }));
+      },
+      setSubdivisions: (subdivisionIds) => {
+        set({ subdivisionIds });
+      },
       setRange: (range) => {
         set({ range });
       },
@@ -222,11 +251,20 @@ export const useExplorerStore = create<ExplorerState>()(
         // Otra búsqueda: se olvidan la nota elegida y los filtros de la lista.
         set({ searchId, articleId: null, listFilter: 'all', showIrrelevant: false });
       },
-      restoreSearch: ({ searchId, regionId, conceptIds, dateFrom, dateTo, providers }) => {
+      restoreSearch: ({
+        searchId,
+        regionId,
+        conceptIds,
+        dateFrom,
+        dateTo,
+        providers,
+        subdivisionIds = [],
+      }) => {
         set({
           searchId,
           regionId,
           conceptIds,
+          subdivisionIds,
           range: { kind: 'custom', from: dateFrom, to: dateTo },
           // Editar una búsqueda reabierta parte de sus fuentes (si las guardó).
           ...(providers && providers.length > 0 ? { sources: providers } : {}),

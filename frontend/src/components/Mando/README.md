@@ -12,6 +12,7 @@ http://localhost:8080/?clasico#/explorar
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `MandoPanels.tsx`     | Acomoda las piezas sobre el globo y mide el alto de la consola.                                                         |
 | `MissionDock.tsx`     | La consola en tres zonas: radar, la frase con sus tarjetas y las consultas recientes, y el costo con «Iniciar barrido». |
+| `TrackPicker.tsx`     | La ventana «¿Qué rastrear?» al centro: la FGR con sus subdivisiones y los temas generales (ADR-0038).                   |
 | `MissionProgress.tsx` | Mientras se busca: el riel de etapas, el porcentaje, el cronómetro y la bitácora.                                       |
 | `ScanOverlay.tsx`     | El radar sobre el globo y el letrero «BARRIDO COMPLETO».                                                                |
 | `Dossier.tsx`         | El expediente: las cifras, las categorías, la cronología o la lista, y las descargas.                                   |
