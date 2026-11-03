@@ -1,0 +1,86 @@
+[
+  {
+    "category": "Narcotráfico y delitos contra la salud",
+    "description": "Tema general, sin la FGR: producción, transporte o venta de drogas; narcomenudeo; laboratorios; aseguramiento de droga.",
+    "keywords": ["narcotráfico", "narcotraficante", "narcotraficantes", "narcomenudeo", "narcomenudista", "delitos contra la salud", "droga", "drogas", "cocaína", "fentanilo", "metanfetamina", "marihuana", "narcolaboratorio", "laboratorio clandestino"],
+    "exclude_terms": ["serie", "película", "telenovela"]
+  },
+  {
+    "category": "Delincuencia organizada",
+    "description": "Tema general, sin la FGR: cárteles, grupos criminales y sus líderes, cuando la nota trata del grupo más que de un delito puntual.",
+    "keywords": ["delincuencia organizada", "crimen organizado", "cártel", "cárteles", "grupo criminal", "grupos criminales", "célula delictiva", "organización criminal", "CJNG", "Chapitos"],
+    "exclude_terms": ["serie", "película", "telenovela"]
+  },
+  {
+    "category": "Secuestro",
+    "description": "Tema general, sin la FGR: privación ilegal de la libertad para pedir rescate o por otra razón.",
+    "keywords": ["secuestro", "secuestros", "secuestrado", "secuestrada", "secuestrados", "secuestradas", "secuestrador", "secuestradores", "plagio", "privación ilegal de la libertad", "levantón", "levantados"],
+    "exclude_terms": ["simulacro", "película", "serie", "tesis"]
+  },
+  {
+    "category": "Desaparición de personas",
+    "description": "Tema general, sin la FGR: personas desaparecidas, fichas de búsqueda, fosas y búsqueda de restos.",
+    "keywords": ["desaparecido", "desaparecida", "desaparecidos", "desaparecidas", "desaparición forzada", "desaparición de personas", "ficha de búsqueda", "colectivo de búsqueda", "buscadoras", "fosa clandestina", "fosas clandestinas", "restos humanos", "Alerta Amber"],
+    "exclude_terms": []
+  },
+  {
+    "category": "Homicidio",
+    "description": "Tema general, sin la FGR: asesinatos, ejecuciones, feminicidios y ataques con víctimas mortales.",
+    "keywords": ["homicidio", "homicidios", "asesinato", "asesinatos", "asesinado", "asesinada", "asesinados", "asesinadas", "feminicidio", "feminicidios", "multihomicidio", "masacre", "ataque armado", "cuerpo sin vida", "cuerpos sin vida"],
+    "exclude_terms": ["película", "videojuego", "serie", "novela"]
+  },
+  {
+    "category": "Armas y explosivos",
+    "description": "Tema general, sin la FGR: tráfico, portación o aseguramiento de armas, cartuchos, drones o explosivos.",
+    "keywords": ["tráfico de armas", "arma de fuego", "armas de fuego", "armas largas", "armas cortas", "armamento", "cartuchos", "granadas", "explosivo", "explosivos", "portación de arma"],
+    "exclude_terms": ["videojuego", "película", "serie"]
+  },
+  {
+    "category": "Huachicol y delitos contra hidrocarburos",
+    "description": "Tema general, sin la FGR: robo o venta ilegal de combustible y gas; tomas clandestinas; huachicol fiscal.",
+    "keywords": ["huachicol", "huachicoleo", "huachicolero", "huachicoleros", "toma clandestina", "tomas clandestinas", "robo de combustible", "robo de hidrocarburo", "robo de hidrocarburos", "huachigas", "contrabando de combustible"],
+    "exclude_terms": []
+  },
+  {
+    "category": "Lavado de dinero y delitos fiscales",
+    "description": "Tema general, sin la FGR: operaciones con recursos de procedencia ilícita, defraudación fiscal, facturas falsas.",
+    "keywords": ["lavado de dinero", "recursos de procedencia ilícita", "blanqueo de capitales", "defraudación fiscal", "evasión fiscal", "facturas falsas", "factureras", "empresas fantasma", "Unidad de Inteligencia Financiera", "UIF", "cuentas congeladas"],
+    "exclude_terms": []
+  },
+  {
+    "category": "Corrupción",
+    "description": "Tema general, sin la FGR: servidores públicos que abusan del cargo: sobornos, desvío de recursos, enriquecimiento ilícito.",
+    "keywords": ["corrupción", "corrupto", "corruptos", "soborno", "sobornos", "moches", "desvío de recursos", "peculado", "cohecho", "enriquecimiento ilícito", "tráfico de influencias", "uso ilícito de atribuciones", "abuso de autoridad"],
+    "exclude_terms": ["corrupción de menores", "corrupción de datos"]
+  },
+  {
+    "category": "Trata de personas",
+    "description": "Tema general, sin la FGR: explotación sexual o laboral, tráfico de migrantes.",
+    "keywords": ["trata de personas", "trata de menores", "explotación sexual", "explotación laboral", "tráfico de personas", "tráfico de migrantes", "pollero", "polleros", "lenocinio", "trabajo forzado"],
+    "exclude_terms": []
+  },
+  {
+    "category": "Extorsión",
+    "description": "Tema general, sin la FGR: cobro de piso, extorsión telefónica, amenazas para obtener dinero.",
+    "keywords": ["extorsión", "extorsiones", "extorsionador", "extorsionadores", "cobro de piso", "derecho de piso", "montadeudas", "secuestro virtual"],
+    "exclude_terms": ["simulacro"]
+  },
+  {
+    "category": "Ciberdelitos",
+    "description": "Tema general, sin la FGR: fraudes en línea, hackeo, robo de datos, ransomware, pornografía infantil en internet.",
+    "keywords": ["ciberdelito", "ciberdelitos", "ciberataque", "ciberataques", "hackeo", "hackers", "ransomware", "filtración de datos", "phishing", "robo de datos", "fraude cibernético", "fraude en línea", "robo de identidad", "pornografía infantil", "policía cibernética"],
+    "exclude_terms": ["curso", "webinar", "diplomado", "vacante"]
+  },
+  {
+    "category": "Delitos electorales",
+    "description": "Tema general, sin la FGR: compra de votos, uso de recursos públicos en campañas, violencia política electoral.",
+    "keywords": ["delito electoral", "delitos electorales", "compra de votos", "compra del voto", "coacción del voto", "acarreo", "FISEL", "FEPADE", "violencia política", "rebase de topes de campaña"],
+    "exclude_terms": []
+  },
+  {
+    "category": "Seguridad nacional (traición a la patria)",
+    "description": "Tema general, sin la FGR: traición a la patria, espionaje, sabotaje o actos contra la soberanía y la seguridad de la nación.",
+    "keywords": ["traición a la patria", "seguridad nacional", "espionaje", "espía", "espías", "sabotaje", "soberanía nacional", "injerencia extranjera", "agentes extranjeros", "terrorismo"],
+    "exclude_terms": ["película", "serie"]
+  }
+]

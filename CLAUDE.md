@@ -268,7 +268,7 @@ make geo-terms       # términos de búsqueda, alias y códigos de país (ARGS=-
 make geo-basemap     # mapa base de Protomaps (mundo z6 + México z14)
 make geo-earth       # texturas NASA de la Tierra y estrellas (ARGS=--muestra: 5 recortes)
 make geo-places      # colonias y barrios de OpenStreetMap desde el mapa base (ARGS=--muestra: solo ejemplos)
-make seed            # carga el concepto semilla de la FGR si falta, con su regla (no pisa ediciones)
+make seed            # carga el concepto FGR (con su regla) y los 14 temas de las subdivisiones si faltan (no pisa ediciones)
 make retirar-conceptos # deja vigente solo el concepto FGR, borrado lógico (ARGS=--aplicar lo hace, pide "si")
 make probar-proveedor ARGS="--proveedor gdelt --nombre x"  # UNA consulta real, pide confirmar
 make buscar ARGS="--concepto Extorsión --region 14 --dias 7"  # búsqueda real de punta a punta: muestra costo, pide "si" y enseña 5 notas (--aqui sin worker)

@@ -1,4 +1,4 @@
-"""Comando ``make seed``: carga los conceptos semilla (especificación §7.1).
+"""Comando ``make seed``: carga los conceptos semilla y los temas de las subdivisiones.
 
 Lee ``conceptos.json`` y crea **solo los que no existen**, comparando el
 nombre sin mayúsculas ni acentos. Nunca modifica un concepto existente: si
@@ -10,6 +10,12 @@ su regla de relevancia ``fgr_federal`` (ADR-0030): los cinco conceptos de la
 especificación se retiraron con ``make retirar-conceptos`` y una instalación
 nueva (la VM de Proxmox) arranca ya enfocada en la FGR. La regla se pone solo
 si el concepto todavía tiene la ``general``.
+
+Desde el 02/11/2026 también lee ``temas.json``: un tema general por
+subdivisión (menos «Otros»), para buscar «Homicidio» sin la FGR o para
+combinarlo con ella («FGR + Homicidio»). El tema se llama y se pinta como su
+subdivisión y queda ligado a ella (``concepts.category_id``). Si la
+subdivisión ya tiene tema, no se toca: sus palabras se editan en pantalla.
 
 Usa el mismo caso de uso que la API (``CreateConcept``), así que aplica las
 mismas reglas y deja cada alta en la bitácora con el usuario ``semilla``.
@@ -24,7 +30,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from sqlalchemy import text
@@ -42,6 +48,9 @@ from app.geodata.consola import configure_cli_logging, heading
 logger = logging.getLogger(__name__)
 
 SEED_PATH = Path(__file__).with_name("conceptos.json")
+TOPICS_PATH = Path(__file__).with_name("temas.json")
+# Color de un tema cuya subdivisión todavía no tiene color (el gris de «Otros»).
+FALLBACK_TOPIC_COLOR = "#94A3B8"
 # Firma de las altas en la bitácora: se distinguen de las de una persona.
 SEED_ACTOR = Actor("semilla")
 
@@ -53,10 +62,26 @@ class SeedResult:
     Attributes:
         created: Nombres de los conceptos creados.
         skipped: Nombres que ya existían y no se tocaron.
+        missing: Subdivisiones de ``temas.json`` que no están en el catálogo
+            (por ejemplo, si se renombraron antes de sembrar).
     """
 
     created: tuple[str, ...]
     skipped: tuple[str, ...]
+    missing: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TopicSeed:
+    """Un tema general de ``temas.json``.
+
+    Attributes:
+        category: Nombre de su subdivisión (se compara sin acentos).
+        concept: El concepto; su nombre y color se toman de la subdivisión.
+    """
+
+    category: str
+    concept: ConceptInput
 
 
 def read_seed(path: Path = SEED_PATH) -> list[ConceptInput]:
@@ -76,6 +101,31 @@ def read_seed(path: Path = SEED_PATH) -> list[ConceptInput]:
             keywords=tuple(item["keywords"]),
             exclude_terms=tuple(item["exclude_terms"]),
             color=item["color"],
+        )
+        for item in items
+    ]
+
+
+def read_topics(path: Path = TOPICS_PATH) -> list[TopicSeed]:
+    """Lee los temas generales de las subdivisiones.
+
+    Args:
+        path: Archivo JSON con un tema por subdivisión.
+
+    Returns:
+        Los temas, sin validar todavía.
+    """
+    items = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        TopicSeed(
+            item["category"],
+            ConceptInput(
+                name=item["category"],
+                description=item["description"],
+                keywords=tuple(item["keywords"]),
+                exclude_terms=tuple(item["exclude_terms"]),
+                color=FALLBACK_TOPIC_COLOR,
+            ),
         )
         for item in items
     ]
@@ -144,12 +194,63 @@ async def seed_concepts(engine: AsyncEngine, concepts: Sequence[ConceptInput]) -
     return SeedResult(tuple(created), tuple(skipped))
 
 
-async def _run() -> SeedResult:
+async def seed_topics(engine: AsyncEngine, topics: Sequence[TopicSeed]) -> SeedResult:
+    """Crea el tema general de cada subdivisión que todavía no tenga uno.
+
+    Args:
+        engine: Conexión a la base.
+        topics: Temas de ``temas.json``.
+
+    Returns:
+        Los creados, los que ya tenían tema (o cuyo nombre ya usa otro
+        concepto) y las subdivisiones que no se encontraron.
+
+    Raises:
+        ConceptValidationError: Si algún tema del archivo no cumple las
+            reglas (se detecta antes de crear ninguno).
+    """
+    for topic in topics:
+        topic.concept.validated()
+    repository = PostgresConceptRepository(engine)
+    created: list[str] = []
+    skipped: list[str] = []
+    missing: list[str] = []
+    for topic in topics:
+        async with engine.connect() as conn:
+            category = (
+                await conn.execute(
+                    text("SELECT id, name, color FROM categories WHERE name_norm = :norm"),
+                    {"norm": normalize_name(topic.category)},
+                )
+            ).first()
+        if category is None:
+            missing.append(topic.category)
+            continue
+        data = replace(
+            topic.concept, name=category.name, color=category.color or FALLBACK_TOPIC_COLOR
+        )
+        already = await repository.for_category(category.id)
+        if already is not None or await repository.name_taken(data.validated().name_norm, None):
+            skipped.append(category.name)
+            continue
+        concept = await CreateConcept(repository).execute(data, SEED_ACTOR)
+        # La alta pasa por el caso de uso (reglas y bitácora); el enlace con
+        # la subdivisión es solo de la semilla, por eso va aparte.
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE concepts SET category_id = :category WHERE id = :id"),
+                {"category": category.id, "id": concept.id},
+            )
+        created.append(category.name)
+    return SeedResult(tuple(created), tuple(skipped), tuple(missing))
+
+
+async def _run() -> tuple[SeedResult, SeedResult]:
     engine = create_async_engine(get_settings().database_url())
     try:
         result = await seed_concepts(engine, read_seed())
         await apply_rules(engine, read_rules())
-        return result
+        return result, await seed_topics(engine, read_topics())
     finally:
         await engine.dispose()
 
@@ -162,13 +263,23 @@ def main(argv: Sequence[str] | None = None) -> None:
     """
     argparse.ArgumentParser(description="Carga los conceptos semilla.").parse_args(argv)
     configure_cli_logging()
-    heading(logger, f"Conceptos semilla ({SEED_PATH.name})")
-    result = asyncio.run(_run())
-    for name in result.created:
+    heading(logger, f"Conceptos semilla ({SEED_PATH.name}) y temas ({TOPICS_PATH.name})")
+    concepts, topics = asyncio.run(_run())
+    for name in concepts.created:
         logger.info(f"Creado: {name}")
-    for name in result.skipped:
+    for name in concepts.skipped:
         logger.info(f"Ya existía, no se tocó: {name}")
-    logger.info(f"{len(result.created)} creados · {len(result.skipped)} ya existían")
+    logger.info(f"{len(concepts.created)} creados · {len(concepts.skipped)} ya existían")
+    for name in topics.created:
+        logger.info(f"Tema creado: {name}")
+    for name in topics.skipped:
+        logger.info(f"Ya tenía tema, no se tocó: {name}")
+    for name in topics.missing:
+        logger.warning(f"No existe la subdivisión «{name}»: su tema no se creó.")
+    logger.info(
+        f"Temas: {len(topics.created)} creados · {len(topics.skipped)} ya estaban · "
+        f"{len(topics.missing)} sin subdivisión"
+    )
 
 
 if __name__ == "__main__":
