@@ -45,7 +45,7 @@ _SEARCH = text(
     FROM news_index
     WHERE published_at >= :start AND published_at < :end
       AND (text_norm ~ :keywords OR body_terms ~ :body_keywords)
-      AND (CAST(:topic AS text) IS NULL OR text_norm ~ :topic OR body_terms ~ :body_topic)
+      AND (CAST(:topic AS text) IS NULL OR text_norm ~ :topic)
       AND (CAST(:exclude AS text) IS NULL OR text_norm !~ :exclude)
       AND (
             CAST(:place AS text) IS NULL
@@ -80,9 +80,9 @@ def _sql_params(criteria: LocalIndexCriteria) -> dict[str, object]:
         "end": criteria.end,
         "keywords": word_pattern(criteria.keywords),
         "body_keywords": word_pattern(for_body(criteria.keywords)),
-        # Subdivisión («FGR + Homicidio»): también debe aparecer una de estas.
+        # Subdivisión («FGR · Homicidio»): una de estas debe estar también, en
+        # el título o el fragmento; en el cuerpo no cuenta (Benji, 03/11/2026).
         "topic": word_pattern(criteria.topic_terms),
-        "body_topic": word_pattern(for_body(criteria.topic_terms)),
         "exclude": word_pattern(criteria.exclusions),
         "place": word_pattern(criteria.place_terms),
         "body_place": word_pattern(for_body(criteria.place_terms)),

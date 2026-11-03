@@ -91,7 +91,7 @@ curl -s -X PATCH http://localhost:8080/api/v1/categories/5 -H 'Content-Type: app
 | Campo | Qué es |
 |---|---|
 | `concept_ids` | Conceptos (al menos uno, activos, sin repetir) |
-| `category_ids` | Subdivisiones (opcional, ADR-0038): a los conceptos que no son tema general, como la FGR, se les exige **además** una palabra del tema de cada subdivisión («FGR · Homicidio»). Sin un concepto así, o con una subdivisión sin tema activo, responde `422` |
+| `category_ids` | Subdivisiones (opcional, ADR-0038): a los conceptos que no son tema general, como la FGR, se les exige **además** una palabra del tema de cada subdivisión («FGR · Homicidio»), en el título o el resumen de la nota; en el cuerpo no cuenta. Sin un concepto así, o con una subdivisión sin tema activo, responde `422` |
 | `region_id` | Región (de `/regions`) |
 | `days` | Últimos N días (1 a 90; por defecto 7) |
 | `date_from` y `date_to` | Rango fijo, en lugar de `days`; deben ir los dos |

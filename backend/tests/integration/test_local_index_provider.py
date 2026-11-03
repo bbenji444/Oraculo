@@ -195,6 +195,32 @@ async def test_tambien_busca_en_las_frases_del_cuerpo(body_provider: LocalIndexP
     assert set(slugs([a.url for a in response.articles])) == {"cuerpo", "en_curso", "pegadas"}
 
 
+async def test_la_subdivision_cuenta_en_el_titulo_no_en_el_cuerpo(
+    body_provider: LocalIndexProvider,
+) -> None:
+    # Benji, 03/11/2026: «título o resumen». La palabra clave puede estar en
+    # el cuerpo; la de la subdivisión, no.
+    def planned(topic: tuple[str, ...]) -> PlannedQuery:
+        return PlannedQuery(
+            Provider.LOCAL_INDEX,
+            "t",
+            ("hackeo",),
+            MEXICO,
+            "es",
+            WINDOW,
+            0,
+            (),
+            QueryPlace((), (), MEXICO),
+            topic,
+        )
+
+    only_in_body = await body_provider.search(planned(("alcaldía",)))
+    in_title = await body_provider.search(planned(("robo",)))
+
+    assert only_in_body.articles == ()
+    assert set(slugs([a.url for a in in_title.articles])) == {"en_curso", "lejos"}
+
+
 async def test_una_frase_de_dos_palabras_no_cruza_frases(body_provider: LocalIndexProvider) -> None:
     response = await body_provider.search(query(None, keywords=("hackeo iztapalapa",), exclude=()))
 

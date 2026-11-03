@@ -25,7 +25,12 @@ Los conceptos (ADR-0009) sí tienen palabras clave, y de ellas salen las consult
 2. **Un tema se busca solo o junto con la FGR:**
    - **Solo** («Homicidio»): es un concepto más y sus notas son las que traen sus palabras.
    - **FGR + subdivisión** («FGR · Homicidio»): la búsqueda manda `category_ids`. Las palabras del tema se copian en `search_concepts.topic_terms` y cada consulta lleva **un segundo grupo** que también debe aparecer: `(FGR OR "Fiscalía General de la República") (homicidio OR asesinato …)`. Así se cumple «ambas palabras». Las exclusiones del tema se suman a las del concepto.
-     - El índice local exige además que aparezca una palabra del tema (`text_norm ~ :topic`).
+     - **La palabra del tema va en el título o el resumen de la nota** (Benji, 03/11/2026). Los buscadores la encuentran en todo el artículo, y así se colaban notas que la decían una sola vez, perdida en el cuerpo. Medido en el índice local con una semana de «FGR · Homicidio»: de 109 notas, 79 cumplían solo por el cuerpo, como «Brota más corrupción en el INE», que dice «asesinato» una vez en 11 mil caracteres.
+       - Al recibir las notas, `RunSearch` quita las que no traen la palabra en su título o en el resumen de la fuente (`TopicMatcher`). No se guardan ni se pagan a la IA.
+       - El índice local aplica la misma regla en su SQL (`text_norm ~ :topic`, sin el cuerpo).
+       - Una nota que también encontró otra consulta sin subdivisión se queda.
+       - Con la regla, la misma semana bajó de 145 a 39 notas, todas de homicidios.
+       - La palabra clave del concepto (la FGR) se sigue buscando también en el cuerpo, como siempre.
      - En Google News RSS el grupo va en cada consulta partida por día.
      - Si las palabras del tema no caben con la palabra clave más larga, se reparten en grupos y cada grupo se cruza con todas las palabras clave. No se pierde ninguna combinación.
    - A un tema general no se le agrega otra subdivisión: ya es una. Pedir subdivisiones sin un concepto como la FGR es un error claro.
