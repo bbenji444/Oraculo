@@ -421,3 +421,75 @@ def test_las_consultas_llevan_exclusiones_y_lugar_aparte() -> None:
     assert query.place == IZTAPALAPA
     assert DIALECTS[Provider.LOCAL_INDEX].cacheable is False
     assert DIALECTS[Provider.SEARCHAPI].cacheable is True
+
+
+# --- Subdivisiones: FGR + tema («ambas palabras», 02/11/2026) ---
+
+HOMICIDIO = ("homicidio", "asesinato", "feminicidio")
+
+
+def test_subdivision_agrega_un_segundo_grupo_que_tambien_debe_aparecer() -> None:
+    [query] = build_queries(FGR, NATIONAL, WEEK, [Provider.SEARCHAPI], topic_terms=HOMICIDIO)
+
+    assert query.text.startswith(
+        '("Fiscalía General de la República" OR FGR) (homicidio OR asesinato OR feminicidio)'
+    )
+    assert query.keywords == FGR.keywords
+    assert query.topic_terms == HOMICIDIO
+
+
+def test_sin_subdivision_la_consulta_no_cambia() -> None:
+    with_topic = build_queries(FGR, NATIONAL, WEEK, [Provider.SEARCHAPI], topic_terms=())
+
+    assert [q.text for q in with_topic] == [
+        q.text for q in build_queries(FGR, NATIONAL, WEEK, [Provider.SEARCHAPI])
+    ]
+    assert with_topic[0].topic_terms == ()
+
+
+def test_subdivision_en_el_indice_local_se_describe_en_palabras() -> None:
+    [query] = build_queries(FGR, NATIONAL, WEEK, [Provider.LOCAL_INDEX], topic_terms=HOMICIDIO)
+
+    assert "y también: homicidio, asesinato o feminicidio" in query.text
+
+
+def test_subdivision_en_google_news_rss_va_en_cada_consulta_partida() -> None:
+    window = DateWindow.between(date(2026, 10, 25), date(2026, 10, 26))
+
+    queries = build_queries(
+        FGR, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS], topic_terms=HOMICIDIO
+    )
+
+    assert len(queries) == 4
+    assert all("(homicidio OR asesinato OR feminicidio)" in q.text for q in queries)
+
+
+def test_subdivision_larga_se_reparte_sin_perder_ni_repetir_palabras() -> None:
+    topic = tuple(f"tema{i}" for i in range(40))
+
+    queries = build_queries(FGR, NATIONAL, WEEK, [Provider.SEARCHAPI], topic_terms=topic)
+
+    assert len(queries) > 1
+    assert all(len(q.text.split()) <= GOOGLE_MAX_WORDS for q in queries)
+    # Cada grupo del tema se cruza con todas las palabras clave: ninguna
+    # combinación se queda sin buscar.
+    chunks = list(dict.fromkeys(q.topic_terms for q in queries))
+    assert tuple(t for chunk in chunks for t in chunk) == topic
+    for chunk in chunks:
+        keywords = [k for q in queries if q.topic_terms == chunk for k in q.keywords]
+        assert tuple(keywords) == FGR.keywords
+
+
+def test_si_ninguna_palabra_de_la_subdivision_cabe_es_error_claro() -> None:
+    concept = ConceptDraft.validated(
+        name="Casi lleno",
+        description="",
+        keywords=("ataque",),
+        exclude_terms=tuple(f"excluir{i}" for i in range(GOOGLE_MAX_WORDS - 3)),
+        color="#000000",
+    )
+
+    with pytest.raises(QueryTooLongError, match="subdivisión"):
+        build_queries(
+            concept, NATIONAL, WEEK, [Provider.SEARCHAPI], topic_terms=("palabra larga de tema",)
+        )

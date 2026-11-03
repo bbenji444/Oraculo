@@ -20,8 +20,10 @@ class FakeConceptRepository:
         self.used_in_searches: set[int] = set()
         self._next_id = 1
 
-    def add(self, data: ConceptDraft, created_by: str = "prueba") -> Concept:
-        concept = Concept(self._next_id, data, created_by, NOW, NOW)
+    def add(
+        self, data: ConceptDraft, created_by: str = "prueba", category_id: int | None = None
+    ) -> Concept:
+        concept = Concept(self._next_id, data, created_by, NOW, NOW, category_id)
         self.concepts[concept.id] = concept
         self._next_id += 1
         return concept
@@ -37,6 +39,9 @@ class FakeConceptRepository:
 
     async def get(self, concept_id: int) -> Concept | None:
         return self.concepts.get(concept_id)
+
+    async def for_category(self, category_id: int) -> Concept | None:
+        return next((c for c in self.concepts.values() if c.category_id == category_id), None)
 
     async def name_taken(self, name_norm: str, except_id: int | None) -> bool:
         return any(

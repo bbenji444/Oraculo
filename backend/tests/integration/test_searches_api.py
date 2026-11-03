@@ -255,7 +255,8 @@ def test_detalle_e_historial_con_cursor(client: TestClient, ids: dict[str, int])
         "Ciudad de México",
         "09",
     )
-    assert data["concepts"] == [{"id": ids["concept"], "name": CONCEPT_NAME}]
+    # Sin subdivisiones: la lista va vacía (ADR-0038).
+    assert data["concepts"] == [{"id": ids["concept"], "name": CONCEPT_NAME, "subdivision_ids": []}]
     assert (data["credits_estimated"], data["credits_used"], data["progress"]) == (3, 0, {})
     # La más reciente primero; la segunda página trae la que falta.
     assert [s["search_id"] for s in first.json()["items"]] == created[:0:-1]

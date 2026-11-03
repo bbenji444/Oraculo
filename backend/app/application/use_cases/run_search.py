@@ -62,6 +62,7 @@ from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionR
 from app.application.use_cases.extraction import ArticleText, ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions, search_area
 from app.application.use_cases.stories import GroupStories
+from app.domain.articles import RawArticle
 from app.domain.dedupe import DedupedArticle, TitleSimilarity, dedupe, match_known
 from app.domain.enrichment import ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import DomainError, NotFoundError, ProviderError
@@ -70,6 +71,7 @@ from app.domain.geocoding import Place, Resolution
 from app.domain.queries import DateWindow, PlannedQuery, Provider, QueryPlace, place_for
 from app.domain.query_builder import build_queries
 from app.domain.search import SearchStatus, Stage, StageCount, final_status, in_region
+from app.domain.subdivisions import TopicMatcher
 
 # Cada cuántas notas enriquecidas se actualiza el avance: suficiente para ver
 # que se mueve sin escribir en la base por cada nota.
@@ -163,7 +165,11 @@ def plan_queries(
         ConceptValidationError: Si un concepto no tiene palabras clave.
         QueryTooLongError: Si una palabra clave no cabe en el límite.
     """
-    return [q for c in concepts for q in build_queries(c, place, window, providers)]
+    return [
+        q
+        for c in concepts
+        for q in build_queries(c, place, window, providers, topic_terms=c.topic_terms)
+    ]
 
 
 @dataclass(slots=True)
@@ -330,13 +336,14 @@ class RunSearch:
         self, search: StoredSearch, tally: _Tally, execution: ExecutionResult
     ) -> list[_Work]:
         await self._progress(search.search_id, tally, Stage.DEDUPE)
-        found = execution.articles
+        found = self._on_topic(tally, execution)
         if search.time_window is not None:
             # Corrida automática: solo lo publicado desde la corrida anterior
             # (Benji, 28/10/2026). Lo de fuera ni se guarda ni se paga a la IA.
             window = search.time_window
+            before = len(found)
             found = tuple(a for a in found if window.contains(a.published_at))
-            tally.extra["outside_window"] = len(execution.articles) - len(found)
+            tally.extra["outside_window"] = before - len(found)
         unique = dedupe(found, self._similarity)
         # Nivel 2 de duplicados (ADR-0025): la misma nota que ya se guardó en
         # otra búsqueda con otro link se reutiliza, con su IA ya pagada.
@@ -363,6 +370,32 @@ class RunSearch:
         tally.extra["articles"] = len(work)
         tally.extra["known"] = sum(1 for w in work if w.item.known_id is not None)
         return work
+
+    @staticmethod
+    def _on_topic(tally: _Tally, execution: ExecutionResult) -> tuple[RawArticle, ...]:
+        """Quita lo que trajo una consulta con subdivisión sin la palabra del tema arriba.
+
+        Benji, 03/11/2026 (ADR-0038): en «FGR · Homicidio» la palabra de la
+        subdivisión debe estar en el título o el resumen, no perdida en el
+        cuerpo; los buscadores la encuentran en todo el artículo. Lo que no
+        cumple ni se guarda ni se paga a la IA. Una nota que también trajo
+        otra consulta sin subdivisión se queda por esa otra.
+
+        Args:
+            tally: Conteos (suma ``off_topic`` si hubo subdivisión).
+            execution: Lo que devolvió cada consulta.
+
+        Returns:
+            Las notas que cumplen, sin deduplicar todavía.
+        """
+        if not any(o.query.topic_terms for o in execution.outcomes):
+            return execution.articles
+        kept: list[RawArticle] = []
+        for outcome in execution.outcomes:
+            matcher = TopicMatcher(outcome.query.topic_terms)
+            kept.extend(a for a in outcome.articles if matcher.found_in(a.title, a.snippet))
+        tally.extra["off_topic"] = len(execution.articles) - len(kept)
+        return tuple(kept)
 
     @staticmethod
     def _drop_older_events(search: StoredSearch, tally: _Tally, work: list[_Work]) -> list[_Work]:

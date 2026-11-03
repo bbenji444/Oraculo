@@ -344,6 +344,20 @@ async def test_retirar_deja_solo_la_fgr_y_siempre_es_logico(repo: FakeConceptRep
 
 
 @pytest.mark.anyio
+async def test_retirar_no_toca_los_temas_de_las_subdivisiones(repo: FakeConceptRepository) -> None:
+    fgr = await CreateConcept(repo).execute(
+        concept_input(name="Fiscalia General de la Republica"), ACTOR
+    )
+    homicidio = repo.add(concept_input(name="Homicidio").validated(), category_id=5)
+    suelto = await CreateConcept(repo).execute(concept_input(name="Secuestro"), ACTOR)
+
+    kept, planned = await RetireConcepts(repo).plan(["Fiscalía General de la República"])
+
+    assert {c.id for c in kept} == {fgr.id, homicidio.id}
+    assert [c.id for c in planned] == [suelto.id]
+
+
+@pytest.mark.anyio
 async def test_retirar_recorre_todas_las_paginas(repo: FakeConceptRepository) -> None:
     for i in range(RetireConcepts._PAGE + 3):
         await CreateConcept(repo).execute(concept_input(name=f"Concepto {i:03d}"), ACTOR)

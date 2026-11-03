@@ -19,3 +19,15 @@ export const NO_CATEGORY_COLOR = '#94A3B8';
 export function categoryColor(category: Pick<ArticleCategory, 'color'> | null | undefined): string {
   return category?.color ?? NO_CATEGORY_COLOR;
 }
+
+/**
+ * Un color en «r g b», para usarlo con transparencia en el CSS (`--cat`). Lo
+ * usan el filtro del expediente y la ventana «¿Qué rastrear?».
+ *
+ * @example hexToRgb('#A3E635') // '163 230 53'
+ */
+export function hexToRgb(hex: string): string {
+  const value = hex.replace('#', '');
+  const parts = [0, 2, 4].map((i) => Number.parseInt(value.slice(i, i + 2), 16));
+  return parts.every((n) => Number.isFinite(n)) ? parts.join(' ') : '148 163 184';
+}

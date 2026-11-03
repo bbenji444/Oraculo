@@ -42,7 +42,10 @@ class SearchConcept:
         name: Nombre.
         description: Qué cubre (se lee del concepto vigente; sirve a la IA).
         keywords: Palabras clave copiadas.
-        exclude_terms: Exclusiones copiadas.
+        exclude_terms: Exclusiones copiadas (con las de la subdivisión, si hay).
+        topic_terms: Palabras de las subdivisiones elegidas, copiadas: cada
+            nota debe traer también una («FGR + Homicidio», 02/11/2026).
+        category_ids: Subdivisiones elegidas para este concepto.
     """
 
     concept_id: int
@@ -50,6 +53,8 @@ class SearchConcept:
     description: str
     keywords: tuple[str, ...]
     exclude_terms: tuple[str, ...] = ()
+    topic_terms: tuple[str, ...] = ()
+    category_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

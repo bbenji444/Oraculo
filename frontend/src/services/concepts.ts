@@ -20,6 +20,11 @@ export interface Concept {
   color: string;
   /** Si aparece en el panel de búsqueda. */
   is_active: boolean;
+  /**
+   * Si es el tema general de una subdivisión (ADR-0038): el id de esa
+   * subdivisión en `/categories`; `null` en los demás, como la FGR.
+   */
+  category_id: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -81,7 +86,13 @@ function isConcept(value: unknown): value is Concept {
 
 function asConcept(body: unknown): Concept {
   if (!isConcept(body)) throw badFormat();
-  return body;
+  return withCategory(body);
+}
+
+/** Las respuestas de antes del 02/11/2026 no traen `category_id`: no son temas. */
+function withCategory(concept: Concept): Concept {
+  const raw = concept as Omit<Concept, 'category_id'> & { category_id?: number | null };
+  return { ...raw, category_id: raw.category_id ?? null };
 }
 
 /**
@@ -101,7 +112,7 @@ export async function listConcepts(signal?: AbortSignal): Promise<Concept[]> {
       signal,
     })) as { items?: unknown; next_cursor?: unknown } | null;
     if (!Array.isArray(body?.items) || !body.items.every(isConcept)) throw badFormat();
-    all.push(...body.items);
+    all.push(...body.items.map(withCategory));
     cursor = typeof body.next_cursor === 'string' ? body.next_cursor : null;
   } while (cursor);
   return all;

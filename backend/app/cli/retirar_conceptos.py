@@ -31,6 +31,7 @@ from app.application.use_cases.concepts import RetireConcepts, UpdateConcept
 from app.cli.buscar import CONFIRMATION
 from app.core.config import Settings, get_settings
 from app.domain.concept import Concept, ConceptChanges
+from app.domain.names import normalize_name
 from app.geodata.consola import configure_cli_logging, heading
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,9 @@ async def run(
         heading(logger, "Conceptos (todavía no se ha cambiado nada)")
         logger.info(f"Se queda: {_names(kept)}")
         logger.info(f"Se retirarían ({len(retired)}): {_names(retired)}")
-        if not kept:
+        # Los temas de las subdivisiones también se quedan: la FGR se busca por nombre.
+        fgr = next((c for c in kept if c.data.name_norm == normalize_name(FGR_CONCEPT)), None)
+        if fgr is None:
             logger.error(f"No existe el concepto «{FGR_CONCEPT}»: créalo antes de retirar.")
             return 1
         if not args.aplicar:
@@ -100,7 +103,6 @@ async def run(
             return 1
         done = await retire.execute([FGR_CONCEPT], ACTOR, REASON)
         logger.info(f"Retirados {len(done)} conceptos (borrado lógico, en la bitácora).")
-        fgr = kept[0]
         if not fgr.data.description:
             await UpdateConcept(repository).execute(
                 fgr.id, ConceptChanges(description=FGR_DESCRIPTION), ACTOR

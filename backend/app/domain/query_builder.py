@@ -14,6 +14,11 @@ RSS, 100) se parte por palabra clave y, en ventanas cortas, por día, sin
 pasar de ``QueryDialect.split_up_to`` consultas. Con OR las palabras
 compiten por las mismas 100 notas y la sigla «FGR» tapaba al nombre completo.
 
+Con subdivisión (02/11/2026, «FGR + Homicidio»), cada consulta lleva un
+segundo grupo con las palabras del tema, que también deben aparecer. Si ese
+grupo no cabe en el límite del proveedor, se parte en varios y cada parte
+lleva sus propias consultas.
+
 No hace: no aplica el presupuesto por búsqueda (``MAX_QUERIES_PER_SEARCH``)
 ni la caché; eso es de la búsqueda completa (F3/F4).
 """
@@ -52,12 +57,16 @@ class ConceptTerms(Protocol):
 
 
 def _split_keywords(
-    dialect: QueryDialect, concept: ConceptTerms, place: QueryPlace, window: DateWindow
+    dialect: QueryDialect,
+    concept: ConceptTerms,
+    place: QueryPlace,
+    window: DateWindow,
+    topic: tuple[str, ...] = (),
 ) -> list[tuple[str, ...]]:
     """Reparte las palabras clave en grupos que quepan en el límite del proveedor."""
 
     def fits(chunk: Sequence[str]) -> bool:
-        return dialect.fits(dialect.render(chunk, place, concept.exclude_terms, window))
+        return dialect.fits(dialect.render(chunk, place, concept.exclude_terms, window, topic))
 
     chunks: list[tuple[str, ...]] = []
     current: list[str] = []
@@ -92,8 +101,50 @@ def _days(window: DateWindow) -> list[DateWindow]:
     ]
 
 
+def _split_topic(
+    dialect: QueryDialect,
+    concept: ConceptTerms,
+    place: QueryPlace,
+    window: DateWindow,
+    topic: tuple[str, ...],
+) -> list[tuple[str, ...]]:
+    """Reparte las palabras de la subdivisión en grupos que quepan con la palabra clave más larga.
+
+    Sin subdivisión devuelve un solo grupo vacío, así el resto del plan no cambia.
+    """
+    if not topic:
+        return [()]
+    longest = max(concept.keywords, key=len)
+
+    def fits(chunk: Sequence[str]) -> bool:
+        return dialect.fits(
+            dialect.render([longest], place, concept.exclude_terms, window, tuple(chunk))
+        )
+
+    chunks: list[tuple[str, ...]] = []
+    current: list[str] = []
+    for term in topic:
+        if fits([*current, term]):
+            current.append(term)
+            continue
+        if not current:
+            raise QueryTooLongError(
+                f"La consulta para {dialect.label} no cabe en su límite con la subdivisión. "
+                "Usa palabras más cortas en la subdivisión o menos exclusiones.",
+                {"proveedor": dialect.provider.value, "palabra": term},
+            )
+        chunks.append(tuple(current))
+        current = [term]
+    chunks.append(tuple(current))
+    return chunks
+
+
 def _plan(
-    dialect: QueryDialect, concept: ConceptTerms, place: QueryPlace, window: DateWindow
+    dialect: QueryDialect,
+    concept: ConceptTerms,
+    place: QueryPlace,
+    window: DateWindow,
+    topic: tuple[str, ...] = (),
 ) -> list[tuple[tuple[str, ...], DateWindow]]:
     """Qué palabras y qué días lleva cada consulta de un proveedor.
 
@@ -102,7 +153,7 @@ def _plan(
     notas trae sin pasarse: cada palabra cada día, cada grupo cada día, cada
     palabra con la ventana completa y, al final, los grupos.
     """
-    chunks = _split_keywords(dialect, concept, place, window)
+    chunks = _split_keywords(dialect, concept, place, window, topic)
     limit = dialect.split_up_to
     if limit is None:
         return [(chunk, window) for chunk in chunks]
@@ -119,6 +170,7 @@ def build_queries(
     place: QueryPlace,
     window: DateWindow,
     providers: Sequence[Provider] = tuple(Provider),
+    topic_terms: Sequence[str] = (),
 ) -> list[PlannedQuery]:
     """Genera las consultas que se enviarían a cada proveedor.
 
@@ -127,6 +179,8 @@ def build_queries(
         place: Cómo se nombra el lugar (``queries.place_for``).
         window: Rango de fechas.
         providers: Proveedores a usar, en orden (por defecto todos).
+        topic_terms: Palabras de la subdivisión que también deben aparecer
+            («FGR + Homicidio»); vacío para buscar solo el concepto.
 
     Returns:
         Una o más consultas por proveedor. Ninguna se ejecuta: sirven para
@@ -145,24 +199,28 @@ def build_queries(
             "El concepto no tiene palabras clave.",
             {"problemas": [{"campo": "keywords", "mensaje": "Agrega al menos una palabra clave."}]},
         )
+    topic = tuple(dict.fromkeys(topic_terms))
     queries = []
     for provider in providers:
         dialect = DIALECTS[provider]
-        for chunk, span in _plan(dialect, concept, place, window):
-            queries.append(
-                PlannedQuery(
-                    provider=provider,
-                    # El texto lleva el día; ``window`` sigue siendo la ventana
-                    # completa porque con ella el adaptador descarta lo de
-                    # fuera (Google News RSS no siempre respeta after:/before:).
-                    text=dialect.render(chunk, place, concept.exclude_terms, span),
-                    keywords=chunk,
-                    country=place.country,
-                    language=SEARCH_LANGUAGE,
-                    window=window,
-                    estimated_credits=dialect.credits_per_query,
-                    exclude_terms=concept.exclude_terms,
-                    place=place,
+        for topic_chunk in _split_topic(dialect, concept, place, window, topic):
+            for chunk, span in _plan(dialect, concept, place, window, topic_chunk):
+                queries.append(
+                    PlannedQuery(
+                        provider=provider,
+                        # El texto lleva el día; ``window`` sigue siendo la
+                        # ventana completa porque con ella el adaptador
+                        # descarta lo de fuera (Google News RSS no siempre
+                        # respeta after:/before:).
+                        text=dialect.render(chunk, place, concept.exclude_terms, span, topic_chunk),
+                        keywords=chunk,
+                        country=place.country,
+                        language=SEARCH_LANGUAGE,
+                        window=window,
+                        estimated_credits=dialect.credits_per_query,
+                        exclude_terms=concept.exclude_terms,
+                        place=place,
+                        topic_terms=topic_chunk,
+                    )
                 )
-            )
     return queries

@@ -1,7 +1,7 @@
 /** Lógica del Centro de mando (diseño 3): frase, horario, consultas y bitácora. */
 import { describe, expect, it } from 'vitest';
 
-import type { Search } from '../../services/searches';
+import { type Search, subdivisionsOf } from '../../services/searches';
 import type { SourceOption } from '../../services/sources';
 import {
   clockLabel,
@@ -10,6 +10,8 @@ import {
   elapsedLabel,
   isMandoMode,
   missionLabel,
+  subdivisionsLabel,
+  trackNames,
   missionLog,
   nextAutomaticRun,
   rangeConnector,
@@ -236,5 +238,32 @@ describe('ventana por horas de las corridas (28/10/2026)', () => {
         }),
       ),
     ).toBe('Tu búsqueda del 24 oct: Balacera en Iztapalapa y 2 más en Jalisco');
+  });
+});
+
+describe('FGR con subdivisiones (ADR-0038)', () => {
+  const fgr = { name: 'Fiscalía General de la República', category_id: null };
+  const homicidio = { name: 'Homicidio', category_id: 5 };
+
+  it('pega las subdivisiones a la FGR y deja los temas como son', () => {
+    expect(trackNames([fgr], [])).toEqual(['Fiscalía General de la República']);
+    expect(trackNames([fgr, homicidio], ['Secuestro'])).toEqual(['FGR · Secuestro', 'Homicidio']);
+  });
+
+  it('nombra hasta dos subdivisiones y después las cuenta', () => {
+    expect(subdivisionsLabel(['Homicidio', 'Secuestro'])).toBe('Homicidio y Secuestro');
+    expect(subdivisionsLabel(['A', 'B', 'C'])).toBe('3 subdivisiones');
+  });
+
+  it('las subdivisiones de una búsqueda guardada, sin repetir', () => {
+    expect(
+      subdivisionsOf({
+        concepts: [
+          { id: 13, name: 'FGR', subdivision_ids: [5, 3] },
+          { id: 2, name: 'Otro', subdivision_ids: [5] },
+          { id: 21, name: 'Homicidio' },
+        ],
+      }),
+    ).toEqual([5, 3]);
   });
 });

@@ -730,3 +730,40 @@ async def test_la_corrida_deja_fuera_lo_que_paso_antes_de_su_periodo() -> None:
     assert articles.ids["https://elpais.com/madrid"] not in linked
     assert report.articles == 1
     assert len(linked) == 1
+
+
+async def test_con_subdivision_la_palabra_del_tema_va_en_el_titulo_o_el_resumen() -> None:
+    # Benji, 03/11/2026: en «FGR · Homicidio» no basta que la palabra esté
+    # perdida en el cuerpo. MADRID no dice «Iztapalapa» arriba: ni se guarda
+    # ni se paga a la IA.
+    search = stored_search(replace(EXTORSION, topic_terms=("Iztapalapa",), category_ids=(5,)))
+    use_case, searches, articles, llm, _e = pipeline(search=search)
+
+    report = await use_case.run(uuid4())
+
+    assert report.articles == 1
+    assert "https://elpais.com/madrid" not in articles.ids
+    assert [r.title for r in llm.requests] == [IZTA_TITLE]
+    assert searches.progress[-1]["off_topic"] == 1
+
+
+async def test_lo_que_trae_otra_consulta_sin_subdivision_se_queda() -> None:
+    # MADRID llega por las dos consultas: la del tema «Secuestro», que no
+    # lleva subdivisión, la deja pasar aunque la de la FGR no.
+    fgr = replace(EXTORSION, topic_terms=("Iztapalapa",), category_ids=(5,))
+    secuestro = SearchConcept(17, "Secuestro", "", ("secuestro",))
+    use_case, _searches, articles, _llm, _e = pipeline(search=stored_search(fgr, secuestro))
+
+    report = await use_case.run(uuid4())
+
+    assert report.articles == 2
+    assert "https://elpais.com/madrid" in articles.ids
+
+
+async def test_sin_subdivision_no_cambia_nada() -> None:
+    use_case, searches, _articles, _llm, _e = pipeline()
+
+    report = await use_case.run(uuid4())
+
+    assert report.articles == 2
+    assert "off_topic" not in searches.progress[-1]

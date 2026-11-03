@@ -20,11 +20,18 @@ export interface SearchInput {
   date_to?: string;
   /** Fuentes encendidas (`/sources`); sin mandar, las de por defecto (F12.2). */
   providers?: string[];
+  /**
+   * Subdivisiones (ADR-0038): a la FGR se le exige además una palabra del tema
+   * de cada una («FGR · Homicidio»).
+   */
+  category_ids?: number[];
 }
 
 export interface ConceptRef {
   id: number;
   name: string;
+  /** Subdivisiones con que se buscó; falta en respuestas de antes del 02/11/2026. */
+  subdivision_ids?: number[];
 }
 
 export interface SearchEstimate {
@@ -374,6 +381,15 @@ export async function getArticle(articleId: number, signal?: AbortSignal): Promi
 /** Una búsqueda ya no cambia cuando terminó (bien, a medias o con falla). */
 export function isFinished(status: SearchStatus): boolean {
   return status === 'completed' || status === 'partial' || status === 'failed';
+}
+
+/**
+ * Las subdivisiones con que se hizo una búsqueda («FGR · Homicidio»), sin repetir.
+ *
+ * @example subdivisionsOf({ concepts: [{ id: 13, name: 'FGR', subdivision_ids: [5] }] }) // [5]
+ */
+export function subdivisionsOf(search: Pick<Search, 'concepts'>): number[] {
+  return [...new Set(search.concepts.flatMap((c) => c.subdivision_ids ?? []))];
 }
 
 /**

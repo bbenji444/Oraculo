@@ -90,3 +90,24 @@ def test_en_el_cuerpo_un_termino_largo_se_busca_por_sus_primeras_4_palabras() ->
         "HEROICA CIUDAD DE JUCHITAN",
         "HACKEO",
     )
+
+
+def test_la_subdivision_se_normaliza_aparte_de_las_palabras_clave() -> None:
+    planned = PlannedQuery(
+        Provider.LOCAL_INDEX,
+        "texto",
+        ("FGR",),
+        MEXICO,
+        "es",
+        WEEK,
+        0,
+        (),
+        None,
+        ("Homicidio", "ataque  armado"),
+    )
+
+    criteria = criteria_for(planned, CDMX_TZ)
+
+    assert criteria.keywords == ("FGR",)
+    assert criteria.topic_terms == ("HOMICIDIO", "ATAQUE ARMADO")
+    assert criteria_for(query(None), CDMX_TZ).topic_terms == ()

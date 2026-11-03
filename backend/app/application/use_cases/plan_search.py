@@ -53,6 +53,9 @@ class SearchRequest:
         scheduled_for: Hora programada de una corrida automática.
         time_window: Horas que cubre una corrida automática (``run_window``);
             ``None`` en las manuales.
+        category_ids: Subdivisiones (02/11/2026): se aplican a los conceptos
+            que no son temas generales, como la FGR. Cada nota debe traer las
+            palabras del concepto y las de una subdivisión.
     """
 
     user_id: str
@@ -63,6 +66,7 @@ class SearchRequest:
     trigger: SearchTrigger = SearchTrigger.MANUAL
     scheduled_for: datetime | None = None
     time_window: RunWindow | None = None
+    category_ids: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,11 +198,35 @@ class PlanSearch:
             for s in SOURCES
         ]
 
-    async def _concepts_of(self, ids: Sequence[int]) -> tuple[SearchConcept, ...]:
+    async def _topic_of(
+        self, category_ids: Sequence[int]
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """Palabras y exclusiones de las subdivisiones elegidas (las de su tema general)."""
+        if len(set(category_ids)) != len(category_ids):
+            raise InvalidRequestError(
+                "Una subdivisión está repetida.", {"category_ids": list(category_ids)}
+            )
+        terms: list[str] = []
+        exclusions: list[str] = []
+        for category_id in category_ids:
+            topic = await self._concepts.for_category(category_id)
+            if topic is None or not topic.data.is_active:
+                raise InvalidRequestError(
+                    "Esa subdivisión no tiene palabras clave para buscar.",
+                    {"category_id": category_id},
+                )
+            terms.extend(topic.data.keywords)
+            exclusions.extend(topic.data.exclude_terms)
+        return tuple(dict.fromkeys(terms)), tuple(dict.fromkeys(exclusions))
+
+    async def _concepts_of(
+        self, ids: Sequence[int], category_ids: Sequence[int] = ()
+    ) -> tuple[SearchConcept, ...]:
         if not ids:
             raise InvalidRequestError("Elige al menos un concepto.")
         if len(set(ids)) != len(ids):
             raise InvalidRequestError("Un concepto está repetido.", {"concept_ids": list(ids)})
+        topic_terms, topic_exclusions = await self._topic_of(category_ids)
         found = []
         for concept_id in ids:
             concept = await self._concepts.get(concept_id)
@@ -209,10 +237,26 @@ class PlanSearch:
                     f'El concepto "{concept.data.name}" está desactivado.', {"id": concept_id}
                 )
             data = concept.data
+            # Un tema general («Homicidio») ya es la subdivisión: no se le
+            # agrega otra. Las subdivisiones van con la FGR y los demás.
+            with_topic = bool(category_ids) and concept.category_id is None
             found.append(
                 SearchConcept(
-                    concept.id, data.name, data.description, data.keywords, data.exclude_terms
+                    concept.id,
+                    data.name,
+                    data.description,
+                    data.keywords,
+                    tuple(dict.fromkeys((*data.exclude_terms, *topic_exclusions)))
+                    if with_topic
+                    else data.exclude_terms,
+                    topic_terms if with_topic else (),
+                    tuple(category_ids) if with_topic else (),
                 )
+            )
+        if category_ids and not any(c.category_ids for c in found):
+            raise InvalidRequestError(
+                "Las subdivisiones van con un concepto como la FGR, no solas.",
+                {"category_ids": list(category_ids)},
             )
         return tuple(found)
 
@@ -232,7 +276,7 @@ class PlanSearch:
             RegionNotFoundError: Si la región no existe.
             QueryTooLongError: Si una palabra clave no cabe en un proveedor.
         """
-        concepts = await self._concepts_of(request.concept_ids)
+        concepts = await self._concepts_of(request.concept_ids, request.category_ids)
         region = await self._regions.get(request.region_id)
         facts = await self._regions.place_facts(request.region_id) if region else None
         if region is None or facts is None:

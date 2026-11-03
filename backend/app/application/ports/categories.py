@@ -4,14 +4,67 @@
 por clasificar (o se clasificaron con otra versión del prompt) y guardar lo
 que eligió la IA. La implementación vive en ``adapters/persistence``.
 
+``CategoryCatalogPort`` (02/11/2026) es lo que usa el editor de
+subdivisiones: leer todo el catálogo y guardar una edición. Van separados
+para que clasificar no dependa de editar.
+
 No hace: no decide la categoría (eso es ``app.domain.categories``).
 """
 
 from collections.abc import Sequence
 from typing import Protocol
 
+from app.application.audit import AuditEntry
 from app.application.ports.llm import ClassificationNote
 from app.domain.categories import Category, CategoryChoice
+
+
+class CategoryCatalogPort(Protocol):
+    """El catálogo de subdivisiones, para verlo y editarlo."""
+
+    async def active_categories(self) -> list[Category]:
+        """El catálogo activo, en su orden, con su tema general.
+
+        Returns:
+            Las categorías activas (incluida «Otros»).
+        """
+        ...
+
+    async def all_categories(self) -> list[Category]:
+        """Todo el catálogo, también las apagadas, con su tema general (editor).
+
+        Returns:
+            Las categorías en su orden.
+        """
+        ...
+
+    async def get_category(self, category_id: int) -> Category | None:
+        """Una categoría por id.
+
+        Args:
+            category_id: Id.
+
+        Returns:
+            La categoría, o ``None`` si no existe.
+        """
+        ...
+
+    async def update_category(self, category: Category, audit: AuditEntry) -> Category:
+        """Guarda la categoría editada y deja el cambio en la bitácora.
+
+        Su tema general toma el mismo nombre y se prende o apaga con ella.
+
+        Args:
+            category: Como quedó (``CategoryChanges.apply_to``).
+            audit: Registro para la bitácora.
+
+        Returns:
+            La categoría guardada.
+
+        Raises:
+            CategoryNameTakenError: Si otra categoría o concepto ya usa el nombre.
+        """
+        ...
 
 
 class CategoryStorePort(Protocol):

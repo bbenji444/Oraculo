@@ -69,6 +69,8 @@ class LocalIndexCriteria:
         exclusions: Ninguna debe aparecer.
         place_terms: Al menos uno debe aparecer; vacío = sin filtro de lugar.
         required_terms: Si no está vacío, también debe aparecer uno.
+        topic_terms: Palabras de la subdivisión: si no está vacío, también
+            debe aparecer una («FGR + Homicidio»).
         start: Primer instante incluido (UTC).
         end: Primer instante ya no incluido (UTC).
         limit: Máximo de notas.
@@ -81,6 +83,7 @@ class LocalIndexCriteria:
     start: datetime
     end: datetime
     limit: int = MAX_LOCAL_RESULTS
+    topic_terms: tuple[str, ...] = ()
 
 
 def _normalized(terms: tuple[str, ...]) -> tuple[str, ...]:
@@ -122,4 +125,5 @@ def criteria_for(query: PlannedQuery, tz: tzinfo) -> LocalIndexCriteria:
         required_terms=_normalized(place.required_terms),
         start=start.astimezone(UTC),
         end=end.astimezone(UTC),
+        topic_terms=_normalized(query.topic_terms),
     )

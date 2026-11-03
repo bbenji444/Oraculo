@@ -30,7 +30,7 @@ ENTITY_TYPE = "concept"
 _NAME_UNIQUE_INDEX = "concepts_name_norm_active_key"
 _COLUMNS = """
     c.id, c.name, c.description, c.keywords, c.exclude_terms, c.color, c.is_active,
-    c.created_by, c.created_at, c.updated_at
+    c.created_by, c.created_at, c.updated_at, c.category_id
 """
 
 
@@ -45,7 +45,14 @@ def _to_concept(row: RowMapping) -> Concept:
         color=row["color"],
         is_active=row["is_active"],
     )
-    return Concept(row["id"], data, row["created_by"], row["created_at"], row["updated_at"])
+    return Concept(
+        row["id"],
+        data,
+        row["created_by"],
+        row["created_at"],
+        row["updated_at"],
+        row["category_id"],
+    )
 
 
 def _values(data: ConceptDraft) -> dict[str, Any]:
@@ -125,6 +132,15 @@ class PostgresConceptRepository:
         rows = await self._fetch(
             f"SELECT {_COLUMNS} FROM concepts c WHERE c.id = :id AND c.deleted_at IS NULL",  # noqa: S608 — fragmentos SQL constantes del módulo
             {"id": concept_id},
+        )
+        return rows[0] if rows else None
+
+    async def for_category(self, category_id: int) -> Concept | None:
+        """Ver ``ConceptRepositoryPort.for_category``."""
+        rows = await self._fetch(
+            f"SELECT {_COLUMNS} FROM concepts c "  # noqa: S608 — fragmentos SQL constantes del módulo
+            "WHERE c.category_id = :category AND c.deleted_at IS NULL",
+            {"category": category_id},
         )
         return rows[0] if rows else None
 
