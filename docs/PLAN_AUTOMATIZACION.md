@@ -115,6 +115,28 @@ El reporte habla de la FGR y puede ser sensible. Hay dos formas de mandarlo:
 
 **Recomiendo:** adjunto para empezar (correo y WhatsApp) y link seguro cuando el servidor esté publicado.
 
+### 4.4 ¿Y los WhatsApp «baratos»? (investigado el 4/11/2026)
+
+Cuando se habla de mandar WhatsApp «más barato y sin pasar por WhatsApp», casi siempre es una de dos cosas:
+
+1. **APIs no oficiales:** Evolution API, WAHA, WasenderAPI, Whapi.Cloud y otras.
+   - **Cómo funcionan:** conectan un número normal escaneando un código QR, como WhatsApp Web, y mandan mensajes desde ahí.
+   - **Costo:** algunas son gratis si se instalan en un servidor propio (Evolution API y WAHA); otras cobran una cuota fija, de unos 6 USD al mes por número en WasenderAPI y unos 29 USD en Whapi. Sin plantillas ni aprobaciones de Meta. Evolution API es muy común en comunidades de n8n.
+   - **El riesgo:** WhatsApp no las autoriza y va contra sus condiciones de uso. Meta detecta estas conexiones y **bloquea el número**, muchas veces para siempre. Las fuentes de 2026 dicen que lo está haciendo más seguido.
+   - **Otros problemas:** no hay a quién reclamar si se cae, dejan de funcionar cuando WhatsApp cambia su app, y los mensajes pasan por un tercero.
+2. **Intermediarios oficiales** (360dialog, Twilio, Gupshup, WATI).
+   - Usan la misma API oficial de Meta. **No bajan el precio de Meta**: le suman su comisión o una cuota mensual.
+   - 360dialog cobra una cuota fija, de unos 49–50 USD al mes, sin comisión por mensaje.
+   - Twilio suma unos 0.005 USD por mensaje.
+   - Lo que ganas es un alta más fácil y soporte, no un precio menor.
+
+**Nuestra cuenta** con la API oficial: 3 corridas al día son unos 90 mensajes al mes por persona. A 0.0085 USD cada uno, salen unos **0.77 USD al mes por persona** (unos 14 pesos). Con 10 destinatarios, unos 7.7 USD al mes. A este volumen, lo no oficial ahorra muy poco y arriesga perder el número.
+
+**Recomendación:**
+- **Producción:** la API oficial, directo con Meta, o con 360dialog si el alta se complica.
+- **Nunca un canal no oficial para el reporte de la FGR**, por el riesgo de bloqueo y porque la información pasaría por un tercero sin contrato.
+- **Si se quiere un canal gratis:** un **bot de Telegram** es gratuito y oficial (VERIFICAR).
+
 ---
 
 ## 5. Por qué así y no todo en n8n
@@ -198,6 +220,9 @@ Cada etapa termina con código, pruebas, documentación, verificación con salid
 - Precios de la plataforma de WhatsApp Business (Meta): <https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing>
 - Envío de mensajes y documentos en la Cloud API (Meta): <https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages/>
 - Tarifas de WhatsApp en México 2026 (fuente secundaria; confirmar con Meta): <https://itechdev.com.mx/en/blog/precio-whatsapp-business-api-mexico-2026>
+- Riesgos de las APIs no oficiales de WhatsApp (fuentes secundarias): <https://wapilot.io/cheap-whatsapp-api-providers-ban-risk>, <https://wasphere.com/blog/open-source-whatsapp-api-landscape-2026/>
+- Cambio de precios del 1/10/2026 (fuente secundaria): <https://respond.io/blog/whatsapp-pricing-change-2026>
+- Intermediarios oficiales y sus comisiones (fuente secundaria): <https://ezcontact.ai/en/blog/whatsapp-api-pricing-comparison-meta-twilio-360dialog-ezcontact/>
 - Licencia de n8n (Sustainable Use License): <https://docs.n8n.io/n8n-community-license/sustainable-use-license>
 - Comparativa de motores durables (fuente secundaria): <https://www.pkgpulse.com/guides/hatchet-vs-trigger-dev-v3-vs-inngest-durable-workflows-2026>
 - Managed Agents de Claude: corridas programadas, eventos y webhooks firmados. Lo tomé de la documentación oficial que trae Claude Code (`managed-agents-scheduled-deployments`, `managed-agents-webhooks`); antes de usarlo se confirma en <https://docs.claude.com>.
