@@ -1,95 +1,93 @@
-# Migrar el monitor a la VM de Proxmox (F12.9)
+# El monitor en la VM de Proxmox (F12.9)
 
-Guía para mover el monitor de la PC de Benji a la máquina virtual de Proxmox, que está prendida las 24 horas. **Por qué importa:** si la PC se apaga, las corridas de las 07:00, 15:00 y 23:00 no ocurren y el índice local se queda con huecos (el 22/10/2026 solo entraron 803 notas). En el servidor eso deja de pasar.
+El monitor corre en la máquina virtual **108 «noticias»** del Proxmox de Oráculo, que está prendida las 24 horas. **Por qué importa:** si la PC se apagaba, las corridas de las 07:00, 15:00 y 23:00 no ocurrían y el índice local se quedaba con huecos (el 22/10/2026 solo entraron 803 notas).
 
-Esta guía la preparó Claude Code el 26/10/2026 sin acceso a la VM: **ningún paso se ha ejecutado todavía**. Cada uno dice cómo comprobar que salió bien.
+**Mudanza hecha el 07/11/2026** por Claude Code, desde la PC de Benji y por SSH. Esta guía dice cómo quedó y cómo repetirlo en otra VM.
 
-## 0. Antes de empezar
+## Cómo quedó
 
-- La VM con Ubuntu 24.04 (la misma base que WSL), al menos **4 núcleos, 8 GB de RAM y 40 GB de disco**. Hoy la base pesa ~900 MB y crece ~10 MB al día con el índice local, que se limpia a los 90 días.
-- Acceso por SSH a la VM y salida a internet (GDELT, Google News RSS, la IA).
-- El código en `develop` subido a GitHub (`git push`, con el OK de Benji).
+| | |
+|---|---|
+| VM | Ubuntu 24.04.5, 4 núcleos, 8 GB, 80 GB de disco |
+| Red de la oficina | `192.168.0.42` (SSH, para administrar) |
+| ZeroTier (`oraculo2server`) | `10.244.214.144` |
+| El monitor | `http://10.244.214.144:8080`; desde la oficina, `http://192.168.0.42:8080` |
+| Usuario | `noticias`; el proyecto está en `/home/noticias/monitor-noticias` (rama `develop`) |
+| Arranque | Servicio de systemd `monitor-noticias`: corre `make up` al encender |
+| Corridas y envíos | Prendidos en la VM. En la PC de Benji están apagados (`AUTOMATIC_RUNS_ENABLED=false`, `DELIVERIES_ENABLED=false`), así nunca corren doble |
 
-## 1. Respaldar en la PC
+En la VM, el `.env` agrega:
+
+```
+API_RELOAD=false          # la API no se reinicia sola
+NGINX_LISTEN=0.0.0.0:8080 # se ve en la red de la oficina y en ZeroTier
+AUTOMATIC_RUNS_ENABLED=true
+```
+
+El monitor no tiene inicio de sesión todavía: lo puede abrir cualquiera en la red de la oficina o en ZeroTier.
+
+## Entrar a la VM
+
+Desde la PC de Benji, con la llave SSH `~/.ssh/monitor_vm` (está en el WSL de la PC):
 
 ```bash
-wsl make db-dump
+wsl ssh -i ~/.ssh/monitor_vm noticias@192.168.0.42
 ```
 
-Comprobar: aparece `backups/monitor_noticias_<fecha>.dump`, de ~330 MB.
+Para darle acceso a otra computadora, se le crea su propia llave y se instala con `ssh-copy-id`. La contraseña de la VM la escribe una persona, nunca Claude.
 
-## 2. Instalar en la VM
+**Permisos:** el usuario `noticias` puede, sin contraseña, solo lo que necesitan `make up`, `make down`, `make status` y el servicio (`/etc/sudoers.d/monitor-noticias`). Para instalar programas, `sudo` pide contraseña.
+
+## Operar
 
 ```bash
-git clone <repositorio> monitor-noticias && cd monitor-noticias && git checkout develop
-make bootstrap
+sudo systemctl status monitor-noticias     # ¿está corriendo?
+sudo systemctl restart monitor-noticias    # reiniciar
+make status                                # servicios y /health
+make logs                                  # logs de la API, el worker y el reloj
 ```
 
-`make bootstrap` instala PostgreSQL con PostGIS, Redis, nginx, uv, Node y las dependencias. Se puede repetir sin problema.
-
-Comprobar: `make status` muestra los servicios instalados.
-
-## 3. Copiar la configuración y los geodatos
-
-- **`.env`:** copiarlo de la PC a la VM por SSH (`scp`), **nunca por chat ni por correo**. Revisar en `.env`:
-  - `BROWSERWORK_BASE_URL`, si se quiere usar BrowserWork desde la VM;
-  - `AUTOMATIC_RUNS_ENABLED=true` (es el valor por defecto);
-  - `REPORTS_DIR`, si los PDF deben quedar en otra carpeta.
-- **Mapas:** los PMTiles del mapa y las texturas de la Tierra están en `geodata/output/` (catálogo INEGI, mapa base, `earth_day` y `earth_night`) y no van en git. Hay dos caminos:
-  - copiarlos de la PC (`scp -r geodata/output vm:monitor-noticias/geodata/`);
-  - volver a generarlos con `make geo-load`, `make geo-basemap` y `make geo-earth` (tardan y descargan varios GB).
-
-## 4. Restaurar la base
+**Actualizar el código** tras un merge a `develop`:
 
 ```bash
-pg_restore --no-owner -h localhost -U monitor -d monitor_noticias monitor_noticias_<fecha>.dump
-make migrate
+cd ~/monitor-noticias
+git pull
+make migrate               # si hay migraciones nuevas
+make frontend-build        # si cambió la pantalla
+sudo systemctl restart monitor-noticias
 ```
 
-Comprobar con `make db-shell`:
+Si cambian las dependencias de Python o de Node, antes hay que correr `make bootstrap`, que pide contraseña de administrador.
 
-```sql
-SELECT count(*) FROM articles;        -- las mismas notas que en la PC
-SELECT count(*) FROM news_index;      -- el índice local
-SELECT name, relevance_rule FROM concepts WHERE deleted_at IS NULL;  -- solo la FGR, fgr_federal
-```
+## Repetir la mudanza en otra VM
 
-(Más detalle en `docs/base-de-datos.md`, «Migrar la base a otro servidor».)
+Lo que se hizo el 07/11/2026, en orden:
 
-## 5. Levantar y probar
-
-```bash
-make frontend-build
-make up
-make status
-make corrida-fgr
-```
-
-`make corrida-fgr` pide «si». Comprobar:
-
-- `make status` muestra API, worker, reloj y nginx corriendo, y `/health` en «ok»;
-- la corrida termina con notas y deja su PDF en `data/reportes/`;
-- en el navegador (`http://<vm>:8080`), Historial muestra «Monitor automático · corrida de las …».
-
-## 6. Que arranque solo al reiniciar la VM
-
-`make up` levanta los servicios, pero no sobrevive a un reinicio. Hay que crear un servicio de `systemd` que corra `make up` al arrancar, igual que BrowserWork en el servidor de Oráculo. **Queda por hacer con Benji en la VM.**
-
-## 7. Apagar el monitor en la PC
-
-Cuando la VM ya corra sola, en la PC:
-
-```bash
-wsl make down
-```
-
-Si no se apaga, las dos máquinas harían las mismas corridas y gastarían la IA dos veces. Para dejar la PC solo como entorno de desarrollo, se puede poner `AUTOMATIC_RUNS_ENABLED=false` en su `.env`.
+1. **Acceso.** En la PC: `ssh-keygen` y `ssh-copy-id` (la persona escribe la contraseña). Para la instalación, un permiso temporal de `sudo` sin contraseña, que se quita al final.
+2. **`make`.** Ubuntu no lo trae y `make bootstrap` lo necesita: `sudo apt-get install -y make`.
+3. **Código.** `git clone --branch develop https://github.com/bbenji444/Oraculo.git monitor-noticias`. El repositorio es público.
+4. **`.env`.** Copiarlo de la PC con `scp`, nunca por chat ni por correo, y agregar las variables del servidor (arriba).
+5. **Instalar.** `make bootstrap` instala PostgreSQL 16 + PostGIS, Redis, nginx, Node 22, uv, Python 3.12 y las dependencias. Tardó ~10 min.
+6. **Mapas.** `geodata/output` (1.5 GB, 799 archivos) no va en git. Se copió de la PC con `tar | ssh` y se comprobó que el tamaño fuera idéntico.
+7. **Base.**
+   - En la PC, `make db-dump` (579 MB); copiarlo con `scp`.
+   - En la VM: `pg_restore --no-owner -h localhost -U monitor -d monitor_noticias <archivo>.dump`. Resultado: 0 errores. Los conteos coinciden con la PC (4,229 notas, 299,618 regiones, 32 búsquedas, migración 0037).
+   - Copiar también `data/reportes` (los PDF) y corregir sus rutas en la base:
+     ```sql
+     UPDATE reports SET pdf_path = replace(pdf_path, '/mnt/d/Proyectos/Oraculo/monitor-noticias', '/home/noticias/monitor-noticias') WHERE pdf_path LIKE '/mnt/d/%';
+     ```
+8. **Levantar.**
+   - `make frontend-build`.
+   - `make instalar-servicio`: deja que nginx lea la carpeta (Ubuntu 24.04 cierra las carpetas personales y nginx respondía 403), instala el servicio y los permisos mínimos.
+   - `sudo systemctl start monitor-noticias`.
+9. **Relevo.** Prender `AUTOMATIC_RUNS_ENABLED=true` en la VM y apagarlo en la PC (más `DELIVERIES_ENABLED=false`), reiniciando las dos.
+10. **Cerrar.** Borrar el permiso temporal de `sudo`.
 
 ## Riesgos
 
 | Riesgo | Cómo se evita |
 |---|---|
-| Corridas dobles (PC y VM) | Paso 7: apagar el reloj de la PC o `AUTOMATIC_RUNS_ENABLED=false`. |
-| El `.env` con las llaves se filtra | Copiarlo solo por `scp`; nunca subirlo a git (está en `.gitignore`). |
-| La VM no tiene los mapas | Paso 3: copiar los PMTiles o regenerarlos. |
-| La hora de la VM no es la de la CDMX | El reloj trabaja en UTC y convierte (ADR-0031); basta con que la VM tenga la hora UTC correcta (NTP). |
+| Corridas o correos dobles (PC y VM) | En la PC, `AUTOMATIC_RUNS_ENABLED=false` y `DELIVERIES_ENABLED=false` |
+| El `.env` con las llaves se filtra | Solo por `scp`; nunca en git (está en `.gitignore`) |
+| La hora de la VM | El reloj trabaja en UTC y convierte (ADR-0031). La VM sincroniza la hora sola (NTP) |
+| Cualquiera en la red ve el monitor | Pendiente: inicio de sesión con la integración a Oráculo |

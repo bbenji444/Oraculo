@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **El monitor corre en la VM de Proxmox (07/11/2026, docs/migracion-proxmox.md).** Ya no depende de que la PC de Benji esté prendida.
+  - VM 108 «noticias» (Ubuntu 24.04). El equipo la abre por ZeroTier en `http://10.244.214.144:8080`.
+  - Arranca sola al encender (servicio `monitor-noticias`). Hace las corridas de las 07:00, 15:00 y 23:00 y manda los correos; la PC quedó solo para desarrollar.
+  - Los scripts ahora sirven en un Linux sin Windows: `make bootstrap` instala Node 22, `NGINX_LISTEN` y `API_RELOAD` ajustan el servidor, y `make instalar-servicio` registra el arranque y permisos mínimos de administrador.
+
 - **Horario único de las corridas, editable desde «Envíos» (06/11/2026, ADR-0040, migración 0037).** Benji: «si nosotros editamos, borramos o añadimos algún horario, tiene que funcionar para todos los usuarios».
   - En **Envíos → Horario de las corridas** se agregan, quitan o mueven horas y días. Aplica en el minuto siguiente, sin reiniciar nada, y cada cambio queda en la bitácora.
   - **A cada hora se hace un reporte totalmente nuevo** con lo publicado desde la hora anterior. Si se agregan las 19:00, esa corrida cubre de 15:00 a 19:00 y la de las 23:00 pasa a cubrir de 19:00 a 23:00.
