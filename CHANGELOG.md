@@ -8,6 +8,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Envíos: regla general y horas libres (07/11/2026, ADR-0039, migración 0036).** Benji pidió una regla general en lugar de una regla por persona, y más opciones.
+  - **Regla general:** el reporte a todos los destinatarios activos, con excepciones («todos menos Tadeo»).
+  - **Horas y días a elegir:** cualquier hora, no solo las de las corridas. Las horas se agregan o se quitan con un clic, y los días van de lunes a domingo, con atajos «Lunes a viernes» y «Todos». A una hora sin corrida se manda el reporte más reciente.
+  - **Reglas personalizadas** para unas cuantas personas, como tarjetas que se despliegan para editar. Al lado, la lista de **próximos envíos**.
+  - **Destinatarios:** «Editar» despliega el perfil ahí mismo y «+ Agregar» abre una ventana. Ya se pueden borrar destinatarios y reglas.
+- **Sección «Envíos» (07/11/2026, ADR-0039).** Benji pidió administrar qué se manda, a quién, por qué canal y a qué hora.
+  - **Cuentas de envío:** se conecta Outlook, Hotmail o Gmail con un link de autorización (Composio). WhatsApp aparece como «Próximamente».
+  - **Destinatarios y reglas:** por ejemplo, «Reporte FGR → Benjamin → por correo desde Ovitech → 07:00 y 15:00».
+  - **Historial:** cada envío con estado, intentos y error en español, y los botones «Reintentar» y «Mandar prueba».
+  - Al terminar cada corrida se mandan los envíos de las reglas que tocan, con el PDF adjunto. Se reintenta a los 1, 5 y 30 minutos y nunca se manda dos veces lo mismo.
+  - Apagado por defecto: `DELIVERIES_ENABLED=false`. Pensado para volverse el módulo de envíos de todo Oráculo.
 - **Subdivisiones editables y temas generales (02/11/2026, ADR-0038).** Benji pidió ver y editar todas las subdivisiones, no solo las 8 que salían en las notas, y poder buscar «solo homicidios en general, sin la FGR».
   - Cada subdivisión, menos «Otros», tiene su **tema general**: un concepto con palabras clave que se busca solo. `make seed` siembra los 14 desde `temas.json`.
   - **FGR · Homicidio** trae solo notas con **ambas** palabras: la consulta lleva un segundo grupo con las palabras del tema (`category_ids` en `POST /searches`). La palabra del tema tiene que estar en el título o el resumen, no perdida en el cuerpo. En una semana real, eso bajó «FGR · Homicidio» de 145 a 39 notas, todas de homicidios.

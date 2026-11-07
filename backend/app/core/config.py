@@ -93,6 +93,9 @@ _DEFAULT_AUTOMATIC_USER = "monitor-automatico"
 # más por corrida en el peor caso. Las búsquedas manuales siguen con el general.
 _DEFAULT_AUTOMATIC_LLM_MAX_ARTICLES = 250
 _DEFAULT_REPORTS_DIR = _REPO_ROOT / "data" / "reportes"
+# Nombre con que el monitor aparece en Composio como dueño de las cuentas de
+# envío (ADR-0039). Es el que se usó al conectar Ovitech el 06/11/2026.
+_DEFAULT_COMPOSIO_USER_ID = "oraculo-monitor"
 
 # Pipeline de búsqueda (F4, ADR-0015):
 # - 15 s por página: en la muestra real del 16/10/2026 la más lenta tardó 1.6 s.
@@ -263,6 +266,16 @@ class Settings(BaseSettings):
     automatic_llm_max_articles: int = Field(default=_DEFAULT_AUTOMATIC_LLM_MAX_ARTICLES, ge=1)
     # Carpeta donde cada corrida deja su reporte en PDF (en el disco del servidor).
     reports_dir: Path = _DEFAULT_REPORTS_DIR
+
+    # --- Envíos (F12.11, ADR-0039) ---
+    # Llave de PROYECTO de Composio (empieza con ak_). Sin ella, los envíos por
+    # correo quedan «sin configurar» y no se intentan.
+    composio_api_key: SecretStr | None = None
+    # «Usuario» de Composio dueño de las cuentas conectadas: el monitor.
+    composio_user_id: str = Field(default=_DEFAULT_COMPOSIO_USER_ID, min_length=1)
+    # Interruptor general: las corridas automáticas solo mandan con true. La
+    # prueba manual («Mandar prueba») funciona aunque esté apagado.
+    deliveries_enabled: bool = False
 
     @field_validator("manual_default_sources", "automatic_sources")
     @classmethod

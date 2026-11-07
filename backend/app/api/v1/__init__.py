@@ -7,6 +7,7 @@ from app.api.v1.case_graph import router as case_graph_router
 from app.api.v1.cases import router as cases_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.concepts import router as concepts_router
+from app.api.v1.deliveries import router as deliveries_router
 from app.api.v1.entities import router as entities_router
 from app.api.v1.health import router as health_router
 from app.api.v1.regions import router as regions_router
@@ -31,6 +32,7 @@ api_router.include_router(cases_router)
 api_router.include_router(entities_router)
 api_router.include_router(resolution_router)
 api_router.include_router(relationships_router)
+api_router.include_router(deliveries_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
@@ -49,6 +51,13 @@ OPENAPI_TAGS = [
         "description": (
             "Fuentes que el analista enciende o apaga en la búsqueda manual (F12.2, "
             "ADR-0027): cuáles hay, cuáles cuestan créditos y cuáles están configuradas."
+        ),
+    },
+    {
+        "name": "envíos",
+        "description": (
+            "Qué se manda, a quién, por qué canal y a qué hora (F12.11, ADR-0039): "
+            "cuentas de correo vía Composio, destinatarios, reglas e historial auditable."
         ),
     },
     {

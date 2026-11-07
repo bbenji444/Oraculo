@@ -263,3 +263,24 @@ class CategoryNameTakenError(ConflictError):
     """Otra subdivisión, o el concepto de otro tema, ya usa ese nombre."""
 
     code = "category_name_taken"
+
+
+class DeliveryNotFoundError(NotFoundError):
+    """No existe ese envío, destinatario, regla o cuenta de envío."""
+
+    code = "delivery_not_found"
+
+
+class DeliveryValidationError(InvalidRequestError):
+    """Un destinatario, regla o envío no cumple sus reglas.
+
+    ``details["problemas"]`` lista cada problema con su campo.
+    """
+
+    code = "invalid_delivery"
+
+
+class DeliveryChannelUnavailableError(ServiceUnavailableError):
+    """El canal no está listo: falta la llave de Composio o WhatsApp aún no existe."""
+
+    code = "delivery_channel_unavailable"

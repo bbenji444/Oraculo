@@ -30,6 +30,10 @@ _SECONDS_PER_MINUTE = 60
 _PURGE_HOUR_UTC = 9
 _PURGE_MINUTE = 30
 AUTOMATIC_RUN_TASK = "monitor.automatic_run"
+# Envíos pendientes y reintentos (ADR-0039): cada minuto, para cumplir las
+# esperas de 1, 5 y 30 minutos entre intentos.
+DELIVERIES_TASK = "deliveries.send_due"
+_DELIVERIES_EVERY_SECONDS = 60
 # La Ciudad de México está en UTC-6 todo el año desde que se quitó el horario
 # de verano (octubre de 2022). Si volviera, basta reiniciar el reloj con el
 # nuevo desfase.
@@ -69,6 +73,12 @@ def build_beat_schedule(settings: Settings) -> dict[str, dict[str, Any]]:
             "task": AUTOMATIC_RUN_TASK,
             "schedule": crontab(hour=",".join(str(h) for h in hours), minute=0),
             "options": {"expires": _AUTOMATIC_RUN_EXPIRES_SECONDS},
+        }
+    if settings.deliveries_enabled:
+        schedule["envios-pendientes"] = {
+            "task": DELIVERIES_TASK,
+            "schedule": float(_DELIVERIES_EVERY_SECONDS),
+            "options": {"expires": _DELIVERIES_EVERY_SECONDS},
         }
     return schedule
 

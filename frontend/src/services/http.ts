@@ -25,7 +25,7 @@ export function badFormat(): ApiError {
   return new ApiError('La API respondió con un formato que no se reconoce.', 'bad_format');
 }
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface RequestOptions {
   method?: Method;

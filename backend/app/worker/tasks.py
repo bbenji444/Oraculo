@@ -21,7 +21,8 @@ from app.adapters.queue.celery_queue import ENTITIES_TASK, SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
 from app.worker.automatic_jobs import run_automatic_job
-from app.worker.celery_app import AUTOMATIC_RUN_TASK, celery_app
+from app.worker.celery_app import AUTOMATIC_RUN_TASK, DELIVERIES_TASK, celery_app
+from app.worker.delivery_jobs import send_due_deliveries
 from app.worker.entity_jobs import run_entity_extraction
 from app.worker.ingest_jobs import run_ingest, run_purge
 from app.worker.search_jobs import purge_article_texts, run_search_job
@@ -152,4 +153,18 @@ def automatic_run() -> dict[str, object]:
         "pdf": str(summary.pdf_path) if summary.pdf_path else None,
     }
     logger.info("Corrida automática terminada", extra=result)
+    return result
+
+
+@celery_app.task(name=DELIVERIES_TASK)
+def send_deliveries() -> dict[str, int]:
+    """Manda los envíos pendientes, reintentos incluidos (ADR-0039).
+
+    Returns:
+        Cuántos se intentaron, mandaron y fallaron.
+    """
+    report = asyncio.run(send_due_deliveries(get_settings()))
+    result = {"attempted": report.attempted, "sent": report.sent, "failed": report.failed}
+    if report.attempted:
+        logger.info("Envíos pendientes", extra=result)
     return result
