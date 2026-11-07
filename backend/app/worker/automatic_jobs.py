@@ -1,7 +1,8 @@
 """Una corrida automática del monitor FGR de punta a punta (F12.8, ADR-0031).
 
-La lanza el reloj de Celery a las 07:00, 15:00 y 23:00 (CDMX), o una persona
-con ``make corrida-fgr``. Hace lo mismo que alguien en Explorar, sin pantalla:
+La lanza el reloj de Celery a cada hora del horario único que edita el
+administrador en «Envíos» (ADR-0040), o una persona con ``make corrida-fgr``.
+Hace lo mismo que alguien en Explorar, sin pantalla:
 
 1. arma la petición (``PrepareAutomaticRun``): FGR, todo México, solo las
    horas desde la corrida anterior, Google News RSS y el índice local (0 créditos);
@@ -16,15 +17,17 @@ con ``make corrida-fgr``. Hace lo mismo que alguien en Explorar, sin pantalla:
 Todo queda en PostgreSQL: la búsqueda, sus notas, la bitácora y el reporte.
 
 5. si los envíos están prendidos (``DELIVERIES_ENABLED``), manda el reporte
-   según las reglas de la pantalla «Envíos» (ADR-0039).
+   a todos los destinatarios activos (ADR-0039, ADR-0040).
 
-No hace: no decide horarios (eso es ``celery_app``).
+``check_due_run`` es lo que hace el reloj cada minuto: ¿toca una corrida?
+
+No hace: no guarda el horario (eso es la API) ni programa el reloj (``celery_app``).
 """
 
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
@@ -35,6 +38,7 @@ from app.adapters.persistence.concepts_repository import PostgresConceptReposito
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.reports_repository import PostgresReportStore
+from app.adapters.persistence.schedule_repository import PostgresScheduleStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
@@ -44,14 +48,20 @@ from app.application.use_cases.automatic_run import AutomaticProfile, PrepareAut
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, LLMPrices, ReportFormat
 from app.application.use_cases.run_search import SearchReport
+from app.application.use_cases.schedule import DueRun, GetSchedule
 from app.application.use_cases.start_search import StartSearch
 from app.core.config import Settings
-from app.domain.schedule import parse_run_hours, run_slot
+from app.domain.schedule import RunSchedule, parse_run_hours
 from app.domain.sources import parse_sources
 from app.worker.delivery_jobs import deliver_run
 from app.worker.search_jobs import build_providers, run_search_job
 
 logger = logging.getLogger(__name__)
+
+# El reloj revisa cada minuto; una corrida se lanza si su hora llegó hace menos
+# de 10 minutos. Cubre una revisión atrasada o un reinicio breve del reloj sin
+# lanzar corridas viejas al arrancar después de horas apagado.
+DUE_GRACE = timedelta(minutes=10)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,9 +106,56 @@ def profile_from(settings: Settings) -> AutomaticProfile:
         region_code=settings.automatic_region_code,
         sources=parse_sources(settings.automatic_sources),
         user_id=settings.automatic_user,
-        run_hours=parse_run_hours(settings.automatic_run_hours),
         margin_minutes=settings.automatic_window_margin_minutes,
     )
+
+
+def default_schedule(settings: Settings) -> RunSchedule:
+    """El horario inicial, mientras el administrador no guarde uno (``AUTOMATIC_RUN_HOURS``).
+
+    Args:
+        settings: Configuración.
+
+    Returns:
+        El horario con esas horas, todos los días.
+    """
+    return RunSchedule.from_hours(parse_run_hours(settings.automatic_run_hours))
+
+
+def schedule_reader(settings: Settings, engine: AsyncEngine) -> GetSchedule:
+    """Lector del horario vigente.
+
+    Args:
+        settings: Configuración (para el horario inicial).
+        engine: Motor de la base.
+
+    Returns:
+        El caso de uso ``GetSchedule``.
+    """
+    return GetSchedule(
+        PostgresScheduleStore(engine), default_schedule(settings), lambda: datetime.now(UTC)
+    )
+
+
+async def check_due_run(settings: Settings, now: datetime | None = None) -> datetime | None:
+    """Lo que hace el reloj cada minuto: ¿toca lanzar una corrida?
+
+    Args:
+        settings: Configuración.
+        now: Este momento (por defecto, ahora).
+
+    Returns:
+        La hora programada (CDMX), ya apartada para que nadie más la lance,
+        o ``None`` si no toca.
+    """
+    engine = create_async_engine(settings.database_url())
+    try:
+        reader = schedule_reader(settings, engine)
+        return await DueRun(PostgresScheduleStore(engine), reader, DUE_GRACE).execute(
+            now or datetime.now(UTC)
+        )
+    finally:
+        await engine.dispose()
 
 
 def report_file_name(scheduled_for: datetime) -> str:
@@ -131,13 +188,16 @@ def automatic_settings(settings: Settings) -> Settings:
     )
 
 
-async def run_automatic_job(settings: Settings, now: datetime | None = None) -> AutomaticRunSummary:
+async def run_automatic_job(
+    settings: Settings, now: datetime | None = None, slot: datetime | None = None
+) -> AutomaticRunSummary:
     """Corre una corrida automática completa.
 
     Args:
         settings: Configuración.
-        now: Momento de la corrida (por defecto, ahora); define a qué horario
-            pertenece y qué días cubre.
+        now: Momento de la corrida (por defecto, ahora). Sin ``slot``, define a
+            qué hora del horario pertenece (``make corrida-fgr``).
+        slot: Hora programada que apartó el reloj (``check_due_run``).
 
     Returns:
         La búsqueda creada, su resultado y la ruta del PDF.
@@ -148,10 +208,11 @@ async def run_automatic_job(settings: Settings, now: datetime | None = None) -> 
     """
     settings = automatic_settings(settings)
     local_now = (now or datetime.now(UTC)).astimezone(MEXICO_CITY)
-    slot = run_slot(local_now, parse_run_hours(settings.automatic_run_hours))
     engine = create_async_engine(settings.database_url())
     try:
-        search_id = await _create(settings, engine, local_now, slot)
+        schedule = await schedule_reader(settings, engine).current()
+        slot = (slot or schedule.slot_at_or_before(local_now)).astimezone(MEXICO_CITY)
+        search_id = await _create(settings, engine, schedule, slot)
     finally:
         await engine.dispose()
     logger.info(
@@ -165,7 +226,7 @@ async def run_automatic_job(settings: Settings, now: datetime | None = None) -> 
 
 
 async def _create(
-    settings: Settings, engine: AsyncEngine, local_now: datetime, slot: datetime
+    settings: Settings, engine: AsyncEngine, schedule: RunSchedule, slot: datetime
 ) -> UUID:
     concepts = PostgresConceptRepository(engine)
     regions = PostgresRegionRepository(engine)
@@ -180,8 +241,8 @@ async def _create(
         credits_limit=settings.searchapi_monthly_credit_limit,
         default_sources=profile.sources,
     )
-    # Solo de la corrida programada anterior a esta (run_window).
-    request = await PrepareAutomaticRun(concepts, regions, profile).request(slot)
+    # Solo desde la corrida programada anterior a esta en el horario vigente.
+    request = await PrepareAutomaticRun(concepts, regions, profile).request(slot, schedule)
     started = await StartSearch(
         planner, PostgresSearchStore(engine), _RunsHere(), settings.max_queries_per_search
     ).execute(request)

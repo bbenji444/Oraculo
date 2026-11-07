@@ -14,6 +14,7 @@ from app.api.v1.regions import router as regions_router
 from app.api.v1.relationships import router as relationships_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.resolution import router as resolution_router
+from app.api.v1.schedule import router as schedule_router
 from app.api.v1.searches import router as searches_router
 from app.api.v1.sources import router as sources_router
 
@@ -33,6 +34,7 @@ api_router.include_router(entities_router)
 api_router.include_router(resolution_router)
 api_router.include_router(relationships_router)
 api_router.include_router(deliveries_router)
+api_router.include_router(schedule_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
@@ -56,8 +58,8 @@ OPENAPI_TAGS = [
     {
         "name": "envíos",
         "description": (
-            "Qué se manda, a quién, por qué canal y a qué hora (F12.11, ADR-0039): "
-            "cuentas de correo vía Composio, destinatarios, reglas e historial auditable."
+            "Qué se manda, a quién y por qué canal (F12.11, ADR-0039): cuentas de correo "
+            "vía Composio, destinatarios, cómo se manda cada fuente e historial auditable."
         ),
     },
     {
@@ -95,6 +97,13 @@ OPENAPI_TAGS = [
         "description": (
             "Reporte de una búsqueda terminada en PDF o HTML y sus notas en CSV o GeoJSON "
             "(§15). La primera vez el reporte le pide un resumen a la IA (~0.001 USD)."
+        ),
+    },
+    {
+        "name": "horario",
+        "description": (
+            "Horario único de las corridas automáticas (ADR-0040): un solo horario para todos, "
+            "lo maneja el administrador. Cada hora es una corrida nueva con IA (máx. 8 al día)."
         ),
     },
 ]

@@ -1,7 +1,8 @@
 """Tareas de Celery: ingesta, limpieza, búsquedas, entidades y corridas automáticas.
 
 Ingesta y limpieza (ADR-0013), búsquedas (§9), entidades (9.4) y las corridas
-automáticas del monitor FGR (F12.8, ADR-0031).
+automáticas del monitor FGR (F12.8, ADR-0031), que el reloj revisa cada minuto
+contra el horario único (ADR-0040).
 
 ``celery beat`` (el reloj que arranca ``make up``) las encola según
 ``beat_schedule`` en ``celery_app.py``; el worker las ejecuta. Cada tarea es
@@ -15,13 +16,20 @@ No hace: no contiene lógica de negocio.
 
 import asyncio
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from app.adapters.queue.celery_queue import ENTITIES_TASK, SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
-from app.worker.automatic_jobs import run_automatic_job
-from app.worker.celery_app import AUTOMATIC_RUN_TASK, DELIVERIES_TASK, celery_app
+from app.worker.automatic_jobs import check_due_run, run_automatic_job
+from app.worker.celery_app import (
+    AUTOMATIC_RUN_EXPIRES_SECONDS,
+    AUTOMATIC_RUN_TASK,
+    DELIVERIES_TASK,
+    SCHEDULE_TICK_TASK,
+    celery_app,
+)
 from app.worker.delivery_jobs import send_due_deliveries
 from app.worker.entity_jobs import run_entity_extraction
 from app.worker.ingest_jobs import run_ingest, run_purge
@@ -135,14 +143,40 @@ def extract_case_entities(case_id: str, article_id: int, requested_by: str) -> d
     return result
 
 
+@celery_app.task(name=SCHEDULE_TICK_TASK)
+def schedule_tick() -> str | None:
+    """Revisión de cada minuto: si llegó una hora del horario, encola su corrida.
+
+    La hora queda apartada en la base antes de encolar, así que aunque el
+    worker tarde en tomarla, la siguiente revisión no la vuelve a lanzar.
+
+    Returns:
+        La hora programada encolada (ISO), o ``None`` si no tocaba.
+    """
+    slot = asyncio.run(check_due_run(get_settings()))
+    if slot is None:
+        return None
+    automatic_run.apply_async(
+        kwargs={"slot": slot.isoformat()}, expires=AUTOMATIC_RUN_EXPIRES_SECONDS
+    )
+    logger.info("Corrida automática encolada", extra={"corrida": slot.isoformat()})
+    return slot.isoformat()
+
+
 @celery_app.task(name=AUTOMATIC_RUN_TASK)
-def automatic_run() -> dict[str, object]:
-    """Corrida automática del monitor FGR (la lanza el reloj a las 07:00, 15:00 y 23:00).
+def automatic_run(slot: str | None = None) -> dict[str, object]:
+    """Corrida automática del monitor FGR, a cada hora del horario único.
+
+    Args:
+        slot: Hora programada que apartó ``schedule_tick`` (ISO). Sin ella,
+            se usa la hora del horario a la que pertenece este momento.
 
     Returns:
         La búsqueda creada, su estado, notas, costo y la ruta del PDF.
     """
-    summary = asyncio.run(run_automatic_job(get_settings()))
+    summary = asyncio.run(
+        run_automatic_job(get_settings(), slot=datetime.fromisoformat(slot) if slot else None)
+    )
     result: dict[str, object] = {
         "search_id": str(summary.search_id),
         "corrida": summary.scheduled_for.isoformat(),

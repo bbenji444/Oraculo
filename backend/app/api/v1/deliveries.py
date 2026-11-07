@@ -1,13 +1,15 @@
 """Pantalla «Envíos» (``/deliveries``, F12.11, ADR-0039).
 
-Qué se manda, a quién, por qué canal y a qué hora:
+Qué se manda, a quién y por qué canal. Solo la administra el equipo interno:
+se manda el reporte de cada corrida del horario único (``/schedule``,
+ADR-0040) a todos los destinatarios activos; no hay envíos por persona.
 
-- ``GET /deliveries/overview``: si están prendidos, si Composio está listo, las
-  fuentes y las horas de las corridas;
+- ``GET /deliveries/overview``: si están prendidos, si Composio está listo y
+  las fuentes;
 - ``/deliveries/accounts``: cuentas de envío (conectar Outlook o Gmail y
   revisar si ya quedaron autorizadas; WhatsApp «próximamente»);
 - ``/deliveries/recipients``: destinatarios;
-- ``/deliveries/rules``: reglas;
+- ``/deliveries/rules``: por qué canal y desde qué cuenta se manda cada fuente;
 - ``/deliveries/history``: la guía de cada envío, con sus intentos y «Reintentar»;
 - ``POST /deliveries/test``: «Mandar prueba» con la última corrida.
 
@@ -47,10 +49,7 @@ from app.domain.deliveries import (
     SOURCES,
     AccountProvider,
     DeliveryChannel,
-    RuleAudience,
-    format_time,
     mask_destination,
-    parse_time,
 )
 from app.domain.errors import DeliveryNotFoundError
 
@@ -108,10 +107,6 @@ class OverviewOut(BaseModel):
     email_configured: bool = Field(description="Si hay llave de Composio para el correo.")
     whatsapp_available: bool = Field(description="WhatsApp: todavía no.")
     sources: list[SourceOut]
-    run_hours: list[int] = Field(description="Horas de las corridas automáticas (CDMX).")
-    run_times: list[str] = Field(
-        default_factory=list, description="Las mismas horas como «07:00» (para las reglas)."
-    )
 
 
 def get_delivery_settings(request: Request) -> OverviewOut:
@@ -182,44 +177,29 @@ class RecipientOut(RecipientIn):
 
 
 class RuleIn(BaseModel):
-    """Una regla: qué, a quién, por dónde, desde qué cuenta, a qué horas y qué días."""
+    """Cómo se manda una fuente: canal, cuenta y si está prendida.
+
+    Se manda a todos los destinatarios activos en cada corrida del horario
+    único (``/schedule``).
+    """
 
     source: str = Field(default=SOURCE_FGR_RUN, examples=[SOURCE_FGR_RUN])
-    name: str = Field(default="Regla general", max_length=80)
-    audience: RuleAudience = Field(
-        default=RuleAudience.ALL,
-        description="all = todos los activos; selected = solo los elegidos.",
-    )
-    recipient_ids: list[int] = Field(default_factory=list, description="Los elegidos (selected).")
-    exclude_ids: list[int] = Field(default_factory=list, description="Excepciones (all).")
     channel: DeliveryChannel = DeliveryChannel.EMAIL
-    account_id: int | None = None
-    times: list[str] = Field(
-        default_factory=list, examples=[["07:00", "15:00", "23:00"]], description="Hora de la CDMX."
-    )
-    days: list[int] = Field(
-        default_factory=list, description="1 = lunes … 7 = domingo; vacío = todos los días."
-    )
+    account_id: int | None = Field(default=None, examples=[1])
     is_active: bool = True
 
     def draft(self) -> RuleDraft:
         """La regla para el caso de uso."""
         return RuleDraft(
             source=self.source,
-            name=self.name,
-            audience=self.audience,
-            recipient_ids=tuple(self.recipient_ids),
-            exclude_ids=tuple(self.exclude_ids),
             channel=self.channel,
             account_id=self.account_id,
-            times=tuple(parse_time(t) for t in self.times),
-            days=tuple(self.days),
             is_active=self.is_active,
         )
 
 
 class RuleOut(RuleIn):
-    """Una regla guardada."""
+    """La regla guardada."""
 
     id: int
 
@@ -230,14 +210,8 @@ class RuleOut(RuleIn):
         return cls(
             id=rule.id,
             source=d.source,
-            name=d.name,
-            audience=d.audience,
-            recipient_ids=list(d.recipient_ids),
-            exclude_ids=list(d.exclude_ids),
             channel=d.channel,
             account_id=d.account_id,
-            times=[format_time(t) for t in d.times],
-            days=list(d.days),
             is_active=d.is_active,
         )
 
@@ -424,40 +398,16 @@ async def delete_recipient(recipient_id: int, store: Store) -> None:
     await ManageRecipients(store).delete(recipient_id)
 
 
-@router.get("/rules", response_model=list[RuleOut], summary="Reglas de envío")
+@router.get("/rules", response_model=list[RuleOut], summary="Cómo se manda cada fuente")
 async def list_rules(store: Store) -> list[RuleOut]:
-    """Todas las reglas."""
+    """Las reglas: una por fuente y canal."""
     return [RuleOut.of(r) for r in await store.list_rules()]
 
 
-@router.post(
-    "/rules", response_model=RuleOut, status_code=status.HTTP_201_CREATED, summary="Agregar regla"
-)
-async def create_rule(body: RuleIn, store: Store) -> RuleOut:
-    """Guarda una regla nueva."""
-    return RuleOut.of(await ManageRules(store).create(body.draft()))
-
-
-@router.put(
-    "/rules/{rule_id}",
-    response_model=RuleOut,
-    summary="Editar regla",
-    responses=error_responses(404),
-)
-async def update_rule(rule_id: int, body: RuleIn, store: Store) -> RuleOut:
-    """Reemplaza una regla (también para prenderla o apagarla)."""
-    return RuleOut.of(await ManageRules(store).update(rule_id, body.draft()))
-
-
-@router.delete(
-    "/rules/{rule_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Borrar regla",
-    responses=error_responses(404),
-)
-async def delete_rule(rule_id: int, store: Store) -> None:
-    """Borra una regla; sus envíos pasados siguen en el historial."""
-    await ManageRules(store).delete(rule_id)
+@router.put("/rules", response_model=RuleOut, summary="Guardar cómo se manda")
+async def save_rule(body: RuleIn, store: Store) -> RuleOut:
+    """Guarda la regla de su fuente y canal (la crea o la reemplaza)."""
+    return RuleOut.of(await ManageRules(store).save(body.draft()))
 
 
 @router.get("/history", response_model=HistoryOut, summary="Historial de envíos")

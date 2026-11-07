@@ -1,10 +1,9 @@
 """Envíos desde el worker (F12.11, ADR-0039).
 
-- ``deliver_run``: al terminar una corrida automática, crea las guías de las
-  reglas que le tocan a esa hora y las manda. Solo si ``DELIVERIES_ENABLED``.
-- ``send_due_deliveries``: lo lanza el reloj cada minuto. Crea los envíos de
-  las horas programadas sin corrida (con el reporte más reciente) y manda lo
-  pendiente, incluidos los reintentos.
+- ``deliver_run``: al terminar una corrida automática, crea una guía por
+  destinatario activo y las manda (ADR-0040). Solo si ``DELIVERIES_ENABLED``.
+- ``send_due_deliveries``: lo lanza el reloj cada minuto. Manda lo pendiente,
+  incluidos los reintentos.
 
 Un fallo aquí nunca tumba la corrida: la búsqueda y su PDF ya quedaron
 guardados, y cada envío fallido queda en su guía.
@@ -13,7 +12,7 @@ No hace: no decide reglas (eso es ``app.application.use_cases.deliveries``).
 """
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,8 +22,7 @@ from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
 from app.adapters.persistence.delivery_reports import PostgresRunReports
 from app.application.use_cases.deliveries import PlanDeliveries, SendReport
 from app.core.config import Settings
-from app.domain.deliveries import MINUTES_PER_HOUR, SOURCE_FGR_RUN
-from app.domain.schedule import parse_run_hours
+from app.domain.deliveries import SOURCE_FGR_RUN
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +74,6 @@ async def send_due_deliveries(settings: Settings) -> SendReport:
     """
     engine = create_async_engine(settings.database_url())
     try:
-        run_minutes = frozenset(
-            h * MINUTES_PER_HOUR for h in parse_run_hours(settings.automatic_run_hours)
-        )
-        await PlanDeliveries(PostgresDeliveryStore(engine), PostgresRunReports(engine)).scheduled(
-            SOURCE_FGR_RUN, datetime.now(UTC), run_minutes
-        )
         return await build_sender(settings, engine).send_due()
     finally:
         await engine.dispose()

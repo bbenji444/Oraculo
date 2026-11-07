@@ -24,6 +24,8 @@ REPORT_GENERATED = "report.generated"
 # Quitar una búsqueda del historial (reversible) y devolverla (27/10/2026).
 SEARCH_DELETED = "search.deleted"
 SEARCH_RESTORED = "search.restored"
+# Cambio del horario único de las corridas (ADR-0040).
+SCHEDULE_UPDATED = "schedule.updated"
 
 
 @dataclass(frozen=True, slots=True)

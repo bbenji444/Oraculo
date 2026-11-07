@@ -87,9 +87,6 @@ class FakeDeliveryStore:
     async def delete_recipient(self, recipient_id: int) -> bool:
         return self.recipients.pop(recipient_id, None) is not None
 
-    async def delete_rule(self, rule_id: int) -> bool:
-        return self.rules.pop(rule_id, None) is not None
-
     async def list_rules(
         self, source: str | None = None, active_only: bool = False
     ) -> list[DeliveryRule]:
@@ -99,17 +96,13 @@ class FakeDeliveryStore:
             if (source is None or r.data.source == source) and (r.data.is_active or not active_only)
         ]
 
-    async def get_rule(self, rule_id: int) -> DeliveryRule | None:
-        return self.rules.get(rule_id)
-
-    async def create_rule(self, data: RuleDraft) -> DeliveryRule:
-        rule = DeliveryRule(len(self.rules) + 1, data)
+    async def save_rule(self, data: RuleDraft) -> DeliveryRule:
+        key = (data.source, data.channel)
+        found = [r for r in self.rules.values() if key == (r.data.source, r.data.channel)]
+        same = found[0] if found else None
+        rule = DeliveryRule(same.id if same else len(self.rules) + 1, data)
         self.rules[rule.id] = rule
         return rule
-
-    async def update_rule(self, rule_id: int, data: RuleDraft) -> DeliveryRule:
-        self.rules[rule_id] = DeliveryRule(rule_id, data)
-        return self.rules[rule_id]
 
     async def create_deliveries(self, deliveries: Sequence[NewDelivery]) -> list[UUID]:
         created = []

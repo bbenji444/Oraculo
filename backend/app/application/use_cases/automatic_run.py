@@ -5,7 +5,8 @@ de México. Este caso de uso arma su petición, la misma que haría una persona
 en Explorar:
 - **concepto:** «Fiscalia General de la Republica» (con su regla FGR federal);
 - **región:** todo México: la geolocalización reparte las notas por estado;
-- **fechas:** solo las horas desde la corrida programada anterior (``run_window``);
+- **fechas:** solo las horas desde la corrida programada anterior del horario
+  único (``RunSchedule.window``, ADR-0040);
 - **fuentes:** solo las gratis, Google News RSS y el índice local.
 
 Lo que ya se vio en otra corrida se reutiliza sin volver a pagar a la IA (caché
@@ -25,7 +26,7 @@ from app.application.use_cases.plan_search import SearchRequest
 from app.domain.errors import DomainError
 from app.domain.names import normalize_name
 from app.domain.queries import DateWindow, Provider
-from app.domain.schedule import run_window
+from app.domain.schedule import RunSchedule
 from app.domain.search import SearchTrigger
 
 # Conceptos por página al buscar el del monitor (paginación por cursor).
@@ -51,7 +52,6 @@ class AutomaticProfile:
         region_code: Clave de la región (``MEX``: todo México).
         sources: Fuentes, siempre las mismas para que las corridas se comparen.
         user_id: Firma de las corridas en la bitácora.
-        run_hours: Horarios de las corridas (``parse_run_hours``).
         margin_minutes: Minutos extra antes del inicio de la ventana; 0 es
             estricto (decisión de Benji, 28/10/2026).
     """
@@ -60,7 +60,6 @@ class AutomaticProfile:
     region_code: str
     sources: tuple[Provider, ...]
     user_id: str
-    run_hours: tuple[int, ...] = (7, 15, 23)
     margin_minutes: int = 0
 
 
@@ -84,15 +83,17 @@ class PrepareAutomaticRun:
         self._regions = regions
         self._profile = profile
 
-    async def request(self, scheduled_for: datetime) -> SearchRequest:
+    async def request(self, scheduled_for: datetime, schedule: RunSchedule) -> SearchRequest:
         """La petición de la corrida programada para ``scheduled_for``.
 
-        Cubre solo las horas desde la corrida anterior (``run_window``): la de
-        las 07:00, de las 23:00 de ayer a las 07:00. A los buscadores se les
-        piden esos días y el pipeline descarta lo publicado fuera de las horas.
+        Cubre solo las horas desde la corrida anterior del horario: con 07:00,
+        15:00 y 23:00, la de las 07:00 va de las 23:00 de ayer a las 07:00. A
+        los buscadores se les piden esos días y el pipeline descarta lo
+        publicado fuera de las horas.
 
         Args:
             scheduled_for: Hora programada de la corrida (CDMX).
+            schedule: El horario vigente (para saber cuál fue la anterior).
 
         Returns:
             La petición, marcada como automática.
@@ -107,11 +108,7 @@ class PrepareAutomaticRun:
                 f"No existe la región {self._profile.region_code} del monitor automático.",
                 {"region": self._profile.region_code},
             )
-        hours = run_window(
-            scheduled_for,
-            self._profile.run_hours,
-            timedelta(minutes=self._profile.margin_minutes),
-        )
+        hours = schedule.window(scheduled_for, timedelta(minutes=self._profile.margin_minutes))
         local_start = hours.start.astimezone(MEXICO_CITY)
         local_end = hours.end.astimezone(MEXICO_CITY)
         return SearchRequest(

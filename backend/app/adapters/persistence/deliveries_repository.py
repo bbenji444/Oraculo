@@ -1,7 +1,8 @@
 """Envíos en PostgreSQL (F12.11, ADR-0039).
 
-Implementa ``DeliveryStorePort`` sobre las tablas de la migración 0035:
-cuentas, destinatarios, reglas, guías de envío y sus intentos.
+Implementa ``DeliveryStorePort`` sobre las tablas de las migraciones 0035 y
+0037: cuentas, destinatarios, la regla de cada fuente, guías de envío y sus
+intentos.
 
 No hace: no manda nada ni decide reintentos (eso es del caso de uso).
 """
@@ -30,38 +31,24 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
-    RuleAudience,
 )
 from app.domain.errors import DeliveryNotFoundError
 
 _RULES_ALL = text(
-    "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
-    "times, days, is_active "
-    "FROM delivery_rules WHERE (CAST(:source AS text) IS NULL OR source = :source) "
-    "ORDER BY id"
+    "SELECT id, source, channel, account_id, is_active FROM delivery_rules "
+    "WHERE (CAST(:source AS text) IS NULL OR source = :source) ORDER BY id"
 )
 _RULES_ACTIVE = text(
-    "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
-    "times, days, is_active "
-    "FROM delivery_rules WHERE (CAST(:source AS text) IS NULL OR source = :source) "
-    "AND is_active ORDER BY id"
+    "SELECT id, source, channel, account_id, is_active FROM delivery_rules "
+    "WHERE (CAST(:source AS text) IS NULL OR source = :source) AND is_active ORDER BY id"
 )
-_INSERT_RULE = text(
-    "INSERT INTO delivery_rules (source, name, audience, recipient_ids, exclude_ids, channel, "
-    "account_id, times, days, is_active) VALUES (:source, :name, :audience, "
-    "CAST(:recipient_ids AS bigint[]), CAST(:exclude_ids AS bigint[]), :channel, :account_id, "
-    "CAST(:times AS smallint[]), CAST(:days AS smallint[]), :active) "
-    "RETURNING id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
-    "times, days, is_active"
-)
-_UPDATE_RULE = text(
-    "UPDATE delivery_rules SET source = :source, name = :name, audience = :audience, "
-    "recipient_ids = CAST(:recipient_ids AS bigint[]), exclude_ids = CAST(:exclude_ids AS "
-    "bigint[]), "
-    "channel = :channel, account_id = :account_id, times = CAST(:times AS smallint[]), "
-    "days = CAST(:days AS smallint[]), is_active = :active, updated_at = now() WHERE id = :id "
-    "RETURNING id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
-    "times, days, is_active"
+# Una regla por fuente y canal (índice único delivery_rules_source_channel).
+_SAVE_RULE = text(
+    "INSERT INTO delivery_rules (source, channel, account_id, is_active) "
+    "VALUES (:source, :channel, :account_id, :active) "
+    "ON CONFLICT (source, channel) DO UPDATE SET account_id = EXCLUDED.account_id, "
+    "is_active = EXCLUDED.is_active, updated_at = now() "
+    "RETURNING id, source, channel, account_id, is_active"
 )
 _DELIVERY_SELECT = """
     SELECT d.id, d.rule_id, d.source, d.source_ref, d.channel, d.account_id, d.recipient_id,
@@ -92,14 +79,8 @@ def _rule(row: Row) -> DeliveryRule:
         row.id,
         RuleDraft(
             source=row.source,
-            name=row.name,
-            audience=RuleAudience(row.audience),
-            recipient_ids=tuple(row.recipient_ids or ()),
-            exclude_ids=tuple(row.exclude_ids or ()),
             channel=DeliveryChannel(row.channel),
             account_id=row.account_id,
-            times=tuple(row.times or ()),
-            days=tuple(row.days or ()),
             is_active=row.is_active,
         ),
     )
@@ -300,62 +281,21 @@ class PostgresDeliveryStore:
             )
             return [_rule(r) for r in rows]
 
-    async def get_rule(self, rule_id: int) -> DeliveryRule | None:
-        """Ver ``DeliveryStorePort.get_rule``."""
-        async with self._engine.connect() as conn:
-            row = (
-                await conn.execute(
-                    text(
-                        "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, "
-                        "account_id, "
-                        "times, days, is_active "
-                        "FROM delivery_rules WHERE id = :id"
-                    ),
-                    {"id": rule_id},
-                )
-            ).first()
-        return _rule(row) if row else None
-
-    @staticmethod
-    def _rule_params(data: RuleDraft) -> dict[str, object]:
-        return {
-            "source": data.source,
-            "name": data.name,
-            "audience": data.audience.value,
-            "recipient_ids": list(data.recipient_ids),
-            "exclude_ids": list(data.exclude_ids),
-            "channel": data.channel.value,
-            "account_id": data.account_id,
-            "times": list(data.times),
-            "days": list(data.days),
-            "active": data.is_active,
-        }
-
-    async def create_rule(self, data: RuleDraft) -> DeliveryRule:
-        """Ver ``DeliveryStorePort.create_rule``."""
-        async with self._engine.begin() as conn:
-            row = (await conn.execute(_INSERT_RULE, self._rule_params(data))).one()
-        return _rule(row)
-
-    async def update_rule(self, rule_id: int, data: RuleDraft) -> DeliveryRule:
-        """Ver ``DeliveryStorePort.update_rule``."""
-        async with self._engine.begin() as conn:
-            row = (
-                await conn.execute(_UPDATE_RULE, {"id": rule_id, **self._rule_params(data)})
-            ).first()
-        if row is None:
-            raise DeliveryNotFoundError("No existe esa regla.", {"id": rule_id})
-        return _rule(row)
-
-    async def delete_rule(self, rule_id: int) -> bool:
-        """Ver ``DeliveryStorePort.delete_rule``."""
+    async def save_rule(self, data: RuleDraft) -> DeliveryRule:
+        """Ver ``DeliveryStorePort.save_rule``."""
         async with self._engine.begin() as conn:
             row = (
                 await conn.execute(
-                    text("DELETE FROM delivery_rules WHERE id = :id RETURNING id"), {"id": rule_id}
+                    _SAVE_RULE,
+                    {
+                        "source": data.source,
+                        "channel": data.channel.value,
+                        "account_id": data.account_id,
+                        "active": data.is_active,
+                    },
                 )
-            ).first()
-        return row is not None
+            ).one()
+        return _rule(row)
 
     async def delete_recipient(self, recipient_id: int) -> bool:
         """Ver ``DeliveryStorePort.delete_recipient``."""
@@ -366,16 +306,6 @@ class PostgresDeliveryStore:
                     {"id": recipient_id},
                 )
             ).first()
-            if row is not None:
-                # Que no quede en las listas de las reglas.
-                await conn.execute(
-                    text(
-                        "UPDATE delivery_rules SET "
-                        "recipient_ids = array_remove(recipient_ids, CAST(:id AS bigint)), "
-                        "exclude_ids = array_remove(exclude_ids, CAST(:id AS bigint))"
-                    ),
-                    {"id": recipient_id},
-                )
         return row is not None
 
     # --- Guías de envío ---
