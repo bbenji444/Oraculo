@@ -258,6 +258,7 @@ make test            # pruebas backend (con cobertura) + frontend
 make lint            # ruff + mypy + eslint + prettier + tipos de TypeScript
 make format          # aplica el formato de ruff y Prettier
 make migrate         # aplica migraciones Alembic
+make instalar-servicio # solo en la VM de Proxmox: el monitor arranca solo al encender (systemd)
 make frontend-build  # compila el frontend que sirve nginx
 make geo-download    # descarga INEGI y Natural Earth (con manifiesto)
 make geo-inspect     # proyección, encoding, conteos y 5 nombres reales con Ñ

@@ -1,0 +1,31 @@
+# Servicio de systemd del monitor de noticias en el servidor (la VM de Proxmox).
+#
+# Es una plantilla: `make instalar-servicio` reemplaza __PROJECT_ROOT__ y
+# __USER__ y la instala en /etc/systemd/system/monitor-noticias.service.
+#
+# Qué hace: al encender la VM, corre `make up` (scripts/dev/servicios.sh up)
+# cuando ya hay red y ZeroTier; al apagarla, `make down`. Así las corridas de
+# las 07:00, 15:00 y 23:00 no dependen de que alguien entre a levantar nada.
+# Qué NO hace: no instala ni actualiza el código (eso es git pull y
+# make bootstrap).
+
+[Unit]
+Description=Monitor de noticias (API, worker, reloj de Celery y nginx)
+Wants=network-online.target
+After=network-online.target zerotier-one.service postgresql.service redis-server.service nginx.service
+
+[Service]
+# servicios.sh deja la API, el worker y el reloj corriendo en segundo plano y
+# termina: el servicio queda «activo» mientras esos procesos viven.
+Type=oneshot
+RemainAfterExit=yes
+User=__USER__
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=/usr/bin/bash __PROJECT_ROOT__/scripts/dev/servicios.sh up
+ExecStop=/usr/bin/bash __PROJECT_ROOT__/scripts/dev/servicios.sh down
+# Tras encender, la API y el worker tardan en cargar (servicios.sh espera
+# hasta 90 s a cada uno).
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

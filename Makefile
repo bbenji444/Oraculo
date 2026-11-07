@@ -4,8 +4,9 @@
 #   wsl make <comando>
 # Sin argumentos muestra la ayuda. Por qué WSL y sin Docker: ADR-0006.
 #
-# Las tareas del frontend usan el npm de Windows (cmd.exe /c npm ...), porque
-# sus dependencias están instaladas para Windows y no funcionan en Linux.
+# Las tareas del frontend usan el npm de Windows (cmd.exe /c npm ...) en WSL,
+# porque sus dependencias están instaladas para Windows. En un Linux sin
+# Windows (la VM de Proxmox, docs/migracion-proxmox.md) usan el npm de Linux.
 
 SHELL := /bin/bash
 .SHELLFLAGS := -euo pipefail -c
@@ -19,7 +20,8 @@ UV := $(HOME)/.local/bin/uv
 # Entorno virtual en el disco de Linux, no en /mnt/d (más rápido; ADR-0006).
 export UV_PROJECT_ENVIRONMENT := $(HOME)/.venvs/monitor-noticias
 UV_RUN := cd $(BACKEND_DIR) && $(UV) run --frozen
-NPM := cd $(FRONTEND_DIR) && cmd.exe /c npm
+NPM_BIN := $(if $(shell command -v cmd.exe 2>/dev/null),cmd.exe /c npm,npm)
+NPM := cd $(FRONTEND_DIR) && $(NPM_BIN)
 
 # Cobertura mínima de domain/ y application/ (CLAUDE.md §7).
 COVERAGE_MIN := 85
@@ -30,7 +32,7 @@ COVERAGE_MIN := 85
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
         limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos \
-        corrida-fgr
+        corrida-fgr instalar-servicio
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -40,7 +42,7 @@ help: ## Muestra esta ayuda
 bootstrap: ## Instala todo: servicios en Ubuntu y dependencias de backend y frontend
 	bash scripts/dev/instalar_wsl.sh
 	@echo
-	@echo "==> Instalando dependencias del frontend con el npm de Windows"
+	@echo "==> Instalando dependencias del frontend ($(NPM_BIN))"
 	$(NPM) ci --no-fund --no-audit
 
 up: ## Levanta PostgreSQL, Redis, API, worker, reloj de Celery y nginx (http://localhost:8080)
@@ -54,6 +56,9 @@ status: ## Muestra qué servicios corren y el resultado de /health
 
 logs: ## Sigue los logs de la API, del worker y del reloj (Ctrl+C para salir)
 	bash scripts/dev/servicios.sh logs
+
+instalar-servicio: ## Solo en la VM: arranca el monitor solo al encender (systemd)
+	bash scripts/servidor/instalar_servicio.sh
 
 migrate: ## Aplica las migraciones de Alembic a la base de desarrollo
 	$(UV_RUN) alembic upgrade head

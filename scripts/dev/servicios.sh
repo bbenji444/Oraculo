@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Arranca, detiene y muestra el estado de los servicios de desarrollo en WSL:
-# PostgreSQL, Redis, la API (uvicorn), el worker y el reloj de Celery, y nginx.
+# Arranca, detiene y muestra el estado de los servicios en WSL o en el servidor
+# (la VM de Proxmox, docs/migracion-proxmox.md): PostgreSQL, Redis, la API
+# (uvicorn), el worker y el reloj de Celery, y nginx.
+#
+# Dos variables del .env cambian el comportamiento en el servidor:
+# - API_RELOAD=false: la API no se reinicia sola al cambiar el código.
+# - NGINX_LISTEN: dónde escucha nginx (en WSL, solo 127.0.0.1:8080).
 #
 # Quién lo usa: `make up`, `make down`, `make status` y `make logs`.
 # Uso directo: bash scripts/dev/servicios.sh {up|down|status|logs}
@@ -38,6 +43,9 @@ readonly WORKER_CONCURRENCY=2
 readonly APP_READY_TIMEOUT_SECONDS=90
 # Segundos que se espera a que un proceso termine con SIGTERM antes de forzarlo.
 readonly STOP_GRACE_SECONDS=10
+
+# Por defecto, lo de desarrollo: nginx solo escucha en la propia máquina.
+readonly DEFAULT_NGINX_LISTEN="127.0.0.1:${NGINX_PORT}"
 
 # --- Procesos propios (API, worker y reloj) ------------------------------------
 
@@ -102,7 +110,16 @@ detener_proceso() {
 
 instalar_sitio_nginx() {
   # Se regenera en cada arranque para que los cambios a la plantilla apliquen.
-  sed "s|__PROJECT_ROOT__|${ROOT_DIR}|g" "${ROOT_DIR}/nginx/monitor-noticias.conf.template" \
+  # NGINX_LISTEN admite varias direcciones separadas por espacio; cada una se
+  # vuelve una línea `listen` en lugar de __LISTEN__.
+  local listen_lines="" direccion
+  for direccion in ${NGINX_LISTEN:-${DEFAULT_NGINX_LISTEN}}; do
+    listen_lines+="    listen ${direccion};"$'\n'
+  done
+  LISTEN_LINES="${listen_lines}" awk -v root="${ROOT_DIR}" '
+    /^[[:space:]]*__LISTEN__[[:space:]]*$/ { printf "%s", ENVIRON["LISTEN_LINES"]; next }
+    { gsub(/__PROJECT_ROOT__/, root); print }
+  ' "${ROOT_DIR}/nginx/monitor-noticias.conf.template" \
     | como_root tee "${NGINX_SITE}" >/dev/null
   como_root ln -sf "${NGINX_SITE}" "${NGINX_SITE_LINK}"
   # El sitio de ejemplo de nginx ocupa el puerto 80, que no usamos.
@@ -126,11 +143,16 @@ cmd_up() {
   ok "Redis listo"
 
   paso "API, worker y reloj de Celery"
-  # --reload reinicia la API al guardar código. En /mnt/d no llegan avisos de
-  # cambios de archivos desde Windows, así que watchfiles revisa por sondeo.
+  # En desarrollo, --reload reinicia la API al guardar código. En /mnt/d no
+  # llegan avisos de cambios de archivos desde Windows, así que watchfiles
+  # revisa por sondeo. En el servidor (API_RELOAD=false) la API queda fija.
+  local reload_args=()
+  if [[ "${API_RELOAD:-true}" == "true" ]]; then
+    reload_args=(--reload --reload-dir app)
+  fi
   arrancar_proceso api env WATCHFILES_FORCE_POLLING=true \
     "${UV_BIN}" run --frozen uvicorn app.main:app \
-    --host 127.0.0.1 --port "${API_PORT}" --reload --reload-dir app --no-access-log
+    --host 127.0.0.1 --port "${API_PORT}" "${reload_args[@]}" --no-access-log
   arrancar_proceso worker "${UV_BIN}" run --frozen celery -A app.worker.celery_app worker \
     --loglevel=INFO --concurrency="${WORKER_CONCURRENCY}" --hostname="worker@%h"
   LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "La API" curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/v1/openapi.json"
@@ -148,8 +170,8 @@ cmd_up() {
 
   paso "nginx"
   if [[ ! -f "${ROOT_DIR}/frontend/dist/index.html" ]]; then
-    aviso "No existe frontend/dist: se compila el frontend con el npm de Windows."
-    (cd "${ROOT_DIR}/frontend" && cmd.exe /c "npm run build" >/dev/null) \
+    aviso "No existe frontend/dist: se compila el frontend."
+    (cd "${ROOT_DIR}/frontend" && npm_cmd run build >/dev/null) \
       || fallo "No se pudo compilar el frontend. ¿Corriste 'npm install' en frontend/?"
   fi
   instalar_sitio_nginx
@@ -159,7 +181,7 @@ cmd_up() {
     como_root service nginx start >/dev/null
   fi
   esperar_listo "nginx" curl -fsS -o /dev/null "http://127.0.0.1:${NGINX_PORT}/"
-  ok "nginx sirviendo en http://localhost:${NGINX_PORT}"
+  ok "nginx sirviendo en ${NGINX_LISTEN:-${DEFAULT_NGINX_LISTEN}}"
 
   cmd_status
 }
