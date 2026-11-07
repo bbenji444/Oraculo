@@ -21,6 +21,7 @@ En la VM, el `.env` agrega:
 ```
 API_RELOAD=false          # la API no se reinicia sola
 NGINX_LISTEN=0.0.0.0:8080 # se ve en la red de la oficina y en ZeroTier
+NGINX_SENDFILE=on         # nginx manda los archivos sin copiarlos
 AUTOMATIC_RUNS_ENABLED=true
 ```
 
@@ -47,17 +48,21 @@ make status                                # servicios y /health
 make logs                                  # logs de la API, el worker y el reloj
 ```
 
-**Actualizar el código** tras un merge a `develop`:
+**Actualizar el código es automático.** Cada 5 minutos, el temporizador `monitor-noticias-actualizar` revisa GitHub. Si `develop` tiene commits nuevos, `scripts/servidor/actualizar.sh` hace esto:
+
+1. Si hay una corrida o búsqueda en marcha, espera a la siguiente revisión para no cortarla.
+2. Baja el código e instala las dependencias que hayan cambiado.
+3. Compila la pantalla aparte y la cambia de golpe, así que nunca queda sin página.
+4. Migra y reinicia.
+5. Revisa `/health`. Si no responde, regresa al código anterior.
+
+Para ver qué hizo:
 
 ```bash
-cd ~/monitor-noticias
-git pull
-make migrate               # si hay migraciones nuevas
-make frontend-build        # si cambió la pantalla
-sudo systemctl restart monitor-noticias
+journalctl -u monitor-noticias-actualizar --since today
 ```
 
-Si cambian las dependencias de Python o de Node, antes hay que correr `make bootstrap`, que pide contraseña de administrador.
+Así, lo que entra a `develop` se ve en la VM en 5 a 10 minutos. Si algún día cambian programas del sistema (no de Python ni de Node), hay que correr `make bootstrap` a mano, porque pide contraseña de administrador.
 
 ## Repetir la mudanza en otra VM
 

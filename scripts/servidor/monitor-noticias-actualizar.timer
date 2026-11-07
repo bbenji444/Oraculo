@@ -1,0 +1,13 @@
+# Cada 5 minutos revisa si hay commits nuevos en GitHub y, si los hay,
+# actualiza el monitor (monitor-noticias-actualizar.service). Revisar sin
+# cambios solo hace un `git fetch`: no reinicia nada.
+[Unit]
+Description=Revisar GitHub cada 5 minutos para actualizar el monitor
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

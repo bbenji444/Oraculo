@@ -4,7 +4,8 @@
 #
 # Quién lo usa: `make instalar-servicio`, una sola vez en la VM.
 # También deja que nginx (www-data) lea la carpeta del proyecto e instala los
-# permisos mínimos de administrador para que el servicio arranque solo.
+# permisos mínimos de administrador para que el servicio arranque solo, y el
+# temporizador que actualiza el monitor desde GitHub cada 5 minutos.
 #
 # Qué NO hace: no sirve en WSL (no tiene systemd) ni arranca nada por sí solo:
 # el servicio corre al siguiente encendido, o con
@@ -49,3 +50,10 @@ como_root visudo -cqf "${tmp}" || { rm -f "${tmp}"; fallo "Los permisos tienen e
 como_root install -m 0440 -o root -g root "${tmp}" "${SUDOERS_PATH}"
 rm -f "${tmp}"
 ok "Permisos en ${SUDOERS_PATH}"
+
+paso "Instalando la actualización automática desde GitHub"
+sed -e "s|__PROJECT_ROOT__|${ROOT_DIR}|g" -e "s|__USER__|$(id -un)|g"   "${ROOT_DIR}/scripts/servidor/monitor-noticias-actualizar.service.template"   | como_root tee /etc/systemd/system/monitor-noticias-actualizar.service >/dev/null
+como_root install -m 0644 "${ROOT_DIR}/scripts/servidor/monitor-noticias-actualizar.timer"   /etc/systemd/system/monitor-noticias-actualizar.timer
+como_root systemctl daemon-reload
+como_root systemctl enable --now monitor-noticias-actualizar.timer >/dev/null 2>&1
+ok "Revisa GitHub cada 5 minutos (journalctl -u monitor-noticias-actualizar)"

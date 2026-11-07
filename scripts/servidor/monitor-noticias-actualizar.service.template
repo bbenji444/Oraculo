@@ -1,0 +1,18 @@
+# Actualización automática del monitor desde GitHub (scripts/servidor/actualizar.sh).
+#
+# Es una plantilla: `make instalar-servicio` reemplaza __PROJECT_ROOT__ y
+# __USER__ y la instala en /etc/systemd/system/. La dispara cada 5 minutos el
+# temporizador monitor-noticias-actualizar.timer. Lo que hizo se ve con:
+#   journalctl -u monitor-noticias-actualizar
+[Unit]
+Description=Actualizar el monitor de noticias desde GitHub
+After=network-online.target monitor-noticias.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__PROJECT_ROOT__
+ExecStart=/usr/bin/bash __PROJECT_ROOT__/scripts/servidor/actualizar.sh
+# Compilar la pantalla y esperar a /health puede tardar unos minutos.
+TimeoutStartSec=900

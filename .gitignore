@@ -41,3 +41,6 @@ geodata/output/
 Thumbs.db
 desktop.ini
 .DS_Store
+# Compilaciones temporales de la actualización automática en la VM (scripts/servidor/actualizar.sh).
+frontend/dist.nuevo/
+frontend/dist.viejo/
