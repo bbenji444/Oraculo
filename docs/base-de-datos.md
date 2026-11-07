@@ -147,6 +147,10 @@ FROM entity_extractions WHERE rejected_count > 0 ORDER BY id DESC LIMIT 20;
 
 > Consejo: compara siempre con `name_norm` (y escribe la búsqueda en mayúsculas sin acentos), no con `name`. Así "Peñón" y "PEÑON" coinciden, pero "Penon" no.
 
+## Dónde vive en producción
+
+Desde el 07/11/2026, la base que usa el monitor en la VM de Proxmox está en el **PostgreSQL general de Oráculo** (`192.168.0.20`, PostgreSQL 17.9): base `monitor_noticias`, usuario `monitor`. Se ve en DBeaver dentro de la conexión `postgres` y entra en los respaldos de ese servidor. Cómo se hizo: [migracion-proxmox.md](migracion-proxmox.md).
+
 ## Migrar la base a otro servidor
 
 ### 1. Respaldar (en esta máquina)
