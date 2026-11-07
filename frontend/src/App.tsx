@@ -21,11 +21,13 @@ import { GraphicsBoundary } from './components/Explore/GraphicsBoundary';
 import { SpaceBackground } from './components/Space/SpaceBackground';
 import { DesignPreview } from './components/DesignPreview/DesignPreview';
 import { HistoryPage } from './components/History/HistoryPage';
+import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 import { HudTabs } from './components/ui/HudTabs';
 import { installSpotlight } from './ui/spotlight';
 
-type Tab = 'explorar' | 'casos' | 'conceptos' | 'historial' | 'estado' | 'laboratorio' | 'diseno';
+type Tab =
+  'explorar' | 'casos' | 'conceptos' | 'historial' | 'envios' | 'estado' | 'laboratorio' | 'diseno';
 
 const MuroLab = lazy(() => import('./lab/MuroLab'));
 // El laboratorio es solo para desarrollo: se pide a propósito en la URL.
@@ -38,6 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'casos', label: 'Casos' },
   { id: 'conceptos', label: 'Conceptos' },
   { id: 'historial', label: 'Historial' },
+  { id: 'envios', label: 'Envíos' },
   { id: 'estado', label: 'Estado del sistema' },
   ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
   ...(DESIGN_ENABLED ? [{ id: 'diseno' as const, label: 'Diseño' }] : []),
@@ -51,6 +54,7 @@ function tabFromHash(): Tab {
   if (hash === '#/casos') return 'casos';
   if (hash === '#/conceptos') return 'conceptos';
   if (hash === '#/historial') return 'historial';
+  if (hash === '#/envios') return 'envios';
   return 'explorar';
 }
 
@@ -58,6 +62,7 @@ function Screen({ tab }: { tab: Tab }) {
   if (tab === 'casos') return <CasesPage />;
   if (tab === 'conceptos') return <ConceptsPage />;
   if (tab === 'historial') return <HistoryPage />;
+  if (tab === 'envios') return <DeliveriesPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
   if (tab === 'diseno') return <DesignPreview />;
   if (tab === 'laboratorio') {
