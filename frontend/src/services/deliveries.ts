@@ -1,9 +1,10 @@
 /**
  * Servicio de envíos (`/api/v1/deliveries`; docs/api.md, ADR-0039).
  *
- * Qué se manda, a quién, por qué canal y a qué hora: cuentas de envío
- * (Outlook o Gmail vía Composio; WhatsApp más adelante), destinatarios,
- * reglas e historial de cada envío con sus intentos.
+ * Qué se manda, a quién y por qué canal: cuentas de envío (Outlook o Gmail
+ * vía Composio; WhatsApp más adelante), destinatarios, cómo se manda cada
+ * fuente e historial de cada envío con sus intentos. El horario de las
+ * corridas está en `services/schedule.ts` (ADR-0040).
  *
  * Los componentes nunca llaman a fetch directamente (CLAUDE.md §6.2).
  */
@@ -22,10 +23,6 @@ export interface DeliveryOverview {
   email_configured: boolean;
   whatsapp_available: boolean;
   sources: { id: string; label: string }[];
-  /** Horas de las corridas automáticas (CDMX). */
-  run_hours: number[];
-  /** Las mismas horas como «07:00». */
-  run_times: string[];
 }
 
 export interface DeliveryAccount {
@@ -48,23 +45,14 @@ export interface Recipient extends RecipientInput {
   id: number;
 }
 
-/** `all` = todos los destinatarios activos; `selected` = solo los elegidos. */
-export type RuleAudience = 'all' | 'selected';
-
+/**
+ * Cómo se manda una fuente: canal, cuenta y si está prendida. Hay una por
+ * fuente y canal; se manda a todos los destinatarios activos en cada corrida.
+ */
 export interface RuleInput {
   source: string;
-  name: string;
-  audience: RuleAudience;
-  /** Los elegidos (si `selected`). */
-  recipient_ids: number[];
-  /** Las excepciones (si `all`): «todos menos…». */
-  exclude_ids: number[];
   channel: DeliveryChannel;
   account_id: number | null;
-  /** Horas de la CDMX, como «07:00» o «09:30». */
-  times: string[];
-  /** 1 = lunes … 7 = domingo; vacío = todos los días. */
-  days: number[];
   is_active: boolean;
 }
 
@@ -191,19 +179,11 @@ export async function listRules(signal?: AbortSignal): Promise<Rule[]> {
   return asList<Rule>(await requestJson(url('/rules'), { signal }), hasId);
 }
 
-/** Guarda una regla nueva o editada. */
-export async function saveRule(input: RuleInput, id?: number): Promise<Rule> {
-  const body = await requestJson(id ? url(`/rules/${String(id)}`) : url('/rules'), {
-    method: id ? 'PUT' : 'POST',
-    body: input,
-  });
+/** Guarda la regla de su fuente y canal (la crea o la reemplaza). */
+export async function saveRule(input: RuleInput): Promise<Rule> {
+  const body = await requestJson(url('/rules'), { method: 'PUT', body: input });
   if (!hasId(body)) throw badFormat();
   return body as Rule;
-}
-
-/** Borra una regla (sus envíos pasados siguen en el historial). */
-export async function deleteRule(id: number): Promise<void> {
-  await requestJson(url(`/rules/${String(id)}`), { method: 'DELETE' });
 }
 
 const isDelivery = (value: unknown) =>

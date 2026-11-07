@@ -1,8 +1,9 @@
 /**
  * Pantalla «Envíos» (F12.11, ADR-0039).
  *
- * Qué se manda, a quién, por qué canal y a qué hora. Hoy, el reporte de cada
- * corrida FGR por correo (vía Composio); WhatsApp aparece como «Próximamente».
+ * Solo para el administrador (ADR-0040): un horario único de corridas y el
+ * reporte de cada una a todos los destinatarios activos. Hoy, por correo (vía
+ * Composio); WhatsApp aparece como «Próximamente».
  * Está pensada para volverse el módulo de envíos de todo Oráculo: cada envío
  * lleva su «fuente», y mañana habrá más fuentes que el monitor.
  *
@@ -26,7 +27,7 @@ export function DeliveriesPage() {
       <SectionHeading
         kicker="Automatizaciones"
         title="Envíos"
-        description="Qué se manda, a quién, por qué canal y a qué hora. Cada envío queda registrado."
+        description="Un solo horario para todos: a cada hora se hace un reporte nuevo y se manda a todos los destinatarios. Cada envío queda registrado."
         actions={
           data && (
             <div className="flex flex-wrap gap-2">
@@ -43,10 +44,9 @@ export function DeliveriesPage() {
       />
       {data && !data.enabled && (
         <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-          Las corridas automáticas todavía <b>no mandan nada</b>: arma tus reglas y prueba con
-          «Mandar prueba». Para encenderlos, pon{' '}
-          <code className="font-mono">DELIVERIES_ENABLED=true</code> en el .env y reinicia los
-          servicios.
+          Las corridas se siguen haciendo, pero todavía <b>no mandan correos</b>: prueba con «Mandar
+          prueba». Para encenderlos, pon <code className="font-mono">DELIVERIES_ENABLED=true</code>{' '}
+          en el .env y reinicia los servicios.
         </p>
       )}
       {overview.error && (

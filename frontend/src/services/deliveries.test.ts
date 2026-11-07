@@ -1,14 +1,8 @@
 /** Servicio de envíos (`/api/v1/deliveries`, ADR-0039). */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { daysLabel, ruleTargets, upcomingSends } from '../components/Deliveries/schedule';
-import {
-  deliveryFieldErrors,
-  type Recipient,
-  type Rule,
-  saveRecipient,
-  sendTest,
-} from './deliveries';
+import { daysLabel, scheduleProblem, weeklyCost } from '../components/Deliveries/schedule';
+import { deliveryFieldErrors, saveRecipient, sendTest } from './deliveries';
 import { ApiError } from './http';
 
 function respond(body: unknown, status = 200) {
@@ -75,67 +69,26 @@ describe('servicio de envíos', () => {
   });
 });
 
-const PEOPLE: Recipient[] = [
-  { id: 1, name: 'Benjamin', email: 'b@x.mx', phone: null, is_active: true },
-  { id: 2, name: 'Geovanni', email: 'g@x.mx', phone: null, is_active: true },
-  { id: 3, name: 'Tadeo', email: 't@x.mx', phone: null, is_active: false },
-];
+const LIMITS = { max_runs_per_day: 8, min_gap_minutes: 60 };
 
-function rule(overrides: Partial<Rule>): Rule {
-  return {
-    id: 1,
-    source: 'monitor.corrida_fgr',
-    name: 'Regla general',
-    audience: 'all',
-    recipient_ids: [],
-    exclude_ids: [],
-    channel: 'email',
-    account_id: 1,
-    times: ['07:00', '15:00', '23:00'],
-    days: [],
-    is_active: true,
-    ...overrides,
-  };
-}
-
-describe('programación de envíos', () => {
-  it('a todos menos las excepciones, o solo a los elegidos', () => {
-    expect(ruleTargets(rule({ exclude_ids: [2] }), PEOPLE).map((r) => r.name)).toEqual([
-      'Benjamin',
-    ]);
-    expect(
-      ruleTargets(rule({ audience: 'selected', recipient_ids: [2, 3] }), PEOPLE).map((r) => r.name),
-    ).toEqual(['Geovanni']);
-  });
-
-  it('calcula los próximos envíos en hora de la Ciudad de México', () => {
-    // Viernes 6/11/2026 a las 21:00 de la CDMX (03:00 UTC del sábado).
-    const now = new Date('2026-11-07T03:00:00Z');
-    const sends = upcomingSends(
-      [
-        rule({}),
-        rule({
-          id: 2,
-          name: 'Fin de semana',
-          audience: 'selected',
-          recipient_ids: [1],
-          times: ['09:30'],
-          days: [6],
-        }),
-      ],
-      PEOPLE,
-      now,
-      3,
+describe('horario único de las corridas (ADR-0040)', () => {
+  it('avisa los topes antes de guardar', () => {
+    expect(scheduleProblem(['07:00', '15:00', '19:00', '23:00'], LIMITS)).toBeNull();
+    expect(scheduleProblem([], LIMITS)).toBe('Agrega al menos una hora.');
+    expect(scheduleProblem(['07:00', '07:30'], LIMITS)).toBe(
+      'Entre 07:00 y 07:30 debe haber al menos 60 minutos.',
     );
-
-    expect(sends.map((s) => [s.at.toISOString(), s.rule.name, s.recipients])).toEqual([
-      ['2026-11-07T05:00:00.000Z', 'Regla general', 2],
-      ['2026-11-07T13:00:00.000Z', 'Regla general', 2],
-      ['2026-11-07T15:30:00.000Z', 'Fin de semana', 1],
-    ]);
+    // La última y la primera del día siguiente también cuentan.
+    expect(scheduleProblem(['00:10', '23:30'], LIMITS)).toBe(
+      'Entre 23:30 y 00:10 debe haber al menos 60 minutos.',
+    );
+    const nine = ['00:00', '02:40', '05:20', '08:00', '10:40', '13:20', '16:00', '18:40', '21:20'];
+    expect(scheduleProblem(nine, LIMITS)).toMatch(/^Máximo 8 horas/);
   });
 
-  it('una regla apagada no aparece', () => {
-    expect(upcomingSends([rule({ is_active: false })], PEOPLE, new Date(), 5)).toEqual([]);
+  it('calcula lo que cuesta a la semana', () => {
+    expect(weeklyCost(['07:00', '15:00', '23:00'], [], 0.04)).toBeCloseTo(0.84);
+    expect(weeklyCost(['07:00'], [1, 2, 3, 4, 5], 0.04)).toBeCloseTo(0.2);
+    expect(weeklyCost(['07:00'], [], null)).toBeNull();
   });
 });

@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Horario único de las corridas, editable desde «Envíos» (06/11/2026, ADR-0040, migración 0037).** Benji: «si nosotros editamos, borramos o añadimos algún horario, tiene que funcionar para todos los usuarios».
+  - En **Envíos → Horario de las corridas** se agregan, quitan o mueven horas y días. Aplica en el minuto siguiente, sin reiniciar nada, y cada cambio queda en la bitácora.
+  - **A cada hora se hace un reporte totalmente nuevo** con lo publicado desde la hora anterior. Si se agregan las 19:00, esa corrida cubre de 15:00 a 19:00 y la de las 23:00 pasa a cubrir de 19:00 a 23:00.
+  - **Topes contra el consumo de tokens:** máximo 8 horas al día y 60 minutos entre una y otra. La pantalla avisa cuánto cuesta cada hora extra (≈ US$0.04 por corrida).
+  - El reporte de cada corrida va a **todos** los destinatarios con «Recibe envíos» prendido. Se quitaron las reglas personalizadas y el reenvío del último reporte a horas sin corrida.
+  - El Centro de mando muestra la próxima corrida del horario guardado.
+
 - **Envíos: regla general y horas libres (07/11/2026, ADR-0039, migración 0036).** Benji pidió una regla general en lugar de una regla por persona, y más opciones.
   - **Regla general:** el reporte a todos los destinatarios activos, con excepciones («todos menos Tadeo»).
   - **Horas y días a elegir:** cualquier hora, no solo las de las corridas. Las horas se agregan o se quitan con un clic, y los días van de lunes a domingo, con atajos «Lunes a viernes» y «Todos». A una hora sin corrida se manda el reporte más reciente.

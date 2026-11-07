@@ -135,7 +135,8 @@ export function sourcesLabel(options: readonly SourceOption[], chosen: readonly 
   return `${String(chosen.length)} ${noun} · ${String(paid)} de pago`;
 }
 
-// Horas de las corridas automáticas del monitor FGR, en la Ciudad de México (ADR-0031).
+// Horas iniciales de las corridas automáticas (ADR-0031). Solo se usan mientras
+// no llega el horario único del servidor (`/schedule`, ADR-0040).
 export const AUTOMATIC_RUN_HOURS = [7, 15, 23] as const;
 const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
@@ -156,22 +157,41 @@ function mexicoClock(now: Date): { hour: number; minute: number; second: number 
   return { hour: part('hour'), minute: part('minute'), second: part('second') };
 }
 
+const MS_PER_SECOND = 1000;
+const pad = (n: number) => String(n).padStart(2, '0');
+
 /**
  * La próxima corrida automática y cuánto falta.
  *
  * @param now Momento actual.
- * @returns La hora (7, 15 o 23) y los segundos que faltan.
- * @example nextAutomaticRun(new Date('2026-10-27T19:00:00Z')) // { hour: 15, seconds: 7200 } (13:00 en CDMX)
+ * @param upcoming Próximas corridas del horario único (ISO, de `/schedule`).
+ *   Sin ellas se usan las horas iniciales (7, 15 y 23).
+ * @returns La hora «HH:MM» de la Ciudad de México y los segundos que faltan.
+ * @example nextAutomaticRun(new Date('2026-10-27T19:00:00Z')) // { time: '15:00', seconds: 7200 } (13:00 en CDMX)
  */
-export function nextAutomaticRun(now: Date): { hour: number; seconds: number } {
+export function nextAutomaticRun(
+  now: Date,
+  upcoming: readonly string[] = [],
+): { time: string; seconds: number } {
+  const next = upcoming.map((iso) => new Date(iso)).find((at) => at.getTime() > now.getTime());
+  if (next) {
+    const { hour, minute } = mexicoClock(next);
+    return {
+      time: `${pad(hour)}:${pad(minute)}`,
+      seconds: Math.round((next.getTime() - now.getTime()) / MS_PER_SECOND),
+    };
+  }
   const { hour, minute, second } = mexicoClock(now);
   const elapsed = hour * SECONDS_PER_HOUR + minute * 60 + second;
   for (const runHour of AUTOMATIC_RUN_HOURS) {
     const at = runHour * SECONDS_PER_HOUR;
-    if (at > elapsed) return { hour: runHour, seconds: at - elapsed };
+    if (at > elapsed) return { time: `${pad(runHour)}:00`, seconds: at - elapsed };
   }
   const first = AUTOMATIC_RUN_HOURS[0];
-  return { hour: first, seconds: SECONDS_PER_DAY - elapsed + first * SECONDS_PER_HOUR };
+  return {
+    time: `${pad(first)}:00`,
+    seconds: SECONDS_PER_DAY - elapsed + first * SECONDS_PER_HOUR,
+  };
 }
 
 /**
