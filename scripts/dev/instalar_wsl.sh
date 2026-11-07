@@ -11,9 +11,12 @@
 # Es idempotente: se puede correr varias veces; lo que ya está instalado o
 # creado se deja como está. Por qué existe y por qué sin Docker: ADR-0006.
 #
-# Qué NO hace: no instala las dependencias del frontend (corren en Windows;
-# `make bootstrap` las instala aparte con el npm de Windows), no arranca la
-# API ni el worker (eso es `make up`) y no borra datos existentes.
+# También sirve para el servidor (la VM de Proxmox, docs/migracion-proxmox.md):
+# ahí no hay Windows, así que instala Node.js para compilar el frontend.
+#
+# Qué NO hace: no instala las dependencias del frontend (`make bootstrap` las
+# instala aparte, con el npm de Windows en WSL o el de Linux en la VM), no
+# arranca la API ni el worker (eso es `make up`) y no borra datos existentes.
 
 set -euo pipefail
 
@@ -38,6 +41,12 @@ readonly PGDG_SOURCES_PATH="/etc/apt/sources.list.d/pgdg.sources"
 readonly PMTILES_VERSION=1.31.2
 readonly PMTILES_SHA256="3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"
 readonly PMTILES_BIN="${HOME}/.local/bin/pmtiles"
+# Node.js para compilar el frontend en un Linux sin Windows: frontend/package.json
+# pide >= 22.12 y Ubuntu 24.04 trae la 18. Se usa el repositorio oficial de
+# NodeSource para la serie 22 (LTS), según
+# https://github.com/nodesource/distributions (sección Ubuntu).
+readonly NODE_MAJOR=22
+readonly NODESOURCE_SETUP_URL="https://deb.nodesource.com/setup_${NODE_MAJOR}.x"
 
 # Mensajes, como_root, esperar_listo, cargar_env, ROOT_DIR y UV_BIN.
 # shellcheck source=scripts/dev/comun.sh
@@ -129,6 +138,26 @@ instalar_librerias_reportes() {
   como_root apt-get install -y -qq \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 >/dev/null
   ok "pango $(dpkg-query -W -f='${Version}' libpango-1.0-0)"
+}
+
+instalar_node_si_no_hay_windows() {
+  # En WSL el frontend se compila con el npm de Windows; no hace falta Node aquí.
+  if command -v cmd.exe >/dev/null 2>&1; then
+    return
+  fi
+  paso "Instalando Node.js ${NODE_MAJOR} (no hay Windows: el frontend se compila aquí)"
+  if command -v node >/dev/null 2>&1 && node --version | grep -q "^v${NODE_MAJOR}\."; then
+    ok "Node.js $(node --version) ya instalado"
+    return
+  fi
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -fsSL -o "${tmp}/nodesource_setup.sh" "${NODESOURCE_SETUP_URL}"
+  como_root bash "${tmp}/nodesource_setup.sh" >/dev/null
+  rm -rf "${tmp}"
+  export DEBIAN_FRONTEND=noninteractive
+  como_root apt-get install -y -qq nodejs >/dev/null
+  ok "Node.js $(node --version), npm $(npm --version)"
 }
 
 instalar_uv_y_python() {
@@ -224,6 +253,7 @@ main() {
   instalar_servicios
   instalar_herramientas_geodatos
   instalar_librerias_reportes
+  instalar_node_si_no_hay_windows
   instalar_uv_y_python
   instalar_dependencias_python
   arrancar_postgres

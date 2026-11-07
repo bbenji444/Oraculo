@@ -11,7 +11,6 @@ import {
   type AccountProvider,
   connectAccount,
   deleteRecipient,
-  deleteRule,
   getDeliveryOverview,
   listAccounts,
   listDeliveries,
@@ -95,24 +94,16 @@ export function useSaveRecipient() {
 
 export function useSaveRule() {
   const invalidate = useInvalidate('rules');
-  return useMutation({
-    mutationFn: ({ input, id }: { input: RuleInput; id?: number }) => saveRule(input, id),
-    onSuccess: invalidate,
-  });
+  return useMutation({ mutationFn: (input: RuleInput) => saveRule(input), onSuccess: invalidate });
 }
 
 export function useDeleteRecipient() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteRecipient(id),
-    // Borrar a alguien también lo quita de las reglas.
+    // El historial muestra su nombre: se refresca todo.
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   });
-}
-
-export function useDeleteRule() {
-  const invalidate = useInvalidate('rules');
-  return useMutation({ mutationFn: (id: number) => deleteRule(id), onSuccess: invalidate });
 }
 
 export function useRetryDelivery() {

@@ -116,11 +116,29 @@ describe('frase de la consulta', () => {
 describe('corridas automáticas y relojes', () => {
   it('encuentra la siguiente corrida en la Ciudad de México (UTC−6)', () => {
     // 13:00 en CDMX: faltan 2 h para la de las 15:00.
-    expect(nextAutomaticRun(new Date('2026-10-27T19:00:00Z'))).toEqual({ hour: 15, seconds: 7200 });
+    expect(nextAutomaticRun(new Date('2026-10-27T19:00:00Z'))).toEqual({
+      time: '15:00',
+      seconds: 7200,
+    });
     // 23:30 en CDMX: la siguiente es la de las 07:00 del día siguiente (7 h 30 min).
-    expect(nextAutomaticRun(new Date('2026-10-28T05:30:00Z'))).toEqual({ hour: 7, seconds: 27000 });
+    expect(nextAutomaticRun(new Date('2026-10-28T05:30:00Z'))).toEqual({
+      time: '07:00',
+      seconds: 27000,
+    });
     // 06:59:30: faltan 30 s para la de las 07:00.
-    expect(nextAutomaticRun(new Date('2026-10-27T12:59:30Z'))).toEqual({ hour: 7, seconds: 30 });
+    expect(nextAutomaticRun(new Date('2026-10-27T12:59:30Z'))).toEqual({
+      time: '07:00',
+      seconds: 30,
+    });
+  });
+
+  it('usa el horario único del servidor cuando ya llegó (ADR-0040)', () => {
+    // 18:00 en CDMX; el administrador agregó las 19:00.
+    const upcoming = ['2026-10-27T19:00:00-06:00', '2026-10-27T23:00:00-06:00'];
+    expect(nextAutomaticRun(new Date('2026-10-28T00:00:00Z'), upcoming)).toEqual({
+      time: '19:00',
+      seconds: 3600,
+    });
   });
 
   it('dice cuánto falta en corto', () => {

@@ -21,7 +21,6 @@ from app.domain.deliveries import (
     AccountStatus,
     DeliveryChannel,
     DeliveryStatus,
-    RuleAudience,
 )
 from app.domain.errors import (
     DeliveryChannelUnavailableError,
@@ -41,44 +40,24 @@ pytestmark = pytest.mark.anyio
 
 # Horas de la Ciudad de México (UTC-6) expresadas en UTC.
 AT_0700 = datetime(2026, 11, 6, 13, 0, tzinfo=UTC)
-AT_0930 = datetime(2026, 11, 6, 15, 30, tzinfo=UTC)
 AT_1500 = datetime(2026, 11, 6, 21, 0, tzinfo=UTC)
-AT_2300 = datetime(2026, 11, 7, 5, 0, tzinfo=UTC)
-RUN_MINUTES = frozenset({420, 900, 1380})
 
 
 def draft(
-    times: tuple[int, ...] = (420, 900),
     *,
-    audience: RuleAudience = RuleAudience.SELECTED,
-    recipient_ids: tuple[int, ...] = (1,),
-    exclude_ids: tuple[int, ...] = (),
-    days: tuple[int, ...] = (),
     channel: DeliveryChannel = DeliveryChannel.EMAIL,
     account_id: int | None = 1,
     source: str = SOURCE_FGR_RUN,
-    name: str = "Regla",
     is_active: bool = True,
 ) -> RuleDraft:
-    return RuleDraft(
-        source=source,
-        name=name,
-        audience=audience,
-        recipient_ids=recipient_ids,
-        exclude_ids=exclude_ids,
-        channel=channel,
-        account_id=account_id,
-        times=times,
-        days=days,
-        is_active=is_active,
-    )
+    return RuleDraft(source=source, channel=channel, account_id=account_id, is_active=is_active)
 
 
 async def store_with_rule(rule: RuleDraft | None = None) -> FakeDeliveryStore:
     store = FakeDeliveryStore()
     await store.save_account(AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE)
     await ManageRecipients(store).create("Benjamin", "benji@hotmail.com", None)
-    await ManageRules(store).create(rule or draft())
+    await ManageRules(store).save(rule or draft())
     return store
 
 
@@ -92,20 +71,44 @@ def sender_for(
     return use, fake
 
 
-async def test_la_corrida_crea_una_guia_por_regla_que_le_toca_y_no_repite() -> None:
-    store = await store_with_rule(draft((420, 900)))
+async def test_cada_corrida_manda_su_reporte_una_sola_vez() -> None:
+    store = await store_with_rule()
     plan = PlanDeliveries(store, FakeReports())
 
     first = await plan.for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
     again = await plan.for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
-    night = await plan.for_run(SOURCE_FGR_RUN, "corrida-1", AT_2300)
 
-    assert len(first) == 1
-    assert (again, night) == ([], [])
+    assert (len(first), again) == (1, [])
     [delivery] = store.deliveries.values()
-    assert (delivery.destination, delivery.subject) == (
+    assert (delivery.destination, delivery.subject, delivery.scheduled_for) == (
         "benji@hotmail.com",
         "Reporte FGR · corrida 06/11/2026, 15:00 (CDMX)",
+        AT_1500,
+    )
+
+
+async def test_la_corrida_va_a_todos_los_activos_con_correo() -> None:
+    # Benji, 06/11/2026: un solo reporte para todos; nada por persona.
+    store = await store_with_rule()
+    recipients = ManageRecipients(store)
+    await recipients.create("Geovanni", "geo@x.mx", None)
+    await recipients.create("Tadeo", "tadeo@x.mx", None, False)
+    await recipients.create("Solo WhatsApp", None, "525512345678")
+
+    await PlanDeliveries(store, FakeReports()).for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
+
+    assert sorted(d.destination for d in store.deliveries.values()) == [
+        "benji@hotmail.com",
+        "geo@x.mx",
+    ]
+
+
+async def test_con_la_regla_apagada_no_se_manda_nada() -> None:
+    store = await store_with_rule(draft(is_active=False))
+
+    assert (
+        await PlanDeliveries(store, FakeReports()).for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
+        == []
     )
 
 
@@ -200,95 +203,25 @@ async def test_prueba_sin_corrida_o_sin_destinatario() -> None:
 
 
 async def test_reglas_invalidas() -> None:
-    store = await store_with_rule()
-    rules = ManageRules(store)
+    rules = ManageRules(await store_with_rule())
 
-    with pytest.raises(DeliveryValidationError, match="al menos un destinatario"):
-        await rules.create(draft(recipient_ids=(99,)))
     with pytest.raises(DeliveryValidationError, match="cuenta de correo"):
-        await rules.create(draft(account_id=None))
+        await rules.save(draft(account_id=None))
+    with pytest.raises(DeliveryValidationError, match="cuenta de correo"):
+        await rules.save(draft(account_id=99))
     with pytest.raises(DeliveryValidationError, match="fuente"):
-        await rules.create(draft(source="otra.cosa"))
+        await rules.save(draft(source="otra.cosa"))
     with pytest.raises(DeliveryValidationError, match="WhatsApp"):
-        await rules.create(draft(channel=DeliveryChannel.WHATSAPP))
-    with pytest.raises(DeliveryValidationError, match="nombre"):
-        await rules.create(draft(name="   "))
-    with pytest.raises(DeliveryValidationError, match="al menos una hora"):
-        await rules.create(draft(()))
-    with pytest.raises(DeliveryNotFoundError):
-        await rules.update(99, draft())
-    with pytest.raises(DeliveryNotFoundError):
-        await rules.delete(99)
+        await rules.save(draft(channel=DeliveryChannel.WHATSAPP))
 
 
-async def test_editar_y_borrar_una_regla() -> None:
+async def test_guardar_otra_vez_reemplaza_la_regla_de_la_fuente() -> None:
     store = await store_with_rule()
-    rules = ManageRules(store)
 
-    edited = await rules.update(
-        1, draft((1380, 420, 1380), name="  Noche  y mañana ", days=(5, 1), is_active=False)
-    )
-    assert (edited.data.name, edited.data.times, edited.data.days, edited.data.is_active) == (
-        "Noche y mañana",
-        (420, 1380),
-        (1, 5),
-        False,
-    )
-    await rules.delete(1)
-    assert await store.list_rules(SOURCE_FGR_RUN) == []
+    saved = await ManageRules(store).save(draft(is_active=False))
 
-
-async def test_la_regla_general_manda_a_todos_menos_los_excluidos() -> None:
-    store = await store_with_rule()
-    recipients = ManageRecipients(store)
-    await recipients.create("Geovanni", "geo@x.mx", None)
-    await recipients.create("Tadeo", "tadeo@x.mx", None)
-    await recipients.create("Solo WhatsApp", None, "525512345678")
-    rule = await ManageRules(store).update(
-        1, draft(audience=RuleAudience.ALL, recipient_ids=(1,), exclude_ids=(2, 99))
-    )
-    # En una regla general la lista de elegidos sobra y la exclusión desconocida se cae.
-    assert (rule.data.recipient_ids, rule.data.exclude_ids) == ((), (2,))
-
-    await PlanDeliveries(store, FakeReports()).for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
-
-    assert sorted(d.destination for d in store.deliveries.values()) == [
-        "benji@hotmail.com",
-        "tadeo@x.mx",
-    ]
-
-
-async def test_una_hora_sin_corrida_manda_el_ultimo_reporte_una_vez() -> None:
-    store = await store_with_rule(draft((570,), days=(5,)))
-    plan = PlanDeliveries(store, FakeReports())
-    next_friday = datetime(2026, 11, 13, 15, 30, tzinfo=UTC)
-    saturday = datetime(2026, 11, 7, 15, 30, tzinfo=UTC)
-
-    first = await plan.scheduled(SOURCE_FGR_RUN, AT_0930, RUN_MINUTES)
-    again = await plan.scheduled(SOURCE_FGR_RUN, AT_0930, RUN_MINUTES)
-    later = await plan.scheduled(SOURCE_FGR_RUN, next_friday, RUN_MINUTES)
-    weekend = await plan.scheduled(SOURCE_FGR_RUN, saturday, RUN_MINUTES)
-
-    assert (len(first), again, len(later), weekend) == (1, [], 1, [])
-    keys = sorted(store.keys)
-    assert keys[0].endswith("|2026-11-06 09:30")
-    assert keys[1].endswith("|2026-11-13 09:30")
-    assert {d.scheduled_for for d in store.deliveries.values()} == {AT_0930, next_friday}
-
-
-async def test_a_la_hora_de_una_corrida_no_se_adelanta_al_reporte_nuevo() -> None:
-    store = await store_with_rule(draft((420, 570)))
-
-    assert (
-        await PlanDeliveries(store, FakeReports()).scheduled(SOURCE_FGR_RUN, AT_0700, RUN_MINUTES)
-        == []
-    )
-    assert (
-        await PlanDeliveries(store, FakeReports(ref=None)).scheduled(
-            SOURCE_FGR_RUN, AT_0930, RUN_MINUTES
-        )
-        == []
-    )
+    assert (saved.id, saved.data.is_active) == (1, False)
+    assert len(await store.list_rules(SOURCE_FGR_RUN)) == 1
 
 
 async def test_borrar_un_destinatario() -> None:

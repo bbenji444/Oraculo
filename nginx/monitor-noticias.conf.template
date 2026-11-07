@@ -1,7 +1,8 @@
-# Sitio de nginx del monitor de noticias (desarrollo en WSL).
+# Sitio de nginx del monitor de noticias (WSL o el servidor de Proxmox).
 #
 # Es una plantilla: `make up` reemplaza __PROJECT_ROOT__ por la ruta real del
-# proyecto y la instala en /etc/nginx/sites-available/monitor-noticias.
+# proyecto y __LISTEN__ por las direcciones de NGINX_LISTEN (en WSL, solo
+# 127.0.0.1:8080), y la instala en /etc/nginx/sites-available/monitor-noticias.
 #
 # Qué hace: sirve el frontend compilado (frontend/dist), reenvía /api a la API
 # (uvicorn en el puerto 8000) y sirve los PMTiles de geodata/output con
@@ -9,8 +10,9 @@
 # Qué NO hace: no termina HTTPS; eso se define en el despliegue (F8).
 
 server {
-    # Solo localhost: WSL2 lo reenvía a Windows y no queda expuesto a la red.
-    listen 127.0.0.1:8080;
+    # En WSL solo localhost: WSL2 lo reenvía a Windows y no queda expuesto a la
+    # red. En el servidor, también sus redes (docs/migracion-proxmox.md).
+    __LISTEN__
     server_name localhost;
 
     root __PROJECT_ROOT__/frontend/dist;

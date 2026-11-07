@@ -271,6 +271,15 @@ class DeliveryNotFoundError(NotFoundError):
     code = "delivery_not_found"
 
 
+class ScheduleValidationError(InvalidRequestError):
+    """El horario de las corridas no cumple sus reglas (ADR-0040).
+
+    ``details["problemas"]`` lista cada problema con su campo.
+    """
+
+    code = "invalid_schedule"
+
+
 class DeliveryValidationError(InvalidRequestError):
     """Un destinatario, regla o envío no cumple sus reglas.
 

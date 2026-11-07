@@ -23,7 +23,6 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
-    RuleAudience,
 )
 
 
@@ -49,30 +48,22 @@ class Recipient:
 
 @dataclass(frozen=True, slots=True)
 class RuleDraft:
-    """Una regla: qué, a quién, por dónde, desde qué cuenta, a qué horas y qué días.
+    """Cómo se manda lo de una fuente: por qué canal, desde qué cuenta y si está prendido.
+
+    Hay una sola por fuente y canal. Se manda a **todos** los destinatarios
+    activos en cada corrida del horario único (ADR-0040): no hay horas ni
+    destinatarios por regla.
 
     Attributes:
         source: Fuente («monitor.corrida_fgr»).
-        name: Nombre para la pantalla («Regla general»).
-        audience: Todos los destinatarios activos o solo los elegidos.
-        recipient_ids: Los elegidos (si ``SELECTED``).
-        exclude_ids: Las excepciones (si ``ALL``: «todos menos Tadeo»).
         channel: Canal.
         account_id: Cuenta desde la que se manda (correo).
-        times: Minutos del día (09:30 = 570), hora de la CDMX.
-        days: Días ISO (1 = lunes … 7 = domingo); vacío = todos.
         is_active: Si manda.
     """
 
     source: str
-    name: str
-    audience: RuleAudience
-    recipient_ids: tuple[int, ...]
-    exclude_ids: tuple[int, ...]
     channel: DeliveryChannel
     account_id: int | None
-    times: tuple[int, ...]
-    days: tuple[int, ...] = ()
     is_active: bool = True
 
 
@@ -255,20 +246,8 @@ class DeliveryStorePort(Protocol):
         """Las reglas, opcionalmente de una fuente y solo las prendidas."""
         ...
 
-    async def get_rule(self, rule_id: int) -> DeliveryRule | None:
-        """Una regla por id."""
-        ...
-
-    async def create_rule(self, data: RuleDraft) -> DeliveryRule:
-        """Guarda una regla."""
-        ...
-
-    async def update_rule(self, rule_id: int, data: RuleDraft) -> DeliveryRule:
-        """Reemplaza una regla."""
-        ...
-
-    async def delete_rule(self, rule_id: int) -> bool:
-        """Borra una regla (sus envíos pasados quedan en el historial)."""
+    async def save_rule(self, data: RuleDraft) -> DeliveryRule:
+        """Guarda la regla de su fuente y canal (la crea o la reemplaza)."""
         ...
 
     async def create_deliveries(self, deliveries: Sequence[NewDelivery]) -> list[UUID]:

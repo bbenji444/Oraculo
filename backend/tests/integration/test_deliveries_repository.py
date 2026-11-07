@@ -1,4 +1,4 @@
-"""Envíos contra la base de pruebas (migraciones 0035 y 0036, ADR-0039)."""
+"""Envíos contra la base de pruebas (migraciones 0035 a 0037, ADR-0039 y ADR-0040)."""
 
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -22,7 +22,6 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
-    RuleAudience,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -55,25 +54,11 @@ def sync_engine(settings: Settings) -> Iterator[Engine]:
     engine.dispose()
 
 
-def rule_draft(
-    account_id: int,
-    recipient_ids: tuple[int, ...],
-    times: tuple[int, ...] = (420, 900),
-    *,
-    audience: RuleAudience = RuleAudience.SELECTED,
-    days: tuple[int, ...] = (),
-    is_active: bool = True,
-) -> RuleDraft:
+def rule_draft(account_id: int, *, is_active: bool = True) -> RuleDraft:
     return RuleDraft(
         source=SOURCE_FGR_RUN,
-        name="Mañana y tarde",
-        audience=audience,
-        recipient_ids=recipient_ids if audience is RuleAudience.SELECTED else (),
-        exclude_ids=recipient_ids if audience is RuleAudience.ALL else (),
         channel=DeliveryChannel.EMAIL,
         account_id=account_id,
-        times=times,
-        days=days,
         is_active=is_active,
     )
 
@@ -117,46 +102,20 @@ async def test_cuentas_destinatarios_y_reglas(
     edited = await store.update_recipient(
         recipient.id, RecipientDraft("Benjamin O.", "benji@hotmail.com", "525512345678")
     )
-    rule = await store.create_rule(rule_draft(account.id, (recipient.id,)))
-    off = await store.update_rule(
-        rule.id,
-        rule_draft(
-            account.id,
-            (recipient.id,),
-            (570,),
-            audience=RuleAudience.ALL,
-            days=(1, 5),
-            is_active=False,
-        ),
-    )
+    rule = await store.save_rule(rule_draft(account.id))
+    # Una sola regla por fuente y canal: guardar otra vez la reemplaza.
+    off = await store.save_rule(rule_draft(account.id, is_active=False))
 
     assert again.id == account.id and again.label == "Ovitech 2"
     assert (active.status, active.address) == (AccountStatus.ACTIVE, "ovitech_22@hotmail.com")
     assert [a.id for a in await store.list_accounts()] == [account.id]
     assert edited.data.phone == "525512345678"
-    assert (rule.data.name, rule.data.recipient_ids, rule.data.times) == (
-        "Mañana y tarde",
-        (recipient.id,),
-        (420, 900),
-    )
-    assert (off.data.audience, off.data.exclude_ids, off.data.recipient_ids) == (
-        RuleAudience.ALL,
-        (recipient.id,),
-        (),
-    )
-    assert (off.data.times, off.data.days, off.data.is_active) == ((570,), (1, 5), False)
+    assert (off.id, rule.data.is_active, off.data.is_active) == (rule.id, True, False)
     assert await store.list_rules(SOURCE_FGR_RUN, active_only=True) == []
     assert len(await store.list_rules()) == 1
-    assert await store.get_rule(999) is None
 
-    # Borrar a un destinatario lo quita también de las reglas que lo nombran.
     assert await store.delete_recipient(recipient.id)
     assert not await store.delete_recipient(recipient.id)
-    gone = await store.get_rule(rule.id)
-    assert gone is not None and gone.data.exclude_ids == ()
-    assert await store.delete_rule(rule.id)
-    assert not await store.delete_rule(rule.id)
-    assert await store.list_rules() == []
 
 
 async def test_guias_idempotentes_intentos_reintento_e_historial(
@@ -167,7 +126,7 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
         AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE
     )
     recipient = await store.create_recipient(RecipientDraft("Benjamin", "benji@hotmail.com", None))
-    rule = await store.create_rule(rule_draft(account.id, (recipient.id,)))
+    rule = await store.save_rule(rule_draft(account.id))
 
     first = await store.create_deliveries(
         [new_delivery(account.id, recipient.id, rule.id, "k1", NOW)]

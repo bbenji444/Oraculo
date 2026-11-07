@@ -14,7 +14,12 @@ from app.core.config import Settings
 from app.domain.search import SearchStatus
 from app.worker import tasks
 from app.worker.automatic_jobs import automatic_settings, report_file_name
-from app.worker.celery_app import AUTOMATIC_RUN_TASK, build_beat_schedule, celery_app
+from app.worker.celery_app import (
+    AUTOMATIC_RUN_TASK,
+    SCHEDULE_TICK_TASK,
+    build_beat_schedule,
+    celery_app,
+)
 from app.worker.ingest_jobs import IngestSummary
 from tests.unit.fake_ingest import FILE
 
@@ -31,14 +36,14 @@ def test_el_reloj_programa_la_ingesta_y_la_limpieza() -> None:
     assert purge["schedule"] == crontab(hour=9, minute=30)
 
 
-def test_el_reloj_programa_el_monitor_fgr_a_las_7_15_y_23_de_la_cdmx() -> None:
-    # F12.8, ADR-0031: el reloj trabaja en UTC; la CDMX es UTC-6 todo el año.
+def test_el_reloj_revisa_el_horario_unico_cada_minuto() -> None:
+    # ADR-0040: el horario vive en la base y se edita desde «Envíos»; el reloj
+    # revisa cada minuto si toca una corrida, sin reiniciarse al cambiarlo.
     monitor = build_beat_schedule(Settings())["monitor-fgr"]
 
-    assert monitor["task"] == AUTOMATIC_RUN_TASK
-    assert monitor["schedule"] == crontab(hour="5,13,21", minute=0)
-    # Una corrida atrasada más de 2 horas se descarta: la siguiente cubre hoy y ayer.
-    assert monitor["options"] == {"expires": 7200}
+    assert monitor["task"] == SCHEDULE_TICK_TASK
+    assert monitor["schedule"] == 60.0
+    assert monitor["options"] == {"expires": 60}
 
 
 def test_el_monitor_se_apaga_desde_la_configuracion() -> None:
@@ -62,9 +67,13 @@ def test_el_pdf_de_cada_corrida_se_nombra_por_fecha_y_hora() -> None:
 
 
 def test_las_tareas_estan_registradas_con_su_nombre() -> None:
-    assert {tasks.INGEST_TASK, tasks.PURGE_TASK, tasks.SEARCH_TASK, AUTOMATIC_RUN_TASK} <= set(
-        celery_app.tasks
-    )
+    assert {
+        tasks.INGEST_TASK,
+        tasks.PURGE_TASK,
+        tasks.SEARCH_TASK,
+        AUTOMATIC_RUN_TASK,
+        SCHEDULE_TICK_TASK,
+    } <= set(celery_app.tasks)
     assert "ingesta-indice-local" in celery_app.conf.beat_schedule
 
 

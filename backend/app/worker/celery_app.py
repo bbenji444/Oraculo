@@ -7,9 +7,9 @@ el revisor de salud del worker.
 
 El reloj (``beat_schedule``) dispara la ingesta al índice local cada
 ``INGEST_INTERVAL_MINUTES``, la limpieza por retención una vez al día
-(ADR-0013) y las corridas automáticas del monitor FGR a las 07:00, 15:00 y
-23:00 de la Ciudad de México (``AUTOMATIC_RUN_HOURS``, F12.8, ADR-0031). Las
-tareas están en ``app.worker.tasks``.
+(ADR-0013) y, cada minuto, la revisión del horario único de las corridas del
+monitor FGR (ADR-0040): el administrador lo edita en «Envíos» y el cambio
+aplica sin reiniciar nada. Las tareas están en ``app.worker.tasks``.
 
 No hace: no contiene lógica de las tareas.
 """
@@ -22,7 +22,6 @@ from celery.signals import setup_logging
 
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.domain.schedule import parse_run_hours, utc_hours
 
 _SECONDS_PER_MINUTE = 60
 # Limpieza diaria a las 09:30 UTC = 03:30 en la Ciudad de México: de madrugada,
@@ -30,18 +29,18 @@ _SECONDS_PER_MINUTE = 60
 _PURGE_HOUR_UTC = 9
 _PURGE_MINUTE = 30
 AUTOMATIC_RUN_TASK = "monitor.automatic_run"
+# Revisión del horario (ADR-0040): cada minuto, porque las horas se eligen al
+# minuto (09:30) y pueden cambiar en cualquier momento desde la pantalla.
+SCHEDULE_TICK_TASK = "monitor.schedule_tick"
+_SCHEDULE_TICK_SECONDS = 60
 # Envíos pendientes y reintentos (ADR-0039): cada minuto, para cumplir las
 # esperas de 1, 5 y 30 minutos entre intentos.
 DELIVERIES_TASK = "deliveries.send_due"
 _DELIVERIES_EVERY_SECONDS = 60
-# La Ciudad de México está en UTC-6 todo el año desde que se quitó el horario
-# de verano (octubre de 2022). Si volviera, basta reiniciar el reloj con el
-# nuevo desfase.
-_MEXICO_CITY_UTC_OFFSET = -6
 # Una corrida que no alcanzó a empezar en 2 horas se descarta. La siguiente
 # cubre solo su propio periodo (ADR-0031): el periodo perdido se recupera
 # corriéndola a mano con ``make corrida-fgr``.
-_AUTOMATIC_RUN_EXPIRES_SECONDS = 2 * 60 * 60
+AUTOMATIC_RUN_EXPIRES_SECONDS = 2 * 60 * 60
 
 
 def build_beat_schedule(settings: Settings) -> dict[str, dict[str, Any]]:
@@ -68,11 +67,10 @@ def build_beat_schedule(settings: Settings) -> dict[str, dict[str, Any]]:
         },
     }
     if settings.automatic_runs_enabled:
-        hours = utc_hours(parse_run_hours(settings.automatic_run_hours), _MEXICO_CITY_UTC_OFFSET)
         schedule["monitor-fgr"] = {
-            "task": AUTOMATIC_RUN_TASK,
-            "schedule": crontab(hour=",".join(str(h) for h in hours), minute=0),
-            "options": {"expires": _AUTOMATIC_RUN_EXPIRES_SECONDS},
+            "task": SCHEDULE_TICK_TASK,
+            "schedule": float(_SCHEDULE_TICK_SECONDS),
+            "options": {"expires": _SCHEDULE_TICK_SECONDS},
         }
     if settings.deliveries_enabled:
         schedule["envios-pendientes"] = {

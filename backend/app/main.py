@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.adapters.delivery.factory import build_connector, build_senders
 from app.adapters.health.app_probe import AppHealthProbe
@@ -39,6 +39,7 @@ from app.adapters.persistence.provider_queries_repository import PostgresProvide
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.relationships_repository import PostgresRelationshipRepository
 from app.adapters.persistence.reports_repository import PostgresReportStore
+from app.adapters.persistence.schedule_repository import PostgresScheduleStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
 from app.adapters.reports.render import ReportRenderer
@@ -54,7 +55,7 @@ from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPric
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
 from app.domain.deliveries import SOURCES
-from app.domain.schedule import parse_run_hours
+from app.domain.schedule import RunSchedule, parse_run_hours
 from app.domain.sources import parse_sources
 from app.worker.celery_app import create_celery_app
 from app.worker.search_jobs import build_providers
@@ -77,6 +78,29 @@ def _summarizer(settings: Settings) -> SummarizerSetup | None:
         return build_summarizer(settings)
     except MissingLLMKeyError:
         return None
+
+
+def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> None:
+    """Envíos (F12.11, ADR-0039) y el horario único de las corridas (ADR-0040)."""
+    delivery_store = PostgresDeliveryStore(engine)
+    delivery_reports = PostgresRunReports(engine)
+    app.state.delivery_store = delivery_store
+    app.state.delivery_reports = delivery_reports
+    app.state.delivery_connector = build_connector(settings)
+    app.state.delivery_sender = SendDeliveries(
+        delivery_store, delivery_reports, build_senders(settings)
+    )
+    app.state.delivery_overview = OverviewOut(
+        enabled=settings.deliveries_enabled,
+        email_configured=settings.composio_api_key is not None,
+        whatsapp_available=False,
+        sources=[SourceOut(id=k, label=v) for k, v in SOURCES.items()],
+    )
+    app.state.schedule_store = PostgresScheduleStore(engine)
+    app.state.schedule_default = RunSchedule.from_hours(
+        parse_run_hours(settings.automatic_run_hours)
+    )
+    app.state.automatic_runs_enabled = settings.automatic_runs_enabled
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -182,25 +206,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _utc_now,
         )
         app.state.report_documents = ReportRenderer()
-        # Envíos (F12.11, ADR-0039).
-        delivery_store = PostgresDeliveryStore(engine)
-        delivery_reports = PostgresRunReports(engine)
-        app.state.delivery_store = delivery_store
-        app.state.delivery_reports = delivery_reports
-        app.state.delivery_connector = build_connector(settings)
-        app.state.delivery_sender = SendDeliveries(
-            delivery_store, delivery_reports, build_senders(settings)
-        )
-        app.state.delivery_overview = OverviewOut(
-            enabled=settings.deliveries_enabled,
-            email_configured=settings.composio_api_key is not None,
-            whatsapp_available=False,
-            sources=[SourceOut(id=k, label=v) for k, v in SOURCES.items()],
-            run_hours=sorted(parse_run_hours(settings.automatic_run_hours)),
-            run_times=[
-                f"{h:02d}:00" for h in sorted(parse_run_hours(settings.automatic_run_hours))
-            ],
-        )
+        _wire_deliveries(app, settings, engine)
         try:
             yield
         finally:

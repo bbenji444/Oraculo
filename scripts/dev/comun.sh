@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Utilidades compartidas por los scripts de desarrollo en WSL: mensajes,
-# ejecución como root o como postgres, espera de servicios y carga de .env.
+# Utilidades compartidas por los scripts de desarrollo en WSL y del servidor
+# (la VM de Proxmox, docs/migracion-proxmox.md): mensajes, ejecución como root
+# o como postgres, espera de servicios, el npm que toca y carga de .env.
 #
 # Quién lo usa: instalar_wsl.sh y servicios.sh, con
 #   source "$(dirname "${BASH_SOURCE[0]}")/comun.sh"
@@ -18,6 +19,12 @@ readonly UV_BIN="${HOME}/.local/bin/uv"
 # El entorno virtual vive en el disco de Linux y no en /mnt/d: leer miles de
 # archivos pequeños a través de /mnt/d es lento (ADR-0006).
 export UV_PROJECT_ENVIRONMENT="${HOME}/.venvs/monitor-noticias"
+
+# En WSL el frontend usa el npm de Windows (sus dependencias se instalaron
+# para Windows); en un Linux sin Windows, como la VM, el npm de Linux.
+npm_cmd() {
+  if command -v cmd.exe >/dev/null 2>&1; then cmd.exe /c npm "$@"; else npm "$@"; fi
+}
 
 paso() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok() { printf '    \033[32m✔\033[0m %s\n' "$*"; }

@@ -51,6 +51,9 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0035](0035-gods-eye-view-modulo-aparte.md) | God's Eye View como módulo aparte, tal cual, para evaluarlo (pestaña «God's Eye») | Retirado (27/10/2026) |
 | [0036](0036-sistema-visual-consola-tactica.md) | Sistema visual «consola táctica»: paneles, botones y textos con animación al pasar el mouse | Aceptado |
 | [0037](0037-diseno-centro-de-mando.md) | Diseño «Centro de mando», el principal: la búsqueda como una orden en una consola de misión, radar sobre el globo y expediente a la derecha (el de columna sigue con `?clasico`) | Aceptado |
+| [0038](0038-subdivisiones-y-temas-generales.md) | Subdivisiones editables y temas generales: «FGR · Homicidio» exige las dos palabras | Aceptado |
+| [0039](0039-envios-auditables.md) | Sección «Envíos»: reportes por correo vía Composio, con guía e intentos auditables | Aceptado (reglas reemplazadas por la 0040) |
+| [0040](0040-horario-unico-de-corridas.md) | Horario único de las corridas, editable por el administrador: cada hora es un reporte nuevo desde la anterior y va a todos | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

@@ -58,6 +58,8 @@ El 06/11/2026 se probó Composio a mano: un script mandó el PDF desde la cuenta
 
 ## Adenda (07/11/2026): reglas abiertas y regla general
 
+> **Reemplazada por ADR-0040 (06/11/2026):** ya no hay reglas por persona ni horas por regla; hay un horario único de corridas y cada reporte va a todos.
+
 Benji vio la primera versión y pidió otra forma: «eso se ve horrible, lo de que tenga una regla individual para cada persona». Quiere una **regla general** («a todos, a las 7, 3 y 11») y poder poner o quitar horas.
 
 - **Migración 0036.** Una regla ya no es «una persona + horas de corrida». Ahora tiene:
