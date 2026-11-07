@@ -9,8 +9,15 @@
 
 // Una vuelta completa cada 90 s: se nota que gira, sin distraer al leer.
 export const SECONDS_PER_REVOLUTION = 90;
-// Cada paso es una animación de 1 s; al terminar empieza la siguiente.
+// Cada paso es una animación de 1 s; al terminar empieza la siguiente. Así
+// se usa mientras el giro toma velocidad (la rampa), que cambia segundo a
+// segundo.
 export const SPIN_STEP_MS = 1000;
+// Ya a velocidad constante, pasos de 8 s. Cada fin de paso hace que MapLibre
+// recalcule etiquetas y teselas; con pasos de 1 s eso pasaba cada segundo y el
+// giro se sentía a tirones (Benji, 07/11/2026: «no está girando tan fluido»).
+// La velocidad por segundo es la misma; tocar el globo lo detiene igual.
+export const SPIN_CRUISE_STEP_MS = 8000;
 // Desde este zoom ya se ve un país de cerca: girar estorbaría.
 export const MAX_SPIN_ZOOM = 4;
 // Entre este zoom y el máximo, el giro se frena poco a poco en vez de
@@ -33,6 +40,19 @@ export function spinDegrees(zoom: number, stepMs: number = SPIN_STEP_MS): number
   const degrees = (DEGREES_PER_REVOLUTION / SECONDS_PER_REVOLUTION) * (stepMs / MS_PER_SECOND);
   if (zoom <= SLOW_SPIN_ZOOM) return degrees;
   return (degrees * (MAX_SPIN_ZOOM - zoom)) / (MAX_SPIN_ZOOM - SLOW_SPIN_ZOOM);
+}
+
+/**
+ * Duración del siguiente paso del giro.
+ *
+ * @param elapsedMs Tiempo desde que arrancó el giro.
+ * @param rampMs Duración de la rampa de arranque.
+ * @returns Pasos cortos durante la rampa; largos ya a velocidad constante.
+ * @example spinStepMs(500, 2000) // 1000
+ * @example spinStepMs(5000, 2000) // 8000
+ */
+export function spinStepMs(elapsedMs: number, rampMs: number): number {
+  return elapsedMs < rampMs ? SPIN_STEP_MS : SPIN_CRUISE_STEP_MS;
 }
 
 /**

@@ -78,7 +78,13 @@ import {
   type ScreenSize,
 } from '../../map/framing';
 import { setupMapLibre } from '../../map/setup';
-import { GLOBE_BEARING, REGION_BEARING, SPIN_STEP_MS, spinDegrees } from '../../map/spin';
+import {
+  GLOBE_BEARING,
+  REGION_BEARING,
+  SPIN_STEP_MS,
+  spinDegrees,
+  spinStepMs,
+} from '../../map/spin';
 import {
   buildMapStyle,
   featureLabel,
@@ -225,6 +231,10 @@ const MIN_SPIN_RAMP = 0.05;
 const MS_PER_SECOND = 1000;
 // Desvanecido de los nombres del mapa al aparecer (MapLibre usa 300 ms).
 const LABEL_FADE_MS = 120;
+// Teselas que guarda cada fuente: la Tierra completa hasta el zoom 4
+// (1 + 4 + 16 + 64 + 256 = 341) con margen. Una tesela de 256 px son ~256 KB
+// de video; las fuentes vectoriales a esos zooms ocupan muy pocas.
+const TILE_CACHE_SIZE = 400;
 // Aire mínimo entre la ficha arrastrada y la orilla del mapa.
 const CARD_DRAG_MARGIN = 12;
 
@@ -369,6 +379,8 @@ export function ExploreGlobe({
   const spinningRef = useRef(spinning);
   const activeRef = useRef(active);
   const spinStartRef = useRef(0);
+  // Si el movimiento en curso es un paso del giro (para pausarlo al instante).
+  const spinAnimatingRef = useRef(false);
   const spinStepRef = useRef<() => void>(() => undefined);
   const insetsRef = useRef<Insets>({
     left: insetLeft,
@@ -431,6 +443,12 @@ export function ExploreGlobe({
       // Los nombres aparecen casi de inmediato al llegar a una nota (MapLibre
       // los desvanece en 300 ms por defecto y se sentía que cargaba lento).
       fadeDuration: LABEL_FADE_MS,
+      // Memoria de teselas por fuente. Con la de fábrica (según el tamaño de la
+      // ventana), al dar la vuelta el globo volvía a pedir las texturas de la
+      // Tierra que ya había visto (más de 1,100 peticiones en unos minutos,
+      // 07/11/2026) y las mostraba borrosas mientras llegaban: se veía
+      // «pixeleado al girar». Toda la Tierra hasta el zoom 4 son 341 teselas.
+      maxTileCacheSize: TILE_CACHE_SIZE,
     });
     // El encuadre de los paneles desde el principio: la entrada ya llega corrida.
     if (clearHeaderRef.current) insetsRef.current = { ...insetsRef.current, top: headerInsetPx() };
@@ -467,14 +485,18 @@ export function ExploreGlobe({
       });
     };
     const spinStep = () => {
+      spinAnimatingRef.current = false;
       if (!spinningRef.current || !introDone || !activeRef.current || framingRef.current) return;
-      const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(performance.now() - spinStartRef.current));
-      const degrees = spinDegrees(map.getZoom()) * spinFactor(motionRef.current) * ramp;
+      const elapsed = performance.now() - spinStartRef.current;
+      const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(elapsed));
+      const stepMs = spinStepMs(elapsed, SPIN_RAMP_MS);
+      const degrees = spinDegrees(map.getZoom(), stepMs) * spinFactor(motionRef.current) * ramp;
       if (degrees === 0) return;
       const center = map.getCenter();
+      spinAnimatingRef.current = true;
       map.easeTo({
         center: [center.lng - degrees, center.lat],
-        duration: SPIN_STEP_MS,
+        duration: stepMs,
         easing: (t) => t,
       });
     };
@@ -878,6 +900,12 @@ export function ExploreGlobe({
   useEffect(() => {
     spinningRef.current = spinning;
     const map = mapRef.current;
+    // «Pausar giro»: con pasos de 8 s, esperar al final del paso se notaba.
+    // Solo se detiene la animación del giro, nunca un vuelo.
+    if (!spinning && map && spinAnimatingRef.current) {
+      spinAnimatingRef.current = false;
+      map.stop();
+    }
     if (!spinning || !ready || !map) return;
     spinStartRef.current = performance.now();
     if (spinDegrees(map.getZoom()) === 0) {

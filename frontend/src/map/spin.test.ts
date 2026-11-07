@@ -9,7 +9,9 @@ import {
   REGION_BEARING,
   SLOW_SPIN_ZOOM,
   spinDegrees,
+  SPIN_CRUISE_STEP_MS,
   SPIN_STEP_MS,
+  spinStepMs,
 } from './spin';
 
 afterEach(() => {
@@ -55,5 +57,19 @@ describe('inclinación del globo', () => {
     // Negativo: el polo norte se inclina hacia la derecha.
     expect(GLOBE_BEARING).toBe(-GLOBE_TILT_DEGREES);
     expect(REGION_BEARING).toBe(0);
+  });
+});
+
+describe('spinStepMs', () => {
+  it('usa pasos cortos en la rampa y largos ya a velocidad constante', () => {
+    expect(spinStepMs(0, 2000)).toBe(SPIN_STEP_MS);
+    expect(spinStepMs(1999, 2000)).toBe(SPIN_STEP_MS);
+    expect(spinStepMs(2000, 2000)).toBe(SPIN_CRUISE_STEP_MS);
+  });
+
+  it('un paso largo avanza lo mismo por segundo que uno corto', () => {
+    const perSecondShort = spinDegrees(1.8, SPIN_STEP_MS) / (SPIN_STEP_MS / 1000);
+    const perSecondLong = spinDegrees(1.8, SPIN_CRUISE_STEP_MS) / (SPIN_CRUISE_STEP_MS / 1000);
+    expect(perSecondLong).toBeCloseTo(perSecondShort);
   });
 });
