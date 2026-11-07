@@ -10,6 +10,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type AccountProvider,
   connectAccount,
+  deleteRecipient,
+  deleteRule,
   getDeliveryOverview,
   listAccounts,
   listDeliveries,
@@ -97,6 +99,20 @@ export function useSaveRule() {
     mutationFn: ({ input, id }: { input: RuleInput; id?: number }) => saveRule(input, id),
     onSuccess: invalidate,
   });
+}
+
+export function useDeleteRecipient() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteRecipient(id),
+    // Borrar a alguien también lo quita de las reglas.
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
+export function useDeleteRule() {
+  const invalidate = useInvalidate('rules');
+  return useMutation({ mutationFn: (id: number) => deleteRule(id), onSuccess: invalidate });
 }
 
 export function useRetryDelivery() {

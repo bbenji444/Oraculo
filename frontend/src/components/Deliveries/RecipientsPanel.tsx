@@ -1,198 +1,180 @@
 /**
  * Destinatarios: a quién se le manda (ADR-0039).
  *
- * Lista con «Editar» y un formulario corto para agregar o editar (nombre,
- * correo y WhatsApp). Los errores del servidor aparecen junto a su campo.
+ * - «+ Agregar», arriba a la derecha, abre una ventana para registrar uno nuevo.
+ * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo o borrarlo.
  *
- * No hace: no decide qué recibe cada quien (eso son las reglas).
+ * No hace: no decide qué recibe cada quien (eso es la programación de envíos).
  */
-import { useId, useState } from 'react';
+import { useState } from 'react';
 
-import { useRecipients, useSaveRecipient } from '../../hooks/useDeliveries';
-import { deliveryFieldErrors, type Recipient } from '../../services/deliveries';
+import { useDeleteRecipient, useRecipients, useSaveRecipient } from '../../hooks/useDeliveries';
+import type { Recipient } from '../../services/deliveries';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
-import { HudSwitch } from '../ui/HudSwitch';
+import { Modal } from './Modal';
+import { RecipientForm } from './RecipientForm';
 
-interface Draft {
-  name: string;
-  email: string;
-  phone: string;
-  is_active: boolean;
-}
+function RecipientItem({
+  recipient,
+  open,
+  onToggle,
+}: {
+  recipient: Recipient;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const save = useSaveRecipient();
+  const remove = useDeleteRecipient();
+  const [confirm, setConfirm] = useState(false);
+  const contact = [recipient.email, recipient.phone && `WhatsApp ${recipient.phone}`]
+    .filter(Boolean)
+    .join(' · ');
 
-const EMPTY: Draft = { name: '', email: '', phone: '', is_active: true };
-
-function toDraft(r: Recipient): Draft {
-  return { name: r.name, email: r.email ?? '', phone: r.phone ?? '', is_active: r.is_active };
+  return (
+    <li className="rounded-lg border border-sky-400/15">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-slate-100">{recipient.name}</span>
+          <span className="block truncate text-xs text-slate-400">{contact}</span>
+        </span>
+        {!recipient.is_active && <HudChip tone="slate">Apagado</HudChip>}
+        <HudButton size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
+          {open ? 'Cerrar' : 'Editar'}
+        </HudButton>
+      </div>
+      {open && (
+        <div className="border-t border-sky-400/10 px-3 py-3">
+          <RecipientForm
+            initial={recipient}
+            submitLabel="Guardar cambios"
+            pending={save.isPending}
+            error={save.error}
+            onCancel={onToggle}
+            onSubmit={(input) => {
+              save.mutate({ input, id: recipient.id }, { onSuccess: onToggle });
+            }}
+            extra={
+              confirm ? (
+                <span className="ml-auto flex items-center gap-2 text-xs text-rose-200">
+                  ¿Borrar a {recipient.name}?
+                  <HudButton
+                    size="sm"
+                    variant="danger"
+                    disabled={remove.isPending}
+                    onClick={() => {
+                      remove.mutate(recipient.id);
+                    }}
+                  >
+                    Sí, borrar
+                  </HudButton>
+                  <HudButton
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setConfirm(false);
+                    }}
+                  >
+                    No
+                  </HudButton>
+                </span>
+              ) : (
+                <HudButton
+                  size="sm"
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => {
+                    setConfirm(true);
+                  }}
+                >
+                  Borrar
+                </HudButton>
+              )
+            }
+          />
+        </div>
+      )}
+    </li>
+  );
 }
 
 export function RecipientsPanel() {
   const recipients = useRecipients();
-  const save = useSaveRecipient();
-  const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [editing, setEditing] = useState<number | null>(null);
-  const id = useId();
-  const fields = deliveryFieldErrors(save.error);
-
-  function set<K extends keyof Draft>(key: K, value: Draft[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    save.mutate(
-      {
-        input: {
-          name: draft.name,
-          email: draft.email.trim() || null,
-          phone: draft.phone.trim() || null,
-          is_active: draft.is_active,
-        },
-        id: editing ?? undefined,
-      },
-      {
-        onSuccess: () => {
-          setDraft(EMPTY);
-          setEditing(null);
-        },
-      },
-    );
-  }
-
-  const errorText = (field: string) =>
-    fields[field]?.map((m) => (
-      <p key={m} className="mt-1 text-xs text-rose-300">
-        {m}
-      </p>
-    ));
+  const create = useSaveRecipient();
+  const [adding, setAdding] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   return (
     <HudPanel className="space-y-4 p-5">
-      <div>
-        <h2 className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase">
-          Destinatarios
-        </h2>
-        <p className="mt-1 text-xs text-slate-400">A quién se le manda.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase">
+            Destinatarios
+          </h2>
+          <p className="mt-1 text-xs text-slate-400">
+            A quién se le manda.
+            {recipients.data
+              ? ` ${String(recipients.data.filter((r) => r.is_active).length)} activos.`
+              : ''}
+          </p>
+        </div>
+        <HudButton
+          size="sm"
+          variant="solid"
+          onClick={() => {
+            create.reset();
+            setAdding(true);
+          }}
+        >
+          + Agregar
+        </HudButton>
       </div>
 
+      {recipients.isPending && <p className="text-sm text-slate-400">Cargando destinatarios…</p>}
       {recipients.data?.length === 0 && (
-        <p className="text-sm text-slate-400">Todavía no hay destinatarios.</p>
+        <p className="text-sm text-slate-400">Todavía no hay destinatarios. Agrega el primero.</p>
       )}
       <ul className="space-y-2">
         {recipients.data?.map((r) => (
-          <li
+          <RecipientItem
             key={r.id}
-            className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-400/15 px-3 py-2"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm text-slate-100">{r.name}</span>
-              <span className="block truncate text-xs text-slate-400">
-                {[r.email, r.phone && `WhatsApp ${r.phone}`].filter(Boolean).join(' · ')}
-              </span>
-            </span>
-            {!r.is_active && <HudChip tone="slate">Apagado</HudChip>}
-            <HudButton
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setEditing(r.id);
-                setDraft(toDraft(r));
-              }}
-            >
-              Editar
-            </HudButton>
-          </li>
+            recipient={r}
+            open={openId === r.id}
+            onToggle={() => {
+              setOpenId((current) => (current === r.id ? null : r.id));
+            }}
+          />
         ))}
       </ul>
 
-      <form
-        onSubmit={submit}
-        aria-label={editing ? 'Editar destinatario' : 'Agregar destinatario'}
-        className="space-y-3 border-t border-sky-400/10 pt-4"
-      >
-        <p className="hud-label mb-0">{editing ? 'Editar destinatario' : 'Agregar destinatario'}</p>
-        <div>
-          <label htmlFor={`${id}-name`} className="hud-label">
-            Nombre
-          </label>
-          <input
-            id={`${id}-name`}
-            value={draft.name}
-            maxLength={120}
-            onChange={(e) => {
-              set('name', e.target.value);
+      {adding && (
+        <Modal
+          title="Agregar destinatario"
+          onClose={() => {
+            setAdding(false);
+          }}
+        >
+          <RecipientForm
+            submitLabel="Agregar"
+            pending={create.isPending}
+            error={create.error}
+            onCancel={() => {
+              setAdding(false);
             }}
-            className="hud-input"
-          />
-          {errorText('name')}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor={`${id}-email`} className="hud-label">
-              Correo
-            </label>
-            <input
-              id={`${id}-email`}
-              type="email"
-              value={draft.email}
-              onChange={(e) => {
-                set('email', e.target.value);
-              }}
-              className="hud-input"
-            />
-            {errorText('email')}
-          </div>
-          <div>
-            <label htmlFor={`${id}-phone`} className="hud-label">
-              WhatsApp <span className="font-normal text-slate-500">(opcional)</span>
-            </label>
-            <input
-              id={`${id}-phone`}
-              value={draft.phone}
-              placeholder="525512345678"
-              onChange={(e) => {
-                set('phone', e.target.value);
-              }}
-              className="hud-input"
-            />
-            {errorText('phone')}
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-slate-200">Recibe envíos</span>
-          <HudSwitch
-            checked={draft.is_active}
-            onChange={(checked) => {
-              set('is_active', checked);
+            onSubmit={(input) => {
+              create.mutate(
+                { input },
+                {
+                  onSuccess: () => {
+                    setAdding(false);
+                  },
+                },
+              );
             }}
-            label="Recibe envíos"
           />
-        </div>
-        {save.error && Object.keys(fields).length === 0 && (
-          <p role="alert" className="text-xs text-rose-300">
-            {save.error.message}
-          </p>
-        )}
-        <div className="flex gap-2">
-          <HudButton type="submit" variant="solid" size="sm" disabled={save.isPending}>
-            {editing ? 'Guardar cambios' : 'Agregar'}
-          </HudButton>
-          {editing && (
-            <HudButton
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setEditing(null);
-                setDraft(EMPTY);
-              }}
-            >
-              Cancelar
-            </HudButton>
-          )}
-        </div>
-      </form>
+        </Modal>
+      )}
     </HudPanel>
   );
 }

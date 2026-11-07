@@ -24,6 +24,8 @@ export interface DeliveryOverview {
   sources: { id: string; label: string }[];
   /** Horas de las corridas automáticas (CDMX). */
   run_hours: number[];
+  /** Las mismas horas como «07:00». */
+  run_times: string[];
 }
 
 export interface DeliveryAccount {
@@ -46,13 +48,23 @@ export interface Recipient extends RecipientInput {
   id: number;
 }
 
+/** `all` = todos los destinatarios activos; `selected` = solo los elegidos. */
+export type RuleAudience = 'all' | 'selected';
+
 export interface RuleInput {
   source: string;
-  recipient_id: number;
+  name: string;
+  audience: RuleAudience;
+  /** Los elegidos (si `selected`). */
+  recipient_ids: number[];
+  /** Las excepciones (si `all`): «todos menos…». */
+  exclude_ids: number[];
   channel: DeliveryChannel;
   account_id: number | null;
-  /** Horas de la CDMX; vacío = todas las corridas. */
-  hours: number[];
+  /** Horas de la CDMX, como «07:00» o «09:30». */
+  times: string[];
+  /** 1 = lunes … 7 = domingo; vacío = todos los días. */
+  days: number[];
   is_active: boolean;
 }
 
@@ -91,6 +103,8 @@ export interface Delivery {
   created_at: string;
   sent_at: string | null;
   next_attempt_at: string | null;
+  /** Hora programada que lo mandó. */
+  scheduled_for: string | null;
   attempt_log: DeliveryAttempt[];
 }
 
@@ -167,6 +181,11 @@ export async function saveRecipient(input: RecipientInput, id?: number): Promise
   return body as Recipient;
 }
 
+/** Borra un destinatario (sus envíos pasados siguen en el historial). */
+export async function deleteRecipient(id: number): Promise<void> {
+  await requestJson(url(`/recipients/${String(id)}`), { method: 'DELETE' });
+}
+
 /** Reglas de envío. */
 export async function listRules(signal?: AbortSignal): Promise<Rule[]> {
   return asList<Rule>(await requestJson(url('/rules'), { signal }), hasId);
@@ -180,6 +199,11 @@ export async function saveRule(input: RuleInput, id?: number): Promise<Rule> {
   });
   if (!hasId(body)) throw badFormat();
   return body as Rule;
+}
+
+/** Borra una regla (sus envíos pasados siguen en el historial). */
+export async function deleteRule(id: number): Promise<void> {
+  await requestJson(url(`/rules/${String(id)}`), { method: 'DELETE' });
 }
 
 const isDelivery = (value: unknown) =>

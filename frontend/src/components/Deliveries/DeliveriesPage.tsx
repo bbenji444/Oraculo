@@ -15,7 +15,7 @@ import { SectionHeading } from '../ui/SectionHeading';
 import { AccountsPanel } from './AccountsPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { RecipientsPanel } from './RecipientsPanel';
-import { RulesPanel } from './RulesPanel';
+import { SchedulePanel } from './SchedulePanel';
 
 export function DeliveriesPage() {
   const overview = useDeliveryOverview();
@@ -54,13 +54,11 @@ export function DeliveriesPage() {
           {overview.error.message}
         </p>
       )}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <AccountsPanel emailConfigured={data?.email_configured ?? false} />
-          <RecipientsPanel />
-        </div>
-        <RulesPanel />
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <AccountsPanel emailConfigured={data?.email_configured ?? false} />
+        <RecipientsPanel />
       </div>
+      <SchedulePanel />
       <HistoryPanel />
     </div>
   );

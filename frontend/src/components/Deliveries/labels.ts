@@ -39,17 +39,3 @@ const WHEN = new Intl.DateTimeFormat('es-MX', {
 export function whenLabel(iso: string): string {
   return WHEN.format(new Date(iso));
 }
-
-/**
- * Las horas de una regla, como se leen.
- *
- * @example hoursLabel([], [7, 15, 23]) // 'Todas las corridas'
- * @example hoursLabel([7, 15], [7, 15, 23]) // '07:00 y 15:00'
- */
-export function hoursLabel(hours: readonly number[], all: readonly number[]): string {
-  if (hours.length === 0 || all.every((h) => hours.includes(h))) return 'Todas las corridas';
-  const names = hours.map((h) => `${String(h).padStart(2, '0')}:00`);
-  return names.length === 1
-    ? (names[0] ?? '')
-    : `${names.slice(0, -1).join(', ')} y ${names.at(-1) ?? ''}`;
-}

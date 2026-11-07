@@ -1,8 +1,14 @@
 /** Servicio de envíos (`/api/v1/deliveries`, ADR-0039). */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { hoursLabel } from '../components/Deliveries/labels';
-import { deliveryFieldErrors, saveRecipient, sendTest } from './deliveries';
+import { daysLabel, ruleTargets, upcomingSends } from '../components/Deliveries/schedule';
+import {
+  deliveryFieldErrors,
+  type Recipient,
+  type Rule,
+  saveRecipient,
+  sendTest,
+} from './deliveries';
 import { ApiError } from './http';
 
 function respond(body: unknown, status = 200) {
@@ -61,9 +67,75 @@ describe('servicio de envíos', () => {
     expect(deliveryFieldErrors(new Error('otro'))).toEqual({});
   });
 
-  it('dice las horas de una regla como se leen', () => {
-    expect(hoursLabel([], [7, 15, 23])).toBe('Todas las corridas');
-    expect(hoursLabel([7, 15], [7, 15, 23])).toBe('07:00 y 15:00');
-    expect(hoursLabel([23], [7, 15, 23])).toBe('23:00');
+  it('dice los días como se leen', () => {
+    expect(daysLabel([])).toBe('todos los días');
+    expect(daysLabel([1, 2, 3, 4, 5])).toBe('de lunes a viernes');
+    expect(daysLabel([6])).toBe('los sábados');
+    expect(daysLabel([1, 3])).toBe('lunes y miércoles');
+  });
+});
+
+const PEOPLE: Recipient[] = [
+  { id: 1, name: 'Benjamin', email: 'b@x.mx', phone: null, is_active: true },
+  { id: 2, name: 'Geovanni', email: 'g@x.mx', phone: null, is_active: true },
+  { id: 3, name: 'Tadeo', email: 't@x.mx', phone: null, is_active: false },
+];
+
+function rule(overrides: Partial<Rule>): Rule {
+  return {
+    id: 1,
+    source: 'monitor.corrida_fgr',
+    name: 'Regla general',
+    audience: 'all',
+    recipient_ids: [],
+    exclude_ids: [],
+    channel: 'email',
+    account_id: 1,
+    times: ['07:00', '15:00', '23:00'],
+    days: [],
+    is_active: true,
+    ...overrides,
+  };
+}
+
+describe('programación de envíos', () => {
+  it('a todos menos las excepciones, o solo a los elegidos', () => {
+    expect(ruleTargets(rule({ exclude_ids: [2] }), PEOPLE).map((r) => r.name)).toEqual([
+      'Benjamin',
+    ]);
+    expect(
+      ruleTargets(rule({ audience: 'selected', recipient_ids: [2, 3] }), PEOPLE).map((r) => r.name),
+    ).toEqual(['Geovanni']);
+  });
+
+  it('calcula los próximos envíos en hora de la Ciudad de México', () => {
+    // Viernes 6/11/2026 a las 21:00 de la CDMX (03:00 UTC del sábado).
+    const now = new Date('2026-11-07T03:00:00Z');
+    const sends = upcomingSends(
+      [
+        rule({}),
+        rule({
+          id: 2,
+          name: 'Fin de semana',
+          audience: 'selected',
+          recipient_ids: [1],
+          times: ['09:30'],
+          days: [6],
+        }),
+      ],
+      PEOPLE,
+      now,
+      3,
+    );
+
+    expect(sends.map((s) => [s.at.toISOString(), s.rule.name, s.recipients])).toEqual([
+      ['2026-11-07T05:00:00.000Z', 'Regla general', 2],
+      ['2026-11-07T13:00:00.000Z', 'Regla general', 2],
+      ['2026-11-07T15:30:00.000Z', 'Fin de semana', 1],
+    ]);
+  });
+
+  it('una regla apagada no aparece', () => {
+    expect(upcomingSends([rule({ is_active: false })], PEOPLE, new Date(), 5)).toEqual([]);
   });
 });

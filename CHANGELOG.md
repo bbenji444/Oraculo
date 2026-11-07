@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Envíos: regla general y horas libres (07/11/2026, ADR-0039, migración 0036).** Benji pidió una regla general en lugar de una regla por persona, y más opciones.
+  - **Regla general:** el reporte a todos los destinatarios activos, con excepciones («todos menos Tadeo»).
+  - **Horas y días a elegir:** cualquier hora, no solo las de las corridas. Las horas se agregan o se quitan con un clic, y los días van de lunes a domingo, con atajos «Lunes a viernes» y «Todos». A una hora sin corrida se manda el reporte más reciente.
+  - **Reglas personalizadas** para unas cuantas personas, como tarjetas que se despliegan para editar. Al lado, la lista de **próximos envíos**.
+  - **Destinatarios:** «Editar» despliega el perfil ahí mismo y «+ Agregar» abre una ventana. Ya se pueden borrar destinatarios y reglas.
 - **Sección «Envíos» (07/11/2026, ADR-0039).** Benji pidió administrar qué se manda, a quién, por qué canal y a qué hora.
   - **Cuentas de envío:** se conecta Outlook, Hotmail o Gmail con un link de autorización (Composio). WhatsApp aparece como «Próximamente».
   - **Destinatarios y reglas:** por ejemplo, «Reporte FGR → Benjamin → por correo desde Ovitech → 07:00 y 15:00».
