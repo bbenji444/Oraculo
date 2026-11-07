@@ -8,6 +8,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **La base del monitor vive en el PostgreSQL general de Oráculo (07/11/2026).** Benji: «actualmente sí se están respaldando nuestras bases de datos».
+  - Base `monitor_noticias` en `192.168.0.20` (PostgreSQL 17.9), con su propio usuario sin permisos de administrador. Entra en los respaldos del servidor general y se ve en DBeaver junto a las demás bases.
+  - El monitor sigue corriendo en la VM 108. Se copió con 0 errores y los mismos conteos, y la base anterior queda de reserva en la VM.
+
 - **El monitor corre en la VM de Proxmox (07/11/2026, docs/migracion-proxmox.md).** Ya no depende de que la PC de Benji esté prendida.
   - VM 108 «noticias» (Ubuntu 24.04). El equipo la abre por ZeroTier en `http://10.244.214.144:8080`.
   - Arranca sola al encender (servicio `monitor-noticias`). Hace las corridas de las 07:00, 15:00 y 23:00 y manda los correos; la PC quedó solo para desarrollar.

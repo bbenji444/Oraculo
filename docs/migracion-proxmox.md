@@ -14,6 +14,7 @@ El monitor corre en la máquina virtual **108 «noticias»** del Proxmox de Orá
 | El monitor | `http://10.244.214.144:8080`; desde la oficina, `http://192.168.0.42:8080` |
 | Usuario | `noticias`; el proyecto está en `/home/noticias/monitor-noticias` (rama `develop`) |
 | Arranque | Servicio de systemd `monitor-noticias`: corre `make up` al encender |
+| Base de datos | En el **PostgreSQL general de Oráculo** (`192.168.0.20`, PostgreSQL 17.9), base `monitor_noticias`, usuario `monitor` (solo esa base). Entra en los respaldos del servidor general y se ve en DBeaver dentro de la conexión `postgres`. Desde el 07/11/2026 |
 | Corridas y envíos | Prendidos en la VM. En la PC de Benji están apagados (`AUTOMATIC_RUNS_ENABLED=false`, `DELIVERIES_ENABLED=false`), así nunca corren doble |
 
 En la VM, el `.env` agrega:
@@ -63,6 +64,22 @@ journalctl -u monitor-noticias-actualizar --since today
 ```
 
 Así, lo que entra a `develop` se ve en la VM en 5 a 10 minutos. Si algún día cambian programas del sistema (no de Python ni de Node), hay que correr `make bootstrap` a mano, porque pide contraseña de administrador.
+
+## La base en el servidor general (07/11/2026)
+
+El 07/11/2026 la base pasó de la VM al PostgreSQL general de Oráculo (`192.168.0.20`) para entrar en sus respaldos. El monitor sigue corriendo en la VM 108; solo cambió dónde guarda los datos.
+
+1. **En DBeaver, con la conexión `postgres` (superusuario):**
+   - `CREATE ROLE monitor LOGIN PASSWORD '…'` y `CREATE DATABASE monitor_noticias OWNER monitor`. El usuario no es administrador: solo abre su base.
+   - Dentro de esa base, `CREATE EXTENSION` de `postgis`, `pg_trgm` y `unaccent`. Solo un superusuario puede crearlas.
+2. **La contraseña** la eligió Benji. La guardó en la VM con `~/guardar_clave.sh`, que la pide sin mostrarla y la deja en `~/.clave_bd_central` (permiso 600). Nunca pasó por el chat. Si se pierde, en DBeaver: `ALTER ROLE monitor PASSWORD '…'` y se vuelve a guardar.
+3. **Copia de los datos:**
+   - se detuvo el monitor, `pg_dump` de la base de la VM y `pg_restore --no-owner` en `192.168.0.20`;
+   - resultado: 0 errores y los mismos conteos (4,229 notas, 165,214 del índice, 299,618 regiones, 40 tablas, migración 0037).
+4. **En el `.env` de la VM** cambiaron solo `POSTGRES_HOST=192.168.0.20` y `POSTGRES_PASSWORD`. La copia anterior está en `.env.antes-servidor-general`.
+5. **De reserva:** la base vieja sigue en la VM, sin conexiones. Para regresar: `cp .env.antes-servidor-general .env` y `sudo systemctl restart monitor-noticias`. Se puede borrar cuando el servidor general lleve unos días sin problemas.
+
+La contraseña de ejemplo de `.env.example` es pública (el repositorio es público), así que no se usa en el servidor general.
 
 ## Repetir la mudanza en otra VM
 
