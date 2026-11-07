@@ -5,7 +5,8 @@ Lo que solo se usa en el servidor (la VM de Proxmox), no en WSL. La guía comple
 | Archivo | Para qué |
 |---|---|
 | `monitor-noticias.service.template` | Servicio de systemd: levanta el monitor (`make up`) al encender la VM y lo baja al apagarla. |
-| `instalar_servicio.sh` | Lo instala y habilita. Se corre una vez con `make instalar-servicio`. |
+| `sudoers-monitor-noticias.template` | Permisos mínimos de administrador: solo lo que necesitan `make up` y el servicio. |
+| `instalar_servicio.sh` | Instala el servicio y los permisos, y deja que nginx lea la carpeta. Se corre una vez con `make instalar-servicio`. |
 
 Para manejarlo después:
 
