@@ -584,3 +584,24 @@ Las escrituras piden editor o dueño con el caso abierto.
 Las rutas temporales `/local-index/*` se retiraron en la Fase 6: el índice local se consulta como un proveedor más dentro de cada búsqueda.
 
 Todas están en la documentación interactiva.
+
+## Envíos (`/deliveries`, ADR-0039)
+
+Qué se manda, a quién, por qué canal y a qué hora. Hoy, el reporte de cada corrida FGR (`source = monitor.corrida_fgr`) por correo vía Composio. WhatsApp todavía no.
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /deliveries/overview` | Si las corridas mandan (`enabled`), si el correo está listo, las fuentes y las horas de las corridas |
+| `GET /deliveries/accounts` | Cuentas de envío |
+| `POST /deliveries/accounts` | `{provider: "outlook" \| "gmail", label}`. Crea la cuenta pendiente y devuelve `connect_url` para autorizarla. `503 delivery_channel_unavailable` con WhatsApp o sin `COMPOSIO_API_KEY` |
+| `POST /deliveries/accounts/{id}/refresh` | Pregunta a Composio si ya quedó autorizada y lee su dirección |
+| `GET`, `POST /deliveries/recipients` · `PUT /deliveries/recipients/{id}` | Destinatarios `{name, email, phone, is_active}`. `422 invalid_delivery` con `details.problemas` |
+| `GET`, `POST /deliveries/rules` · `PUT /deliveries/rules/{id}` | Reglas `{source, recipient_id, channel, account_id, hours, is_active}`. `hours` vacío = todas las corridas |
+| `GET /deliveries/history?cursor=&limit=` | Guías de envío, de la más nueva a la más vieja. El destino va enmascarado |
+| `GET /deliveries/history/{id}` | Una guía con todos sus intentos (`attempt_log`) |
+| `POST /deliveries/history/{id}/retry` | Reintenta una guía fallida sin borrar sus intentos |
+| `POST /deliveries/test` | `{recipient_id, account_id}`. Manda ya la última corrida y devuelve cómo quedó |
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/deliveries/test -H 'Content-Type: application/json' -d '{"recipient_id":1,"account_id":1}'
+```

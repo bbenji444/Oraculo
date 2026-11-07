@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.adapters.delivery.factory import build_connector, build_senders
 from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
 from app.adapters.health.postgres_probe import PostgresHealthProbe
@@ -31,6 +32,8 @@ from app.adapters.persistence.case_graph_repository import PostgresCaseGraphRepo
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.categories_repository import PostgresCategoryStore
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
+from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
+from app.adapters.persistence.delivery_reports import PostgresRunReports
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
@@ -42,12 +45,16 @@ from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
+from app.api.v1.deliveries import OverviewOut, SourceOut
 from app.application.use_cases.check_health import CheckSystemHealth
+from app.application.use_cases.deliveries import SendDeliveries
 from app.application.use_cases.entities import QueueExtraction
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
+from app.domain.deliveries import SOURCES
+from app.domain.schedule import parse_run_hours
 from app.domain.sources import parse_sources
 from app.worker.celery_app import create_celery_app
 from app.worker.search_jobs import build_providers
@@ -175,6 +182,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _utc_now,
         )
         app.state.report_documents = ReportRenderer()
+        # Envíos (F12.11, ADR-0039).
+        delivery_store = PostgresDeliveryStore(engine)
+        delivery_reports = PostgresRunReports(engine)
+        app.state.delivery_store = delivery_store
+        app.state.delivery_reports = delivery_reports
+        app.state.delivery_connector = build_connector(settings)
+        app.state.delivery_sender = SendDeliveries(
+            delivery_store, delivery_reports, build_senders(settings)
+        )
+        app.state.delivery_overview = OverviewOut(
+            enabled=settings.deliveries_enabled,
+            email_configured=settings.composio_api_key is not None,
+            whatsapp_available=False,
+            sources=[SourceOut(id=k, label=v) for k, v in SOURCES.items()],
+            run_hours=sorted(parse_run_hours(settings.automatic_run_hours)),
+        )
         try:
             yield
         finally:
