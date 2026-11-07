@@ -1,8 +1,9 @@
 # Sitio de nginx del monitor de noticias (WSL o el servidor de Proxmox).
 #
 # Es una plantilla: `make up` reemplaza __PROJECT_ROOT__ por la ruta real del
-# proyecto y __LISTEN__ por las direcciones de NGINX_LISTEN (en WSL, solo
-# 127.0.0.1:8080), y la instala en /etc/nginx/sites-available/monitor-noticias.
+# proyecto, __LISTEN__ por las direcciones de NGINX_LISTEN (en WSL, solo
+# 127.0.0.1:8080) y __SENDFILE__ por NGINX_SENDFILE (en WSL, off), y la
+# instala en /etc/nginx/sites-available/monitor-noticias.
 #
 # Qué hace: sirve el frontend compilado (frontend/dist), reenvía /api a la API
 # (uvicorn en el puerto 8000) y sirve los PMTiles de geodata/output con
@@ -18,9 +19,24 @@ server {
     root __PROJECT_ROOT__/frontend/dist;
     index index.html;
 
-    # Los archivos viven en D: (montado en /mnt/d). sendfile sobre ese tipo de
-    # montaje puede entregar respuestas vacías o corruptas; se desactiva.
-    sendfile off;
+    # En WSL los archivos viven en D: (montado en /mnt/d) y sendfile sobre ese
+    # montaje puede entregar respuestas vacías o corruptas: ahí va apagado. En
+    # el servidor (NGINX_SENDFILE=on) los archivos están en su propio disco y
+    # sendfile los manda sin copiarlos por la memoria de nginx.
+    sendfile __SENDFILE__;
+
+    # Comprimir lo que es texto. El JavaScript de la pantalla pesa 2.1 MB y
+    # viajaba sin comprimir (nginx.conf solo comprime HTML): por ZeroTier
+    # tardaba varios segundos (medido el 07/11/2026). Nivel 5: casi lo mismo
+    # que el máximo con mucho menos CPU. Los PMTiles no se comprimen: ya vienen
+    # comprimidos y el mapa los pide por pedazos (Range).
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types text/css text/javascript application/javascript application/json
+               image/svg+xml text/plain application/geo+json;
 
     include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
 

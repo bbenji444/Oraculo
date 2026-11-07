@@ -6,6 +6,7 @@
 # Dos variables del .env cambian el comportamiento en el servidor:
 # - API_RELOAD=false: la API no se reinicia sola al cambiar el código.
 # - NGINX_LISTEN: dónde escucha nginx (en WSL, solo 127.0.0.1:8080).
+# - NGINX_SENDFILE=on: nginx manda los archivos sin copiarlos (en WSL, off).
 #
 # Quién lo usa: `make up`, `make down`, `make status` y `make logs`.
 # Uso directo: bash scripts/dev/servicios.sh {up|down|status|logs}
@@ -116,9 +117,9 @@ instalar_sitio_nginx() {
   for direccion in ${NGINX_LISTEN:-${DEFAULT_NGINX_LISTEN}}; do
     listen_lines+="    listen ${direccion};"$'\n'
   done
-  LISTEN_LINES="${listen_lines}" awk -v root="${ROOT_DIR}" '
+  LISTEN_LINES="${listen_lines}" awk -v root="${ROOT_DIR}" -v sendfile="${NGINX_SENDFILE:-off}" '
     /^[[:space:]]*__LISTEN__[[:space:]]*$/ { printf "%s", ENVIRON["LISTEN_LINES"]; next }
-    { gsub(/__PROJECT_ROOT__/, root); print }
+    { gsub(/__PROJECT_ROOT__/, root); gsub(/__SENDFILE__/, sendfile); print }
   ' "${ROOT_DIR}/nginx/monitor-noticias.conf.template" \
     | como_root tee "${NGINX_SITE}" >/dev/null
   como_root ln -sf "${NGINX_SITE}" "${NGINX_SITE_LINK}"
