@@ -3,7 +3,8 @@
 # el servidor (docs/migracion-proxmox.md, paso 6).
 #
 # Quién lo usa: `make instalar-servicio`, una sola vez en la VM.
-# También deja que nginx (www-data) lea la carpeta del proyecto.
+# También deja que nginx (www-data) lea la carpeta del proyecto e instala los
+# permisos mínimos de administrador para que el servicio arranque solo.
 #
 # Qué NO hace: no sirve en WSL (no tiene systemd) ni arranca nada por sí solo:
 # el servicio corre al siguiente encendido, o con
@@ -15,6 +16,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../dev/comun.sh"
 
 readonly UNIT_PATH="/etc/systemd/system/monitor-noticias.service"
+readonly SUDOERS_PATH="/etc/sudoers.d/monitor-noticias"
 
 [[ -d /run/systemd/system ]] || fallo "Este sistema no usa systemd (¿es WSL?): no hace falta el servicio."
 [[ ${EUID} -ne 0 ]] || fallo "Córrelo con el usuario del monitor, no como root."
@@ -36,3 +38,14 @@ como_root systemctl daemon-reload
 como_root systemctl enable monitor-noticias.service >/dev/null 2>&1
 ok "Instalado en ${UNIT_PATH} y habilitado al encender"
 ok "Para arrancarlo ya: sudo systemctl start monitor-noticias"
+
+paso "Instalando los permisos mínimos del monitor"
+# El servicio corre `make up`, que necesita sudo para PostgreSQL, Redis y
+# nginx. Estos permisos dejan solo eso, sin contraseña. Se revisan con visudo
+# antes de instalarlos: un archivo con errores bloquearía sudo por completo.
+tmp="$(mktemp)"
+sed "s|__USER__|$(id -un)|g" "${ROOT_DIR}/scripts/servidor/sudoers-monitor-noticias.template" > "${tmp}"
+como_root visudo -cqf "${tmp}" || { rm -f "${tmp}"; fallo "Los permisos tienen errores; no se instalaron."; }
+como_root install -m 0440 -o root -g root "${tmp}" "${SUDOERS_PATH}"
+rm -f "${tmp}"
+ok "Permisos en ${SUDOERS_PATH}"

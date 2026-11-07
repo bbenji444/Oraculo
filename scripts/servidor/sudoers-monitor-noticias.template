@@ -1,0 +1,16 @@
+# Permisos de administrador mínimos para el usuario del monitor en la VM.
+#
+# Es una plantilla: `make instalar-servicio` reemplaza __USER__ y la instala
+# en /etc/sudoers.d/monitor-noticias (revisada con visudo antes de dejarla).
+#
+# Qué permite, sin contraseña: solo lo que hacen `make up`, `make down` y
+# `make status` (PostgreSQL, Redis y nginx con `service`, y el sitio de nginx
+# del monitor) y manejar el servicio monitor-noticias. Instalar programas o
+# tocar otra cosa de la VM sigue pidiendo contraseña (decisión del 07/11/2026,
+# docs/migracion-proxmox.md).
+__USER__ ALL=(root) NOPASSWD: /usr/sbin/service postgresql *, /usr/sbin/service redis-server *, /usr/sbin/service nginx *
+__USER__ ALL=(root) NOPASSWD: /usr/bin/tee /etc/nginx/sites-available/monitor-noticias
+__USER__ ALL=(root) NOPASSWD: /usr/bin/ln -sf /etc/nginx/sites-available/monitor-noticias /etc/nginx/sites-enabled/monitor-noticias
+__USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/default
+__USER__ ALL=(root) NOPASSWD: /usr/sbin/nginx -t -q
+__USER__ ALL=(root) NOPASSWD: /usr/bin/systemctl start monitor-noticias, /usr/bin/systemctl stop monitor-noticias, /usr/bin/systemctl restart monitor-noticias
