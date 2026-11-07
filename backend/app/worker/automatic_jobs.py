@@ -15,8 +15,10 @@ con ``make corrida-fgr``. Hace lo mismo que alguien en Explorar, sin pantalla:
 
 Todo queda en PostgreSQL: la búsqueda, sus notas, la bitácora y el reporte.
 
-No hace: no decide horarios (eso es ``celery_app``) ni envía el reporte a nadie
-(WhatsApp o correo son la F12.11).
+5. si los envíos están prendidos (``DELIVERIES_ENABLED``), manda el reporte
+   según las reglas de la pantalla «Envíos» (ADR-0039).
+
+No hace: no decide horarios (eso es ``celery_app``).
 """
 
 import asyncio
@@ -46,6 +48,7 @@ from app.application.use_cases.start_search import StartSearch
 from app.core.config import Settings
 from app.domain.schedule import parse_run_hours, run_slot
 from app.domain.sources import parse_sources
+from app.worker.delivery_jobs import deliver_run
 from app.worker.search_jobs import build_providers, run_search_job
 
 logger = logging.getLogger(__name__)
@@ -157,6 +160,7 @@ async def run_automatic_job(settings: Settings, now: datetime | None = None) -> 
     )
     report = await run_search_job(settings, search_id)
     pdf_path = await _save_report(settings, search_id, slot)
+    await deliver_run(settings, search_id, slot.hour)
     return AutomaticRunSummary(search_id, slot, report, pdf_path)
 
 
