@@ -30,24 +30,44 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
+    RuleAudience,
 )
 from app.domain.errors import DeliveryNotFoundError
 
 _RULES_ALL = text(
-    "SELECT id, source, recipient_id, channel, account_id, hours, is_active "
+    "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
+    "times, days, is_active "
     "FROM delivery_rules WHERE (CAST(:source AS text) IS NULL OR source = :source) "
     "ORDER BY id"
 )
 _RULES_ACTIVE = text(
-    "SELECT id, source, recipient_id, channel, account_id, hours, is_active "
+    "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
+    "times, days, is_active "
     "FROM delivery_rules WHERE (CAST(:source AS text) IS NULL OR source = :source) "
     "AND is_active ORDER BY id"
+)
+_INSERT_RULE = text(
+    "INSERT INTO delivery_rules (source, name, audience, recipient_ids, exclude_ids, channel, "
+    "account_id, times, days, is_active) VALUES (:source, :name, :audience, "
+    "CAST(:recipient_ids AS bigint[]), CAST(:exclude_ids AS bigint[]), :channel, :account_id, "
+    "CAST(:times AS smallint[]), CAST(:days AS smallint[]), :active) "
+    "RETURNING id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
+    "times, days, is_active"
+)
+_UPDATE_RULE = text(
+    "UPDATE delivery_rules SET source = :source, name = :name, audience = :audience, "
+    "recipient_ids = CAST(:recipient_ids AS bigint[]), exclude_ids = CAST(:exclude_ids AS "
+    "bigint[]), "
+    "channel = :channel, account_id = :account_id, times = CAST(:times AS smallint[]), "
+    "days = CAST(:days AS smallint[]), is_active = :active, updated_at = now() WHERE id = :id "
+    "RETURNING id, source, name, audience, recipient_ids, exclude_ids, channel, account_id, "
+    "times, days, is_active"
 )
 _DELIVERY_SELECT = """
     SELECT d.id, d.rule_id, d.source, d.source_ref, d.channel, d.account_id, d.recipient_id,
            r.name AS recipient_name, d.destination, d.subject, d.attachment_name, d.status,
            d.attempts, d.last_error, d.provider_ref, d.is_test, d.created_at, d.sent_at,
-           d.next_attempt_at
+           d.next_attempt_at, d.scheduled_for
     FROM deliveries d LEFT JOIN delivery_recipients r ON r.id = d.recipient_id
 """
 
@@ -71,12 +91,16 @@ def _rule(row: Row) -> DeliveryRule:
     return DeliveryRule(
         row.id,
         RuleDraft(
-            row.source,
-            row.recipient_id,
-            DeliveryChannel(row.channel),
-            row.account_id,
-            tuple(row.hours or ()),
-            row.is_active,
+            source=row.source,
+            name=row.name,
+            audience=RuleAudience(row.audience),
+            recipient_ids=tuple(row.recipient_ids or ()),
+            exclude_ids=tuple(row.exclude_ids or ()),
+            channel=DeliveryChannel(row.channel),
+            account_id=row.account_id,
+            times=tuple(row.times or ()),
+            days=tuple(row.days or ()),
+            is_active=row.is_active,
         ),
     )
 
@@ -102,6 +126,7 @@ def _delivery(row: Row) -> Delivery:
         created_at=row.created_at,
         sent_at=row.sent_at,
         next_attempt_at=row.next_attempt_at,
+        scheduled_for=row.scheduled_for,
     )
 
 
@@ -281,7 +306,9 @@ class PostgresDeliveryStore:
             row = (
                 await conn.execute(
                     text(
-                        "SELECT id, source, recipient_id, channel, account_id, hours, is_active "
+                        "SELECT id, source, name, audience, recipient_ids, exclude_ids, channel, "
+                        "account_id, "
+                        "times, days, is_active "
                         "FROM delivery_rules WHERE id = :id"
                     ),
                     {"id": rule_id},
@@ -293,48 +320,63 @@ class PostgresDeliveryStore:
     def _rule_params(data: RuleDraft) -> dict[str, object]:
         return {
             "source": data.source,
-            "recipient_id": data.recipient_id,
+            "name": data.name,
+            "audience": data.audience.value,
+            "recipient_ids": list(data.recipient_ids),
+            "exclude_ids": list(data.exclude_ids),
             "channel": data.channel.value,
             "account_id": data.account_id,
-            "hours": list(data.hours),
+            "times": list(data.times),
+            "days": list(data.days),
             "active": data.is_active,
         }
 
     async def create_rule(self, data: RuleDraft) -> DeliveryRule:
         """Ver ``DeliveryStorePort.create_rule``."""
         async with self._engine.begin() as conn:
-            row = (
-                await conn.execute(
-                    text(
-                        "INSERT INTO delivery_rules "
-                        "(source, recipient_id, channel, account_id, hours, is_active) VALUES "
-                        "(:source, :recipient_id, :channel, :account_id, "
-                        "CAST(:hours AS smallint[]), :active) RETURNING id, source, recipient_id, "
-                        "channel, account_id, hours, is_active"
-                    ),
-                    self._rule_params(data),
-                )
-            ).one()
+            row = (await conn.execute(_INSERT_RULE, self._rule_params(data))).one()
         return _rule(row)
 
     async def update_rule(self, rule_id: int, data: RuleDraft) -> DeliveryRule:
         """Ver ``DeliveryStorePort.update_rule``."""
         async with self._engine.begin() as conn:
             row = (
-                await conn.execute(
-                    text(
-                        "UPDATE delivery_rules SET source = :source, recipient_id = :recipient_id, "
-                        "channel = :channel, account_id = :account_id, "
-                        "hours = CAST(:hours AS smallint[]), is_active = :active, "
-                        "updated_at = now() WHERE id = :id RETURNING id, source, recipient_id, "
-                        "channel, account_id, hours, is_active"
-                    ),
-                    {"id": rule_id, **self._rule_params(data)},
-                )
+                await conn.execute(_UPDATE_RULE, {"id": rule_id, **self._rule_params(data)})
             ).first()
         if row is None:
             raise DeliveryNotFoundError("No existe esa regla.", {"id": rule_id})
         return _rule(row)
+
+    async def delete_rule(self, rule_id: int) -> bool:
+        """Ver ``DeliveryStorePort.delete_rule``."""
+        async with self._engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    text("DELETE FROM delivery_rules WHERE id = :id RETURNING id"), {"id": rule_id}
+                )
+            ).first()
+        return row is not None
+
+    async def delete_recipient(self, recipient_id: int) -> bool:
+        """Ver ``DeliveryStorePort.delete_recipient``."""
+        async with self._engine.begin() as conn:
+            row = (
+                await conn.execute(
+                    text("DELETE FROM delivery_recipients WHERE id = :id RETURNING id"),
+                    {"id": recipient_id},
+                )
+            ).first()
+            if row is not None:
+                # Que no quede en las listas de las reglas.
+                await conn.execute(
+                    text(
+                        "UPDATE delivery_rules SET "
+                        "recipient_ids = array_remove(recipient_ids, CAST(:id AS bigint)), "
+                        "exclude_ids = array_remove(exclude_ids, CAST(:id AS bigint))"
+                    ),
+                    {"id": recipient_id},
+                )
+        return row is not None
 
     # --- Guías de envío ---
 
@@ -348,9 +390,11 @@ class PostgresDeliveryStore:
                         text(
                             "INSERT INTO deliveries (id, rule_id, source, source_ref, channel, "
                             "account_id, recipient_id, destination, subject, attachment_name, "
-                            "idempotency_key, is_test, next_attempt_at) VALUES (:id, :rule_id, "
+                            "idempotency_key, is_test, scheduled_for, next_attempt_at) VALUES "
+                            "(:id, :rule_id, "
                             ":source, :source_ref, :channel, :account_id, :recipient_id, "
-                            ":destination, :subject, :attachment, :key, :is_test, now()) "
+                            ":destination, :subject, :attachment, :key, :is_test, :scheduled_for, "
+                            "now()) "
                             "ON CONFLICT (idempotency_key) DO NOTHING RETURNING id"
                         ),
                         {
@@ -366,6 +410,7 @@ class PostgresDeliveryStore:
                             "attachment": d.attachment_name,
                             "key": d.idempotency_key,
                             "is_test": d.is_test,
+                            "scheduled_for": d.scheduled_for,
                         },
                     )
                 ).first()

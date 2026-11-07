@@ -5,7 +5,8 @@ corrida FGR) a una lista de destinatarios, según reglas que administra Benji.
 Aquí viven las reglas puras:
 
 - qué estados puede tener una guía de envío y cuándo se reintenta;
-- qué regla aplica a qué hora;
+- qué regla manda a qué hora y qué día, y a quién (todos, todos menos
+  algunos, o solo algunos);
 - cómo se valida un destinatario;
 - la llave que impide mandar dos veces lo mismo.
 
@@ -16,6 +17,7 @@ No hace: no manda nada ni lee la base (eso es de los adaptadores).
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -43,6 +45,13 @@ class AccountProvider(StrEnum):
         return (
             DeliveryChannel.WHATSAPP if self is AccountProvider.WHATSAPP else DeliveryChannel.EMAIL
         )
+
+
+class RuleAudience(StrEnum):
+    """A quién manda una regla."""
+
+    ALL = "all"  # todos los destinatarios activos (menos las excepciones)
+    SELECTED = "selected"  # solo los elegidos
 
 
 class AccountStatus(StrEnum):
@@ -80,6 +89,11 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PHONE = re.compile(r"^\d{10,15}$")
 MAX_NAME_CHARS = 120
 HOURS_IN_DAY = 24
+MINUTES_IN_DAY = HOURS_IN_DAY * 60
+MINUTES_PER_HOUR = 60
+# Días ISO: 1 = lunes … 7 = domingo.
+FIRST_DAY, LAST_DAY = 1, 7
+_TIME = re.compile(r"^(\d{1,2}):(\d{2})$")
 
 
 def next_attempt_at(attempts: int, now: datetime) -> datetime | None:
@@ -101,21 +115,71 @@ def next_attempt_at(attempts: int, now: datetime) -> datetime | None:
     return now + timedelta(minutes=RETRY_DELAYS_MINUTES[attempts - 1])
 
 
-def rule_applies(hours: tuple[int, ...], slot_hour: int) -> bool:
-    """Si una regla manda en la corrida de esa hora.
+def rule_due(times: tuple[int, ...], days: tuple[int, ...], local: datetime) -> bool:
+    """Si una regla manda en ese minuto (hora de la CDMX).
 
     Args:
-        hours: Horas de la regla (hora de la CDMX); vacío = todas.
-        slot_hour: Hora de la corrida (7, 15 o 23).
+        times: Minutos del día de la regla (09:30 = 570).
+        days: Días ISO de la regla (1 = lunes); vacío = todos.
+        local: El momento, ya en hora de la Ciudad de México.
 
     Returns:
         ``True`` si le toca.
     """
-    return not hours or slot_hour in hours
+    minute = local.hour * MINUTES_PER_HOUR + local.minute
+    return minute in times and (not days or local.isoweekday() in days)
+
+
+def rule_targets[T](
+    audience: RuleAudience,
+    recipient_ids: Sequence[int],
+    exclude_ids: Sequence[int],
+    active: Sequence[tuple[int, T]],
+) -> list[T]:
+    """A quién manda una regla, de entre los destinatarios activos.
+
+    Args:
+        audience: Todos o solo los elegidos.
+        recipient_ids: Los elegidos (si ``SELECTED``).
+        exclude_ids: Las excepciones (si ``ALL``).
+        active: ``(id, destinatario)`` de los destinatarios activos.
+
+    Returns:
+        Los destinatarios que reciben, en el orden de ``active``.
+    """
+    if audience is RuleAudience.ALL:
+        return [r for rid, r in active if rid not in exclude_ids]
+    return [r for rid, r in active if rid in recipient_ids]
+
+
+def parse_time(text: str) -> int:
+    """«09:30» → 570 (minutos del día).
+
+    Raises:
+        DeliveryValidationError: Si no es una hora válida.
+    """
+    match = _TIME.match(text.strip())
+    if match:
+        hour, minute = int(match.group(1)), int(match.group(2))
+        if hour < HOURS_IN_DAY and minute < MINUTES_PER_HOUR:
+            return hour * MINUTES_PER_HOUR + minute
+    raise DeliveryValidationError(
+        "Esa hora no es válida.",
+        {"problemas": [{"campo": "times", "mensaje": f"«{text}» no es una hora (usa 09:30)."}]},
+    )
+
+
+def format_time(minutes: int) -> str:
+    """570 → «09:30»."""
+    return f"{minutes // MINUTES_PER_HOUR:02d}:{minutes % MINUTES_PER_HOUR:02d}"
 
 
 def idempotency_key(
-    source: str, source_ref: str, channel: DeliveryChannel, destination: str
+    source: str,
+    source_ref: str,
+    channel: DeliveryChannel,
+    destination: str,
+    slot: str | None = None,
 ) -> str:
     """La llave que impide mandar dos veces lo mismo al mismo destino.
 
@@ -124,11 +188,14 @@ def idempotency_key(
         source_ref: Cuál (el id de la corrida).
         channel: Canal.
         destination: Correo o número, ya limpio.
+        slot: Hora programada sin corrida («2026-11-07 09:30»): ese reporte
+            se vuelve a mandar porque alguien lo programó así.
 
     Returns:
         Texto único por envío.
     """
-    return f"{source}|{source_ref}|{channel.value}|{destination.lower()}"
+    key = f"{source}|{source_ref}|{channel.value}|{destination.lower()}"
+    return f"{key}|{slot}" if slot else key
 
 
 def mask_destination(destination: str) -> str:
@@ -202,21 +269,34 @@ class RecipientDraft:
         return cls(clean_name, clean_email, clean_phone, is_active)
 
 
-def validate_hours(hours: tuple[int, ...]) -> tuple[int, ...]:
-    """Valida y ordena las horas de una regla.
-
-    Args:
-        hours: Horas de la CDMX (0 a 23); vacío = todas.
-
-    Returns:
-        Las horas sin repetir y ordenadas.
+def validate_times(times: Sequence[int]) -> tuple[int, ...]:
+    """Valida y ordena las horas de una regla (minutos del día).
 
     Raises:
-        DeliveryValidationError: Si alguna hora no existe.
+        DeliveryValidationError: Si no hay ninguna o alguna no existe.
     """
-    if any(h < 0 or h >= HOURS_IN_DAY for h in hours):
+    if not times:
         raise DeliveryValidationError(
-            "Las horas van de 0 a 23.",
-            {"problemas": [{"campo": "hours", "mensaje": "Hora inválida."}]},
+            "Elige al menos una hora.",
+            {"problemas": [{"campo": "times", "mensaje": "Elige al menos una hora."}]},
         )
-    return tuple(sorted(set(hours)))
+    if any(t < 0 or t >= MINUTES_IN_DAY for t in times):
+        raise DeliveryValidationError(
+            "Hora inválida.", {"problemas": [{"campo": "times", "mensaje": "Hora inválida."}]}
+        )
+    return tuple(sorted(set(times)))
+
+
+def validate_days(days: Sequence[int]) -> tuple[int, ...]:
+    """Valida y ordena los días (1 = lunes … 7 = domingo); vacío = todos.
+
+    Raises:
+        DeliveryValidationError: Si algún día no existe.
+    """
+    if any(d < FIRST_DAY or d > LAST_DAY for d in days):
+        raise DeliveryValidationError(
+            "Día inválido.", {"problemas": [{"campo": "days", "mensaje": "Día inválido."}]}
+        )
+    unique = tuple(sorted(set(days)))
+    # Los siete días son lo mismo que «todos».
+    return () if len(unique) == LAST_DAY else unique

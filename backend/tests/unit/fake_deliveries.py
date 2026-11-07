@@ -84,6 +84,12 @@ class FakeDeliveryStore:
         self.recipients[recipient_id] = Recipient(recipient_id, data)
         return self.recipients[recipient_id]
 
+    async def delete_recipient(self, recipient_id: int) -> bool:
+        return self.recipients.pop(recipient_id, None) is not None
+
+    async def delete_rule(self, rule_id: int) -> bool:
+        return self.rules.pop(rule_id, None) is not None
+
     async def list_rules(
         self, source: str | None = None, active_only: bool = False
     ) -> list[DeliveryRule]:
@@ -132,6 +138,7 @@ class FakeDeliveryStore:
                 created_at=NOW,
                 sent_at=None,
                 next_attempt_at=NOW,
+                scheduled_for=d.scheduled_for,
             )
             created.append(d.id)
         return created

@@ -2,8 +2,10 @@
 
 - ``ManageRecipients``, ``ManageRules`` y ``ManageAccounts``: lo que Benji
   administra en la pantalla «Envíos».
-- ``PlanDeliveries``: al terminar una corrida, crea una guía por cada regla que
-  le toca a esa hora.
+- ``PlanDeliveries``: crea una guía por destinatario de cada regla que manda
+  en ese momento. Al terminar una corrida (``for_run``) se manda el reporte
+  recién hecho; a una hora programada sin corrida (``scheduled``), el más
+  reciente.
 - ``SendDeliveries``: manda las guías pendientes, con reintentos (1, 5 y 30
   minutos) y un registro por intento.
 - ``SendTest``: «Mandar prueba»: la última corrida a un destinatario, ya.
@@ -16,6 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from app.application.ports.deliveries import (
     AccountConnectorPort,
@@ -33,16 +36,21 @@ from app.application.ports.deliveries import (
     RuleDraft,
 )
 from app.domain.deliveries import (
+    MINUTES_PER_HOUR,
     SOURCES,
     AccountProvider,
     AccountStatus,
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
+    RuleAudience,
+    format_time,
     idempotency_key,
     next_attempt_at,
-    rule_applies,
-    validate_hours,
+    rule_due,
+    rule_targets,
+    validate_days,
+    validate_times,
 )
 from app.domain.errors import (
     DeliveryChannelUnavailableError,
@@ -53,6 +61,8 @@ from app.domain.errors import (
 # Guías que se mandan por pasada: una corrida con muchos destinatarios se
 # reparte en varias pasadas del reloj (cada minuto).
 SEND_BATCH = 50
+MEXICO_CITY = ZoneInfo("America/Mexico_City")
+MAX_RULE_NAME = 80
 
 
 def _utc_now() -> datetime:
@@ -101,6 +111,15 @@ class ManageRecipients:
             recipient_id, RecipientDraft.validated(name, email, phone, is_active)
         )
 
+    async def delete(self, recipient_id: int) -> None:
+        """Borra un destinatario; sus envíos pasados siguen en el historial.
+
+        Raises:
+            DeliveryNotFoundError: Si no existe.
+        """
+        if not await self._store.delete_recipient(recipient_id):
+            raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
+
 
 class ManageRules:
     """Alta y edición de reglas: qué, a quién, por dónde, desde qué cuenta y cuándo."""
@@ -112,24 +131,32 @@ class ManageRules:
     async def _validated(self, data: RuleDraft) -> RuleDraft:
         if data.source not in SOURCES:
             raise _invalid("source", "Esa fuente no existe.")
-        recipient = await self._store.get_recipient(data.recipient_id)
-        if recipient is None:
-            raise _invalid("recipient_id", "Elige un destinatario que exista.")
-        if data.channel is DeliveryChannel.EMAIL:
-            if not recipient.data.email:
-                raise _invalid("recipient_id", "Ese destinatario no tiene correo.")
-            account = await self._store.get_account(data.account_id) if data.account_id else None
-            if account is None or account.provider.channel is not DeliveryChannel.EMAIL:
-                raise _invalid("account_id", "Elige la cuenta de correo desde la que se manda.")
-        elif not recipient.data.phone:
-            raise _invalid("recipient_id", "Ese destinatario no tiene WhatsApp.")
+        name = " ".join(data.name.split())
+        if not name:
+            raise _invalid("name", "Ponle un nombre a la regla.")
+        if len(name) > MAX_RULE_NAME:
+            raise _invalid("name", f"Máximo {MAX_RULE_NAME} caracteres.")
+        known = {r.id for r in await self._store.list_recipients()}
+        chosen = tuple(dict.fromkeys(i for i in data.recipient_ids if i in known))
+        excluded = tuple(dict.fromkeys(i for i in data.exclude_ids if i in known))
+        if data.audience is RuleAudience.SELECTED and not chosen:
+            raise _invalid("recipient_ids", "Elige al menos un destinatario.")
+        if data.channel is DeliveryChannel.WHATSAPP:
+            raise _invalid("channel", "WhatsApp llegará en una siguiente etapa.")
+        account = await self._store.get_account(data.account_id) if data.account_id else None
+        if account is None or account.provider.channel is not DeliveryChannel.EMAIL:
+            raise _invalid("account_id", "Elige la cuenta de correo desde la que se manda.")
         return RuleDraft(
-            data.source,
-            data.recipient_id,
-            data.channel,
-            data.account_id,
-            validate_hours(data.hours),
-            data.is_active,
+            source=data.source,
+            name=name,
+            audience=data.audience,
+            recipient_ids=chosen if data.audience is RuleAudience.SELECTED else (),
+            exclude_ids=excluded if data.audience is RuleAudience.ALL else (),
+            channel=data.channel,
+            account_id=data.account_id,
+            times=validate_times(data.times),
+            days=validate_days(data.days),
+            is_active=data.is_active,
         )
 
     async def create(self, data: RuleDraft) -> DeliveryRule:
@@ -151,6 +178,15 @@ class ManageRules:
         if await self._store.get_rule(rule_id) is None:
             raise DeliveryNotFoundError("No existe esa regla.", {"id": rule_id})
         return await self._store.update_rule(rule_id, await self._validated(data))
+
+    async def delete(self, rule_id: int) -> None:
+        """Borra una regla; sus envíos pasados siguen en el historial.
+
+        Raises:
+            DeliveryNotFoundError: Si no existe.
+        """
+        if not await self._store.delete_rule(rule_id):
+            raise DeliveryNotFoundError("No existe esa regla.", {"id": rule_id})
 
 
 class ManageAccounts:
@@ -208,20 +244,20 @@ class ManageAccounts:
 
 
 class PlanDeliveries:
-    """Crea las guías de una corrida según las reglas que le tocan."""
+    """Crea las guías que tocan: al terminar una corrida o a una hora programada."""
 
     def __init__(self, store: DeliveryStorePort, reports: ReportSourcePort) -> None:
         """Recibe el almacén y la fuente de reportes."""
         self._store = store
         self._reports = reports
 
-    async def for_run(self, source: str, source_ref: str, slot_hour: int) -> list[UUID]:
-        """Crea una guía por cada regla prendida que manda a esa hora.
+    async def for_run(self, source: str, source_ref: str, slot: datetime) -> list[UUID]:
+        """Al terminar una corrida: manda su reporte a las reglas de esa hora.
 
         Args:
             source: Fuente («monitor.corrida_fgr»).
             source_ref: La corrida (id de la búsqueda).
-            slot_hour: Hora de la corrida en la CDMX.
+            slot: Hora programada de la corrida.
 
         Returns:
             Las guías creadas (las que ya existían no se repiten).
@@ -229,16 +265,49 @@ class PlanDeliveries:
         content = await self._reports.content_for(source, source_ref)
         if content is None:
             return []
-        recipients = {r.id: r for r in await self._store.list_recipients()}
+        return await self._plan(source, content, slot.astimezone(MEXICO_CITY), slot_key=None)
+
+    async def scheduled(
+        self, source: str, now: datetime, run_minutes: frozenset[int]
+    ) -> list[UUID]:
+        """A una hora programada sin corrida: manda el reporte más reciente.
+
+        Las horas que coinciden con una corrida las atiende ``for_run``, cuando
+        el reporte ya está hecho; aquí se saltan.
+
+        Args:
+            source: Fuente.
+            now: Este minuto.
+            run_minutes: Minutos del día con corrida (07:00 = 420, …).
+
+        Returns:
+            Las guías creadas.
+        """
+        local = now.astimezone(MEXICO_CITY).replace(second=0, microsecond=0)
+        minute = local.hour * MINUTES_PER_HOUR + local.minute
+        if minute in run_minutes:
+            return []
+        ref = await self._reports.latest_ref(source)
+        content = await self._reports.content_for(source, ref) if ref else None
+        if content is None:
+            return []
+        slot_key = f"{local:%Y-%m-%d} {format_time(minute)}"
+        return await self._plan(source, content, local, slot_key=slot_key)
+
+    async def _plan(
+        self, source: str, content: ReportContent, local: datetime, slot_key: str | None
+    ) -> list[UUID]:
+        active = [(r.id, r) for r in await self._store.list_recipients() if r.data.is_active]
         planned: list[NewDelivery] = []
         for rule in await self._store.list_rules(source, active_only=True):
-            recipient = recipients.get(rule.data.recipient_id)
-            if recipient is None or not recipient.data.is_active:
+            data = rule.data
+            if not rule_due(data.times, data.days, local):
                 continue
-            if not rule_applies(rule.data.hours, slot_hour):
-                continue
-            target = _Target(rule.data.channel, recipient, rule.id, rule.data.account_id)
-            planned.append(_new_delivery(target, content, source))
+            for recipient in rule_targets(
+                data.audience, data.recipient_ids, data.exclude_ids, active
+            ):
+                target = _Target(data.channel, recipient, rule.id, data.account_id)
+                planned.append(_new_delivery(target, content, source, slot=(slot_key, local)))
         return await self._store.create_deliveries([p for p in planned if p.destination])
 
 
@@ -253,11 +322,17 @@ class _Target:
 
 
 def _new_delivery(
-    target: _Target, content: ReportContent, source: str, *, is_test: bool = False
+    target: _Target,
+    content: ReportContent,
+    source: str,
+    *,
+    is_test: bool = False,
+    slot: tuple[str | None, datetime | None] = (None, None),
 ) -> NewDelivery:
     data = target.recipient.data
     destination = (data.email if target.channel is DeliveryChannel.EMAIL else data.phone) or ""
-    key = idempotency_key(source, content.source_ref, target.channel, destination)
+    slot_key, scheduled_for = slot
+    key = idempotency_key(source, content.source_ref, target.channel, destination, slot_key)
     return NewDelivery(
         id=uuid4(),
         rule_id=target.rule_id,
@@ -272,6 +347,7 @@ def _new_delivery(
         # Las pruebas se pueden repetir: su llave lleva su propio id.
         idempotency_key=f"test|{uuid4()}|{key}" if is_test else key,
         is_test=is_test,
+        scheduled_for=scheduled_for,
     )
 
 

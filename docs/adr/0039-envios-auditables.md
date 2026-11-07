@@ -55,3 +55,21 @@ El 06/11/2026 se probó Composio a mano: un script mandó el PDF desde la cuenta
   - desde la pantalla, «Mandar prueba» de Ovitech a Benjamin con el PDF de la corrida del 06/11 a las 15:00 quedó «Enviado» en 1 intento;
   - las pruebas automáticas usan un cliente falso y nunca mandan nada.
 - **Para encender los envíos de las corridas:** revisar las reglas y poner `DELIVERIES_ENABLED=true`.
+
+## Adenda (07/11/2026): reglas abiertas y regla general
+
+Benji vio la primera versión y pidió otra forma: «eso se ve horrible, lo de que tenga una regla individual para cada persona». Quiere una **regla general** («a todos, a las 7, 3 y 11») y poder poner o quitar horas.
+
+- **Migración 0036.** Una regla ya no es «una persona + horas de corrida». Ahora tiene:
+  - `name`;
+  - `audience`: `all` (todos los destinatarios activos, menos `exclude_ids`) o `selected` (solo `recipient_ids`);
+  - `times`: minutos del día (09:30 = 570), cualquier hora, no solo las de las corridas;
+  - `days`: días ISO (1 = lunes); vacío = todos.
+
+  Las reglas viejas se convierten solas: su persona pasa a `recipient_ids` y sus horas a minutos; sin horas = 07:00, 15:00 y 23:00.
+- **Horas sin corrida.** A las horas de corrida se sigue mandando el reporte nuevo al terminarla (`PlanDeliveries.for_run`). A las demás horas, el reloj de Celery (cada minuto) manda el reporte más reciente (`PlanDeliveries.scheduled`). La llave de esas guías lleva la hora («2026-11-07 09:30») para que no se repita en el mismo minuto, y la guía guarda `scheduled_for`.
+- **Pantalla.**
+  - «Programación de envíos»: la regla general, las reglas personalizadas como tarjetas que se despliegan y los próximos envíos.
+  - Cada destinatario se edita desplegando su perfil, y «+ Agregar» abre una ventana.
+  - Se pueden borrar reglas y destinatarios. Un destinatario borrado sale de las reglas, y su historial se conserva.
+- **Alternativa descartada:** una tabla aparte de «audiencias». Por ahora basta con dos listas en la regla. Si llegan grupos («clientes de Jalisco»), se agrega una tabla de grupos sin cambiar las guías.

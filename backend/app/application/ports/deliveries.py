@@ -23,6 +23,7 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
+    RuleAudience,
 )
 
 
@@ -48,13 +49,30 @@ class Recipient:
 
 @dataclass(frozen=True, slots=True)
 class RuleDraft:
-    """Una regla validada: qué, a quién, por dónde, desde qué cuenta y cuándo."""
+    """Una regla: qué, a quién, por dónde, desde qué cuenta, a qué horas y qué días.
+
+    Attributes:
+        source: Fuente («monitor.corrida_fgr»).
+        name: Nombre para la pantalla («Regla general»).
+        audience: Todos los destinatarios activos o solo los elegidos.
+        recipient_ids: Los elegidos (si ``SELECTED``).
+        exclude_ids: Las excepciones (si ``ALL``: «todos menos Tadeo»).
+        channel: Canal.
+        account_id: Cuenta desde la que se manda (correo).
+        times: Minutos del día (09:30 = 570), hora de la CDMX.
+        days: Días ISO (1 = lunes … 7 = domingo); vacío = todos.
+        is_active: Si manda.
+    """
 
     source: str
-    recipient_id: int
+    name: str
+    audience: RuleAudience
+    recipient_ids: tuple[int, ...]
+    exclude_ids: tuple[int, ...]
     channel: DeliveryChannel
     account_id: int | None
-    hours: tuple[int, ...]
+    times: tuple[int, ...]
+    days: tuple[int, ...] = ()
     is_active: bool = True
 
 
@@ -82,6 +100,7 @@ class NewDelivery:
     attachment_name: str | None
     idempotency_key: str
     is_test: bool = False
+    scheduled_for: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +126,7 @@ class Delivery:
     created_at: datetime
     sent_at: datetime | None
     next_attempt_at: datetime | None
+    scheduled_for: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +245,10 @@ class DeliveryStorePort(Protocol):
         """Reemplaza los datos de un destinatario."""
         ...
 
+    async def delete_recipient(self, recipient_id: int) -> bool:
+        """Borra un destinatario (sus envíos pasados quedan, sin su nombre)."""
+        ...
+
     async def list_rules(
         self, source: str | None = None, active_only: bool = False
     ) -> list[DeliveryRule]:
@@ -241,6 +265,10 @@ class DeliveryStorePort(Protocol):
 
     async def update_rule(self, rule_id: int, data: RuleDraft) -> DeliveryRule:
         """Reemplaza una regla."""
+        ...
+
+    async def delete_rule(self, rule_id: int) -> bool:
+        """Borra una regla (sus envíos pasados quedan en el historial)."""
         ...
 
     async def create_deliveries(self, deliveries: Sequence[NewDelivery]) -> list[UUID]:

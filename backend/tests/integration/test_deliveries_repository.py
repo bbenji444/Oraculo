@@ -1,4 +1,4 @@
-"""Envíos contra la base de pruebas (migración 0035, ADR-0039)."""
+"""Envíos contra la base de pruebas (migraciones 0035 y 0036, ADR-0039)."""
 
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -22,6 +22,7 @@ from app.domain.deliveries import (
     DeliveryChannel,
     DeliveryStatus,
     RecipientDraft,
+    RuleAudience,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -54,7 +55,36 @@ def sync_engine(settings: Settings) -> Iterator[Engine]:
     engine.dispose()
 
 
-def new_delivery(account_id: int, recipient_id: int, rule_id: int, key: str) -> NewDelivery:
+def rule_draft(
+    account_id: int,
+    recipient_ids: tuple[int, ...],
+    times: tuple[int, ...] = (420, 900),
+    *,
+    audience: RuleAudience = RuleAudience.SELECTED,
+    days: tuple[int, ...] = (),
+    is_active: bool = True,
+) -> RuleDraft:
+    return RuleDraft(
+        source=SOURCE_FGR_RUN,
+        name="Mañana y tarde",
+        audience=audience,
+        recipient_ids=recipient_ids if audience is RuleAudience.SELECTED else (),
+        exclude_ids=recipient_ids if audience is RuleAudience.ALL else (),
+        channel=DeliveryChannel.EMAIL,
+        account_id=account_id,
+        times=times,
+        days=days,
+        is_active=is_active,
+    )
+
+
+def new_delivery(
+    account_id: int,
+    recipient_id: int,
+    rule_id: int,
+    key: str,
+    scheduled_for: datetime | None = None,
+) -> NewDelivery:
     return NewDelivery(
         id=uuid4(),
         rule_id=rule_id,
@@ -67,6 +97,7 @@ def new_delivery(account_id: int, recipient_id: int, rule_id: int, key: str) -> 
         subject="Reporte FGR",
         attachment_name="fgr.pdf",
         idempotency_key=key,
+        scheduled_for=scheduled_for,
     )
 
 
@@ -86,23 +117,46 @@ async def test_cuentas_destinatarios_y_reglas(
     edited = await store.update_recipient(
         recipient.id, RecipientDraft("Benjamin O.", "benji@hotmail.com", "525512345678")
     )
-    rule = await store.create_rule(
-        RuleDraft(SOURCE_FGR_RUN, recipient.id, DeliveryChannel.EMAIL, account.id, (7, 15))
-    )
+    rule = await store.create_rule(rule_draft(account.id, (recipient.id,)))
     off = await store.update_rule(
         rule.id,
-        RuleDraft(SOURCE_FGR_RUN, recipient.id, DeliveryChannel.EMAIL, account.id, (), False),
+        rule_draft(
+            account.id,
+            (recipient.id,),
+            (570,),
+            audience=RuleAudience.ALL,
+            days=(1, 5),
+            is_active=False,
+        ),
     )
 
     assert again.id == account.id and again.label == "Ovitech 2"
     assert (active.status, active.address) == (AccountStatus.ACTIVE, "ovitech_22@hotmail.com")
     assert [a.id for a in await store.list_accounts()] == [account.id]
     assert edited.data.phone == "525512345678"
-    assert rule.data.hours == (7, 15)
-    assert (off.data.hours, off.data.is_active) == ((), False)
+    assert (rule.data.name, rule.data.recipient_ids, rule.data.times) == (
+        "Mañana y tarde",
+        (recipient.id,),
+        (420, 900),
+    )
+    assert (off.data.audience, off.data.exclude_ids, off.data.recipient_ids) == (
+        RuleAudience.ALL,
+        (recipient.id,),
+        (),
+    )
+    assert (off.data.times, off.data.days, off.data.is_active) == ((570,), (1, 5), False)
     assert await store.list_rules(SOURCE_FGR_RUN, active_only=True) == []
     assert len(await store.list_rules()) == 1
     assert await store.get_rule(999) is None
+
+    # Borrar a un destinatario lo quita también de las reglas que lo nombran.
+    assert await store.delete_recipient(recipient.id)
+    assert not await store.delete_recipient(recipient.id)
+    gone = await store.get_rule(rule.id)
+    assert gone is not None and gone.data.exclude_ids == ()
+    assert await store.delete_rule(rule.id)
+    assert not await store.delete_rule(rule.id)
+    assert await store.list_rules() == []
 
 
 async def test_guias_idempotentes_intentos_reintento_e_historial(
@@ -113,11 +167,11 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
         AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE
     )
     recipient = await store.create_recipient(RecipientDraft("Benjamin", "benji@hotmail.com", None))
-    rule = await store.create_rule(
-        RuleDraft(SOURCE_FGR_RUN, recipient.id, DeliveryChannel.EMAIL, account.id, ())
-    )
+    rule = await store.create_rule(rule_draft(account.id, (recipient.id,)))
 
-    first = await store.create_deliveries([new_delivery(account.id, recipient.id, rule.id, "k1")])
+    first = await store.create_deliveries(
+        [new_delivery(account.id, recipient.id, rule.id, "k1", NOW)]
+    )
     repeated = await store.create_deliveries(
         [new_delivery(account.id, recipient.id, rule.id, "k1")]
     )
@@ -125,7 +179,7 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
 
     far_future = datetime.now(UTC) + timedelta(days=1)
     [due] = await store.due_deliveries(far_future, 10)
-    assert due.recipient_name == "Benjamin"
+    assert (due.recipient_name, due.scheduled_for) == ("Benjamin", NOW)
     assert await store.claim(due.id)
     assert not await store.claim(due.id)  # ya la tomó otra pasada
 

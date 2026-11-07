@@ -197,6 +197,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             whatsapp_available=False,
             sources=[SourceOut(id=k, label=v) for k, v in SOURCES.items()],
             run_hours=sorted(parse_run_hours(settings.automatic_run_hours)),
+            run_times=[
+                f"{h:02d}:00" for h in sorted(parse_run_hours(settings.automatic_run_hours))
+            ],
         )
         try:
             yield

@@ -47,7 +47,10 @@ from app.domain.deliveries import (
     SOURCES,
     AccountProvider,
     DeliveryChannel,
+    RuleAudience,
+    format_time,
     mask_destination,
+    parse_time,
 )
 from app.domain.errors import DeliveryNotFoundError
 
@@ -106,6 +109,9 @@ class OverviewOut(BaseModel):
     whatsapp_available: bool = Field(description="WhatsApp: todavía no.")
     sources: list[SourceOut]
     run_hours: list[int] = Field(description="Horas de las corridas automáticas (CDMX).")
+    run_times: list[str] = Field(
+        default_factory=list, description="Las mismas horas como «07:00» (para las reglas)."
+    )
 
 
 def get_delivery_settings(request: Request) -> OverviewOut:
@@ -176,24 +182,39 @@ class RecipientOut(RecipientIn):
 
 
 class RuleIn(BaseModel):
-    """Una regla: qué, a quién, por dónde, desde qué cuenta y cuándo."""
+    """Una regla: qué, a quién, por dónde, desde qué cuenta, a qué horas y qué días."""
 
     source: str = Field(default=SOURCE_FGR_RUN, examples=[SOURCE_FGR_RUN])
-    recipient_id: int
+    name: str = Field(default="Regla general", max_length=80)
+    audience: RuleAudience = Field(
+        default=RuleAudience.ALL,
+        description="all = todos los activos; selected = solo los elegidos.",
+    )
+    recipient_ids: list[int] = Field(default_factory=list, description="Los elegidos (selected).")
+    exclude_ids: list[int] = Field(default_factory=list, description="Excepciones (all).")
     channel: DeliveryChannel = DeliveryChannel.EMAIL
     account_id: int | None = None
-    hours: list[int] = Field(default_factory=list, description="Horas (CDMX); vacío = todas.")
+    times: list[str] = Field(
+        default_factory=list, examples=[["07:00", "15:00", "23:00"]], description="Hora de la CDMX."
+    )
+    days: list[int] = Field(
+        default_factory=list, description="1 = lunes … 7 = domingo; vacío = todos los días."
+    )
     is_active: bool = True
 
     def draft(self) -> RuleDraft:
         """La regla para el caso de uso."""
         return RuleDraft(
-            self.source,
-            self.recipient_id,
-            self.channel,
-            self.account_id,
-            tuple(self.hours),
-            self.is_active,
+            source=self.source,
+            name=self.name,
+            audience=self.audience,
+            recipient_ids=tuple(self.recipient_ids),
+            exclude_ids=tuple(self.exclude_ids),
+            channel=self.channel,
+            account_id=self.account_id,
+            times=tuple(parse_time(t) for t in self.times),
+            days=tuple(self.days),
+            is_active=self.is_active,
         )
 
 
@@ -209,10 +230,14 @@ class RuleOut(RuleIn):
         return cls(
             id=rule.id,
             source=d.source,
-            recipient_id=d.recipient_id,
+            name=d.name,
+            audience=d.audience,
+            recipient_ids=list(d.recipient_ids),
+            exclude_ids=list(d.exclude_ids),
             channel=d.channel,
             account_id=d.account_id,
-            hours=list(d.hours),
+            times=[format_time(t) for t in d.times],
+            days=list(d.days),
             is_active=d.is_active,
         )
 
@@ -263,6 +288,9 @@ class DeliveryOut(BaseModel):
     created_at: datetime
     sent_at: datetime | None
     next_attempt_at: datetime | None
+    scheduled_for: datetime | None = Field(
+        default=None, description="Hora programada que lo mandó."
+    )
     attempt_log: list[AttemptOut] = Field(default_factory=list)
 
     @classmethod
@@ -289,6 +317,7 @@ class DeliveryOut(BaseModel):
             created_at=d.created_at,
             sent_at=d.sent_at,
             next_attempt_at=d.next_attempt_at,
+            scheduled_for=d.scheduled_for,
             attempt_log=[AttemptOut.of(a) for a in attempts or []],
         )
 
@@ -384,6 +413,17 @@ async def update_recipient(recipient_id: int, body: RecipientIn, store: Store) -
     return RecipientOut.of(updated)
 
 
+@router.delete(
+    "/recipients/{recipient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar destinatario",
+    responses=error_responses(404),
+)
+async def delete_recipient(recipient_id: int, store: Store) -> None:
+    """Borra un destinatario; sus envíos pasados siguen en el historial."""
+    await ManageRecipients(store).delete(recipient_id)
+
+
 @router.get("/rules", response_model=list[RuleOut], summary="Reglas de envío")
 async def list_rules(store: Store) -> list[RuleOut]:
     """Todas las reglas."""
@@ -407,6 +447,17 @@ async def create_rule(body: RuleIn, store: Store) -> RuleOut:
 async def update_rule(rule_id: int, body: RuleIn, store: Store) -> RuleOut:
     """Reemplaza una regla (también para prenderla o apagarla)."""
     return RuleOut.of(await ManageRules(store).update(rule_id, body.draft()))
+
+
+@router.delete(
+    "/rules/{rule_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar regla",
+    responses=error_responses(404),
+)
+async def delete_rule(rule_id: int, store: Store) -> None:
+    """Borra una regla; sus envíos pasados siguen en el historial."""
+    await ManageRules(store).delete(rule_id)
 
 
 @router.get("/history", response_model=HistoryOut, summary="Historial de envíos")

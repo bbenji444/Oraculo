@@ -591,16 +591,18 @@ Qué se manda, a quién, por qué canal y a qué hora. Hoy, el reporte de cada c
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /deliveries/overview` | Si las corridas mandan (`enabled`), si el correo está listo, las fuentes y las horas de las corridas |
+| `GET /deliveries/overview` | Si las corridas mandan (`enabled`), si el correo está listo, las fuentes y las horas de las corridas (`run_times`, «07:00») |
 | `GET /deliveries/accounts` | Cuentas de envío |
 | `POST /deliveries/accounts` | `{provider: "outlook" \| "gmail", label}`. Crea la cuenta pendiente y devuelve `connect_url` para autorizarla. `503 delivery_channel_unavailable` con WhatsApp o sin `COMPOSIO_API_KEY` |
 | `POST /deliveries/accounts/{id}/refresh` | Pregunta a Composio si ya quedó autorizada y lee su dirección |
-| `GET`, `POST /deliveries/recipients` · `PUT /deliveries/recipients/{id}` | Destinatarios `{name, email, phone, is_active}`. `422 invalid_delivery` con `details.problemas` |
-| `GET`, `POST /deliveries/rules` · `PUT /deliveries/rules/{id}` | Reglas `{source, recipient_id, channel, account_id, hours, is_active}`. `hours` vacío = todas las corridas |
-| `GET /deliveries/history?cursor=&limit=` | Guías de envío, de la más nueva a la más vieja. El destino va enmascarado |
+| `GET`, `POST /deliveries/recipients` · `PUT`, `DELETE /deliveries/recipients/{id}` | Destinatarios `{name, email, phone, is_active}`. `422 invalid_delivery` con `details.problemas`. Borrar a alguien lo quita de las reglas; su historial se conserva |
+| `GET`, `POST /deliveries/rules` · `PUT`, `DELETE /deliveries/rules/{id}` | Reglas `{source, name, audience, recipient_ids, exclude_ids, channel, account_id, times, days, is_active}` (migración 0036). `audience`: `all` (todos los activos menos `exclude_ids`) o `selected` (solo `recipient_ids`). `times`: horas «HH:MM» de la Ciudad de México, al menos una. `days`: 1 = lunes … 7 = domingo; vacío = todos los días |
+| `GET /deliveries/history?cursor=&limit=` | Guías de envío, de la más nueva a la más vieja. El destino va enmascarado. `scheduled_for` es la hora programada que las creó |
 | `GET /deliveries/history/{id}` | Una guía con todos sus intentos (`attempt_log`) |
 | `POST /deliveries/history/{id}/retry` | Reintenta una guía fallida sin borrar sus intentos |
 | `POST /deliveries/test` | `{recipient_id, account_id}`. Manda ya la última corrida y devuelve cómo quedó |
+
+A la hora de una corrida (07:00, 15:00 y 23:00) se manda el reporte recién hecho, al terminarla. A cualquier otra hora (por ejemplo, 09:30) se manda el reporte de la corrida más reciente; la guía lleva la hora en su llave, así que la misma corrida puede salir a las 09:30 y otra vez a las 11:00, pero nunca dos veces a las 09:30.
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/deliveries/test -H 'Content-Type: application/json' -d '{"recipient_id":1,"account_id":1}'
