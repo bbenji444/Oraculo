@@ -1,7 +1,7 @@
 # Plan de automatización: envíos auditables del monitor y camino para renovar Oráculo
 
 - **Fecha:** 3 de noviembre de 2026
-- **Estado:** Propuesta. Espera la aprobación de Benji; no hay código todavía.
+- **Estado:** Hay un prototipo funcional de E1 y E2 (correo vía Composio) desde el 07/11/2026; ver ADR-0039. WhatsApp sigue pendiente.
 - **Fase:** F12.11 (envío automático del reporte), y el modelo a seguir para Oráculo.
 - **Lo que pidió Benji:**
   - que los reportes automáticos lleguen a un teléfono, a correos o a cualquier webhook;
