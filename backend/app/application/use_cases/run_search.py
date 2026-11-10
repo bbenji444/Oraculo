@@ -586,7 +586,11 @@ class RunSearch:
         rows: list[SearchResultRow] = []
         located = {True: 0, False: 0, None: 0}
         for w in work:
-            inside = in_region(w.primary, searched) if searched is not None else None
+            inside = (
+                in_region(w.primary, searched, w.item.article.source_domain)
+                if searched is not None
+                else None
+            )
             located[inside] += 1
             rows.extend(
                 SearchResultRow(w.stored.article_id, s.provider, s.rank, inside)

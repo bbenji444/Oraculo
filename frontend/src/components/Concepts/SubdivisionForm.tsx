@@ -10,12 +10,16 @@
  * /categories/{id}` y las palabras a `PATCH /concepts/{id}` del tema. Los
  * errores se muestran junto a su campo.
  *
+ * Desde el 09/11/2026 también crea subdivisiones (sin `category`: `POST
+ * /categories` con las palabras de su tema general) y las borra (`DELETE`:
+ * sus notas pasan a «Otros»). «Otros» no se borra.
+ *
  * No hace: no reclasifica notas; lo editado vale para las que se clasifiquen
  * después.
  */
 import { useId, useState } from 'react';
 
-import { useUpdateCategory } from '../../hooks/useCategories';
+import { useCreateCategory, useDeleteCategory, useUpdateCategory } from '../../hooks/useCategories';
 import { useUpdateConcept } from '../../hooks/useConcepts';
 import { type Category, type CategoryPatch, categoryFieldErrors } from '../../services/categories';
 import { type Concept, fieldErrors } from '../../services/concepts';
@@ -24,14 +28,21 @@ import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
 import { HudSwitch } from '../ui/HudSwitch';
+import { DeleteConfirm } from './DeleteConfirm';
 import { KeywordChips } from './KeywordChips';
 
 interface SubdivisionFormProps {
-  category: Category;
+  /** La subdivisión a editar; sin ella, se crea una nueva. */
+  category?: Category;
   /** Su tema general, si tiene (de `/concepts`). */
   topic: Concept | undefined;
   onClose: () => void;
+  /** Al crear una nueva, para abrirla ya guardada. */
+  onCreated?: (category: Category) => void;
 }
+
+// Color con que arranca una subdivisión nueva (el cian del sistema).
+const NEW_COLOR = '#00D2FF';
 
 // Mismos topes que el servidor (domain/categories.py): la IA lee la
 // descripción en cada lote.
@@ -47,7 +58,17 @@ interface Draft {
   exclude_terms: string[];
 }
 
-function toDraft(category: Category, topic: Concept | undefined): Draft {
+function toDraft(category: Category | undefined, topic: Concept | undefined): Draft {
+  if (!category) {
+    return {
+      name: '',
+      description: '',
+      color: NEW_COLOR,
+      is_active: true,
+      keywords: [],
+      exclude_terms: [],
+    };
+  }
   return {
     name: category.name,
     description: category.description,
@@ -62,18 +83,27 @@ function sameTerms(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((term, i) => term === b[i]);
 }
 
-export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormProps) {
+export function SubdivisionForm({ category, topic, onClose, onCreated }: SubdivisionFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(category, topic));
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const updateCategory = useUpdateCategory();
   const updateConcept = useUpdateConcept();
+  const createCategory = useCreateCategory();
+  const removeCategory = useDeleteCategory();
   const id = useId();
-  const saving = updateCategory.isPending || updateConcept.isPending;
-  const fields = categoryFieldErrors(updateCategory.error);
-  const termFields = fieldErrors(updateConcept.error);
+  const creating = category === undefined;
+  const saving = updateCategory.isPending || updateConcept.isPending || createCategory.isPending;
+  const fields = categoryFieldErrors(creating ? createCategory.error : updateCategory.error);
+  // Al crear, las palabras clave llegan en el mismo error que la subdivisión.
+  const termFields: { keywords?: string[]; exclude_terms?: string[] } = creating
+    ? fields
+    : fieldErrors(updateConcept.error);
   // Un error que no es de un campo (la red, el servidor) va en un aviso general.
   let general: string | null = null;
-  if (updateCategory.error && Object.keys(fields).length === 0) {
+  if (createCategory.error && Object.keys(fields).length === 0) {
+    general = createCategory.error.message;
+  } else if (updateCategory.error && Object.keys(fields).length === 0) {
     general = updateCategory.error.message;
   } else if (updateConcept.error && Object.keys(termFields).length === 0) {
     general = updateConcept.error.message;
@@ -86,6 +116,22 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    if (!category) {
+      try {
+        const created = await createCategory.mutateAsync({
+          name: draft.name,
+          description: draft.description,
+          color: draft.color,
+          is_active: draft.is_active,
+          keywords: draft.keywords,
+          exclude_terms: draft.exclude_terms,
+        });
+        onCreated?.(created);
+      } catch {
+        // El error queda en la mutación y se muestra junto a su campo.
+      }
+      return;
+    }
     const patch: CategoryPatch = {};
     if (draft.name !== category.name) patch.name = draft.name;
     if (draft.description !== category.description) patch.description = draft.description;
@@ -127,7 +173,7 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
             id={`${id}-title`}
             className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase"
           >
-            <DecodeText text={`Subdivisión «${category.name}»`} />
+            <DecodeText text={category ? `Subdivisión «${category.name}»` : 'Nueva subdivisión'} />
           </h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
             ×
@@ -201,14 +247,14 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
           <span className="text-sm text-slate-200">
             Prendida{' '}
             <span className="text-xs text-slate-500">
-              {category.is_other
+              {category?.is_other
                 ? '(«Otros» no se apaga: es a donde va lo que no encaja)'
                 : '(la IA la usa al clasificar y se puede buscar)'}
             </span>
           </span>
           <HudSwitch
             checked={draft.is_active}
-            disabled={category.is_other}
+            disabled={category?.is_other ?? false}
             onChange={(checked) => {
               set('is_active', checked);
             }}
@@ -216,7 +262,7 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
           />
         </div>
 
-        {topic ? (
+        {topic || creating ? (
           <div className="space-y-4 border-t border-sky-400/10 pt-5">
             <p className="text-xs leading-snug text-slate-400">
               Palabras del tema general. Solo, trae las notas con cualquiera de ellas; junto con la
@@ -263,7 +309,7 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
 
         <div className="flex flex-wrap items-center gap-3 border-t border-sky-400/10 pt-5">
           <HudButton type="submit" variant="solid" disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving ? 'Guardando…' : creating ? 'Agregar subdivisión' : 'Guardar cambios'}
           </HudButton>
           <HudButton variant="ghost" onClick={onClose}>
             Cerrar
@@ -273,7 +319,34 @@ export function SubdivisionForm({ category, topic, onClose }: SubdivisionFormPro
               Guardado.
             </span>
           )}
+          {category && !category.is_other && !confirmDelete && (
+            <HudButton
+              variant="danger"
+              size="sm"
+              className="ml-auto"
+              onClick={() => {
+                removeCategory.reset();
+                setConfirmDelete(true);
+              }}
+            >
+              Borrar
+            </HudButton>
+          )}
         </div>
+        {category && confirmDelete && (
+          <DeleteConfirm
+            name={category.name}
+            message={`¿Borrar «${category.name}»? Sus notas pasan a «Otros» y su tema general deja de buscarse. Si solo quieres que la IA deje de usarla, apágala y guarda.`}
+            pending={removeCategory.isPending}
+            error={removeCategory.error?.message ?? null}
+            onConfirm={() => {
+              removeCategory.mutate(category.id, { onSuccess: onClose });
+            }}
+            onCancel={() => {
+              setConfirmDelete(false);
+            }}
+          />
+        )}
       </form>
     </HudPanel>
   );

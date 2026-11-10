@@ -7,7 +7,8 @@
  *   una o varias subdivisiones. Con una subdivisión, la búsqueda trae solo
  *   notas con las dos cosas: la FGR y una palabra de la subdivisión
  *   («FGR · Homicidio»).
- * - **Temas generales**: cada subdivisión por su cuenta, sin la FGR
+ * - **Temas generales** («O buscar un delito en general»): cada subdivisión por
+ *   su cuenta, sin la FGR
  *   («solo homicidios en general»).
  *
  * Los dos bloques **no se mezclan** (Benji, 03/11/2026: «es una súper
@@ -186,6 +187,16 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
 
         {!loading && (
           <section aria-label="Fiscalía General de la República" className="space-y-2.5">
+            {/* Benji (09/11/2026) no entendía por qué «Homicidio» salía arriba
+                y abajo: cada bloque dice qué trae, con un ejemplo. */}
+            <div>
+              <p className="hud-label mb-0">Filtrar el tema por delito</p>
+              <p className="text-[11px] leading-snug text-slate-400">
+                Elige el tema y, si quieres, un delito: llegan notas del tema{' '}
+                <span className="text-slate-200">y</span> del delito. Ejemplo: «Homicidio» aquí =
+                homicidios donde aparece la FGR.
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               {bases.map((concept) => (
                 <button
@@ -206,8 +217,7 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
             {topics.length > 0 && bases.length > 0 && (
               <>
                 <p className="text-[11px] leading-snug text-slate-400">
-                  Subdivisiones: con una elegida, solo llegan notas que traen la FGR{' '}
-                  <span className="text-slate-200">y</span> la subdivisión.
+                  «Todas» trae todo lo del tema, de cualquier delito.
                 </p>
                 <div
                   role="group"
@@ -259,10 +269,10 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
             className="space-y-2.5 border-t border-sky-400/10 pt-4"
           >
             <div>
-              <p className="hud-label mb-0">Temas generales</p>
+              <p className="hud-label mb-0">O buscar un delito en general (sin el tema)</p>
               <p className="text-[11px] leading-snug text-slate-400">
-                Cada tema por su cuenta, sin la FGR: «Homicidio» trae los homicidios en general.
-                Elegir uno apaga la FGR; para homicidios de la FGR usa «Homicidio» de arriba.
+                Ejemplo: «Homicidio» aquí = todos los homicidios de la región, aparezca o no la FGR.
+                Elegir uno apaga el bloque de arriba: no se mezclan.
               </p>
             </div>
             <div

@@ -7,8 +7,13 @@
  *
  * Todo escribe en el store (`selectRegion`), igual que el clic en el globo:
  * mapa y filtros nunca se desincronizan.
+ *
+ * Sin región elegida, queda elegido «Todo México» de verdad. Antes el menú
+ * solo lo mostraba como texto de ayuda: parecía elegido, la consulta no
+ * dejaba barrer y volver a elegirlo no hacía nada porque el menú ya lo
+ * mostraba (Benji, 09/11/2026).
  */
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { useChildRegions, useRegionDetail, useRegionsByLevel } from '../../hooks/useRegions';
 import { MAX_FILTER_OPTIONS } from '../../services/regions';
@@ -58,6 +63,8 @@ export function RegionPicker() {
   const detail = useRegionDetail(regionId).data;
   const { stateId, municipalityId, localityId } = chainOf(detail);
   const states = useRegionsByLevel('state').data;
+  // México es el país de los estados (todos traen su id en parent_id).
+  const mexicoId = states?.[0]?.parent_id ?? null;
   const municipalities = useChildRegions(stateId).data;
   const localities = useChildRegions(municipalityId).data;
   // Filtro de texto para las localidades: un municipio puede tener cientos.
@@ -65,6 +72,10 @@ export function RegionPicker() {
   const shownLocalities = localities?.filter((l) =>
     l.name.toLowerCase().includes(localityFilter.trim().toLowerCase()),
   );
+
+  useEffect(() => {
+    if (regionId === null && mexicoId !== null) selectRegion(mexicoId);
+  }, [regionId, mexicoId, selectRegion]);
 
   return (
     <div className="space-y-3">
@@ -102,8 +113,7 @@ export function RegionPicker() {
           disabled={!states}
           placeholder="Todo México"
           onChange={(id) => {
-            const mexico = detail?.ancestors.find((a) => a.level === 'country');
-            selectRegion(id ?? mexico?.id ?? null);
+            selectRegion(id ?? mexicoId);
           }}
         />
         <LevelSelect

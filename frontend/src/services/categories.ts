@@ -87,8 +87,49 @@ export async function updateCategory(id: number, patch: CategoryPatch): Promise<
   return body;
 }
 
+/** Una subdivisión nueva con las palabras de su tema general (09/11/2026). */
+export interface CategoryCreate {
+  name: string;
+  description: string;
+  color: string;
+  is_active: boolean;
+  /** Palabras clave de su tema general; al menos una. */
+  keywords: string[];
+  exclude_terms: string[];
+}
+
+/**
+ * Agrega una subdivisión antes de «Otros», con su tema general.
+ *
+ * @param data La subdivisión nueva.
+ * @returns La subdivisión guardada.
+ * @throws {ApiError} `invalid_category`, `invalid_concept` o `category_name_taken`.
+ */
+export async function createCategory(data: CategoryCreate): Promise<Category> {
+  const body = await requestJson(apiUrl('categories'), { method: 'POST', body: data });
+  if (!isCategory(body)) throw badFormat();
+  return body;
+}
+
+/**
+ * Borra una subdivisión: sus notas pasan a «Otros» y su tema general se retira.
+ *
+ * @param id Id de la subdivisión (nunca «Otros»).
+ * @returns Cuántas notas pasaron a «Otros».
+ * @throws {ApiError} `category_not_found` o `invalid_category` (si es «Otros»).
+ */
+export async function deleteCategory(id: number): Promise<number> {
+  const body = (await requestJson(apiUrl(`categories/${String(id)}`), {
+    method: 'DELETE',
+  })) as { notes_moved_to_other?: unknown } | null;
+  if (typeof body?.notes_moved_to_other !== 'number') throw badFormat();
+  return body.notes_moved_to_other;
+}
+
 /** Problemas por campo de una subdivisión, como los entrega la API. */
-export type CategoryFieldErrors = Partial<Record<keyof CategoryPatch, string[]>>;
+export type CategoryFieldErrors = Partial<
+  Record<keyof CategoryPatch | 'keywords' | 'exclude_terms', string[]>
+>;
 
 /**
  * Traduce un error de la API a mensajes por campo, para mostrarlos junto a
@@ -100,13 +141,13 @@ export type CategoryFieldErrors = Partial<Record<keyof CategoryPatch, string[]>>
 export function categoryFieldErrors(error: unknown): CategoryFieldErrors {
   if (!(error instanceof ApiError)) return {};
   if (error.code === 'category_name_taken') return { name: [error.message] };
-  if (error.code !== 'invalid_category') return {};
+  if (error.code !== 'invalid_category' && error.code !== 'invalid_concept') return {};
   const problems = error.details.problemas;
   const result: CategoryFieldErrors = {};
   if (!Array.isArray(problems)) return result;
   for (const problem of problems as { campo?: unknown; mensaje?: unknown }[]) {
     if (typeof problem.campo !== 'string' || typeof problem.mensaje !== 'string') continue;
-    (result[problem.campo as keyof CategoryPatch] ??= []).push(problem.mensaje);
+    (result[problem.campo as keyof CategoryFieldErrors] ??= []).push(problem.mensaje);
   }
   return result;
 }

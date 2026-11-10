@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.api.v1.app_config import router as app_config_router
 from app.api.v1.articles import router as articles_router
 from app.api.v1.case_graph import router as case_graph_router
 from app.api.v1.cases import router as cases_router
@@ -20,6 +21,7 @@ from app.api.v1.sources import router as sources_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
+api_router.include_router(app_config_router)
 api_router.include_router(regions_router)
 api_router.include_router(concepts_router)
 api_router.include_router(searches_router)

@@ -351,9 +351,10 @@ def test_todas_por_paginas_con_cursor_y_sin_fecha_al_final(
     search_id, articles = filled
     url = f"{URL}/{search_id}/articles"
 
-    first = client.get(url, params={"relevant": "all", "limit": 1}).json()
+    first = client.get(url, params={"relevant": "all", "in_region": "all", "limit": 1}).json()
     second = client.get(
-        url, params={"relevant": "all", "limit": 1, "cursor": first["next_cursor"]}
+        url,
+        params={"relevant": "all", "in_region": "all", "limit": 1, "cursor": first["next_cursor"]},
     ).json()
 
     assert [i["article_id"] for i in first["items"]] == [articles[IZTA_SEARCHAPI.title]]
@@ -368,8 +369,15 @@ def test_todas_por_paginas_con_cursor_y_sin_fecha_al_final(
         ({"in_region": "false"}, [MADRID.title]),
         ({"in_region": "true"}, [IZTA_SEARCHAPI.title]),
         ({"in_region": "none"}, []),
-        ({"precision": "country"}, [MADRID.title]),
-        ({"precision": ["municipality", "country"]}, [IZTA_SEARCHAPI.title, MADRID.title]),
+        ({"in_region": "all"}, [IZTA_SEARCHAPI.title, MADRID.title]),
+        # Sin filtro de región, las de fuera no cuentan (09/11/2026).
+        ({}, [IZTA_SEARCHAPI.title]),
+        ({"precision": "country"}, []),
+        ({"precision": "country", "in_region": "all"}, [MADRID.title]),
+        (
+            {"precision": ["municipality", "country"], "in_region": "all"},
+            [IZTA_SEARCHAPI.title, MADRID.title],
+        ),
         ({"precision": "unknown"}, []),
     ],
 )
@@ -395,7 +403,8 @@ def test_filtro_por_concepto(
     judged = client.get(url, params={"relevant": "all", "concept_id": ids["concept"]}).json()
     other = client.get(url, params={"concept_id": ids["off"]}).json()
 
-    assert len(judged["items"]) == 2
+    # La nota de fuera de la región (París) ya no cuenta (09/11/2026).
+    assert len(judged["items"]) == 1
     assert other["items"] == []
 
 
@@ -444,9 +453,10 @@ def test_detalle_de_una_nota(client: TestClient, filled: tuple[str, dict[str, in
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"level": "state", "relevant": "all"}, ([("09", 1)], 0, 1, 0)),
-        ({"level": "municipality", "relevant": "all"}, ([("09007", 1)], 0, 1, 0)),
-        ({"level": "country", "relevant": "all"}, ([("FRA", 1), ("MEX", 1)], 0, 0, 0)),
+        # Las de fuera de la región (París) ya no se pintan (09/11/2026).
+        ({"level": "state", "relevant": "all"}, ([("09", 1)], 0, 0, 0)),
+        ({"level": "municipality", "relevant": "all"}, ([("09007", 1)], 0, 0, 0)),
+        ({"level": "country", "relevant": "all"}, ([("MEX", 1)], 0, 0, 0)),
         ({}, ([("09", 1)], 0, 0, 0)),
     ],
 )

@@ -4,7 +4,14 @@ import pytest
 
 from app.domain.geocoding import seat_area
 from app.domain.region import RegionLevel
-from app.domain.search import SearchStatus, Stage, StageCount, final_status, in_region
+from app.domain.search import (
+    SearchStatus,
+    Stage,
+    StageCount,
+    final_status,
+    in_region,
+    outlet_country,
+)
 from tests.unit import fake_gazetteer as cat
 from tests.unit.fake_gazetteer import place
 
@@ -42,6 +49,27 @@ def test_dentro_de_la_region_por_la_clave() -> None:
 def test_dentro_de_un_pais() -> None:
     assert in_region(cat.IZTAPALAPA, cat.MEXICO) is True
     assert in_region(cat.SPAIN, cat.MEXICO) is False
+
+
+def test_sin_lugar_un_medio_de_otro_pais_cuenta_como_fuera() -> None:
+    # Búsqueda del 09/11/2026: «PDI» en México traía decenas de medios .cl sin
+    # lugar en la nota (la PDI es la policía de Chile).
+    assert in_region(None, cat.MEXICO, "chilevision.cl") is False
+    assert in_region(None, cat.CDMX, "rpp.pe") is False
+    # Un medio mexicano o uno que no dice su país sigue «sin ubicación».
+    assert in_region(None, cat.MEXICO, "eluniversal.com.mx") is None
+    assert in_region(None, cat.MEXICO, "milenio.com") is None
+    assert in_region(None, cat.MEXICO, None) is None
+    # Con ubicación manda la ubicación, no el medio.
+    assert in_region(cat.IZTAPALAPA, cat.MEXICO, "chilevision.cl") is True
+
+
+def test_pais_del_medio_por_su_dominio() -> None:
+    assert outlet_country("adnradio.cl") == "CHL"
+    assert outlet_country("ELPAIS.ES") == "ESP"
+    assert outlet_country("eluniversal.com.mx") == "MEX"
+    assert outlet_country("milenio.com") is None
+    assert outlet_country("") is None
 
 
 def test_la_localidad_cabecera_homonima_vale_por_su_municipio() -> None:

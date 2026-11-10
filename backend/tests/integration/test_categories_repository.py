@@ -15,6 +15,7 @@ from app.application.audit import Actor, AuditEntry
 from app.core.config import Settings
 from app.domain.authority import Authority
 from app.domain.categories import CategoryChanges, CategoryChoice, other_category
+from app.domain.concept import ConceptDraft
 from app.domain.errors import CategoryNameTakenError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -230,3 +231,72 @@ async def test_editar_con_el_nombre_de_otra_subdivision_es_conflicto(
     # Nada se guardó a medias: ni la categoría ni su tema.
     after = await store.get_category(HOMICIDIO_ID)
     assert after is not None and after.name == current.name
+
+
+async def test_agregar_y_borrar_una_subdivision(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Benji, 09/11/2026: las subdivisiones se agregan y se borran.
+    store = PostgresCategoryStore(test_engine)
+    actor = Actor("prueba-alta-baja-subdivisiones")
+    before = await store.all_categories()
+    topic = ConceptDraft.validated(
+        name="Prueba Feminicidio",
+        description="",
+        keywords=("feminicidio",),
+        exclude_terms=(),
+        color="#FF4D6D",
+    )
+    template = CategoryChanges("Prueba Feminicidio", "Asesinato de mujeres", "#FF4D6D")
+    created = await store.create_category(
+        template.apply_to(before[0]),
+        topic,
+        actor.user_id,
+        AuditEntry(actor, "category.created", {}),
+    )
+    try:
+        after = await store.all_categories()
+        # Va antes de «Otros», que sigue al final, y trae su tema general.
+        assert [c.name for c in after][-2:] == ["Prueba Feminicidio", "Otros"]
+        assert created.topic_concept_id is not None
+        note = _article(sync_engine, "feminicidio", "Nota de prueba", None, None)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("UPDATE articles SET category_id = :c WHERE id = :a"),
+                {"c": created.category_id, "a": note},
+            )
+
+        moved = await store.delete_category(created, AuditEntry(actor, "category.deleted", {}))
+
+        assert moved == 1
+        assert [c.name for c in await store.all_categories()] == [c.name for c in before]
+        with sync_engine.connect() as conn:
+            category_name = conn.execute(
+                text(
+                    "SELECT c.name FROM articles a JOIN categories c ON c.id = a.category_id "
+                    "WHERE a.id = :a"
+                ),
+                {"a": note},
+            ).scalar_one()
+            topic_row = conn.execute(
+                text("SELECT deleted_at IS NOT NULL, category_id FROM concepts WHERE id = :t"),
+                {"t": created.topic_concept_id},
+            ).one()
+            actions = conn.execute(
+                text(
+                    "SELECT action, payload->>'notes_moved_to_other' FROM audit_log "
+                    "WHERE user_id = :u ORDER BY id"
+                ),
+                {"u": actor.user_id},
+            ).all()
+        assert category_name == "Otros"
+        assert tuple(topic_row) == (True, None)
+        assert [tuple(a) for a in actions] == [
+            ("category.created", None),
+            ("category.deleted", "1"),
+        ]
+    finally:
+        with sync_engine.begin() as conn:
+            conn.execute(text("DELETE FROM concepts WHERE name = 'Prueba Feminicidio'"))
+            conn.execute(text("DELETE FROM categories WHERE name = 'Prueba Feminicidio'"))
+            conn.execute(text("DELETE FROM audit_log WHERE user_id = :u"), {"u": actor.user_id})

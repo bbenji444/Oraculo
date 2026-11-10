@@ -33,11 +33,11 @@ _RUN = text(
 )
 _CATEGORIES = text(
     """
-    SELECT coalesce(c.name, 'Sin clasificar') AS name, count(*) AS notes
+    SELECT coalesce(c.name, 'Sin clasificar') AS name, count(DISTINCT a.id) AS notes
     FROM search_results sr
     JOIN articles a ON a.id = sr.article_id
     LEFT JOIN categories c ON c.id = a.category_id
-    WHERE sr.search_id = CAST(:id AS uuid)
+    WHERE sr.search_id = CAST(:id AS uuid) AND sr.in_region IS NOT FALSE
     GROUP BY 1 ORDER BY notes DESC, name LIMIT :limit
     """
 )

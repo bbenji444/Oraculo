@@ -24,6 +24,8 @@ import { HistoryPage } from './components/History/HistoryPage';
 import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 import { HudTabs } from './components/ui/HudTabs';
+import { useAppConfig } from './hooks/useAppConfig';
+import { safeOraculoUrl } from './services/appConfig';
 import { installSpotlight } from './ui/spotlight';
 
 type Tab =
@@ -92,6 +94,24 @@ function BrandGlobe() {
   );
 }
 
+/**
+ * Botón para regresar al sistema principal de Oráculo (Benji, 09/11/2026).
+ * Solo aparece si el servidor tiene ORACULO_URL.
+ */
+function OraculoLink() {
+  const url = safeOraculoUrl(useAppConfig().data?.oraculo_url);
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      className="hud-btn hud-btn--sm shrink-0 whitespace-nowrap"
+      title="Regresar al sistema principal de Oráculo"
+    >
+      ← Oráculo
+    </a>
+  );
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>(tabFromHash);
   // Explorar se monta la primera vez que se visita y ya no se desmonta: cada
@@ -154,6 +174,7 @@ export function App() {
             className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
           />
           <HudTabs tabs={TABS} active={tab} label="Secciones" />
+          <OraculoLink />
         </div>
       </header>
       {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás

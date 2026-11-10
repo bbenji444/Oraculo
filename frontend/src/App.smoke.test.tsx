@@ -56,6 +56,7 @@ const SEARCH_ID = search.search_id;
 // Ruta de cada respuesta grabada (sin la base /api/v1 ni los parámetros).
 const ROUTES: Record<string, unknown> = {
   concepts,
+  'app-config': { oraculo_url: 'http://172.25.18.234' },
   'regions/search': regionsSearch,
   'regions/272': jalisco,
   regions: states,
@@ -302,6 +303,12 @@ describe('flujo principal (H1, Centro de mando)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Expediente ·/ }));
     expect(screen.getByRole('complementary', { name: 'Expediente de la consulta' })).toBeTruthy();
   }, 15000);
+
+  it('el encabezado lleva de regreso al sistema principal de Oráculo', async () => {
+    renderApp();
+    const link = await screen.findByRole('link', { name: '← Oráculo' });
+    expect(link.getAttribute('href')).toBe('http://172.25.18.234/');
+  });
 
   it('reabrir una búsqueda del Historial no gasta nada', async () => {
     window.location.hash = '#/historial';

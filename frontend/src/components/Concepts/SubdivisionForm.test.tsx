@@ -115,3 +115,73 @@ describe('SubdivisionForm', () => {
     });
   });
 });
+
+describe('SubdivisionForm: agregar y borrar (09/11/2026)', () => {
+  it('agrega una subdivisión con las palabras de su tema general', async () => {
+    const spy = stubApi();
+    const onCreated = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <SubdivisionForm topic={undefined} onClose={vi.fn()} onCreated={onCreated} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Feminicidio' } });
+    fireEvent.change(screen.getByLabelText('Palabras clave'), {
+      target: { value: 'feminicidio,' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar subdivisión' }));
+
+    await waitFor(() => {
+      expect(onCreated).toHaveBeenCalled();
+    });
+    const [url, init] = spy.mock.calls[0] ?? [];
+    expect([url, init?.method]).toEqual(['/api/v1/categories', 'POST']);
+    expect(JSON.parse(init?.body as string)).toEqual({
+      name: 'Feminicidio',
+      description: '',
+      color: '#00D2FF',
+      is_active: true,
+      keywords: ['feminicidio'],
+      exclude_terms: [],
+    });
+  });
+
+  it('borrar pide confirmación y avisa que sus notas pasan a «Otros»', async () => {
+    const spy = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ notes_moved_to_other: 3 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    vi.stubGlobal('fetch', spy);
+    const onClose = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <SubdivisionForm category={HOMICIDIO} topic={TOPIC} onClose={onClose} />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar' }));
+    expect(screen.getByRole('alertdialog').textContent).toContain('pasan a «Otros»');
+    expect(spy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, borrar' }));
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+    expect(spy.mock.calls[0]?.[0]).toBe('/api/v1/categories/5');
+    expect(spy.mock.calls[0]?.[1]?.method).toBe('DELETE');
+  });
+
+  it('«Otros» no se puede borrar', () => {
+    stubApi();
+    renderForm(OTROS, undefined);
+
+    expect(screen.queryByRole('button', { name: 'Borrar' })).toBeNull();
+  });
+});

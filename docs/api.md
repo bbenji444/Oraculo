@@ -70,6 +70,14 @@ Responde la subdivisión como quedó. Si no existe, `404 category_not_found`. Si
 curl -s -X PATCH http://localhost:8080/api/v1/categories/5 -H 'Content-Type: application/json' -d '{"color":"#FF4D6D"}'
 ```
 
+`POST /categories` (09/11/2026) agrega una subdivisión antes de «Otros», con su tema general: `{name, description, color, is_active, keywords, exclude_terms}`. Pide nombre, color (`#RRGGBB`) y al menos una palabra clave. Responde `201` con la subdivisión, que trae `topic_concept_id`. Errores: `422 invalid_category`/`invalid_concept` con `details.problemas`, o `409 category_name_taken`. La IA la usa con las notas que se clasifiquen después. Queda en la bitácora (`category.created`).
+
+`DELETE /categories/{id}` borra una subdivisión. Sus notas pasan a «Otros» y su tema general se retira (borrado lógico: las búsquedas pasadas conservan su nombre). Responde `{notes_moved_to_other}`. «Otros» no se borra (`422 invalid_category`). Queda en la bitácora (`category.deleted`, con cuántas notas se movieron).
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/categories -H 'Content-Type: application/json' -d '{"name":"Feminicidio","description":"Asesinato de mujeres por razón de género","color":"#FF4D6D","keywords":["feminicidio","feminicidios"]}'
+```
+
 ## Fuentes de la búsqueda (switches)
 
 `GET /sources`. Una por fuente, en el orden de pantalla. Las que no están configuradas (`configured: false`) se muestran apagadas y no se pueden encender. `slow: true` = abre un navegador real (BrowserWork, ADR-0028): tarda más y, si pide captcha, esa fuente se omite y la búsqueda queda `partial`. BrowserWork está programado pero **oculto** desde el 25/10/2026 hasta que corrija sus links; mientras tanto no aparece aquí y pedirlo responde `422`.
@@ -227,7 +235,7 @@ curl -s 'http://localhost:8080/api/v1/searches?limit=1'
 | Parámetro | Qué hace |
 |---|---|
 | `relevant` | `true` (por defecto): solo las relevantes para algún concepto; `all`: todas |
-| `in_region` | `true`: dentro de la región; `false`: fuera; `none`: sin ubicación |
+| `in_region` | `true`: dentro de la región; `false`: fuera; `none`: sin ubicación; `all`: todas. **Sin valor: dentro y sin ubicación**; las de fuera no cuentan (ADR-0041) |
 | `precision` | `country`, `state`, `municipality`, `locality` o `unknown` (sin ubicación); se puede repetir |
 | `concept_id` | Solo las de ese concepto |
 | `limit` y `cursor` | Página (1 a 200, por defecto 50) |
@@ -578,6 +586,7 @@ Las escrituras piden editor o dueño con el caso abierto.
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
+- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url}`, la dirección del sistema principal de Oráculo para el botón «← Oráculo» (`ORACULO_URL`; sin valor, no hay botón).
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
 

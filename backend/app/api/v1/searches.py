@@ -262,7 +262,12 @@ async def list_search_articles(  # noqa: PLR0913 — un parámetro de URL por fi
     ] = "true",
     in_region: Annotated[
         InRegion | None,
-        Query(description="true: dentro; false: fuera; none: sin ubicación."),
+        Query(
+            description=(
+                "true: dentro; false: fuera; none: sin ubicación; all: todas. Sin valor: "
+                "dentro y sin ubicación (las de fuera de la región no cuentan)."
+            )
+        ),
     ] = None,
     precision: Annotated[
         list[str] | None,
