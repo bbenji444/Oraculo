@@ -21,12 +21,14 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.domain.errors import (
+    AuthenticationRequiredError,
     ConflictError,
     DomainError,
     ForbiddenError,
     InvalidRequestError,
     NotFoundError,
     ServiceUnavailableError,
+    TooManyAttemptsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +49,9 @@ class ErrorOut(BaseModel):
 
 
 _ERROR_DESCRIPTIONS = {
+    status.HTTP_401_UNAUTHORIZED: "Falta entrar con una llave de acceso válida",
     status.HTTP_403_FORBIDDEN: "Tu rol no permite esta acción",
+    status.HTTP_429_TOO_MANY_REQUESTS: "Demasiados intentos; espera unos minutos",
     status.HTTP_404_NOT_FOUND: "No encontrado",
     status.HTTP_409_CONFLICT: "Choca con algo que ya existe o con un tope",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "Petición inválida",
@@ -100,17 +104,22 @@ def error_response(
     return JSONResponse(status_code=status_code, content=body.model_dump())
 
 
+# El primero que coincida manda (las subclases heredan el código de su padre).
+_STATUS_BY_ERROR: tuple[tuple[type[DomainError], int], ...] = (
+    (AuthenticationRequiredError, status.HTTP_401_UNAUTHORIZED),
+    (TooManyAttemptsError, status.HTTP_429_TOO_MANY_REQUESTS),
+    (ForbiddenError, status.HTTP_403_FORBIDDEN),
+    (NotFoundError, status.HTTP_404_NOT_FOUND),
+    (ConflictError, status.HTTP_409_CONFLICT),
+    (InvalidRequestError, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    (ServiceUnavailableError, status.HTTP_503_SERVICE_UNAVAILABLE),
+)
+
+
 def _status_for(error: DomainError) -> int:
-    if isinstance(error, ForbiddenError):
-        return status.HTTP_403_FORBIDDEN
-    if isinstance(error, NotFoundError):
-        return status.HTTP_404_NOT_FOUND
-    if isinstance(error, ConflictError):
-        return status.HTTP_409_CONFLICT
-    if isinstance(error, InvalidRequestError):
-        return status.HTTP_422_UNPROCESSABLE_CONTENT
-    if isinstance(error, ServiceUnavailableError):
-        return status.HTTP_503_SERVICE_UNAVAILABLE
+    for kind, code in _STATUS_BY_ERROR:
+        if isinstance(error, kind):
+            return code
     return status.HTTP_400_BAD_REQUEST
 
 

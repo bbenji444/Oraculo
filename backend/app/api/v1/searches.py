@@ -18,6 +18,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
+from app.api.auth import CurrentUser
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.articles import Articles
 from app.api.v1.concepts import get_actor
@@ -185,12 +186,21 @@ SearchId = Annotated[UUID, Path(description="Id de la búsqueda.")]
 @router.get("", response_model=SearchPageOut, summary="Historial de búsquedas")
 async def list_searches(
     reader: Reader,
-    actor: CurrentActor,
+    user: CurrentUser,
+    scope: Annotated[
+        Literal["mine", "all"],
+        Query(
+            description="mine: las mías (y las automáticas, si eres superusuario); "
+            "all: las de todos (solo superusuarios)."
+        ),
+    ] = "mine",
     cursor: Annotated[str | None, Query(description="Cursor de la página anterior.")] = None,
     limit: Annotated[int, Query(description="Tamaño de página (1 a 100).")] = DEFAULT_PAGE_SIZE,
 ) -> SearchPageOut:
-    """Búsquedas de la persona, de la más reciente a la más vieja."""
-    page = await ListSearches(reader).execute(actor.user_id, cursor, limit)
+    """Búsquedas de la persona, de la más reciente a la más vieja (ADR-0042)."""
+    page = await ListSearches(reader).execute(
+        user, everyone=scope == "all", cursor=cursor, limit=limit
+    )
     return SearchPageOut.from_page(page)
 
 

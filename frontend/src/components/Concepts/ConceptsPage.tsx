@@ -11,9 +11,14 @@
  * Debajo de la tabla, las subdivisiones (02/11/2026, ADR-0038): todas, también
  * las apagadas. Cada una se edita a la derecha con las palabras de su tema
  * general; por eso los temas no se repiten en la tabla de conceptos.
+ *
+ * Etapa 1 del acceso con llave (ADR-0042): solo un superusuario crea o cambia
+ * conceptos y subdivisiones. Un usuario normal los ve y los prueba, sin
+ * botones para crear (el servidor también lo impide).
  */
 import { useState } from 'react';
 
+import { useMe } from '../../hooks/useAuth';
 import { useCategories } from '../../hooks/useCategories';
 import { useConcepts, useUpdateConcept } from '../../hooks/useConcepts';
 import type { Concept } from '../../services/concepts';
@@ -37,6 +42,7 @@ export function ConceptsPage() {
   const concepts = useConcepts();
   const categories = useCategories(true);
   const toggle = useUpdateConcept();
+  const canChange = useMe().data?.role === 'superuser';
   const [editing, setEditing] = useState<Editing>({ kind: 'none' });
   const all = concepts.data ?? [];
   // Los temas generales se editan con su subdivisión, abajo.
@@ -63,16 +69,23 @@ export function ConceptsPage() {
               concepts.isSuccess ? ` ${String(activeCount)} de ${String(list.length)} activos.` : ''
             }`}
             actions={
-              <HudButton
-                variant="solid"
-                onClick={() => {
-                  setEditing({ kind: 'new' });
-                }}
-              >
-                + Nuevo concepto
-              </HudButton>
+              canChange ? (
+                <HudButton
+                  variant="solid"
+                  onClick={() => {
+                    setEditing({ kind: 'new' });
+                  }}
+                >
+                  + Nuevo concepto
+                </HudButton>
+              ) : undefined
             }
           />
+          {!canChange && (
+            <p className="mt-3 text-xs text-slate-400">
+              Puedes abrir y probar los conceptos. Por ahora solo un superusuario los crea o cambia.
+            </p>
+          )}
         </div>
 
         <HudPanel className="overflow-hidden p-1.5">
@@ -114,13 +127,15 @@ export function ConceptsPage() {
             title="Subdivisiones"
             description="Con ellas la IA clasifica cada nota y, con las palabras de su tema, se buscan solas o junto con la FGR."
             actions={
-              <HudButton
-                onClick={() => {
-                  setEditing({ kind: 'new-subdivision' });
-                }}
-              >
-                + Nueva subdivisión
-              </HudButton>
+              canChange ? (
+                <HudButton
+                  onClick={() => {
+                    setEditing({ kind: 'new-subdivision' });
+                  }}
+                >
+                  + Nueva subdivisión
+                </HudButton>
+              ) : undefined
             }
           />
         </div>

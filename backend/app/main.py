@@ -15,8 +15,9 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.cache.redis_sessions import RedisLoginLimiter, RedisSessionStore
 from app.adapters.delivery.factory import build_connector, build_senders
 from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
@@ -28,6 +29,8 @@ from app.adapters.llm.factory import (
     build_summarizer,
     llm_info,
 )
+from app.adapters.persistence.access_repository import PostgresAccessStore
+from app.adapters.persistence.access_scope import create_api_engine
 from app.adapters.persistence.case_graph_repository import PostgresCaseGraphRepository
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.categories_repository import PostgresCategoryStore
@@ -44,10 +47,12 @@ from app.adapters.persistence.search_repository import PostgresArticleStore, Pos
 from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
+from app.api.auth import dev_user, install_auth
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
 from app.api.v1.app_config import AppConfigOut
 from app.api.v1.deliveries import OverviewOut, SourceOut
+from app.application.use_cases.access import AccessAdmin, Authenticator, SessionPolicy
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.deliveries import SendDeliveries
 from app.application.use_cases.entities import QueueExtraction
@@ -105,6 +110,42 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
     app.state.app_config = AppConfigOut(oraculo_url=settings.oraculo_url)
 
 
+# Pimienta del modo dev cuando el .env no trae una: las llaves que se creen en
+# la PC no sirven en el servidor (allá la pimienta es otra y secreta).
+_DEV_PEPPER = b"solo-desarrollo-no-usar-en-servidor"
+_SECONDS_PER_HOUR = 3600
+_SECONDS_PER_MINUTE = 60
+
+
+def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: Redis) -> None:
+    """Llaves, sesiones y administración de accesos (ADR-0042)."""
+    pepper = (
+        settings.auth_key_pepper.get_secret_value().encode()
+        if settings.auth_key_pepper
+        else _DEV_PEPPER
+    )
+    store = PostgresAccessStore(engine)
+    sessions = RedisSessionStore(redis)
+    app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now)
+    if settings.auth_mode == "keys":
+        app.state.authenticator = Authenticator(
+            store=store,
+            sessions=sessions,
+            limiter=RedisLoginLimiter(
+                redis,
+                settings.auth_login_max_failures,
+                settings.auth_login_window_minutes * _SECONDS_PER_MINUTE,
+            ),
+            pepper=pepper,
+            policy=SessionPolicy(
+                max_seconds=int(settings.auth_session_hours * _SECONDS_PER_HOUR),
+                idle_seconds=settings.auth_session_idle_minutes * _SECONDS_PER_MINUTE,
+                recheck_seconds=settings.auth_session_recheck_seconds,
+            ),
+            clock=_utc_now,
+        )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Crea la aplicación FastAPI.
 
@@ -121,7 +162,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # pool_pre_ping descarta conexiones muertas (por ejemplo, si
         # PostgreSQL se reinició) antes de usarlas.
-        engine = create_async_engine(settings.database_url(), pool_pre_ping=True)
+        # Cada transacción lleva quién pide, para la seguridad por filas (0039).
+        engine = create_api_engine(settings.database_url(), pool_pre_ping=True)
         redis_client = Redis.from_url(
             settings.redis_url,
             socket_timeout=settings.health_check_timeout_seconds,
@@ -145,7 +187,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.concept_repository = PostgresConceptRepository(engine)
         # Casos de investigación (Fase 9.3): acceso por caso y bitácora.
         app.state.case_repository = PostgresCaseRepository(engine)
-        app.state.dev_user = settings.dev_user
         # Entidades de los casos (Fase 9.4): la IA lee cada nota nueva en el worker.
         app.state.entity_repository = PostgresEntityRepository(engine)
         app.state.extraction_queue = QueueExtraction(
@@ -209,6 +250,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.report_documents = ReportRenderer()
         _wire_deliveries(app, settings, engine)
+        _wire_access(app, settings, engine, redis_client)
         try:
             yield
         finally:
@@ -231,6 +273,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
     register_error_handlers(app)
+    # Fuera del lifespan: el candado debe existir aunque las pruebas no lo corran.
+    app.state.auth_mode = settings.auth_mode
+    app.state.auth_cookie_secure = settings.auth_cookie_secure
+    app.state.dev_auth_user = dev_user(settings.dev_user)
+    install_auth(app)
     app.include_router(api_router, prefix=API_PREFIX)
     return app
 

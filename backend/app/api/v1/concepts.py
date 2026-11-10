@@ -1,18 +1,18 @@
 """Endpoints ``/api/v1/concepts`` (especificación §13).
 
-Routers delgados: reciben parámetros, arman el ``Actor`` (usuario de
-desarrollo + IP) y llaman a un caso de uso. Las rutas ``/preview`` se
+Routers delgados: reciben parámetros, arman el ``Actor`` (la persona
+que entró con su llave + IP) y llaman a un caso de uso. Las rutas ``/preview`` se
 declaran antes que ``/{concept_id}`` para que FastAPI no las confunda.
 
 No hace: no valida reglas de negocio; sus errores los traduce
 ``app.api.errors`` al formato uniforme.
 """
 
-import ipaddress
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
+from app.api.auth import client_ip, get_current_user
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.regions import get_region_repository
 from app.api.v1.schemas.concepts import (
@@ -72,39 +72,19 @@ def get_preview_providers(request: Request) -> tuple[Provider, ...]:
     return planner.offered_providers()
 
 
-def client_ip(request: Request) -> str | None:
-    """IP de quien hace la petición, o ``None`` si no es una IP válida.
-
-    El "host" del cliente no siempre es una IP (el cliente de pruebas dice
-    ``testclient``; un socket Unix no tiene), y la columna ``audit_log.ip``
-    es de tipo ``inet``: guardar texto rompería el registro de auditoría.
-
-    Args:
-        request: Petición actual.
-
-    Returns:
-        La IP en texto, o ``None``.
-    """
-    host = request.client.host if request.client else None
-    if host is None:
-        return None
-    try:
-        return str(ipaddress.ip_address(host))
-    except ValueError:
-        return None
-
-
 def get_actor(request: Request) -> Actor:
-    """Quién hace la petición: el usuario fijo de desarrollo hasta F8, y su IP.
+    """Quién hace la petición (la persona que reconoció el candado) y su IP.
 
     Args:
         request: Petición actual.
 
     Returns:
         El actor para la bitácora.
+
+    Raises:
+        AuthenticationRequiredError: Si la ruta no pasó por el candado.
     """
-    user: str = request.app.state.dev_user
-    return Actor(user, client_ip(request))
+    return Actor(get_current_user(request).username, client_ip(request))
 
 
 Concepts = Annotated[ConceptRepositoryPort, Depends(get_concept_repository)]

@@ -165,6 +165,11 @@ class SearchOut(BaseModel):
     """Una búsqueda: estado, avance y costo. La pantalla la consulta mientras corre."""
 
     search_id: str
+    user_id: str = Field(
+        default="",
+        examples=["benji"],
+        description="Quién la lanzó (monitor-automatico en las corridas automáticas).",
+    )
     status: str = Field(
         examples=["running"], description="pending, running, completed, partial o failed."
     )
@@ -203,7 +208,7 @@ class SearchOut(BaseModel):
         default=SearchTrigger.MANUAL,
         description=(
             "Quién la lanzó: manual (una persona) o automatic (el monitor FGR a las "
-            "07:00, 15:00 o 23:00, ADR-0031). Las automáticas las ven todos."
+            "07:00, 15:00 o 23:00, ADR-0031). Las automáticas las ven los superusuarios."
         ),
     )
     scheduled_for: datetime | None = Field(
@@ -232,6 +237,7 @@ class SearchOut(BaseModel):
         """
         return cls(
             search_id=str(detail.search_id),
+            user_id=detail.user_id,
             status=detail.status.value,
             region_id=detail.region_id,
             region_code=detail.region_code,

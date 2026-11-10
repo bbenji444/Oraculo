@@ -156,7 +156,8 @@ cmd_up() {
     --host 127.0.0.1 --port "${API_PORT}" "${reload_args[@]}" --no-access-log
   arrancar_proceso worker "${UV_BIN}" run --frozen celery -A app.worker.celery_app worker \
     --loglevel=INFO --concurrency="${WORKER_CONCURRENCY}" --hostname="worker@%h"
-  LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "La API" curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/v1/openapi.json"
+  # /app-config es pública y ligera (openapi.json pide llave desde ADR-0042).
+  LIMITE_ESPERA="${APP_READY_TIMEOUT_SECONDS}" esperar_listo "La API" curl -fsS -o /dev/null "http://127.0.0.1:${API_PORT}/api/v1/app-config"
   ok "API respondiendo en el puerto ${API_PORT}"
   # Celery escribe "ready" un poco antes de contestar pings; se espera a que
   # /health ya lo vea para no reportar un falso error recién arrancado.

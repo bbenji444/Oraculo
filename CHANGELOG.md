@@ -8,6 +8,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Acceso con llave, usuarios y roles; cada quien su historial (10/11/2026, ADR-0042, migraciones 0038 y 0039).** Benji: «un token como el de la API de ChatGPT», seguridad altísima, y que cada usuario tenga su propio historial con RLS. Es la etapa 1 de 3.
+  - **Entrar con llave `orc_live_…`.** La pantalla pide la llave una vez y abre una sesión con cookie `HttpOnly` de hasta 8 h, que se cierra tras 1 h sin uso. Otros sistemas mandan la llave en `Authorization: Bearer`. La base guarda solo una huella con «pimienta», nunca la llave.
+  - **Roles.** El superusuario (Benji) ve todo, más «Estado del sistema» y la nueva pestaña **«Accesos»**. El usuario normal ve Explorar, Casos, Conceptos e Historial; cada ruta revisa el rol, no solo la pantalla.
+  - **«Accesos».** Dar de alta personas, cambiar nombre, correo y rol, desactivar, y crear o revocar llaves. La llave nueva se muestra una sola vez, con botón para copiarla.
+  - **Cada quien su historial, con seguridad por filas (RLS) en PostgreSQL.** Una búsqueda ajena no existe para la base: responde 404 aunque se pida por su id. El superusuario tiene «Ver de todos».
+  - **Protecciones:**
+    - freno de 10 intentos fallidos por IP;
+    - revisión contra peticiones de otros sitios (CSRF);
+    - revocar o desactivar saca al instante;
+    - nadie se quita su propio rol;
+    - siempre queda un superusuario.
+  - **Todo lo de Benji sigue igual.** Lo que era de «desarrollo» pasó a `benji`; las corridas 07:00, 15:00 y 23:00 y sus correos no cambian.
+  - **Nuevo comando** `make crear-llave` para la primera llave y para recuperar el acceso.
+
 - **Ajustes de búsqueda pedidos por Benji (09/11/2026).**
   - **Las notas fuera de la región ya no cuentan (ADR-0041).** Una búsqueda de «PDI» en México traía 47 notas de Chile: «PDI» es la policía chilena. Ahora lo de fuera no sale en la lista, el globo, los conteos, el PDF ni los correos, y una nota sin lugar de un medio de otro país (`.cl`, `.pe`…) también cuenta como fuera. Se puede revisar con el filtro «fuera de la región».
   - **«Todo México» se puede elegir sin moverle.** Al abrir «Dónde» ya queda elegido de verdad. Antes solo lo parecía y no dejaba barrer.

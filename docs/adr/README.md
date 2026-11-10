@@ -55,6 +55,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0039](0039-envios-auditables.md) | Sección «Envíos»: reportes por correo vía Composio, con guía e intentos auditables | Aceptado (reglas reemplazadas por la 0040) |
 | [0040](0040-horario-unico-de-corridas.md) | Horario único de las corridas, editable por el administrador: cada hora es un reporte nuevo desde la anterior y va a todos | Aceptado |
 | [0041](0041-notas-fuera-de-la-region.md) | Las notas fuera de la región no cuentan; un medio de otro país sin lugar en la nota cuenta como fuera | Aceptado |
+| [0042](0042-acceso-con-llave-y-seguridad-por-filas.md) | Acceso con llave `orc_live_…` (cookie HttpOnly o Bearer), roles superusuario/usuario y seguridad por filas en PostgreSQL | Aceptado (etapa 1 de 3) |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

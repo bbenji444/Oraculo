@@ -27,6 +27,7 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useNow } from '../../hooks/useNow';
+import { useMe } from '../../hooks/useAuth';
 import { useSchedule } from '../../hooks/useSchedule';
 import { useRegionDetail } from '../../hooks/useRegions';
 import { useSearchHistory } from '../../hooks/useSearches';
@@ -96,16 +97,24 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
 }
 
-/** Reloj de la Ciudad de México y cuenta regresiva a la próxima corrida. */
+/**
+ * Reloj de la Ciudad de México y cuenta regresiva a la próxima corrida.
+ *
+ * Las corridas automáticas son del superusuario (ADR-0042): a un usuario
+ * normal solo se le muestra el reloj.
+ */
 function MissionClock() {
   const now = useNow();
-  const next = nextAutomaticRun(now, useSchedule().data?.upcoming);
+  const isSuperuser = useMe().data?.role === 'superuser';
+  const next = nextAutomaticRun(now, useSchedule(isSuperuser).data?.upcoming);
   return (
     <div className="flex items-center gap-3 text-[11px] text-slate-400">
-      <span className="mando-next-run">
-        Próxima corrida automática <span className="text-slate-200">{next.time}</span> · en{' '}
-        {countdownLabel(next.seconds)}
-      </span>
+      {isSuperuser && (
+        <span className="mando-next-run">
+          Próxima corrida automática <span className="text-slate-200">{next.time}</span> · en{' '}
+          {countdownLabel(next.seconds)}
+        </span>
+      )}
       <span className="mando-clock" title="Hora de la Ciudad de México">
         {clockLabel(now)}
       </span>

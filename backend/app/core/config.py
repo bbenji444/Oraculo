@@ -10,9 +10,9 @@ obligatoria, la aplicación no arranca y pydantic dice cuál falta.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -34,8 +34,24 @@ _DEFAULT_POSTGRES_PORT = 5432
 # basura de un archivo que Python y `head` leían bien (ADR-0008).
 _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geodata"
 
-# Nombre del usuario de desarrollo en la bitácora de auditoría.
-_DEFAULT_DEV_USER = "desarrollo"
+# Usuario con el que se entra en AUTH_MODE=dev (sin llave): el superusuario
+# que crea la migración 0038, para que en la PC todo siga a nombre de Benji.
+_DEFAULT_DEV_USER = "benji"
+
+# Llaves de acceso (ADR-0042):
+# - una sesión dura a lo más una jornada (8 h) y se cierra sola tras 60 min
+#   sin uso, como en los paneles bancarios;
+# - 10 intentos fallidos por IP en 15 min bloquean esa IP hasta que pase la
+#   ventana (adivinar una llave de 238 bits es imposible; esto frena ruido);
+# - cada 5 min la sesión vuelve a revisar en la base que la llave y la persona
+#   sigan activas (revocar también borra las sesiones al instante);
+# - la pimienta mide al menos 32 caracteres (≥ 190 bits con base64).
+_DEFAULT_SESSION_HOURS = 8.0
+_DEFAULT_SESSION_IDLE_MINUTES = 60
+_DEFAULT_LOGIN_MAX_FAILURES = 10
+_DEFAULT_LOGIN_WINDOW_MINUTES = 15
+_DEFAULT_SESSION_RECHECK_SECONDS = 300
+_MIN_PEPPER_CHARS = 32
 
 # Proveedores de noticias (plan aprobado de F3):
 # - 20 s por petición; SearchApi 30 s porque link=resolved sigue redirecciones.
@@ -168,8 +184,22 @@ class Settings(BaseSettings):
 
     geodata_work_dir: Path = _DEFAULT_GEODATA_WORK_DIR
 
-    # Usuario fijo que firma los cambios en la bitácora hasta que F8 agregue
-    # autenticación (especificación §16).
+    # --- Acceso con llave (ADR-0042) ---
+    # keys: cada persona entra con su llave orc_live_… (servidor).
+    # dev: sin llave, todo a nombre de DEV_USER como superusuario (PC y pruebas).
+    auth_mode: Literal["dev", "keys"] = "keys"
+    # Secreto del servidor para la huella HMAC de las llaves. Sin él, en modo
+    # keys la API no arranca. Si cambia, todas las llaves dejan de servir.
+    auth_key_pepper: SecretStr | None = None
+    auth_session_hours: float = Field(default=_DEFAULT_SESSION_HOURS, gt=0, le=24)
+    auth_session_idle_minutes: int = Field(default=_DEFAULT_SESSION_IDLE_MINUTES, ge=5)
+    auth_session_recheck_seconds: int = Field(default=_DEFAULT_SESSION_RECHECK_SECONDS, ge=0)
+    auth_login_max_failures: int = Field(default=_DEFAULT_LOGIN_MAX_FAILURES, ge=1)
+    auth_login_window_minutes: int = Field(default=_DEFAULT_LOGIN_WINDOW_MINUTES, ge=1)
+    # Solo true cuando el monitor se sirva por HTTPS: con true el navegador no
+    # manda la cookie por http://.
+    auth_cookie_secure: bool = False
+    # Usuario con el que se entra en AUTH_MODE=dev (y que firma en la bitácora).
     dev_user: str = Field(default=_DEFAULT_DEV_USER, min_length=1)
 
     # --- Proveedores de noticias (F3, especificación §7.2 y §8) ---
@@ -294,6 +324,18 @@ class Settings(BaseSettings):
         """Falla al arrancar si ``AUTOMATIC_RUN_HOURS`` no son horas de 0 a 23."""
         parse_run_hours(value)
         return value
+
+    @model_validator(mode="after")
+    def _pepper_for_keys(self) -> Self:
+        """En modo ``keys`` exige la pimienta: sin ella nadie podría entrar."""
+        pepper = self.auth_key_pepper.get_secret_value() if self.auth_key_pepper else ""
+        if self.auth_mode == "keys" and len(pepper) < _MIN_PEPPER_CHARS:
+            msg = (
+                f"AUTH_MODE=keys necesita AUTH_KEY_PEPPER de al menos {_MIN_PEPPER_CHARS} "
+                "caracteres (ver .env.example)."
+            )
+            raise ValueError(msg)
+        return self
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

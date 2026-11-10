@@ -42,6 +42,7 @@ from app.application.ports.search_reads import (
     CategoryCount,
     CategoryView,
     ConceptRef,
+    HistoryScope,
     InRegion,
     PreviousRun,
     RegionPoint,
@@ -329,12 +330,19 @@ class PostgresSearchStore:
         return rows[0] if rows else None
 
     async def history(
-        self, user_id: str, after: TimeCursor | None, limit: int
+        self, scope: HistoryScope, after: TimeCursor | None, limit: int
     ) -> list[SearchDetail]:
         """Ver ``SearchReaderPort.history``."""
-        # Las corridas automáticas del monitor FGR son de todos (F12.8).
-        where = f"(s.user_id = :user OR s.trigger = '{SearchTrigger.AUTOMATIC.value}')"
-        params: dict[str, object] = {"user": user_id}
+        params: dict[str, object] = {}
+        if scope.owner is None:
+            where = "TRUE"
+        elif scope.include_automatic:
+            # Las corridas automáticas son del superusuario (ADR-0042).
+            where = f"(s.user_id = :user OR s.trigger = '{SearchTrigger.AUTOMATIC.value}')"
+            params["user"] = scope.owner
+        else:
+            where = "s.user_id = :user"
+            params["user"] = scope.owner
         if after is not None:
             where += " AND (s.created_at, s.id) < (:moment, CAST(:after_id AS uuid))"
             params.update({"moment": after.moment, "after_id": after.id})

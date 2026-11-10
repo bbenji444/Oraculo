@@ -22,6 +22,7 @@ import {
   getSearch,
   isFinished,
   listAllArticles,
+  type HistoryScope,
   listSearches,
   restoreSearch,
   type SearchInput,
@@ -93,10 +94,10 @@ export function useArticle(articleId: number | null) {
 }
 
 /** Historial de búsquedas, por páginas. */
-export function useSearchHistory() {
+export function useSearchHistory(scope: HistoryScope = 'mine') {
   return useInfiniteQuery({
-    queryKey: ['searches', 'history'],
-    queryFn: ({ pageParam, signal }) => listSearches(pageParam, signal),
+    queryKey: ['searches', 'history', scope],
+    queryFn: ({ pageParam, signal }) => listSearches(pageParam, signal, scope),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
   });

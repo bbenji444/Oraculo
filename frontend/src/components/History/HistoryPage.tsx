@@ -9,11 +9,17 @@
  * panel con borde de luz; las corridas automáticas llevan un radar. El texto
  * ocupa al menos 16 rem y los botones bajan de renglón si no caben: antes, en
  * pantallas angostas, el título se partía en una palabra por renglón.
+ *
+ * Cada persona ve solo sus búsquedas (ADR-0042; lo asegura la base con
+ * seguridad por filas). Un superusuario ve las suyas y las corridas
+ * automáticas, y con «Ver de todos» las de todos, con el nombre de quién la
+ * lanzó.
  */
 import { type CSSProperties, useCallback, useState } from 'react';
 
+import { useMe } from '../../hooks/useAuth';
 import { useDeleteSearch, useRestoreSearch, useSearchHistory } from '../../hooks/useSearches';
-import { type Search, subdivisionsOf } from '../../services/searches';
+import { type HistoryScope, type Search, subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import {
   automaticRunLabel,
@@ -28,6 +34,7 @@ import { CountUp } from '../ui/CountUp';
 import { ArrowIcon, HudButton } from '../ui/HudButton';
 import { type ChipTone, HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
+import { HudSwitch } from '../ui/HudSwitch';
 import { SectionHeading } from '../ui/SectionHeading';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; tone: ChipTone; live?: boolean }> = {
@@ -73,11 +80,13 @@ function SearchGlyph() {
 interface SearchItemProps {
   search: Search;
   index: number;
+  /** Con «Ver de todos»: mostrar quién la lanzó. */
+  showOwner: boolean;
   deleting: boolean;
   onDelete: (search: Search) => void;
 }
 
-function SearchItem({ search, index, deleting, onDelete }: SearchItemProps) {
+function SearchItem({ search, index, showOwner, deleting, onDelete }: SearchItemProps) {
   const status = STATUS_LABEL[search.status];
   const automatic = automaticRunLabel(search);
   return (
@@ -90,7 +99,7 @@ function SearchItem({ search, index, deleting, onDelete }: SearchItemProps) {
         {automatic ? <span aria-hidden="true" className="hud-radar" /> : <SearchGlyph />}
         <div className="min-w-0 flex-1 basis-64">
           {automatic && (
-            // Corrida del reloj (F12.8): la ven todos los analistas.
+            // Corrida del reloj (F12.8): la ven los superusuarios (ADR-0042).
             <p className="mb-1 font-display text-[10px] tracking-[0.24em] text-sky-300 uppercase">
               {automatic}
             </p>
@@ -101,6 +110,12 @@ function SearchItem({ search, index, deleting, onDelete }: SearchItemProps) {
           <p className="mt-1 text-xs text-slate-400">
             {formatRange(search.date_from, search.date_to)} · pedida el{' '}
             {formatMexicoCity(search.created_at)}
+            {showOwner && search.user_id && !automatic && (
+              <>
+                {' '}
+                por <span className="font-mono text-slate-300">{search.user_id}</span>
+              </>
+            )}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-500">
             {/* Antes de F12.2 las búsquedas no guardaban con qué fuentes se hicieron. */}
@@ -143,7 +158,9 @@ function SearchItem({ search, index, deleting, onDelete }: SearchItemProps) {
 }
 
 export function HistoryPage() {
-  const history = useSearchHistory();
+  const isSuperuser = useMe().data?.role === 'superuser';
+  const [scope, setScope] = useState<HistoryScope>('mine');
+  const history = useSearchHistory(isSuperuser ? scope : 'mine');
   const searches = history.data?.pages.flatMap((page) => page.items) ?? [];
   const remove = useDeleteSearch();
   const restore = useRestoreSearch();
@@ -176,6 +193,20 @@ export function HistoryPage() {
           kicker="Bitácora de búsquedas"
           title="Historial de búsquedas"
           description="Reabrir una búsqueda no gasta créditos: sus notas ya están guardadas."
+          actions={
+            isSuperuser ? (
+              <span className="flex items-center gap-2 text-sm text-slate-300">
+                Ver de todos
+                <HudSwitch
+                  checked={scope === 'all'}
+                  label="Ver las búsquedas de todos"
+                  onChange={(all) => {
+                    setScope(all ? 'all' : 'mine');
+                  }}
+                />
+              </span>
+            ) : undefined
+          }
         />
         {searches.length > 0 && (
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -207,6 +238,7 @@ export function HistoryPage() {
               key={search.search_id}
               search={search}
               index={index}
+              showOwner={scope === 'all'}
               deleting={remove.isPending && remove.variables === search.search_id}
               onDelete={removeSearch}
             />
