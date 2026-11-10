@@ -23,6 +23,7 @@ En la VM, el `.env` agrega:
 API_RELOAD=false          # la API no se reinicia sola
 NGINX_LISTEN=0.0.0.0:8080 # se ve en la red de la oficina y en ZeroTier
 NGINX_SENDFILE=on         # nginx manda los archivos sin copiarlos
+ORACULO_URL=http://172.25.18.234  # botón «← Oráculo» del encabezado
 AUTOMATIC_RUNS_ENABLED=true
 ```
 

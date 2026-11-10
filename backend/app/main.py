@@ -46,6 +46,7 @@ from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
+from app.api.v1.app_config import AppConfigOut
 from app.api.v1.deliveries import OverviewOut, SourceOut
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.deliveries import SendDeliveries
@@ -101,6 +102,7 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
         parse_run_hours(settings.automatic_run_hours)
     )
     app.state.automatic_runs_enabled = settings.automatic_runs_enabled
+    app.state.app_config = AppConfigOut(oraculo_url=settings.oraculo_url)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
