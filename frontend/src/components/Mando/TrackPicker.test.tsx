@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** Ventana «¿Qué rastrear?»: la FGR con sus subdivisiones y los temas generales (02/11/2026). */
+/** Ventana «¿Qué rastrear?»: con quién y qué delitos, en una sola lista (09/11/2026). */
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import type { Category } from '../../services/categories';
 import type { Concept } from '../../services/concepts';
 import { useExplorerStore } from '../../store/explorer';
 import { TrackPicker } from './TrackPicker';
+import { trackSummary } from './trackSummary';
 
 function concept(id: number, name: string, categoryId: number | null, color: string): Concept {
   return {
@@ -62,92 +63,107 @@ afterEach(cleanup);
 
 function groups() {
   return {
-    subdivisions: screen.getByRole('group', { name: 'Subdivisiones de la FGR' }),
-    topics: screen.getByRole('group', { name: 'Temas generales' }),
+    anchors: screen.getByRole('group', { name: 'Relacionados con' }),
+    crimes: screen.getByRole('group', { name: 'Delitos' }),
   };
 }
 
+function summary() {
+  return screen.getByRole('status').textContent;
+}
+
 describe('TrackPicker', () => {
-  it('muestra las subdivisiones buscables y sus temas, sin «Otros»', () => {
+  it('cada delito sale una sola vez, sin «Otros»', () => {
     render(<TrackPicker onClose={vi.fn()} />);
-    const { subdivisions, topics } = groups();
+    const { anchors, crimes } = groups();
 
     expect(
-      within(subdivisions)
+      within(anchors)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Todas', 'Secuestro', 'Homicidio']);
+    ).toEqual([FGR.name, 'Con nadie en particular']);
     expect(
-      within(topics)
+      within(crimes)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Secuestro', 'Homicidio']);
+    ).toEqual(['Todos', 'Secuestro', 'Homicidio']);
+    expect(screen.getAllByRole('button', { name: 'Homicidio' })).toHaveLength(1);
   });
 
-  it('una subdivisión prende la FGR y se busca con las dos', () => {
+  it('FGR con delitos trae las notas que tienen las dos cosas', () => {
     render(<TrackPicker onClose={vi.fn()} />);
-    const { subdivisions } = groups();
+    const { anchors, crimes } = groups();
 
-    fireEvent.click(within(subdivisions).getByRole('button', { name: 'Homicidio' }));
-    fireEvent.click(within(subdivisions).getByRole('button', { name: 'Secuestro' }));
+    fireEvent.click(within(anchors).getByRole('button', { name: FGR.name }));
+    fireEvent.click(within(crimes).getByRole('button', { name: 'Homicidio' }));
+    fireEvent.click(within(crimes).getByRole('button', { name: 'Secuestro' }));
 
     expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
     expect(useExplorerStore.getState().subdivisionIds).toEqual([5, 3]);
+    expect(summary()).toBe(`Notas de ${FGR.name} que además hablan de Secuestro o Homicidio.`);
 
-    fireEvent.click(within(subdivisions).getByRole('button', { name: 'Todas' }));
+    fireEvent.click(within(crimes).getByRole('button', { name: 'Todos' }));
     expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
-    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+    expect(summary()).toBe(`Todo lo de ${FGR.name}, de cualquier delito.`);
   });
 
-  it('apagar la FGR quita sus subdivisiones', () => {
+  it('un delito sin nadie elegido se busca con la FGR', () => {
+    render(<TrackPicker onClose={vi.fn()} />);
+
+    fireEvent.click(within(groups().crimes).getByRole('button', { name: 'Homicidio' }));
+
+    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([5]);
+  });
+
+  it('«Con nadie en particular» busca cada delito por su cuenta', () => {
+    render(<TrackPicker onClose={vi.fn()} />);
+    const { anchors, crimes } = groups();
+
+    fireEvent.click(within(anchors).getByRole('button', { name: 'Con nadie en particular' }));
+    expect(summary()).toBe('Elige al menos un delito.');
+    expect(within(crimes).getByRole('button', { name: 'Todos' })).toHaveProperty('disabled', true);
+
+    fireEvent.click(within(crimes).getByRole('button', { name: 'Homicidio' }));
+    fireEvent.click(within(crimes).getByRole('button', { name: 'Secuestro' }));
+
+    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id, SECUESTRO.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
+    expect(summary()).toBe(
+      'Todas las notas de Secuestro o Homicidio, aparezca o no alguien en particular.',
+    );
+  });
+
+  it('cambiar de quién conserva los delitos elegidos', () => {
+    // Benji, 03/11/2026: la FGR y los delitos en general no se mezclan.
+    useExplorerStore.setState({ conceptIds: [FGR.id], subdivisionIds: [5] });
+    render(<TrackPicker onClose={vi.fn()} />);
+    const { anchors } = groups();
+
+    fireEvent.click(within(anchors).getByRole('button', { name: 'Con nadie en particular' }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
+
+    fireEvent.click(within(anchors).getByRole('button', { name: FGR.name }));
+    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
+    expect(useExplorerStore.getState().subdivisionIds).toEqual([5]);
+  });
+
+  it('quitar a la FGR quita sus delitos', () => {
     useExplorerStore.setState({ conceptIds: [FGR.id], subdivisionIds: [5] });
     render(<TrackPicker onClose={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: FGR.name }));
+    fireEvent.click(within(groups().anchors).getByRole('button', { name: FGR.name }));
 
     expect(useExplorerStore.getState().conceptIds).toEqual([]);
     expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
   });
 
-  it('un tema general se elige por su cuenta, sin la FGR', () => {
-    render(<TrackPicker onClose={vi.fn()} />);
-
-    fireEvent.click(within(groups().topics).getByRole('button', { name: 'Homicidio' }));
-
-    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id]);
-    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
-  });
-
-  it('la FGR y los temas generales no se mezclan', () => {
-    // Benji, 03/11/2026: con la FGR elegida no quiere homicidios en general.
-    // FGR + el tema «Homicidio» sumaría toda la FGR y todos los homicidios.
-    useExplorerStore.setState({ conceptIds: [FGR.id], subdivisionIds: [5] });
-    render(<TrackPicker onClose={vi.fn()} />);
-    const { subdivisions, topics } = groups();
-
-    fireEvent.click(within(topics).getByRole('button', { name: 'Homicidio' }));
-    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id]);
-    expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
-
-    // Varios temas sí van juntos.
-    fireEvent.click(within(topics).getByRole('button', { name: 'Secuestro' }));
-    expect(useExplorerStore.getState().conceptIds).toEqual([HOMICIDIO.id, SECUESTRO.id]);
-
-    // Y volver a la FGR apaga los temas.
-    fireEvent.click(within(subdivisions).getByRole('button', { name: 'Homicidio' }));
-    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
-    expect(useExplorerStore.getState().subdivisionIds).toEqual([5]);
-
-    fireEvent.click(within(topics).getByRole('button', { name: 'Secuestro' }));
-    fireEvent.click(screen.getByRole('button', { name: FGR.name }));
-    expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
-  });
-
-  it('una búsqueda reabierta con FGR y un tema suelto se corrige al elegir subdivisión', () => {
+  it('una búsqueda reabierta con FGR y un tema suelto se corrige al elegir delito', () => {
     useExplorerStore.setState({ conceptIds: [FGR.id, HOMICIDIO.id], subdivisionIds: [] });
     render(<TrackPicker onClose={vi.fn()} />);
 
-    fireEvent.click(within(groups().subdivisions).getByRole('button', { name: 'Secuestro' }));
+    fireEvent.click(within(groups().crimes).getByRole('button', { name: 'Secuestro' }));
 
     expect(useExplorerStore.getState().conceptIds).toEqual([FGR.id]);
     expect(useExplorerStore.getState().subdivisionIds).toEqual([3]);
@@ -161,5 +177,17 @@ describe('TrackPicker', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Listo' }));
 
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('trackSummary', () => {
+  it('dice en palabras qué trae la búsqueda', () => {
+    expect(trackSummary([], [], false)).toBe('Elige con quién o un delito.');
+    expect(trackSummary(['FGR', 'PDI'], [], false)).toBe(
+      'Todo lo de FGR o PDI, de cualquier delito.',
+    );
+    expect(trackSummary(['FGR'], ['Homicidio', 'Secuestro', 'Extorsión'], false)).toBe(
+      'Notas de FGR que además hablan de Homicidio, Secuestro o Extorsión.',
+    );
   });
 });
