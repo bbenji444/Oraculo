@@ -8,12 +8,13 @@ gasta créditos.
 import asyncio
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.api.v1.searches import get_search_queue
 from app.core.config import Settings
+from app.domain.access import AuthUser, Role
 from app.domain.enrichment import Enrichment
 from app.domain.geocoding import Mention, MentionRole
 from app.main import create_app
@@ -651,3 +653,25 @@ def test_no_se_quita_la_busqueda_manual_de_otra_persona(
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "search_forbidden"
+
+
+def test_un_usuario_normal_lanza_la_suya_y_nadie_mas_la_ve(
+    settings: Settings, ids: dict[str, int], queue: FakeQueue
+) -> None:
+    # Dos personas normales (ADR-0042): la base (RLS) separa sus búsquedas.
+    with make_client(settings, queue) as ana, make_client(settings, queue) as pepe:
+        cast(FastAPI, ana.app).state.dev_auth_user = AuthUser(0, "rls-ana", "Ana", Role.USER)
+        cast(FastAPI, pepe.app).state.dev_auth_user = AuthUser(0, "rls-pepe", "Pepe", Role.USER)
+
+        started = ana.post(URL, json=body(ids))
+        search_id = started.json()["search_id"]
+
+        assert started.status_code == 202
+        assert [s["search_id"] for s in ana.get(URL).json()["items"]] == [search_id]
+        assert ana.get(f"{URL}/{search_id}").json()["user_id"] == "rls-ana"
+        assert ana.get(f"{URL}/{search_id}/articles").status_code == 200
+        assert pepe.get(f"{URL}/{search_id}").status_code == 404
+        assert pepe.get(f"{URL}/{search_id}/articles").status_code == 404
+        assert pepe.get(URL, params={"scope": "all"}).json()["items"] == []
+        assert pepe.delete(f"{URL}/{search_id}").status_code == 404
+        assert ana.delete(f"{URL}/{search_id}").status_code == 204

@@ -25,7 +25,7 @@ from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.application.ports.llm import EnrichmentError
-from app.application.ports.search_reads import ArticleFilters, ArticleItem
+from app.application.ports.search_reads import ArticleFilters, ArticleItem, HistoryScope
 from app.application.ports.search_store import NewSearch, SearchConcept
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
 from app.application.use_cases.extraction import ExtractTexts
@@ -58,6 +58,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 CONCEPT_NAME = "Prueba pipeline"
+# El historial de «prueba» con las corridas automáticas (como lo ve un superusuario).
+MINE = HistoryScope("prueba", include_automatic=True)
 # El mini-catálogo trae Francia, no España: la nota de fuera pasa en París.
 REPLIES: dict[str, Enrichment | Exception] = {
     **DEFAULT_REPLIES,
@@ -563,7 +565,7 @@ async def test_la_subdivision_se_guarda_con_la_busqueda_y_se_lee_igual(
     )
 
     stored = await searches.load(search_id)
-    [detail] = [s for s in await searches.history("prueba", None, 200) if s.search_id == search_id]
+    [detail] = [s for s in await searches.history(MINE, None, 200) if s.search_id == search_id]
 
     assert stored is not None
     # La descripción se lee del concepto vigente; lo demás es la copia.
@@ -661,7 +663,7 @@ async def test_las_corridas_automaticas_aparecen_en_el_historial_de_todos(
             {"id": other_manual},
         )
 
-    history = await searches.history("prueba", None, 10)
+    history = await searches.history(MINE, None, 10)
 
     assert [s.search_id for s in history] == [automatic]
     assert (history[0].trigger, history[0].scheduled_for) == (SearchTrigger.AUTOMATIC, slot)
@@ -784,7 +786,7 @@ async def test_la_corrida_guarda_sus_horas_y_sabe_desde_cuando_cubrir(
     await automatic(morning + timedelta(hours=8), "failed", None)
 
     loaded = await searches.load(done)
-    [detail] = [s for s in await searches.history("prueba", None, 200) if s.search_id == done]
+    [detail] = [s for s in await searches.history(MINE, None, 200) if s.search_id == done]
 
     assert loaded is not None
     assert loaded.time_window == window

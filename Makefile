@@ -32,7 +32,7 @@ COVERAGE_MIN := 85
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
         limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos \
-        corrida-fgr instalar-servicio
+        corrida-fgr instalar-servicio crear-llave
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -156,6 +156,9 @@ retirar-conceptos: ## Deja vigente solo el concepto FGR (borrado lógico): sin A
 
 corrida-fgr: ## Corre ahora una corrida del monitor FGR (la misma de las 07:00, 15:00 y 23:00): pide "si" y muestra 5 notas
 	$(UV_RUN) python -m app.cli.corrida_fgr
+
+crear-llave: ## Crea una llave de acceso desde la consola (ARGS="--usuario benji --dias 365"; --archivo RUTA; --listar)
+	$(UV_RUN) python -m app.cli.crear_llave $(ARGS)
 
 extraer-entidades: ## La IA lee notas de un caso y muestra las entidades que propone; pide "si" (ARGS="--caso <id> --muestra 5")
 	$(UV_RUN) python -m app.cli.extraer_entidades $(ARGS)

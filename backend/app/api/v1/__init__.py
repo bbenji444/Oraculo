@@ -1,9 +1,12 @@
 """Versión 1 de la API REST (``/api/v1``)."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.auth import require_superuser_user, superuser_for_changes
+from app.api.v1.access import router as access_router
 from app.api.v1.app_config import router as app_config_router
 from app.api.v1.articles import router as articles_router
+from app.api.v1.auth import router as auth_router
 from app.api.v1.case_graph import router as case_graph_router
 from app.api.v1.cases import router as cases_router
 from app.api.v1.categories import router as categories_router
@@ -22,11 +25,16 @@ from app.api.v1.sources import router as sources_router
 api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(app_config_router)
+api_router.include_router(auth_router)
+api_router.include_router(access_router)
 api_router.include_router(regions_router)
-api_router.include_router(concepts_router)
+# Etapa 1 (ADR-0042): todos leen; solo el superusuario cambia.
+_CHANGES_BY_SUPERUSER = [Depends(superuser_for_changes)]
+_SUPERUSER_ONLY = [Depends(require_superuser_user)]
+api_router.include_router(concepts_router, dependencies=_CHANGES_BY_SUPERUSER)
 api_router.include_router(searches_router)
 api_router.include_router(sources_router)
-api_router.include_router(categories_router)
+api_router.include_router(categories_router, dependencies=_CHANGES_BY_SUPERUSER)
 api_router.include_router(articles_router)
 api_router.include_router(reports_router)
 # Antes que cases_router: "/cases/map" no debe leerse como "/cases/{id}".
@@ -35,12 +43,20 @@ api_router.include_router(cases_router)
 api_router.include_router(entities_router)
 api_router.include_router(resolution_router)
 api_router.include_router(relationships_router)
-api_router.include_router(deliveries_router)
-api_router.include_router(schedule_router)
+# Envíos y horario: del superusuario hasta la etapa 3 (envíos por persona).
+api_router.include_router(deliveries_router, dependencies=_SUPERUSER_ONLY)
+api_router.include_router(schedule_router, dependencies=_SUPERUSER_ONLY)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
     {"name": "diagnóstico", "description": "Estado de la API, la base, Redis y el worker."},
+    {
+        "name": "acceso",
+        "description": (
+            "Entrar con una llave orc_live_… (cookie de sesión) o mandarla en "
+            "Authorization: Bearer; personas y llaves, solo superusuarios (ADR-0042)."
+        ),
+    },
     {"name": "regiones", "description": "Catálogo geográfico INEGI y países (§12)."},
     {"name": "conceptos", "description": "Temas que se buscan, con sus palabras clave (§7)."},
     {

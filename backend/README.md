@@ -10,7 +10,7 @@ API (FastAPI) y worker (Celery) del monitor de noticias. Corre en Ubuntu dentro 
 | `app/application/ports/` | Interfaces (`Protocol`) que el núcleo necesita. | `domain` |
 | `app/application/use_cases/` | Acciones completas (por ejemplo, revisar la salud del sistema). | `domain`, `ports` |
 | `app/adapters/` | Implementaciones de los puertos con tecnología concreta (PostgreSQL, Redis, Celery...). | `application`, `domain` |
-| `app/api/v1/` | Routers FastAPI delgados y esquemas de entrada y salida. Uso y ejemplos con `curl` en [docs/api.md](../docs/api.md). | `application` |
+| `app/api/` | `auth.py`: el candado de la API (llave por cookie o Bearer, CSRF, roles; ADR-0042). `v1/`: routers FastAPI delgados y esquemas de entrada y salida. Uso y ejemplos con `curl` en [docs/api.md](../docs/api.md). | `application` |
 | `app/worker/` | App de Celery, su reloj (`beat`), las tareas de ingesta al índice local y la tarea que corre una búsqueda (`search.run`, §9). | `application`, `adapters` |
 | `app/cli/` | Comandos de terminal: probar un proveedor, buscar de punta a punta, diagnóstico de GDELT, ingesta e historial. | `application`, `adapters` |
 | `app/core/` | Configuración (variables de entorno) y logs JSON. | — |

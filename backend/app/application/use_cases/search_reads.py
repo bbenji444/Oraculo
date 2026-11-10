@@ -13,11 +13,13 @@ from app.application.ports.search_reads import (
     ArticleItem,
     ArticleReaderPort,
     CategoryCount,
+    HistoryScope,
     RegionPoint,
     SearchDetail,
     SearchReaderPort,
 )
 from app.application.use_cases.run_search import SearchNotFoundError
+from app.domain.access import AuthUser
 from app.domain.aggregates import AggregateLevel, aggregate
 from app.domain.errors import InvalidRequestError, NotFoundError
 from app.domain.geocoding import Precision
@@ -84,12 +86,21 @@ class ListSearches:
         self._reader = reader
 
     async def execute(
-        self, user_id: str, cursor: str | None = None, limit: int = DEFAULT_PAGE_SIZE
+        self,
+        viewer: AuthUser,
+        *,
+        everyone: bool = False,
+        cursor: str | None = None,
+        limit: int = DEFAULT_PAGE_SIZE,
     ) -> Page[SearchDetail]:
         """Devuelve una página, de la más reciente a la más vieja.
 
+        Un usuario normal ve solo las suyas. Un superusuario ve las suyas y las
+        corridas automáticas, o las de todos con ``everyone`` (ADR-0042).
+
         Args:
-            user_id: Quién las pidió.
+            viewer: Quién mira.
+            everyone: «Ver de todos» (solo cuenta para superusuarios).
             cursor: Cursor de la página anterior.
             limit: Tamaño de página (1 a 100).
 
@@ -101,7 +112,11 @@ class ListSearches:
         """
         check_limit(limit)
         after = decode_time_cursor(cursor) if cursor else None
-        rows = await self._reader.history(user_id, after, limit + 1)
+        if viewer.is_superuser:
+            scope = HistoryScope(None if everyone else viewer.username, include_automatic=True)
+        else:
+            scope = HistoryScope(viewer.username)
+        rows = await self._reader.history(scope, after, limit + 1)
         items = rows[:limit]
         next_cursor = (
             encode_time_cursor(TimeCursor(items[-1].created_at, str(items[-1].search_id)))

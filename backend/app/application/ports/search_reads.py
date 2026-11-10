@@ -140,6 +140,20 @@ class SearchTrashPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class HistoryScope:
+    """Qué búsquedas muestra el historial.
+
+    Attributes:
+        owner: Solo las de esta persona; ``None`` = las de todos (superusuario
+            con «Ver de todos»).
+        include_automatic: Sumar las corridas automáticas (del superusuario).
+    """
+
+    owner: str | None
+    include_automatic: bool = False
+
+
 class SearchReaderPort(Protocol):
     """Lecturas de búsquedas para la API. Una búsqueda eliminada no se lee."""
 
@@ -155,12 +169,16 @@ class SearchReaderPort(Protocol):
         ...
 
     async def history(
-        self, user_id: str, after: TimeCursor | None, limit: int
+        self, scope: HistoryScope, after: TimeCursor | None, limit: int
     ) -> list[SearchDetail]:
-        """Búsquedas de una persona, de la más reciente a la más vieja.
+        """Búsquedas del historial, de la más reciente a la más vieja.
+
+        La seguridad por filas (ADR-0042) ya impide ver búsquedas ajenas a un
+        usuario normal; ``scope`` decide qué muestra el historial dentro de
+        lo que la persona puede ver.
 
         Args:
-            user_id: Quién las pidió.
+            scope: De quién.
             after: Cursor de la página anterior.
             limit: Cuántas como máximo.
 

@@ -4,7 +4,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 - **Documentación interactiva:** <http://localhost:8080/api/v1/docs>. Ahí se ven todas las rutas, sus parámetros y sus errores posibles, y se pueden probar.
 - **Dónde correr los ejemplos:** en Ubuntu (WSL). Desde PowerShell, entra primero con `wsl`.
-- **Usuario:** hasta la Fase 8 todas las peticiones son del usuario de desarrollo (`DEV_USER`).
+- **Acceso (ADR-0042):** en el servidor toda ruta pide una llave `orc_live_…` (ver «Acceso con llave»). En la PC de desarrollo (`AUTH_MODE=dev`) se entra sin llave como `DEV_USER`, superusuario.
 
 ## Reglas comunes
 
@@ -16,16 +16,69 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 | HTTP | Cuándo | Ejemplos de `code` |
 |---|---|---|
-| 403 | Tu rol no permite la acción (por ejemplo, un lector que edita un caso) | `case_forbidden` |
+| 401 | Falta la llave, la sesión terminó o la llave no sirve (revocada, vencida) | `auth_required` |
+| 403 | Tu rol no permite la acción (por ejemplo, un lector que edita un caso), o una petición con cookie sin `Origin` del mismo servidor | `case_forbidden`, `forbidden` |
 | 404 | Lo pedido no existe (o es un caso del que no eres miembro) | `search_not_found`, `article_not_found`, `concept_not_found`, `region_not_found`, `case_not_found` |
-| 409 | Choca con algo que ya existe, con un tope, con una búsqueda que aún corre o con un caso cerrado | `credit_limit_reached`, `concept_name_taken`, `search_not_finished`, `case_closed` |
+| 409 | Choca con algo que ya existe, con un tope, con una búsqueda que aún corre o con un caso cerrado | `credit_limit_reached`, `concept_name_taken`, `search_not_finished`, `case_closed`, `username_taken`, `access_rule` |
 | 422 | Parámetros inválidos | `invalid_request`, `query_budget_exceeded`, `invalid_case` |
+| 429 | Demasiados intentos fallidos de entrar desde la misma IP (espera 15 min) | `too_many_attempts` |
 | 500 | Falla inesperada (el detalle queda en el registro, nunca en la respuesta) | `internal_error` |
 | 503 | Falta configurar el sistema | `llm_not_configured`, `service_unavailable` |
 
 **Paginación por cursor.** Las listas devuelven `items` y `next_cursor`. Para la siguiente página manda `?cursor=<next_cursor>`. Cuando `next_cursor` es `null`, ya no hay más. Nunca se usan números de página (CLAUDE.md §6.3).
 
 **Fechas.** Se guardan en UTC y se entregan con su zona horaria (`-06:00` = Ciudad de México).
+
+## Acceso con llave
+
+Cada persona entra con una llave como las de las APIs de OpenAI o Claude: `orc_live_<8 públicos>_<40 secretos>`. La da un superusuario en la pestaña «Accesos» (o `make crear-llave` en el servidor) y se muestra **una sola vez**. La base guarda solo su huella. Diseño completo en ADR-0042.
+
+Rutas públicas (sin llave): `GET /health`, `GET /app-config`, `POST /auth/login` y `POST /auth/logout`. Todas las demás, también `/docs` y `/openapi.json`, piden llave.
+
+**Desde la pantalla (cookie).** `POST /auth/login` con la llave en el cuerpo (nunca en la URL) abre una sesión de hasta 8 h que se cierra tras 60 min sin uso. La cookie `monitor_sesion` es `HttpOnly` y `SameSite=Strict`. Las peticiones que cambian algo deben traer `Origin` del mismo servidor; el navegador lo manda solo.
+
+```bash
+curl -s -c sesion.txt -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' -d '{"key":"orc_live_…"}'
+curl -s -b sesion.txt http://localhost:8080/api/v1/auth/me
+```
+
+```json
+{ "username": "benji", "display_name": "Benjamin", "role": "superuser",
+  "sections": ["explorar", "casos", "conceptos", "historial", "envios", "estado", "accesos"],
+  "auth_mode": "keys" }
+```
+
+**Desde otro sistema (Bearer).** La llave en cada petición, sin cookie:
+
+```bash
+curl -s -H 'Authorization: Bearer orc_live_…' 'http://localhost:8080/api/v1/searches?limit=1'
+```
+
+**Roles.**
+- `user`: Explorar, Casos, Conceptos (solo verlos) e Historial (solo las suyas).
+- `superuser`: además, Envíos, horario, Estado del sistema y Accesos; cambia conceptos y subdivisiones; ve el historial de todos con `?scope=all`.
+
+La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena responde `404`, como si no existiera.
+
+**Administrar personas y llaves (solo superusuarios).**
+
+| Ruta | Qué hace |
+|---|---|
+| `GET /access/users` | Personas, con cuántas llaves vigentes tiene cada una |
+| `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` |
+| `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
+| `GET /access/users/{id}/keys` | Sus llaves, sin secretos (`masked`: `orc_live_a1b2c3d4…`), con último uso e IP |
+| `POST /access/users/{id}/keys` | Crea una: `{"label": "Laptop", "days": 90}` (`days` de 1 a 365, o `null` para que no venza). Responde `{"key": "orc_live_…", "info": {…}}`: **única vez que sale la llave completa** |
+| `DELETE /access/keys/{id}` | Revoca al instante y cierra las sesiones que entraron con ella |
+
+Reglas (`409 access_rule`):
+- nadie se quita su propio rol ni se desactiva;
+- siempre queda un superusuario activo;
+- nadie revoca su única llave vigente;
+- máximo 5 llaves vigentes por persona.
+
+Cada alta, cambio, llave creada o revocada, entrada y entrada fallida queda en la bitácora (`user.created`, `user.updated`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
 
 ## Flujo de una búsqueda
 
@@ -212,7 +265,10 @@ curl -s http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d
 
 ## Historial
 
-`GET /searches?limit=20&cursor=…`: las búsquedas de la persona, de la más reciente a la más vieja.
+`GET /searches?limit=20&cursor=…`: las búsquedas de la persona, de la más reciente a la más vieja (ADR-0042).
+
+- **Usuario normal:** solo las suyas.
+- **Superusuario:** las suyas y las corridas automáticas; con `scope=all`, las de todos. Cada una trae `user_id` (quién la lanzó).
 
 ```bash
 curl -s 'http://localhost:8080/api/v1/searches?limit=1'
@@ -224,7 +280,7 @@ curl -s 'http://localhost:8080/api/v1/searches?limit=1'
 
 **Quitar del historial (27/10/2026).** `DELETE /searches/{id}` responde `204` y es reversible: `POST /searches/{id}/restore` la devuelve, también con `204`.
 
-- **Quién:** quien la lanzó. Las corridas automáticas son de todos, así que cualquiera puede quitarlas. La búsqueda manual de otra persona responde `403` `search_forbidden`.
+- **Quién:** quien la lanzó. Las corridas automáticas las puede quitar un superusuario. La búsqueda de otra persona no se ve: responde `404`.
 - **Después:** una búsqueda eliminada ya no sale en el historial y `GET /searches/{id}` responde `404`. Sus notas siguen en el índice y en los casos donde se agregaron.
 - **Bitácora:** `search.deleted` y `search.restored`.
 

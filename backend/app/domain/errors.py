@@ -173,6 +173,22 @@ class ForbiddenError(DomainError):
     code = "forbidden"
 
 
+class AuthenticationRequiredError(DomainError):
+    """Falta una llave o sesión válida (responde 401, ADR-0042).
+
+    El mensaje es el mismo para una llave inexistente, revocada o vencida: así
+    no se da pista de cuáles existen.
+    """
+
+    code = "auth_required"
+
+
+class TooManyAttemptsError(DomainError):
+    """Demasiados intentos fallidos de entrar desde la misma IP (responde 429)."""
+
+    code = "too_many_attempts"
+
+
 class CaseNotFoundError(NotFoundError):
     """No existe el caso o la persona no es miembro.
 
@@ -293,3 +309,31 @@ class DeliveryChannelUnavailableError(ServiceUnavailableError):
     """El canal no está listo: falta la llave de Composio o WhatsApp aún no existe."""
 
     code = "delivery_channel_unavailable"
+
+
+class UserNotFoundError(NotFoundError):
+    """No existe esa persona (administración de accesos, ADR-0042)."""
+
+    code = "user_not_found"
+
+
+class UsernameTakenError(ConflictError):
+    """Ya hay una persona con ese usuario."""
+
+    code = "username_taken"
+
+
+class AccessKeyNotFoundError(NotFoundError):
+    """No existe esa llave de acceso."""
+
+    code = "access_key_not_found"
+
+
+class AccessRuleError(ConflictError):
+    """El cambio dejaría el sistema sin administrador o choca con un tope.
+
+    Por ejemplo: quitarse a uno mismo el rol de superusuario, apagar al último
+    superusuario activo o pasar del tope de llaves activas por persona.
+    """
+
+    code = "access_rule"

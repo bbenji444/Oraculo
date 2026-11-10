@@ -20,6 +20,7 @@ from app.application.ports.search_reads import (
     ArticleItem,
     CategoryCount,
     ConceptRef,
+    HistoryScope,
     InRegion,
     RegionPoint,
     SearchDetail,
@@ -33,15 +34,18 @@ from app.application.use_cases.search_reads import (
     ListSearchArticles,
     ListSearches,
 )
+from app.domain.access import AuthUser, Role
 from app.domain.aggregates import AggregateLevel, NoteLocation
 from app.domain.enrichment import LLMUsage
 from app.domain.errors import InvalidRequestError
 from app.domain.geocoding import Precision
-from app.domain.search import SearchStatus
+from app.domain.search import SearchStatus, SearchTrigger
 
 pytestmark = pytest.mark.anyio
 
 T0 = datetime(2026, 10, 17, 18, tzinfo=UTC)
+BENJI = AuthUser(1, "benji", "Benjamin", Role.SUPERUSER)
+ANA = AuthUser(2, "ana", "Ana", Role.USER)
 
 
 def detail(minutes_ago: int) -> SearchDetail:
@@ -72,14 +76,22 @@ def detail(minutes_ago: int) -> SearchDetail:
 class Reader:
     def __init__(self, rows: list[SearchDetail]) -> None:
         self.rows = sorted(rows, key=lambda d: (d.created_at, str(d.search_id)), reverse=True)
+        self.scopes: list[HistoryScope] = []
 
     async def search_detail(self, search_id: UUID) -> SearchDetail | None:
         return next((d for d in self.rows if d.search_id == search_id), None)
 
     async def history(
-        self, user_id: str, after: TimeCursor | None, limit: int
+        self, scope: HistoryScope, after: TimeCursor | None, limit: int
     ) -> list[SearchDetail]:
-        rows = [d for d in self.rows if d.user_id == user_id]
+        self.scopes.append(scope)
+        rows = [
+            d
+            for d in self.rows
+            if scope.owner is None
+            or d.user_id == scope.owner
+            or (scope.include_automatic and d.trigger is SearchTrigger.AUTOMATIC)
+        ]
         if after is not None:
             assert after.moment is not None
             key = (after.moment, after.id)
@@ -107,18 +119,43 @@ async def test_historial_por_paginas_de_la_mas_reciente_a_la_mas_vieja() -> None
     other = replace(detail(0), user_id="otra-persona")
     use = ListSearches(Reader([*rows, other]))
 
-    first = await use.execute("benji", limit=2)
-    second = await use.execute("benji", first.next_cursor, limit=2)
+    first = await use.execute(BENJI, limit=2)
+    second = await use.execute(BENJI, cursor=first.next_cursor, limit=2)
 
     assert [d.search_id for d in first.items] == [rows[0].search_id, rows[1].search_id]
     assert [d.search_id for d in second.items] == [rows[2].search_id]
     assert second.next_cursor is None
 
 
+async def test_un_usuario_normal_ve_solo_las_suyas_aunque_pida_todas() -> None:
+    mine = replace(detail(1), user_id="ana")
+    automatic = replace(detail(2), user_id="monitor-automatico", trigger=SearchTrigger.AUTOMATIC)
+    reader = Reader([mine, automatic, detail(3)])
+
+    page = await ListSearches(reader).execute(ANA, everyone=True)
+
+    assert [d.search_id for d in page.items] == [mine.search_id]
+    assert reader.scopes == [HistoryScope("ana", include_automatic=False)]
+
+
+async def test_el_superusuario_ve_las_suyas_y_las_automaticas_o_las_de_todos() -> None:
+    mine = detail(1)
+    automatic = replace(detail(2), user_id="monitor-automatico", trigger=SearchTrigger.AUTOMATIC)
+    other = replace(detail(3), user_id="ana")
+    reader = Reader([mine, automatic, other])
+
+    own = await ListSearches(reader).execute(BENJI)
+    everyone = await ListSearches(reader).execute(BENJI, everyone=True)
+
+    assert {d.search_id for d in own.items} == {mine.search_id, automatic.search_id}
+    assert len(everyone.items) == 3
+    assert reader.scopes[1] == HistoryScope(None, include_automatic=True)
+
+
 @pytest.mark.parametrize("limit", [0, 101])
 async def test_limite_fuera_de_rango(limit: int) -> None:
     with pytest.raises(InvalidRequestError, match="límite"):
-        await ListSearches(Reader([])).execute("benji", limit=limit)
+        await ListSearches(Reader([])).execute(BENJI, limit=limit)
 
 
 async def test_detalle_o_404() -> None:

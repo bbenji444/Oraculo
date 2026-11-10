@@ -22,6 +22,7 @@ from app.application.ports.search_reads import (
     ArticleItem,
     CategoryCount,
     ConceptRef,
+    HistoryScope,
     LocationView,
     PreviousRun,
     RegionPoint,
@@ -117,7 +118,7 @@ class Reader:
         return self.row if search_id == self.row.search_id else None
 
     async def history(
-        self, user_id: str, after: TimeCursor | None, limit: int
+        self, scope: HistoryScope, after: TimeCursor | None, limit: int
     ) -> list[SearchDetail]:
         return []
 
