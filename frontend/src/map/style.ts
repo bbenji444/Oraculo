@@ -47,8 +47,10 @@ export const EARTH_FADE_END_ZOOM = 7;
 // ensucian la Tierra (como en las imágenes de referencia de Benji).
 export const LABELS_MIN_ZOOM = 3.5;
 // Fuerza del halo atmosférico de MapLibre (`atmosphere-blend`, 0 a 1): con 1
-// el borde del globo se veía demasiado azul (Benji, 26/10/2026).
-export const ATMOSPHERE_STRENGTH = 0.6;
+// el borde del globo se veía demasiado azul (Benji, 26/10/2026) y con 0.6 le
+// faltaba un poco; pidió «solo un poquito» más azul, como la Tierra de noche
+// de su imagen de referencia (10/11/2026).
+export const ATMOSPHERE_STRENGTH = 0.75;
 export const ATTRIBUTION_OSM =
   '© <a href="https://openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a> · <a href="https://protomaps.com" target="_blank" rel="noopener noreferrer">Protomaps</a>';
 
@@ -346,7 +348,7 @@ export function buildMapStyle(origin: string, earth: EarthMode = 'night'): Style
     version: 8,
     projection: { type: 'globe' },
     // Halo atmosférico alrededor del globo, que se desvanece al acercarse. Al
-    // 60 %: completo se veía demasiado azul (Benji, 26/10/2026).
+    // 75 %: completo se veía demasiado azul (ver ATMOSPHERE_STRENGTH).
     sky: {
       'atmosphere-blend': [
         'interpolate',
