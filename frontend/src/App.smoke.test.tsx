@@ -19,6 +19,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
+import type { Me } from './services/auth';
 import type { Case } from './services/cases';
 import type { Article, Search } from './services/searches';
 import { useExplorerStore } from './store/explorer';
@@ -53,6 +54,16 @@ vi.mock('./components/Explore/ExploreGlobe', async () => {
 vi.mock('./components/Space/SpaceBackground', () => ({ SpaceBackground: () => null }));
 
 const SEARCH_ID = search.search_id;
+// Una llave con la forma correcta (no es real).
+const GOOD_KEY = `orc_live_AbCd1234_${'x'.repeat(40)}`;
+// Quién entró (ADR-0042): el superusuario, con todas las pestañas.
+const BENJI: Me = {
+  username: 'benji',
+  display_name: 'Benjamin',
+  role: 'superuser',
+  sections: ['explorar', 'casos', 'conceptos', 'historial', 'envios', 'estado', 'accesos'],
+  auth_mode: 'keys',
+};
 // Ruta de cada respuesta grabada (sin la base /api/v1 ni los parámetros).
 const ROUTES: Record<string, unknown> = {
   concepts,
@@ -108,6 +119,19 @@ function respond(body: unknown, status = 200): Response {
 function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   const url = new URL(input, 'http://localhost');
   const path = url.pathname.replace('/api/v1/', '');
+  if (path === 'auth/me') {
+    return Promise.resolve(
+      respond({ error: { code: 'auth_required', message: 'Entra con tu llave.' } }, 401),
+    );
+  }
+  if (path === 'auth/login' && init?.method === 'POST') {
+    const body = JSON.parse(init.body as string) as { key: string };
+    return Promise.resolve(
+      body.key === GOOD_KEY
+        ? respond(BENJI)
+        : respond({ error: { code: 'auth_required', message: 'La llave no es válida.' } }, 401),
+    );
+  }
   if (path === 'searches' && init?.method === 'POST') {
     startBodies.push(typeof init.body === 'string' ? JSON.parse(init.body) : init.body);
     return Promise.resolve(respond({ search_id: SEARCH_ID }, 202));
@@ -158,8 +182,10 @@ function fakeCases(path: string, url: URL, init?: RequestInit): Response {
   return respond({ error: { message: path } }, 404);
 }
 
-function renderApp() {
+function renderApp(me: Me | null = BENJI) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // La sesión ya abierta: así la pantalla aparece sin esperar /auth/me.
+  if (me) client.setQueryData(['auth', 'me'], me);
   return render(
     <QueryClientProvider client={client}>
       <App />
@@ -492,4 +518,53 @@ describe('diseño de columna (?clasico, H1)', () => {
     });
     expect(reportRequests).toEqual(['?format=pdf']);
   }, 15000);
+});
+
+describe('acceso con llave (ADR-0042)', () => {
+  it('sin sesión pide la llave; una falsa no entra y la buena abre el monitor', async () => {
+    renderApp(null);
+
+    const field = await screen.findByLabelText('Llave de acceso');
+    expect(screen.queryByRole('navigation', { name: 'Secciones' })).toBeNull();
+    expect(field.getAttribute('type')).toBe('password');
+    expect(field.getAttribute('autocomplete')).toBe('off');
+    const enter = screen.getByRole('button', { name: 'Entrar' });
+    fireEvent.change(field, { target: { value: 'no-es-llave' } });
+    expect((enter as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/Así no se ve una llave/)).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: `orc_live_AbCd1234_${'y'.repeat(40)}` } });
+    fireEvent.click(enter);
+    expect((await screen.findByRole('alert')).textContent).toContain('no es válida');
+
+    fireEvent.change(field, { target: { value: GOOD_KEY } });
+    fireEvent.click(enter);
+    expect(await screen.findByRole('button', { name: 'Salir' })).toBeTruthy();
+    expect(screen.getByText('Benjamin')).toBeTruthy();
+    const nav = screen.getByRole('navigation', { name: 'Secciones' });
+    expect(within(nav).getByRole('link', { name: 'Accesos' })).toBeTruthy();
+  });
+
+  it('un usuario normal no ve «Estado del sistema» ni «Accesos», ni entrando por la URL', () => {
+    window.location.hash = '#/accesos';
+    renderApp({
+      ...BENJI,
+      username: 'ana',
+      display_name: 'Ana',
+      role: 'user',
+      sections: ['explorar', 'casos', 'conceptos', 'historial'],
+    });
+
+    const nav = screen.getByRole('navigation', { name: 'Secciones' });
+    const tabs = within(nav)
+      .getAllByRole('link')
+      .map((t) => t.getAttribute('href'));
+    expect(tabs).toContain('#/historial');
+    expect(tabs).not.toContain('#/estado');
+    expect(tabs).not.toContain('#/accesos');
+    expect(tabs).not.toContain('#/envios');
+    expect(within(nav).getByRole('link', { current: 'page' }).getAttribute('href')).toBe(
+      '#/explorar',
+    );
+  });
 });

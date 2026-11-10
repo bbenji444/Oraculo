@@ -20,6 +20,8 @@ interface ConfirmDeleteProps {
   busy?: boolean;
   /** Texto del botón inicial. */
   label?: string;
+  /** Verbo de la confirmación, en minúsculas («¿Revocar? · Sí, revocar»). */
+  verb?: string;
 }
 
 export function ConfirmDelete({
@@ -27,6 +29,7 @@ export function ConfirmDelete({
   onConfirm,
   busy = false,
   label = 'Eliminar',
+  verb = 'eliminar',
 }: ConfirmDeleteProps) {
   const [asking, setAsking] = useState(false);
   if (!asking) {
@@ -46,14 +49,14 @@ export function ConfirmDelete({
   return (
     <span
       role="group"
-      aria-label={`Confirmar: eliminar ${what}`}
+      aria-label={`Confirmar: ${verb} ${what}`}
       className="hud-reveal flex items-center gap-2"
     >
       <span className="font-display text-[10px] tracking-[0.18em] text-rose-200 uppercase">
-        ¿Eliminar?
+        ¿{verb.charAt(0).toUpperCase() + verb.slice(1)}?
       </span>
       <HudButton variant="danger" size="sm" disabled={busy} onClick={onConfirm}>
-        Sí, eliminar
+        Sí, {verb}
       </HudButton>
       <HudButton
         variant="ghost"

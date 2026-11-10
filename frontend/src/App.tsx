@@ -8,12 +8,19 @@
  * #/estado) para que se pueda compartir o recargar
  * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
  *
+ * Acceso con llave (ADR-0042): sin sesión se ve «Entrar con tu llave». Con
+ * sesión, solo las pestañas del rol de la persona: «Estado del sistema» y
+ * «Accesos» (#/accesos) son de superusuarios. El nombre y «Salir» van en el
+ * encabezado.
+ *
  * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
  * el laboratorio del muro de la Fase 9.1 (ADR-0102). Se carga aparte, solo al
  * abrirlo, para no pesar en Explorar.
  */
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
+import { AccessPage } from './components/Access/AccessPage';
+import { LoginScreen } from './components/Auth/LoginScreen';
 import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
@@ -25,11 +32,12 @@ import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 import { HudTabs } from './components/ui/HudTabs';
 import { useAppConfig } from './hooks/useAppConfig';
+import { useLogout, useMe } from './hooks/useAuth';
+import type { Me, Section } from './services/auth';
 import { safeOraculoUrl } from './services/appConfig';
 import { installSpotlight } from './ui/spotlight';
 
-type Tab =
-  'explorar' | 'casos' | 'conceptos' | 'historial' | 'envios' | 'estado' | 'laboratorio' | 'diseno';
+type Tab = Section | 'laboratorio' | 'diseno';
 
 const MuroLab = lazy(() => import('./lab/MuroLab'));
 // El laboratorio es solo para desarrollo: se pide a propósito en la URL.
@@ -37,27 +45,32 @@ const LAB_ENABLED = new URLSearchParams(window.location.search).has('laboratorio
 // La muestra del diseño nuevo (27/10/2026): solo con ?diseno en la URL.
 const DESIGN_ENABLED = new URLSearchParams(window.location.search).has('diseno');
 
-const TABS: { id: Tab; label: string }[] = [
+const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'explorar', label: 'Explorar' },
   { id: 'casos', label: 'Casos' },
   { id: 'conceptos', label: 'Conceptos' },
   { id: 'historial', label: 'Historial' },
   { id: 'envios', label: 'Envíos' },
   { id: 'estado', label: 'Estado del sistema' },
+  { id: 'accesos', label: 'Accesos' },
   ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
   ...(DESIGN_ENABLED ? [{ id: 'diseno' as const, label: 'Diseño' }] : []),
 ];
 
-function tabFromHash(): Tab {
-  const hash = window.location.hash;
-  if (hash === '#/laboratorio' && LAB_ENABLED) return 'laboratorio';
-  if (hash === '#/diseno' && DESIGN_ENABLED) return 'diseno';
-  if (hash === '#/estado') return 'estado';
-  if (hash === '#/casos') return 'casos';
-  if (hash === '#/conceptos') return 'conceptos';
-  if (hash === '#/historial') return 'historial';
-  if (hash === '#/envios') return 'envios';
-  return 'explorar';
+/** Las pestañas que el rol permite (lo dice el servidor en `/auth/me`). */
+function tabsFor(me: Me): { id: Tab; label: string }[] {
+  return ALL_TABS.filter(
+    (t) =>
+      (me.sections as string[]).includes(t.id) ||
+      // El laboratorio y la muestra de diseño son de desarrollo: solo superusuarios.
+      ((t.id === 'laboratorio' || t.id === 'diseno') && me.role === 'superuser'),
+  );
+}
+
+function tabFromHash(allowed: readonly Tab[]): Tab {
+  const wanted = window.location.hash.replace(/^#\//, '');
+  // #/geodatos y cualquier pestaña que el rol no tenga llevan a Explorar.
+  return (allowed as string[]).includes(wanted) ? (wanted as Tab) : 'explorar';
 }
 
 function Screen({ tab }: { tab: Tab }) {
@@ -66,6 +79,7 @@ function Screen({ tab }: { tab: Tab }) {
   if (tab === 'historial') return <HistoryPage />;
   if (tab === 'envios') return <DeliveriesPage />;
   if (tab === 'estado') return <SystemStatusPanel />;
+  if (tab === 'accesos') return <AccessPage />;
   if (tab === 'diseno') return <DesignPreview />;
   if (tab === 'laboratorio') {
     return (
@@ -112,8 +126,70 @@ function OraculoLink() {
   );
 }
 
+/** Nombre de quien entró y «Salir» (en modo desarrollo no hay llave que cerrar). */
+function UserBadge({ me }: { me: Me }) {
+  const logout = useLogout();
+  return (
+    <span className="flex shrink-0 items-center gap-2 text-xs text-slate-300">
+      <span className="max-w-[10rem] truncate" title={`${me.display_name} (${me.username})`}>
+        {me.display_name}
+      </span>
+      {me.auth_mode === 'keys' && (
+        <button
+          type="button"
+          className="hud-btn hud-btn--sm whitespace-nowrap"
+          disabled={logout.isPending}
+          onClick={() => {
+            logout.mutate();
+          }}
+        >
+          Salir
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** Mientras se sabe si hay sesión: el universo, sin nada encima. */
+function Gate({ children }: { children?: ReactNode }) {
+  return (
+    <div className="relative h-dvh font-sans text-slate-100">
+      <GraphicsBoundary fallback={null}>
+        <SpaceBackground mode="drift" />
+      </GraphicsBoundary>
+      <div aria-hidden="true" className="velo-universo pointer-events-none absolute inset-0" />
+      {children}
+    </div>
+  );
+}
+
 export function App() {
-  const [tab, setTab] = useState<Tab>(tabFromHash);
+  const me = useMe();
+  if (me.isPending) return <Gate />;
+  if (me.error) {
+    return (
+      <Gate>
+        <p role="alert" className="relative z-10 p-8 text-center text-sm text-rose-300">
+          {me.error.message}
+        </p>
+      </Gate>
+    );
+  }
+  if (!me.data) {
+    return (
+      <Gate>
+        <LoginScreen />
+      </Gate>
+    );
+  }
+  // key: al cambiar de persona se monta todo de nuevo (nada de la anterior).
+  return <Monitor key={me.data.username} me={me.data} />;
+}
+
+function Monitor({ me }: { me: Me }) {
+  const tabs = tabsFor(me);
+  const allowed = tabs.map((t) => t.id);
+  const [tab, setTab] = useState<Tab>(() => tabFromHash(allowed));
   // Explorar se monta la primera vez que se visita y ya no se desmonta: cada
   // montaje creaba dos contextos 3D y volvía a subir la foto del cielo a la
   // tarjeta, y al ir y venir entre pestañas la Intel integrada se reiniciaba
@@ -126,13 +202,13 @@ export function App() {
 
   useEffect(() => {
     const onHashChange = () => {
-      setTab(tabFromHash());
+      setTab(tabFromHash(tabsFor(me).map((t) => t.id)));
     };
     window.addEventListener('hashchange', onHashChange);
     return () => {
       window.removeEventListener('hashchange', onHashChange);
     };
-  }, []);
+  }, [me]);
 
   return (
     <div className="relative h-dvh font-sans text-slate-100">
@@ -173,8 +249,9 @@ export function App() {
             aria-hidden="true"
             className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
           />
-          <HudTabs tabs={TABS} active={tab} label="Secciones" />
+          <HudTabs tabs={tabs} active={tab} label="Secciones" />
           <OraculoLink />
+          <UserBadge me={me} />
         </div>
       </header>
       {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás

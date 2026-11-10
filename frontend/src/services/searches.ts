@@ -72,6 +72,8 @@ export interface SearchProgress {
 
 export interface Search {
   search_id: string;
+  /** Quién la lanzó (`monitor-automatico` en las corridas automáticas). */
+  user_id?: string;
   status: SearchStatus;
   region_id: number;
   region_code: string;
@@ -300,12 +302,17 @@ export async function getSearch(searchId: string, signal?: AbortSignal): Promise
 }
 
 /** Una página del historial, de la más reciente a la más vieja. */
+export type HistoryScope = 'mine' | 'all';
+
 export async function listSearches(
   cursor: string | null,
   signal?: AbortSignal,
+  scope: HistoryScope = 'mine',
 ): Promise<Page<Search>> {
   const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
   if (cursor) params.set('cursor', cursor);
+  // «all» solo lo respeta el servidor para superusuarios (ADR-0042).
+  if (scope === 'all') params.set('scope', 'all');
   const data = await requestJson(`${apiUrl('searches')}?${params.toString()}`, { signal });
   if (!isPage(data, isSearch)) throw badFormat();
   return data;

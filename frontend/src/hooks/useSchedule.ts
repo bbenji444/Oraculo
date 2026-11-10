@@ -12,11 +12,13 @@ const KEY = ['schedule'] as const;
 // Las próximas corridas cambian con la hora: se vuelve a pedir cada minuto.
 const REFRESH_MS = 60_000;
 
-export function useSchedule() {
+/** El horario; `enabled` en falso para quien no es superusuario (ADR-0042). */
+export function useSchedule(enabled = true) {
   return useQuery({
     queryKey: KEY,
     queryFn: ({ signal }) => getSchedule(signal),
     refetchInterval: REFRESH_MS,
+    enabled,
   });
 }
 

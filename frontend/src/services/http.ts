@@ -5,7 +5,21 @@
  * centraliza cómo se habla con la API: JSON de ida y vuelta, y traducción
  * del formato uniforme de error (`{"error": {"code", "message", "details"}}`)
  * a un `ApiError` con el mensaje en español tal cual.
+ *
+ * Si la API responde 401 (la sesión terminó o se revocó la llave), avisa con
+ * el evento `SESSION_EXPIRED_EVENT` para que la pantalla vuelva a «Entrar».
+ * Las cookies de sesión viajan solas: `fetch` las manda al mismo servidor.
  */
+
+/** Evento de `window` cuando la API dice que ya no hay sesión (ADR-0042). */
+export const SESSION_EXPIRED_EVENT = 'monitor:sesion-terminada';
+
+function notifyIfLoggedOut(status: number): void {
+  // Sin window (pruebas en Node) no hay pantalla a la cual avisar.
+  if (status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+}
 
 /** Error de la API con su mensaje en español, su código estable y sus detalles. */
 export class ApiError extends Error {
@@ -58,7 +72,10 @@ export async function requestJson(url: string, options: RequestOptions = {}): Pr
     throw new ApiError('No se pudo contactar a la API.', 'network_error');
   }
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw errorFrom(response.status, payload);
+  if (!response.ok) {
+    notifyIfLoggedOut(response.status);
+    throw errorFrom(response.status, payload);
+  }
   return payload;
 }
 
@@ -103,7 +120,10 @@ export async function requestFile(url: string, method: 'GET' | 'POST' = 'GET'): 
   } catch {
     throw new ApiError('No se pudo contactar a la API.', 'network_error');
   }
-  if (!response.ok) throw errorFrom(response.status, await response.json().catch(() => null));
+  if (!response.ok) {
+    notifyIfLoggedOut(response.status);
+    throw errorFrom(response.status, await response.json().catch(() => null));
+  }
   const disposition = response.headers.get('Content-Disposition') ?? '';
   const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? null;
   return { blob: await response.blob(), filename };
