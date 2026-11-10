@@ -13,7 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - **«Todo México» se puede elegir sin moverle.** Al abrir «Dónde» ya queda elegido de verdad. Antes solo lo parecía y no dejaba barrer.
   - **Botón «← Oráculo»** en el encabezado, para regresar al sistema principal (`ORACULO_URL`).
   - **Subdivisiones editables al 100%.** En «Conceptos → Subdivisiones» se agregan (con las palabras de su tema general) y se borran (sus notas pasan a «Otros»; «Otros» no se borra).
-  - **«¿Qué rastrear?» se entiende solo.** Los bloques dicen «Filtrar el tema por delito» y «O buscar un delito en general (sin el tema)», con un ejemplo cada uno.
+  - **«¿Qué rastrear?» con una sola lista de delitos.** Antes «Homicidio» salía dos veces. Ahora se elige **con quién** (FGR, Policía de investigación o «Con nadie en particular») y **qué delitos**, cada uno una sola vez, y una frase dice qué va a traer la búsqueda («Notas de la FGR que además hablan de Homicidio»).
 
 - **La base del monitor vive en el PostgreSQL general de Oráculo (07/11/2026).** Benji: «actualmente sí se están respaldando nuestras bases de datos».
   - Base `monitor_noticias` en `192.168.0.20` (PostgreSQL 17.9), con su propio usuario sin permisos de administrador. Entra en los respaldos del servidor general y se ve en DBeaver junto a las demás bases.
