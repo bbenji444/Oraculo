@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Ajustes de búsqueda pedidos por Benji (09/11/2026).**
+  - **Las notas fuera de la región ya no cuentan (ADR-0041).** Una búsqueda de «PDI» en México traía 47 notas de Chile: «PDI» es la policía chilena. Ahora lo de fuera no sale en la lista, el globo, los conteos, el PDF ni los correos, y una nota sin lugar de un medio de otro país (`.cl`, `.pe`…) también cuenta como fuera. Se puede revisar con el filtro «fuera de la región».
+  - **«Todo México» se puede elegir sin moverle.** Al abrir «Dónde» ya queda elegido de verdad. Antes solo lo parecía y no dejaba barrer.
+  - **Botón «← Oráculo»** en el encabezado, para regresar al sistema principal (`ORACULO_URL`).
+  - **Subdivisiones editables al 100%.** En «Conceptos → Subdivisiones» se agregan (con las palabras de su tema general) y se borran (sus notas pasan a «Otros»; «Otros» no se borra).
+  - **«¿Qué rastrear?» se entiende solo.** Los bloques dicen «Filtrar el tema por delito» y «O buscar un delito en general (sin el tema)», con un ejemplo cada uno.
+
 - **La base del monitor vive en el PostgreSQL general de Oráculo (07/11/2026).** Benji: «actualmente sí se están respaldando nuestras bases de datos».
   - Base `monitor_noticias` en `192.168.0.20` (PostgreSQL 17.9), con su propio usuario sin permisos de administrador. Entra en los respaldos del servidor general y se ve en DBeaver junto a las demás bases.
   - El monitor sigue corriendo en la VM 108. Se copió con 0 errores y los mismos conteos, y la base anterior queda de reserva en la VM.

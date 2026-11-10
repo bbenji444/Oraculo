@@ -6,20 +6,22 @@ Sirve para leyendas, filtros y el reporte.
 Desde el 02/11/2026 también se editan (``PATCH /categories/{id}``): son las
 subdivisiones de la FGR y cada una tiene su tema general para buscar sin la
 FGR (``topic_concept_id``), cuyas palabras clave se editan en ``/concepts``.
+Desde el 09/11/2026 se agregan (``POST``, con su tema general) y se borran
+(``DELETE``: sus notas pasan a «Otros»).
 
 No hace: no clasifica (eso pasa al cerrar cada búsqueda).
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.concepts import get_actor
 from app.application.audit import Actor
 from app.application.ports.categories import CategoryCatalogPort
-from app.application.use_cases.catalog import EditCategory
+from app.application.use_cases.catalog import CreateCategory, DeleteCategory, EditCategory
 from app.domain.categories import Category, CategoryChanges
 
 router = APIRouter(prefix="/categories", tags=["categorías"], responses=ERROR_RESPONSES)
@@ -128,3 +130,63 @@ async def edit_category(
     """Cambia nombre, descripción, color o si está prendida; queda en la bitácora."""
     category = await EditCategory(store).execute(category_id, body.to_changes(), actor)
     return CategoryItemOut.from_domain(category)
+
+
+class CategoryCreateIn(BaseModel):
+    """Una subdivisión nueva con su tema general."""
+
+    name: str = Field(examples=["Feminicidio"])
+    description: str = Field(
+        default="", description="Qué entra en ella; es lo que lee la IA al clasificar."
+    )
+    color: str = Field(examples=["#FF4D6D"])
+    is_active: bool = True
+    keywords: list[str] = Field(
+        description="Palabras clave de su tema general (al menos una).",
+        examples=[["feminicidio", "feminicidios"]],
+    )
+    exclude_terms: list[str] = Field(default_factory=list)
+
+
+class CategoryDeleteOut(BaseModel):
+    """Cómo quedó el borrado."""
+
+    notes_moved_to_other: int = Field(description="Notas que pasaron a «Otros».")
+
+
+@router.post(
+    "",
+    response_model=CategoryItemOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Agregar una subdivisión",
+    responses=error_responses(409, 422),
+)
+async def create_category(
+    body: CategoryCreateIn, store: Store, actor: CurrentActor
+) -> CategoryItemOut:
+    """Agrega una subdivisión antes de «Otros», con su tema general; queda en la bitácora.
+
+    La IA la usa con las notas que se clasifiquen después.
+    """
+    category = await CreateCategory(store).execute(
+        CategoryChanges(body.name, body.description, body.color, body.is_active),
+        tuple(body.keywords),
+        tuple(body.exclude_terms),
+        actor,
+    )
+    return CategoryItemOut.from_domain(category)
+
+
+@router.delete(
+    "/{category_id}",
+    response_model=CategoryDeleteOut,
+    summary="Borrar una subdivisión",
+    responses=error_responses(404, 422),
+)
+async def delete_category(category_id: int, store: Store, actor: CurrentActor) -> CategoryDeleteOut:
+    """Borra una subdivisión: sus notas pasan a «Otros» y su tema general se retira.
+
+    «Otros» no se borra (``422 invalid_category``).
+    """
+    moved = await DeleteCategory(store).execute(category_id, actor)
+    return CategoryDeleteOut(notes_moved_to_other=moved)

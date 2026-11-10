@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.application.audit import AuditEntry
 from app.application.ports.llm import ClassificationNote
 from app.domain.categories import Category, CategoryChoice
+from app.domain.concept import ConceptDraft
 from app.domain.errors import CategoryNameTakenError, CategoryNotFoundError
 from app.domain.names import normalize_name
 
@@ -56,6 +57,36 @@ _PENDING = """
     FROM articles a
     WHERE a.category_version IS DISTINCT FROM :version
 """
+
+
+_AUDIT = text(
+    "INSERT INTO audit_log (user_id, action, entity_type, entity_id, payload, ip) "
+    "VALUES (:user_id, :action, :entity_type, :entity_id, CAST(:payload AS jsonb), "
+    "CAST(:ip AS inet))"
+)
+# Una subdivisión nueva va antes de «Otros», que siempre queda al final.
+_INSERT_CATEGORY = text(
+    "INSERT INTO categories (name, name_norm, description, color, sort_order, is_active) "
+    "VALUES (:name, :norm, :description, :color, "
+    "(SELECT COALESCE(max(sort_order), 0) + 1 FROM categories WHERE NOT is_other), :active) "
+    "RETURNING id, sort_order"
+)
+_INSERT_TOPIC = text(
+    "INSERT INTO concepts (name, name_norm, description, keywords, exclude_terms, color, "
+    "is_active, created_by, category_id) VALUES (:name, :name_norm, :description, "
+    ":keywords, :exclude_terms, :color, :is_active, :created_by, :category_id)"
+)
+
+
+def _audit_params(audit: AuditEntry, entity_id: int) -> dict[str, object]:
+    return {
+        "user_id": audit.actor.user_id,
+        "action": audit.action,
+        "entity_type": ENTITY_TYPE,
+        "entity_id": str(entity_id),
+        "payload": json.dumps(dict(audit.payload), ensure_ascii=False),
+        "ip": audit.actor.ip,
+    }
 
 
 class PostgresCategoryStore:
@@ -150,6 +181,88 @@ class PostgresCategoryStore:
                 "La subdivisión ya no existe.", {"id": category.category_id}
             )
         return saved
+
+    async def create_category(
+        self, category: Category, topic: ConceptDraft, actor_id: str, audit: AuditEntry
+    ) -> Category:
+        """Ver ``CategoryCatalogPort.create_category``."""
+        try:
+            async with self._engine.begin() as conn:
+                row = (
+                    await conn.execute(
+                        _INSERT_CATEGORY,
+                        {
+                            "name": category.name,
+                            "norm": normalize_name(category.name),
+                            "description": category.description,
+                            "color": category.color,
+                            "active": category.is_active,
+                        },
+                    )
+                ).one()
+                await conn.execute(
+                    text(
+                        "UPDATE categories SET sort_order = :after "
+                        "WHERE is_other AND sort_order <= :order"
+                    ),
+                    {"order": row.sort_order, "after": row.sort_order + 1},
+                )
+                await conn.execute(
+                    _INSERT_TOPIC,
+                    {
+                        "name": topic.name,
+                        "name_norm": topic.name_norm,
+                        "description": topic.description,
+                        "keywords": list(topic.keywords),
+                        "exclude_terms": list(topic.exclude_terms),
+                        "color": topic.color,
+                        "is_active": topic.is_active,
+                        "created_by": actor_id,
+                        "category_id": row.id,
+                    },
+                )
+                await conn.execute(_AUDIT, _audit_params(audit, row.id))
+        except IntegrityError as error:
+            raise CategoryNameTakenError(
+                f'Ya existe una subdivisión o un concepto llamado "{category.name}".',
+                {"name": category.name},
+            ) from error
+        saved = await self.get_category(row.id)
+        if saved is None:
+            raise CategoryNotFoundError("La subdivisión ya no existe.", {"id": row.id})
+        return saved
+
+    async def delete_category(self, category: Category, audit: AuditEntry) -> int:
+        """Ver ``CategoryCatalogPort.delete_category``."""
+        async with self._engine.begin() as conn:
+            moved = (
+                await conn.execute(
+                    text(
+                        "UPDATE articles SET category_id = "
+                        "(SELECT id FROM categories WHERE is_other) WHERE category_id = :id"
+                    ),
+                    {"id": category.category_id},
+                )
+            ).rowcount
+            # El tema general se retira de forma lógica: las búsquedas pasadas
+            # conservan su nombre (search_concepts.concept_name).
+            await conn.execute(
+                text(
+                    "UPDATE concepts SET deleted_at = now(), is_active = false, "
+                    "category_id = NULL WHERE category_id = :id AND deleted_at IS NULL"
+                ),
+                {"id": category.category_id},
+            )
+            await conn.execute(
+                text("DELETE FROM categories WHERE id = :id AND NOT is_other"),
+                {"id": category.category_id},
+            )
+            payload = {**dict(audit.payload), "notes_moved_to_other": moved}
+            await conn.execute(
+                _AUDIT,
+                _audit_params(AuditEntry(audit.actor, audit.action, payload), category.category_id),
+            )
+        return int(moved or 0)
 
     async def pending_notes(
         self, article_ids: Sequence[int], version: str

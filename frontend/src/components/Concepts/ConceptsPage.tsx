@@ -30,7 +30,8 @@ type Editing =
   | { kind: 'none' }
   | { kind: 'new' }
   | { kind: 'edit'; id: number }
-  | { kind: 'subdivision'; id: number };
+  | { kind: 'subdivision'; id: number }
+  | { kind: 'new-subdivision' };
 
 export function ConceptsPage() {
   const concepts = useConcepts();
@@ -112,6 +113,15 @@ export function ConceptsPage() {
             kicker="Fiscalía General de la República"
             title="Subdivisiones"
             description="Con ellas la IA clasifica cada nota y, con las palabras de su tema, se buscan solas o junto con la FGR."
+            actions={
+              <HudButton
+                onClick={() => {
+                  setEditing({ kind: 'new-subdivision' });
+                }}
+              >
+                + Nueva subdivisión
+              </HudButton>
+            }
           />
         </div>
         <HudPanel className="overflow-hidden">
@@ -138,7 +148,16 @@ export function ConceptsPage() {
       <aside className="min-w-0">
         {/* Si el concepto que se editaba ya no está (otra persona lo borró),
             se cierra el panel en lugar de mostrar un formulario vacío. */}
-        {editing.kind === 'subdivision' && subdivision ? (
+        {editing.kind === 'new-subdivision' ? (
+          <SubdivisionForm
+            key="nueva"
+            topic={undefined}
+            onClose={close}
+            onCreated={(created) => {
+              setEditing({ kind: 'subdivision', id: created.id });
+            }}
+          />
+        ) : editing.kind === 'subdivision' && subdivision ? (
           <SubdivisionForm
             // Otra subdivisión: el formulario arranca con lo guardado.
             key={subdivision.id}
