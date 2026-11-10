@@ -117,18 +117,58 @@ def final_status(
     return SearchStatus.COMPLETED
 
 
-def in_region(primary: Place | None, searched: Place) -> bool | None:
+# Dominios de país de los medios que más se cuelan en búsquedas de México:
+# Latinoamérica, España y Brasil (ISO 3166 alfa-3, igual que regions.code de
+# los países). «PDI» es la policía de Chile y Google News traía decenas de
+# medios .cl sin lugar en la nota (búsqueda del 09/11/2026). Los .com no dicen
+# el país y se dejan sin decidir.
+_COUNTRY_TLDS: dict[str, str] = {
+    "mx": "MEX", "cl": "CHL", "pe": "PER", "ar": "ARG", "co": "COL", "ve": "VEN",
+    "ec": "ECU", "bo": "BOL", "py": "PRY", "uy": "URY", "gt": "GTM", "hn": "HND",
+    "sv": "SLV", "ni": "NIC", "cr": "CRI", "pa": "PAN", "do": "DOM", "cu": "CUB",
+    "pr": "PRI", "es": "ESP", "br": "BRA",
+}  # fmt: skip
+
+
+def outlet_country(domain: str | None) -> str | None:
+    """País de un medio según la terminación de su dominio, si la dice.
+
+    Args:
+        domain: Dominio del medio («adnradio.cl», «eluniversal.com.mx»).
+
+    Returns:
+        Clave ISO alfa-3 del país, o ``None`` si el dominio no dice el país.
+
+    Example:
+        >>> outlet_country("chilevision.cl")
+        'CHL'
+        >>> outlet_country("milenio.com") is None
+        True
+    """
+    if not domain:
+        return None
+    return _COUNTRY_TLDS.get(domain.rsplit(".", 1)[-1].lower())
+
+
+def in_region(
+    primary: Place | None, searched: Place, outlet_domain: str | None = None
+) -> bool | None:
     """Dice si la ubicación principal de una nota cae en la región buscada.
 
     Args:
         primary: Ubicación principal de la nota, si tiene.
         searched: Región de la búsqueda.
+        outlet_domain: Dominio del medio. Si la nota no tiene ubicación y el
+            medio es de otro país (``.cl``, ``.pe``…), cuenta como fuera.
 
     Returns:
         ``None`` si la nota no tiene ubicación (va a "Sin ubicación");
         ``True``/``False`` según el prefijo de la clave o el país.
     """
     if primary is None:
+        country = outlet_country(outlet_domain)
+        if country is not None and country != searched.country_code:
+            return False
         return None
     if searched.level is RegionLevel.COUNTRY:
         return primary.country_code == searched.code

@@ -234,7 +234,8 @@ async def test_busqueda_guardada_de_punta_a_punta(
     assert first.in_region is True
     assert first.concepts == (CONCEPT_NAME,)
     assert first.precision == "municipality"
-    assert {p.in_region for p in preview} == {True, False}
+    # Las de fuera de la región no salen en la vista previa (09/11/2026).
+    assert {p.in_region for p in preview} == {True}
     snapshot = await searches.snapshot(search_id)
     assert snapshot is not None
     assert (snapshot.status, snapshot.credits_used) == (SearchStatus.COMPLETED, 1)

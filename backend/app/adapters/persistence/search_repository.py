@@ -1177,6 +1177,7 @@ class PostgresArticleStore:
                             LEFT JOIN article_locations al
                                 ON al.article_id = a.id AND al.is_primary
                             LEFT JOIN regions r ON r.id = al.region_id
+                            WHERE sr.in_region IS NOT FALSE
                             ORDER BY (a.enrichment_status = 'ok') DESC,
                                 (al.id IS NOT NULL) DESC, sr.in_region DESC NULLS LAST,
                                 sr.best_rank, a.id
@@ -1286,6 +1287,10 @@ def _article_filters(filters: ArticleFilters) -> tuple[list[str], dict[str, obje
         where.append("sr.in_region IS FALSE")
     elif filters.in_region is InRegion.UNLOCATED:
         where.append("sr.in_region IS NULL")
+    elif filters.in_region is not InRegion.ALL:
+        # Por defecto, las de fuera de la región no cuentan (09/11/2026): una
+        # búsqueda de México traía decenas de notas de la PDI de Chile.
+        where.append("sr.in_region IS NOT FALSE")
     if filters.precisions:
         located = sorted(filters.precisions - {_UNKNOWN})
         parts = ["p.precision = ANY(:precisions)"] if located else []

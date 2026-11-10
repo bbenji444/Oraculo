@@ -39,7 +39,7 @@ def test_el_reloj_programa_la_ingesta_y_la_limpieza() -> None:
 def test_el_reloj_revisa_el_horario_unico_cada_minuto() -> None:
     # ADR-0040: el horario vive en la base y se edita desde «Envíos»; el reloj
     # revisa cada minuto si toca una corrida, sin reiniciarse al cambiarlo.
-    monitor = build_beat_schedule(Settings())["monitor-fgr"]
+    monitor = build_beat_schedule(Settings(automatic_runs_enabled=True))["monitor-fgr"]
 
     assert monitor["task"] == SCHEDULE_TICK_TASK
     assert monitor["schedule"] == 60.0

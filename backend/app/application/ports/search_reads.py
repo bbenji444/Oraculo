@@ -211,6 +211,8 @@ class InRegion(StrEnum):
     INSIDE = "true"
     OUTSIDE = "false"
     UNLOCATED = "none"
+    # Todas, también las de fuera (para revisar o auditar una búsqueda).
+    ALL = "all"
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,7 +221,10 @@ class ArticleFilters:
 
     Attributes:
         relevant_only: Solo las relevantes para algún concepto (por defecto).
-        in_region: Dentro, fuera o sin ubicación; ``None`` = todas.
+        in_region: Dentro, fuera o sin ubicación. ``None`` (por defecto) =
+            dentro y sin ubicación: las de fuera de la región no cuentan en la
+            lista, el globo, los conteos ni el reporte (Benji, 09/11/2026);
+            se ven pidiendo ``OUTSIDE``.
         precisions: Precisión de la ubicación principal (``unknown`` = sin
             ubicación); vacío = todas.
         concept_id: Solo las de este concepto (relevantes, salvo que
