@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Radar sobre la zona buscada (11/11/2026).** Mientras corre una búsqueda:
+  - el radar se centra en la región y toma su tamaño;
+  - marca la región con esquinas de «objetivo» y sus coordenadas;
+  - enciende un símbolo de nota por cada nota encontrada y muestra la etapa en curso.
+
 - **Código opcional y llave de API por persona (11/11/2026, ADR-0047, migración 0044).** Benji: «dice mi jefe que es tedioso» y «cada usuario debe tener su propia API key».
   - En «Accesos», el interruptor **Pedir código de Microsoft Authenticator al entrar**. Arranca apagado: se entra con usuario y contraseña.
   - Cada persona tiene su **llave de API**, que el superusuario puede ver, copiar o cambiar. Se guarda cifrada y cada vista queda en la bitácora. Los usuarios normales no la ven.
@@ -29,6 +34,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Fechas y zonas estrictas (11/11/2026, ADR-0048).** Benji: «si le doy buscar hoy, solo hoy».
+  - Una búsqueda manual solo guarda lo publicado en los días pedidos, de 00:00 a 23:59 de la Ciudad de México.
+  - En un estado o municipio, una nota sin lugar ya no cuenta como de la zona.
+- **Globo:**
+  - se quitaron «Pausar giro» y la velocidad de la animación; la animación siempre es lenta;
+  - gira en una consulta nueva o tras 5 minutos sin tocar nada, y se detiene al volver.
 - **Relevancia mucho más estricta (11/11/2026, ADR-0044).** Benji: «me está arrojando información basura».
   - La IA (`enrich_v4`) solo marca una nota como relevante si el tema es **el asunto principal**. Ya no cuentan las agendas de marchas, los resúmenes del día ni las menciones de pasada.
   - Sí cuentan el activismo de víctimas y colectivos, y las acciones oficiales de una institución como la FGR.

@@ -116,13 +116,13 @@ describe('store de Explorar', () => {
     useExplorerStore.getState().setPanelOpen(false);
 
     expect(useExplorerStore.getState().panelOpen).toBe(false);
-    // Se recuerdan las preferencias, el último caso usado (9.3), las fuentes
-    // elegidas (F12.2) y la búsqueda abierta con su consulta (para volver a
+    // Se recuerdan las preferencias (ya no la velocidad: siempre es lenta,
+    // 11/11/2026), el último caso usado (9.3), las fuentes elegidas (F12.2) y
+    // la búsqueda abierta con su consulta (para volver a
     // ella tras ir a otro módulo, 10/11/2026); nunca el panel.
     const state = useExplorerStore.getState();
     expect(useExplorerStore.persist.getOptions().partialize?.(state)).toEqual({
       earth: state.earth,
-      motion: state.motion,
       lastCaseId: state.lastCaseId,
       sources: state.sources,
       searchId: state.searchId,
