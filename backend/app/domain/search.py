@@ -162,10 +162,15 @@ def in_region(
             medio es de otro país (``.cl``, ``.pe``…), cuenta como fuera.
 
     Returns:
-        ``None`` si la nota no tiene ubicación (va a "Sin ubicación");
-        ``True``/``False`` según el prefijo de la clave o el país.
+        ``True``/``False`` según el prefijo de la clave o el país. Sin
+        ubicación: ``False`` si se buscó un estado, municipio o localidad
+        (no se puede asegurar que pasó ahí; Benji, 11/11/2026: «súper estricto
+        de las zonas»), y ``None`` («Sin ubicación») si se buscó un país,
+        salvo que el medio sea de otro país.
     """
     if primary is None:
+        if searched.level is not RegionLevel.COUNTRY:
+            return False
         country = outlet_country(outlet_domain)
         if country is not None and country != searched.country_code:
             return False

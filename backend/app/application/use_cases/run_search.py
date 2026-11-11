@@ -32,7 +32,7 @@ No hace: no decide cuándo correr (lo lanza la tarea de Celery o el comando
 import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
 from app.application.audit import Actor
@@ -70,6 +70,7 @@ from app.domain.extraction import ExtractionStatus
 from app.domain.geocoding import Place, Resolution
 from app.domain.queries import DateWindow, PlannedQuery, Provider, QueryPlace, place_for
 from app.domain.query_builder import build_queries
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus, Stage, StageCount, final_status, in_region
 from app.domain.subdivisions import TopicMatcher
 
@@ -86,6 +87,31 @@ class SearchNotFoundError(NotFoundError):
     """La búsqueda pedida no existe."""
 
     code = "search_not_found"
+
+
+def strict_window(search: StoredSearch) -> RunWindow:
+    """El periodo estricto de una búsqueda: lo publicado fuera no cuenta.
+
+    - Corrida automática: su ventana de horas (desde la corrida anterior).
+    - Búsqueda manual: los días elegidos completos, de las 00:00 del primero
+      a las 00:00 del día siguiente al último, en hora de la Ciudad de México.
+      «Hoy» el 11/11 es solo el 11/11: ni ayer ni el 12.
+
+    Args:
+        search: La búsqueda guardada.
+
+    Returns:
+        La ventana.
+
+    Example:
+        >>> # date_from = date_to = 2026-11-11
+        >>> # → 2026-11-11 00:00 CDMX hasta 2026-11-12 00:00 CDMX (sin incluir)
+    """
+    if search.time_window is not None:
+        return search.time_window
+    start = datetime.combine(search.date_from, time.min, MEXICO_CITY)
+    end = datetime.combine(search.date_to + timedelta(days=1), time.min, MEXICO_CITY)
+    return RunWindow(start, end)
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,10 +363,13 @@ class RunSearch:
     ) -> list[_Work]:
         await self._progress(search.search_id, tally, Stage.DEDUPE)
         found = self._on_topic(tally, execution)
-        if search.time_window is not None:
-            # Corrida automática: solo lo publicado desde la corrida anterior
-            # (Benji, 28/10/2026). Lo de fuera ni se guarda ni se paga a la IA.
-            window = search.time_window
+        window = strict_window(search)
+        if window is not None:
+            # Solo lo publicado en el periodo pedido. Corrida automática: desde
+            # la corrida anterior (Benji, 28/10/2026). Búsqueda manual: los días
+            # elegidos, de 00:00 a 23:59 de la Ciudad de México (11/11/2026:
+            # «si le doy buscar hoy, solo hoy»). Lo de fuera ni se guarda ni se
+            # paga a la IA.
             before = len(found)
             found = tuple(a for a in found if window.contains(a.published_at))
             tally.extra["outside_window"] = before - len(found)
@@ -353,13 +382,12 @@ class RunSearch:
             item.known_id = match.article_id if match else None
         stored = await self._articles.upsert(unique)
         work = [_Work(item, s) for item, s in zip(unique, stored, strict=True)]
-        if search.time_window is not None:
+        if window is not None:
             # Segundo filtro, con la fecha guardada: una nota vieja puede volver
             # con otra fecha (el índice local mandó en la corrida de las 15:00
             # del 28/10/2026 seis notas de la madrugada fechadas dentro de la
             # ventana). Ya guardada conserva su fecha real y era de la corrida
             # anterior: no le toca a esta.
-            window = search.time_window
             kept = [
                 w
                 for w in work
@@ -416,7 +444,7 @@ class RunSearch:
         Returns:
             Las notas que le tocan a la corrida.
         """
-        window = search.time_window
+        window = strict_window(search)
         if window is None:
             return work
         first_day = window.start.astimezone(MEXICO_CITY).date()

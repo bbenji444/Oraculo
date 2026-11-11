@@ -78,10 +78,11 @@ async def test_reubica_con_las_reglas_vigentes_sin_tocar_las_que_no_cambian() ->
     assert gloria.in_region is False
     assert not cdmx.changed
     assert cdmx.in_region is True
-    assert (nothing.after, nothing.in_region) == (None, None)
+    # En una búsqueda de un estado, sin lugar no cuenta como dentro (11/11/2026).
+    assert (nothing.after, nothing.in_region) == (None, False)
     assert set(store.saved) == {1, 2}  # la nota sin menciones no se reescribe
-    assert store.in_region == {1: False, 2: True, 3: None}
-    assert store.progress == {"in_region": 1, "out_of_region": 1, "unlocated": 1}
+    assert store.in_region == {1: False, 2: True, 3: False}
+    assert store.progress == {"in_region": 1, "out_of_region": 2, "unlocated": 0}
 
 
 async def test_busqueda_o_region_inexistentes() -> None:
@@ -103,7 +104,7 @@ async def test_el_comando_muestra_antes_y_despues(caplog: pytest.LogCaptureFixtu
     assert "1 de 3 notas cambiaron de ubicación" in text
     assert "antes:   Colonia la Gloria [110350261]" in text
     assert "después: Heroica Ciudad de Juchitán de Zaragoza [20043] · FUERA de la región" in text
-    assert "dentro: 1 · fuera: 1 · sin ubicación: 1" in text
+    assert "dentro: 1 · fuera: 2 · sin ubicación: 0" in text
     assert reubicar.describe(None) == "Sin ubicación"
     assert reubicar.parse_args([]).busqueda is None
 
@@ -166,7 +167,8 @@ async def test_reprocesar_vuelve_a_preguntar_a_la_ia_y_guarda_lo_nuevo() -> None
     assert (report.usage, report.failed) == (LLMUsage(1000, 100), 0)
     assert store.spent == [(LLMUsage(1000, 100), pytest.approx(0.00015), Actor("benji"))]
     # Al final reubica todo para dejar los conteos al día.
-    assert store.progress == {"in_region": 1, "out_of_region": 0, "unlocated": 1}
+    # La nota sin lugar, en una búsqueda de la CDMX, cuenta como fuera (11/11/2026).
+    assert store.progress == {"in_region": 1, "out_of_region": 1, "unlocated": 0}
 
 
 async def test_reprocesar_registra_las_fallas_y_sigue() -> None:
