@@ -13,8 +13,10 @@ from app.application.ports.access import (
     UserCredentials,
 )
 from app.application.use_cases.access import AccessAdmin, Authenticator, SessionPolicy
+from app.application.use_cases.audit_trail import ReadAuditTrail
 from app.application.use_cases.login import PasswordLogin
 from app.domain.access import AuthUser, KeyInfo, KeyRecord, Role, UserAccount
+from app.domain.audit_trail import AuditEvent, AuditQuery
 from app.domain.errors import UsernameTakenError
 
 PEPPER = b"pimienta-de-prueba-con-mas-de-32-caracteres"
@@ -377,6 +379,38 @@ class FakeLimiter:
         self.failures.pop(ip, None)
 
 
+class FakeAuditTrail:
+    """``AuditTrailPort`` que lee lo que la tienda en memoria anotó en su bitácora."""
+
+    def __init__(self, store: FakeAccessStore) -> None:
+        self._store = store
+
+    async def events(self, query: AuditQuery, limit: int) -> list[AuditEvent]:
+        names = {u.username: u.display_name for u in self._store.users.values()}
+        rows = [
+            AuditEvent(
+                event_id=n,
+                created_at=T0,
+                actor=audit.actor.user_id,
+                actor_name=names.get(audit.actor.user_id),
+                action=audit.action,
+                entity_type=audit.action.split(".")[0],
+                entity_id=entity_id,
+                payload=audit.payload,
+                ip=audit.actor.ip,
+            )
+            for n, (audit, entity_id) in enumerate(self._store.events, start=1)
+        ]
+        picked = [
+            e
+            for e in reversed(rows)
+            if (query.before is None or e.event_id < query.before)
+            and (not query.prefixes or e.action.split(".")[0] in query.prefixes)
+            and (query.actor is None or e.actor == query.actor)
+        ]
+        return picked[:limit]
+
+
 @dataclass
 class AccessWorld:
     """Todo armado: tienda, sesiones, freno, reloj y casos de uso."""
@@ -389,6 +423,7 @@ class AccessWorld:
     admin: AccessAdmin
     tickets: FakeTickets
     login: PasswordLogin
+    trail: ReadAuditTrail
 
 
 def access_world() -> AccessWorld:
@@ -426,4 +461,5 @@ def access_world() -> AccessWorld:
         AccessAdmin(store, sessions, PEPPER, clock),
         tickets,
         login,
+        ReadAuditTrail(FakeAuditTrail(store)),
     )

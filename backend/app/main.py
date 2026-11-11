@@ -35,6 +35,7 @@ from app.adapters.llm.factory import (
 )
 from app.adapters.persistence.access_repository import PostgresAccessStore
 from app.adapters.persistence.access_scope import create_api_engine
+from app.adapters.persistence.audit_trail_repository import PostgresAuditTrail
 from app.adapters.persistence.case_graph_repository import PostgresCaseGraphRepository
 from app.adapters.persistence.cases_repository import PostgresCaseRepository
 from app.adapters.persistence.categories_repository import PostgresCategoryStore
@@ -62,6 +63,7 @@ from app.api.v1 import OPENAPI_TAGS, api_router
 from app.api.v1.app_config import AppConfigOut
 from app.api.v1.deliveries import OverviewOut, SourceOut
 from app.application.use_cases.access import AccessAdmin, Authenticator, SessionPolicy
+from app.application.use_cases.audit_trail import ReadAuditTrail
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.deliveries import SendDeliveries
 from app.application.use_cases.delivery_schedules import StarterSchedule, StarterTemplate
@@ -154,6 +156,7 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
     app.state.access_admin = AccessAdmin(
         store, sessions, pepper, _utc_now, starter.give, box=AesGcmSecretBox(pepper)
     )
+    app.state.audit_trail = ReadAuditTrail(PostgresAuditTrail(engine))
     if settings.auth_mode == "keys":
         limiter = RedisLoginLimiter(
             redis,

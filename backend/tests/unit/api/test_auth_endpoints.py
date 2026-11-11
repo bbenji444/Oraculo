@@ -9,7 +9,9 @@ Revisa lo que ve un navegador o un sistema:
 - con cookie, lo que cambia algo pide ``Origin`` del mismo servidor (CSRF);
 - la llave de sistema en ``Authorization: Bearer`` funciona sin cookie;
 - un usuario normal no abre lo del superusuario;
-- otro módulo puede preguntar de quién es un token (``/auth/introspect``).
+- otro módulo puede preguntar de quién es un token (``/auth/introspect``);
+- la bitácora (``/access/audit``) dice quién vio cada llave, y solo la abre
+  un superusuario.
 """
 
 from collections.abc import Iterator
@@ -30,6 +32,7 @@ from tests.unit.fake_access import PEPPER, AccessWorld, FakeBox, access_world
 ME = "/api/v1/auth/me"
 LOGIN = "/api/v1/auth/login"
 USERS = "/api/v1/access/users"
+AUDIT = "/api/v1/access/audit"
 SAME_ORIGIN = {"Origin": "http://testserver"}
 PASSWORD = "Contraseña-segura-2026"
 BENJI = AuthUser(1, "benji", "Benjamin", Role.SUPERUSER)
@@ -62,6 +65,7 @@ def app(world: AccessWorld) -> FastAPI:
     application.state.authenticator = world.auth
     application.state.access_admin = world.admin
     application.state.password_login = world.login
+    application.state.audit_trail = world.trail
     return application
 
 
@@ -389,3 +393,48 @@ def test_el_superusuario_prende_el_codigo_y_copia_llaves(
     pepe_row = next(u for u in listed if u["username"] == "pepe")
     assert pepe_row["api_key"].endswith("…")
     assert created.json()["key"] not in pepe_row["api_key"]
+
+
+def test_la_bitacora_dice_quien_vio_la_llave(
+    app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    app.state.access_admin = AccessAdmin(
+        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
+    )
+    pepe = world.store.add_user("pepe")
+    _enter(client, world, "benji", secret)
+    created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN).json()
+    client.get(f"{USERS}/{pepe}/api-key")
+
+    response = client.get(AUDIT, params={"group": "access", "limit": 2})
+    page = response.json()
+    rest = client.get(AUDIT, params={"group": "access", "before": page["next_before"]}).json()
+    searches = client.get(AUDIT, params={"group": "searches"}).json()
+
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    newest = page["items"][0]
+    assert (newest["action"], newest["actor"], newest["actor_name"]) == (
+        "access_key.revealed",
+        "benji",
+        "Benji",
+    )
+    assert newest["details"]["de"] == "pepe"
+    # La llave va enmascarada: nunca completa en la bitácora.
+    assert created["key"] not in response.text
+    assert newest["details"]["llave"].endswith("…")
+    assert [i["action"] for i in page["items"]][1] == "access_key.created"
+    assert page["next_before"] is not None
+    assert rest["items"][0]["action"] == "auth.login"
+    assert rest["next_before"] is None
+    assert searches == {"items": [], "next_before": None}
+    assert client.get(AUDIT, params={"group": "nada"}).status_code == 422
+
+
+def test_un_usuario_normal_no_abre_la_bitacora(client: TestClient, world: AccessWorld) -> None:
+    ana = world.store.add_user("ana")
+    ana_secret = new_totp_secret()
+    _ready(world, ana, ana_secret)
+    _enter(client, world, "ana", ana_secret)
+
+    assert client.get(AUDIT).status_code == 403
