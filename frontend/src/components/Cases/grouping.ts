@@ -11,7 +11,7 @@
  *   las que solo se nombran. En personas, además, por estatus legal: un
  *   detenido importa antes que alguien solo mencionado.
  * - Los vínculos se parten en fuertes y débiles según `strength`, que calcula
- *   el backend.
+ *   el backend, y se pueden filtrar por una entidad («Ver vínculos de…»).
  *
  * No hace: no pide datos ni decide nada (solo ordena lo que recibe).
  */
@@ -149,4 +149,38 @@ export function splitByStrength(relationships: readonly Relationship[]): {
 /** Llave única de un vínculo en pantalla (un sugerido todavía no tiene id). */
 export function relationshipKey(r: Pick<Relationship, 'entity_a' | 'entity_b' | 'type'>): string {
   return `${String(r.entity_a.id)}-${String(r.entity_b.id)}-${r.type}`;
+}
+
+/** Una entidad que aparece en algún vínculo, para filtrar por ella. */
+export interface LinkEnd {
+  id: number;
+  label: string;
+  /** En cuántos vínculos de la lista aparece. */
+  links: number;
+}
+
+/**
+ * Las entidades que aparecen en los vínculos, de la más conectada a la
+ * menos (y por nombre si empatan): las opciones de «Ver vínculos de…».
+ */
+export function linkEnds(relationships: readonly Relationship[]): LinkEnd[] {
+  const ends = new Map<number, LinkEnd>();
+  for (const r of relationships) {
+    for (const end of [r.entity_a, r.entity_b]) {
+      const current = ends.get(end.id);
+      if (current) current.links += 1;
+      else ends.set(end.id, { id: end.id, label: end.label, links: 1 });
+    }
+  }
+  return [...ends.values()].sort(
+    (a, b) => b.links - a.links || a.label.localeCompare(b.label, 'es'),
+  );
+}
+
+/** Si el vínculo toca a la entidad; sin entidad elegida, todos pasan. */
+export function touches(
+  r: Pick<Relationship, 'entity_a' | 'entity_b'>,
+  entityId: number | null,
+): boolean {
+  return entityId === null || r.entity_a.id === entityId || r.entity_b.id === entityId;
 }

@@ -11,6 +11,9 @@
  * «Separar»), permite decir «Es la misma que…» otra entidad del caso y separar
  * menciones propias en una sugerencia nueva cuando juntó a dos homónimos.
  *
+ * Desde F12 (ADR-0107) lleva una casilla para elegirla y revisarla en bloque,
+ * y el estatus legal del menú lo guarda `CaseEntities`.
+ *
  * No hace: no pide datos (los recibe de `CaseEntities`).
  */
 import { useState } from 'react';
@@ -20,6 +23,7 @@ import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
 import { participatesInEvent } from './grouping';
 import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
+import { SelectBox } from './SelectBox';
 import { ExternalLink } from '../ExternalLink';
 import { HudSelect } from '../ui/HudSelect';
 
@@ -27,11 +31,20 @@ interface EntityCardProps {
   entity: Entity;
   canEdit: boolean;
   busy: boolean;
+  /**
+   * Estatus legal que se ve en el menú (personas). Lo guarda `CaseEntities`
+   * para que «Confirmar» en bloque mande el mismo que se ve aquí (D1).
+   */
+  legal: LegalStatus;
+  onLegalChange: (legal: LegalStatus) => void;
   onConfirm: (legal: LegalStatus | undefined) => void;
   onDiscard: () => void;
   /** Otras entidades del caso del mismo tipo con las que se puede unir (9.5). */
   mergeTargets: Entity[];
   onResolve: (action: ResolutionAction) => void;
+  /** Si está elegida para revisar en bloque (F12). */
+  selected: boolean;
+  onSelect: (checked: boolean) => void;
 }
 
 // Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
@@ -41,10 +54,14 @@ export function EntityCard({
   entity,
   canEdit,
   busy,
+  legal,
+  onLegalChange,
   onConfirm,
   onDiscard,
   mergeTargets,
   onResolve,
+  selected,
+  onSelect,
 }: EntityCardProps) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState(0);
@@ -53,14 +70,25 @@ export function EntityCard({
   const canSplit = canEdit && own.length > 1;
   const isPerson = entity.type === 'person';
   const inEvent = participatesInEvent(entity);
-  const [legal, setLegal] = useState<LegalStatus>(
-    entity.legal_status ?? entity.suggested_legal_status ?? 'mentioned',
-  );
   const status = entity.legal_status_label ?? entity.suggested_legal_status_label;
 
   return (
-    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
+    <li
+      className={`hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03] ${
+        selected ? 'bg-sky-400/[0.05]' : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start gap-3">
+        {canEdit && (
+          <span className="pt-0.5">
+            <SelectBox
+              state={selected ? 'all' : 'none'}
+              label={`Elegir ${entity.label}`}
+              disabled={busy}
+              onChange={onSelect}
+            />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-100">
             {entity.label}
@@ -162,7 +190,7 @@ export function EntityCard({
                 className="w-auto min-w-[9rem]"
                 value={legal}
                 options={LEGAL_STATUS_OPTIONS}
-                onChange={setLegal}
+                onChange={onLegalChange}
               />
             )}
             {(entity.review_status !== 'confirmed' || entity.legal_status !== legal) && (

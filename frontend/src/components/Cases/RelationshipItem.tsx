@@ -7,13 +7,16 @@
  * y su confianza; al desplegar las notas en común, cada una dice si en ella
  * las dos participan en el hecho.
  *
- * No hace: no pide datos ni decide (avisa con `onReview`).
+ * Desde F12 lleva una casilla para elegirlo y revisarlo en bloque.
+ *
+ * No hace: no pide datos ni decide (avisa con `onReview` y `onSelect`).
  */
 import { useState } from 'react';
 
 import type { Relationship, RelationshipEnd } from '../../services/relationships';
 import { formatDay } from '../Explore/format';
 import { confidencePercent, relationshipPhrase } from './labels';
+import { SelectBox } from './SelectBox';
 import { ExternalLink } from '../ExternalLink';
 
 // Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
@@ -37,16 +40,40 @@ interface RelationshipItemProps {
   canEdit: boolean;
   busy: boolean;
   onReview: (action: 'confirm' | 'discard') => void;
+  /** Si está elegido para revisar en bloque (F12). */
+  selected: boolean;
+  onSelect: (checked: boolean) => void;
 }
 
-export function RelationshipItem({ relationship, canEdit, busy, onReview }: RelationshipItemProps) {
+export function RelationshipItem({
+  relationship,
+  canEdit,
+  busy,
+  onReview,
+  selected,
+  onSelect,
+}: RelationshipItemProps) {
   const [open, setOpen] = useState(false);
   const notes = relationship.shared_articles.length;
   const strong = relationship.strength === 'strong';
 
   return (
-    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
+    <li
+      className={`hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03] ${
+        selected ? 'bg-sky-400/[0.05]' : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start gap-3">
+        {canEdit && (
+          <span className="pt-0.5">
+            <SelectBox
+              state={selected ? 'all' : 'none'}
+              label={`Elegir ${relationship.entity_a.label} y ${relationship.entity_b.label}`}
+              disabled={busy}
+              onChange={onSelect}
+            />
+          </span>
+        )}
         <div className="min-w-0 flex-1 text-sm">
           <p>
             <End end={relationship.entity_a} />

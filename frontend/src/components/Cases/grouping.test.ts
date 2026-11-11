@@ -1,103 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Entity, LegalStatus, Mention } from '../../services/entities';
-import type { Relationship } from '../../services/relationships';
+import { entity, link } from '../../test/caseFixtures';
 import {
   effectiveLegal,
   groupByType,
+  linkEnds,
   participatesInEvent,
   relationshipKey,
   splitByStrength,
+  touches,
 } from './grouping';
-
-let nextMention = 1;
-
-function mention(role: Mention['role']): Mention {
-  const id = nextMention++;
-  return {
-    id,
-    entity_id: 0,
-    article_id: 1,
-    article_title: 'Nota',
-    article_url: 'https://x.mx/1',
-    source_name: null,
-    published_at: null,
-    mention_text: 'x',
-    role,
-    legal_status_hint: null,
-    legal_status_hint_label: null,
-    confidence: 0.9,
-    evidence_span: 'x',
-  };
-}
-
-function entity(
-  id: number,
-  type: string,
-  label: string,
-  options: {
-    roles?: Mention['role'][];
-    legal?: LegalStatus | null;
-    suggested?: LegalStatus | null;
-    articles?: number;
-  } = {},
-): Entity {
-  const roles = options.roles ?? ['mentioned'];
-  return {
-    id,
-    type,
-    type_label: type,
-    label,
-    aliases: [],
-    review_status: 'suggested',
-    review_status_label: 'sugerida',
-    legal_status: options.legal ?? null,
-    legal_status_label: null,
-    suggested_legal_status: options.suggested ?? null,
-    suggested_legal_status_label: null,
-    reviewed_by: null,
-    reviewed_at: null,
-    region_id: null,
-    region_name: null,
-    mention_count: roles.length,
-    article_count: options.articles ?? 1,
-    mentions: roles.map(mention),
-    merged: [],
-  };
-}
-
-function link(a: number, b: number, strength: 'strong' | 'weak'): Relationship {
-  const end = (id: number) => ({
-    id,
-    type: 'person',
-    type_label: 'persona',
-    label: `E${String(id)}`,
-    legal_status: null,
-    legal_status_label: null,
-  });
-  return {
-    id: null,
-    entity_a: end(a),
-    entity_b: end(b),
-    type: 'appears_with',
-    type_label: 'aparecen juntas',
-    custom_label: null,
-    symmetric: true,
-    origin: 'cooccurrence',
-    origin_label: 'aparecen en la misma nota',
-    confidence: 0.7,
-    review_status: 'suggested',
-    review_status_label: 'sugerido',
-    reviewed_by: null,
-    reviewed_at: null,
-    notes: null,
-    shared_articles: [],
-    same_event_count: strength === 'strong' ? 1 : 0,
-    strength,
-    strength_label: strength === 'strong' ? 'relación fuerte' : 'solo se mencionan juntas',
-    reason: 'x',
-  };
-}
 
 describe('grupos por tipo', () => {
   it('ordena los grupos: quién y con qué antes que dónde', () => {
@@ -177,5 +89,23 @@ describe('fuerza de los vínculos', () => {
 
     expect(strong.map(relationshipKey)).toEqual(['1-2-appears_with', '2-3-appears_with']);
     expect(weak.map(relationshipKey)).toEqual(['1-3-appears_with']);
+  });
+});
+
+describe('filtrar vínculos por entidad', () => {
+  const links = [link(1, 2, 'strong'), link(2, 3, 'weak'), link(2, 4, 'weak'), link(3, 1, 'weak')];
+
+  it('ofrece primero las entidades más conectadas', () => {
+    expect(linkEnds(links)).toEqual([
+      { id: 2, label: 'E2', links: 3 },
+      { id: 1, label: 'E1', links: 2 },
+      { id: 3, label: 'E3', links: 2 },
+      { id: 4, label: 'E4', links: 1 },
+    ]);
+  });
+
+  it('deja solo los vínculos de la entidad elegida, o todos sin elegir', () => {
+    expect(links.filter((r) => touches(r, 4)).map(relationshipKey)).toEqual(['2-4-appears_with']);
+    expect(links.filter((r) => touches(r, null))).toHaveLength(4);
   });
 });
