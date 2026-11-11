@@ -4,7 +4,7 @@ La pantalla «Accesos» los usa para (ADR-0042 y ADR-0043):
 
 - dar de alta personas: la respuesta trae su **contraseña temporal**, que se
   muestra una sola vez y la persona cambia al primer ingreso;
-- cambiarles el rol o desactivarlas;
+- cambiarles el rol, desactivarlas o borrarlas (borrado lógico);
 - restablecer su contraseña (la olvidó) o su Microsoft Authenticator
   (cambió de celular);
 - crear o revocar llaves de sistema. La llave completa sale **una sola
@@ -196,6 +196,18 @@ async def create_user(
     return CreatedUserOut(
         user=UserOut.of(created.account), temporary_password=created.temporary_password
     )
+
+
+@router.delete(
+    "/users/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar a una persona",
+    responses=error_responses(404, 409),
+)
+async def delete_user(request: Request, admin: Admin, user: SuperUser, user_id: UserId) -> Response:
+    """Desaparece de la lista y ya no puede entrar; sus búsquedas y la bitácora se quedan."""
+    await admin.delete_user(user, client_ip(request), user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

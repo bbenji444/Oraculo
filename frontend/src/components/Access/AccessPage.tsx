@@ -235,6 +235,10 @@ export function AccessPage() {
           />
           <SecurityActions
             user={editing}
+            isSelf={editing.username === me?.username}
+            onDeleted={() => {
+              setEditing(null);
+            }}
             onTemporaryPassword={(password) => {
               setTemporary({
                 password,

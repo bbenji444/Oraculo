@@ -319,3 +319,28 @@ def test_en_modo_keys_sin_pimienta_no_arranca() -> None:
         Settings(auth_mode="keys", auth_key_pepper=None)
     with pytest.raises(ValueError, match="AUTH_KEY_PEPPER"):
         Settings(auth_mode="keys", auth_key_pepper="corta")
+
+
+def test_borrar_a_una_persona_la_saca_y_ya_no_entra(
+    client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    ana = world.store.add_user("ana")
+    ana_secret = new_totp_secret()
+    _ready(world, ana, ana_secret)
+    ana_client = TestClient(client.app)
+    _enter(ana_client, world, "ana", ana_secret)
+    _enter(client, world, "benji", secret)
+
+    no_origin = client.delete(f"{USERS}/{ana}")
+    deleted = client.delete(f"{USERS}/{ana}", headers=SAME_ORIGIN)
+    again = client.delete(f"{USERS}/{ana}", headers=SAME_ORIGIN)
+    myself = client.delete(f"{USERS}/1", headers=SAME_ORIGIN)
+
+    assert no_origin.status_code == 403
+    assert deleted.status_code == 204
+    assert again.status_code == 404
+    assert myself.status_code == 409
+    assert ana_client.get(ME).status_code == 401
+    assert "ana" not in [u["username"] for u in client.get(USERS).json()["items"]]
+    login = TestClient(client.app).post(LOGIN, json={"username": "ana", "password": PASSWORD})
+    assert login.status_code == 401

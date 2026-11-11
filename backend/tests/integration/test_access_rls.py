@@ -402,3 +402,31 @@ def test_el_secreto_cifrado_no_se_puede_alterar() -> None:
         AesGcmSecretBox(b"otra-pimienta-de-mas-de-32-caracteres!!").open(sealed)
     with pytest.raises(ValueError, match="formato"):
         box.open("v9:xyz")
+
+
+async def test_borrar_a_una_persona_en_la_base(api_engine: AsyncEngine) -> None:
+    store = PostgresAccessStore(api_engine)
+    key = new_key()
+    with as_user(JEFA):
+        ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
+        await store.create_key(
+            NewKeyRow(ana.user_id, key.public_id, key_digest(key.full, PEPPER), "", None), AUDIT
+        )
+    await store.set_password(ana.user_id, hash_password("Clave-segura-2026"), False, AUDIT)
+
+    with as_user(JEFA):
+        deleted = await store.delete_user(ana.user_id, AUDIT)
+        twice = await store.delete_user(ana.user_id, AUDIT)
+        listed = [u.username for u in await store.list_users()]
+        hidden = await store.get_user(ana.user_id)
+        with pytest.raises(UsernameTakenError, match="reservados"):
+            await store.create_user(NewUser(ANA.username, "Otra Ana", None, Role.USER), AUDIT)
+    creds = await store.find_credentials(ANA.username)
+    found_key = await store.find_key(key.public_id)
+
+    assert (deleted, twice) == (True, False)
+    assert ANA.username not in listed
+    assert hidden is None
+    assert creds is None
+    assert found_key is not None and found_key.revoked_at is not None
+    assert not found_key.user_active

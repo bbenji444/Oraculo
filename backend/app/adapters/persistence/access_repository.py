@@ -45,6 +45,9 @@ _CREDENTIALS = """
            totp_secret, totp_last_counter, failed_logins, locked_until
     FROM users
 """
+# Las personas borradas (borrado lógico, migración 0041) no existen para nadie:
+# ni para entrar ni en «Accesos».
+_ALIVE = "deleted_at IS NULL"
 # Guarda los fallos seguidos (los calcula el caso de uso) y, con :lock, el
 # bloqueo; sin :lock se borra un bloqueo que ya venció.
 _LOGIN_FAILED = text(
@@ -67,6 +70,16 @@ _SET_TOTP = text(
 _USE_COUNTER = text(
     "UPDATE users SET totp_last_counter = :c "
     "WHERE id = :id AND (totp_last_counter IS NULL OR totp_last_counter < :c) RETURNING id"
+)
+# Borrado lógico: se quitan contraseña y código para que una cuenta borrada
+# no pueda volver a usarse aunque alguien la «reviviera» a mano.
+_DELETE_USER = text(
+    "UPDATE users SET deleted_at = now(), is_active = false, password_hash = NULL, "
+    "totp_secret = NULL, totp_last_counter = NULL, must_change_password = true "
+    "WHERE id = :id AND deleted_at IS NULL RETURNING id"
+)
+_REVOKE_USER_KEYS = text(
+    "UPDATE access_keys SET revoked_at = now() WHERE user_id = :id AND revoked_at IS NULL"
 )
 _KEY_COLUMNS = (
     "id, user_id, key_prefix, label, created_by, created_at, expires_at, revoked_at, "
@@ -184,7 +197,11 @@ class PostgresAccessStore:
         with as_system():
             async with self._engine.connect() as conn:
                 row = (
-                    (await conn.execute(text(f"{_CREDENTIALS} WHERE {where} = :v"), {"v": value}))
+                    (
+                        await conn.execute(
+                            text(f"{_CREDENTIALS} WHERE {where} = :v AND {_ALIVE}"), {"v": value}
+                        )
+                    )
                     .mappings()
                     .first()
                 )
@@ -239,6 +256,16 @@ class PostgresAccessStore:
                 used = await conn.scalar(_USE_COUNTER, {"id": user_id, "c": counter})
         return used is not None
 
+    async def delete_user(self, user_id: int, audit: AuditEntry) -> bool:
+        """Ver ``AccessStorePort.delete_user``."""
+        async with self._engine.begin() as conn:
+            found = await conn.scalar(_DELETE_USER, {"id": user_id})
+            if found is None:
+                return False
+            await conn.execute(_REVOKE_USER_KEYS, {"id": user_id})
+            await _audit(conn, audit, "user", str(user_id))
+        return True
+
     async def find_key(self, public_id: str) -> KeyRecord | None:
         """Ver ``AccessStorePort.find_key``."""
         with as_system():
@@ -281,7 +308,10 @@ class PostgresAccessStore:
         """Ver ``AccessStorePort.list_users``."""
         async with self._engine.connect() as conn:
             rows = await conn.execute(
-                text(_USER_COLUMNS + " ORDER BY u.is_active DESC, u.role, u.username")
+                text(
+                    _USER_COLUMNS
+                    + " WHERE u.deleted_at IS NULL ORDER BY u.is_active DESC, u.role, u.username"
+                )
             )
             return [_account(r) for r in rows.mappings()]
 
@@ -289,7 +319,12 @@ class PostgresAccessStore:
         """Ver ``AccessStorePort.get_user``."""
         async with self._engine.connect() as conn:
             row = (
-                (await conn.execute(text(_USER_COLUMNS + " WHERE u.id = :id"), {"id": user_id}))
+                (
+                    await conn.execute(
+                        text(_USER_COLUMNS + " WHERE u.id = :id AND u.deleted_at IS NULL"),
+                        {"id": user_id},
+                    )
+                )
                 .mappings()
                 .first()
             )
@@ -299,7 +334,10 @@ class PostgresAccessStore:
         """Ver ``AccessStorePort.active_superusers``."""
         async with self._engine.connect() as conn:
             value = await conn.scalar(
-                text("SELECT count(*) FROM users WHERE role = 'superuser' AND is_active")
+                text(
+                    "SELECT count(*) FROM users "
+                    "WHERE role = 'superuser' AND is_active AND deleted_at IS NULL"
+                )
             )
         return int(value or 0)
 
@@ -323,7 +361,8 @@ class PostgresAccessStore:
                 await _audit(conn, audit, "user", str(user_id))
         except IntegrityError as error:
             raise UsernameTakenError(
-                "Ya existe una persona con ese usuario.", {"username": user.username}
+                "Ese usuario ya existe o existió (los usuarios borrados quedan reservados).",
+                {"username": user.username},
             ) from error
         created = await self.get_user(int(user_id))
         if created is None:  # pragma: no cover — se acaba de insertar

@@ -77,6 +77,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `GET /access/users` | Personas: rol, si está activa, si su contraseña es temporal (`must_change_password`), si conectó su Authenticator (`totp_enrolled`), bloqueo y llaves vigentes |
 | `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
+| `DELETE /access/users/{id}` | Borra a la persona (`204`, borrado lógico): sale de la lista, ya no entra, se revocan sus llaves y se cierran sus sesiones. Sus búsquedas y la bitácora se quedan y su usuario queda reservado. No te puedes borrar a ti mismo ni al último superusuario (`409`) |
 | `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
 | `POST /access/users/{id}/reset-totp` | Borra su Authenticator (`204`); escaneará un QR nuevo. Cierra sus sesiones |
 | `GET /access/users/{id}/keys` | Sus llaves de sistema, sin secretos (`masked`: `orc_live_a1b2c3d4…`) |
@@ -89,7 +90,7 @@ Reglas (`409 access_rule`):
 - nadie revoca su única llave vigente;
 - máximo 5 llaves vigentes por persona.
 
-**Bitácora:** cada alta, cambio, restablecimiento, entrada y entrada fallida queda registrada (`user.created`, `user.updated`, `user.password_reset`, `user.password_changed`, `user.totp_enrolled`, `user.totp_reset`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
+**Bitácora:** cada alta, cambio, restablecimiento, entrada y entrada fallida queda registrada (`user.created`, `user.updated`, `user.deleted`, `user.password_reset`, `user.password_changed`, `user.totp_enrolled`, `user.totp_reset`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
 
 ## Flujo de una búsqueda
 
