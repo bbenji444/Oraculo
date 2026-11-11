@@ -4,22 +4,25 @@
  * letrero grande («BARRIDO COMPLETO · 128 notas») que se desvanece solo.
  *
  * Radar (Benji, 11/11/2026: «sincronizado con la zona que estamos buscando»,
- * «que el cliente sienta que realmente está pasando algo»):
- * - va centrado en la región buscada y de su tamaño (todo México, Chiapas, un
- *   municipio), siguiendo al mapa si se mueve;
- * - esquinas de «objetivo fijado» alrededor de la región y sus coordenadas;
- * - barrido, ondas y ecos: un símbolo de nota aparece por cada nota que se
- *   va encontrando;
- * - abajo, la etapa en curso («Consultando proveedores», «Ubicando en el
- *   mapa»…) y las notas detectadas.
- * Sin mapa o sin región todavía, se centra en la parte libre de la pantalla.
+ * «una cúpula en 3D sobre el área», «que el cliente sienta que realmente está
+ * pasando algo»):
+ * - con el mapa y la región, una **cúpula 3D** sobre la zona buscada (todo
+ *   México, Chiapas, un municipio), dibujada en el propio globo
+ *   (map/radar/dome.ts): vidrio con rejilla, haz que gira, onda en el piso y
+ *   un eco que late por cada nota encontrada;
+ * - encima, el letrero con la región y sus coordenadas; abajo, la etapa en
+ *   curso («Consultando proveedores», «Ubicando en el mapa»…) y las notas
+ *   detectadas. Siguen a la cúpula si el mapa se mueve.
+ * Sin mapa o sin región todavía, un radar plano en la parte libre de la pantalla.
  *
  * No hace: no recibe clics (todo es `pointer-events: none`) ni mueve el mapa.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
+import { addDomeRadar, angularDistance, type DomeRadar } from '../../map/radar/dome';
 import { isFinished, type Search } from '../../services/searches';
+import { useExplorerStore } from '../../store/explorer';
 import { type FinishNotice, STAGE_LABEL } from '../Explore/format';
 import { DecodeText } from '../ui/DecodeText';
 import { type Bbox, blips, coordinatesLabel, type RadarGeometry, radarGeometry } from './radar';
@@ -30,6 +33,19 @@ const RING_DELAYS_S = [0, 1.1, 2.2];
 const SCAN_SIZE = 'min(66vh, 46vw)';
 // Ecos a la vista como máximo: más ya no se distinguen.
 const MAX_BLIPS = 18;
+// Inclinación de la cámara durante el barrido (grados): deja ver la cúpula.
+const DOME_PITCH = 40;
+const TILT_MS = 1400;
+// Si la zona está a más de esto (grados) del centro de la vista, la cámara vuela.
+const FAR_DEGREES = 25;
+// Vuelo a la zona: aire para el encabezado y la consola, sin acercarse de más.
+const AIM_PADDING = { top: 140, bottom: 300, left: 60, right: 60 };
+const AIM_MAX_ZOOM = 7;
+const AIM_MS = 2200;
+// Espera para no chocar con el acomodo propio del globo al recibir el mapa.
+const AIM_DELAY_MS = 400;
+// El letrero de arriba nunca queda debajo del encabezado (px desde arriba).
+const MIN_LABEL_TOP_PX = 130;
 
 const BANNER_TITLE: Record<FinishNotice['tone'], string> = {
   ok: 'Barrido completo',
@@ -59,9 +75,13 @@ function useRegionOnScreen(
   useEffect(() => {
     if (!map || !bbox) return;
     let frame = 0;
+    // Un cálculo por cuadro como máximo. Sin cancelar el pendiente: mientras
+    // el globo se mueve hay un «move» en cada cuadro y, cancelando, el cálculo
+    // nunca llegaba a correr (el radar se quedaba en su lugar de respaldo).
     const measure = () => {
-      cancelAnimationFrame(frame);
+      if (frame !== 0) return;
       frame = requestAnimationFrame(() => {
+        frame = 0;
         const canvas = map.getContainer();
         setGeometry(
           radarGeometry((lngLat) => map.project(lngLat), bbox, {
@@ -83,6 +103,76 @@ function useRegionOnScreen(
   return map && bbox ? geometry : null;
 }
 
+/**
+ * La cúpula 3D sobre la región mientras se busca; se quita al terminar.
+ *
+ * @returns Si hay cúpula (hay mapa y región).
+ */
+function useDomeRadar(
+  map: MapLibreMap | null | undefined,
+  bbox: Bbox | undefined,
+  found: number,
+): boolean {
+  const animate = useExplorerStore((s) => s.motion !== 'off');
+  const radarRef = useRef<DomeRadar | null>(null);
+  const foundRef = useRef(found);
+  useEffect(() => {
+    foundRef.current = found;
+    radarRef.current?.setBlips(found);
+  }, [found]);
+  useEffect(() => {
+    if (!map || !bbox) return;
+    // La cámara mira la zona: si está lejos (o del otro lado del globo) vuela a
+    // ella; si ya se ve, solo se inclina. Vista desde arriba la cúpula parece
+    // un disco: inclinada se nota su volumen.
+    const [west, south, east, north] = bbox;
+    const aim = () => {
+      const center: [number, number] = [(west + east) / 2, (south + north) / 2];
+      const here = map.getCenter();
+      const duration = animate ? AIM_MS : 0;
+      if (angularDistance([here.lng, here.lat], center) > FAR_DEGREES) {
+        const fit = map.cameraForBounds([west, south, east, north], { padding: AIM_PADDING });
+        map.flyTo({
+          center,
+          zoom: Math.min(fit?.zoom ?? map.getZoom(), AIM_MAX_ZOOM),
+          pitch: DOME_PITCH,
+          duration,
+        });
+      } else if (map.getPitch() < DOME_PITCH) {
+        map.easeTo({ pitch: DOME_PITCH, duration });
+      }
+    };
+    let aimTimer = 0;
+    // Se espera a que el globo termine su propio acomodo: si no, lo cancelaba.
+    const aimSoon = () => {
+      window.clearTimeout(aimTimer);
+      aimTimer = window.setTimeout(aim, AIM_DELAY_MS);
+    };
+    try {
+      radarRef.current = addDomeRadar(map, bbox, animate);
+      radarRef.current.setBlips(foundRef.current);
+      if (map.isMoving()) map.once('moveend', aimSoon);
+      else aimSoon();
+    } catch {
+      // Sin WebGL 2 o con el estilo a medio cargar no hay cúpula; los
+      // letreros siguen diciendo qué pasa.
+      radarRef.current = null;
+    }
+    return () => {
+      const hadDome = radarRef.current !== null;
+      radarRef.current?.remove();
+      radarRef.current = null;
+      window.clearTimeout(aimTimer);
+      map.off('moveend', aimSoon);
+      // Al terminar el barrido la cámara se endereza para ver los resultados.
+      if (hadDome && map.getPitch() > 0) {
+        map.easeTo({ pitch: 0, duration: animate ? TILT_MS : 0 });
+      }
+    };
+  }, [map, bbox, animate]);
+  return Boolean(map && bbox);
+}
+
 function RegionRadar({
   search,
   map,
@@ -96,7 +186,45 @@ function RegionRadar({
 }) {
   const geometry = useRegionOnScreen(map, bbox);
   const found = Math.min(search.progress.articles ?? 0, MAX_BLIPS);
+  const dome = useDomeRadar(map, bbox, found);
+  // El globo mira la zona del barrido: si no es la región elegida (por
+  // ejemplo, al volver con la búsqueda ya corriendo), se elige y el globo vuela
+  // a ella como al elegirla a mano.
+  const regionId = search.region_id;
+  useEffect(() => {
+    const store = useExplorerStore.getState();
+    if (store.regionId !== regionId) store.selectRegion(regionId);
+  }, [regionId]);
   const stage = STAGE_LABEL[search.progress.stage ?? 'plan'] ?? 'Preparando el barrido';
+  const detected =
+    found > 0 ? ` · ${String(search.progress.articles ?? found)} notas detectadas` : '';
+  if (dome && geometry && bbox) {
+    // La cúpula la dibuja el globo; aquí solo los letreros, pegados a ella.
+    return (
+      <div
+        aria-hidden="true"
+        className="mando-dome-labels"
+        style={{
+          left: geometry.cx,
+          top: Math.max(geometry.box.top, MIN_LABEL_TOP_PX),
+          height: Math.max(
+            0,
+            geometry.box.top + geometry.box.height - Math.max(geometry.box.top, MIN_LABEL_TOP_PX),
+          ),
+        }}
+      >
+        <span className="mando-dome-title">
+          Barrido en curso · {search.region_name}
+          <span className="mando-dome-coords">{coordinatesLabel(bbox)}</span>
+        </span>
+        <span className="mando-scan-status mando-dome-status">
+          <span className="mando-scan-status-dot" />
+          {stage}
+          {detected}
+        </span>
+      </div>
+    );
+  }
   const placed: CSSProperties = geometry
     ? { left: geometry.cx, top: geometry.cy, width: geometry.radius * 2 }
     : { ...fallback, width: SCAN_SIZE };
@@ -153,7 +281,7 @@ function RegionRadar({
         <span className="mando-scan-status">
           <span className="mando-scan-status-dot" />
           {stage}
-          {found > 0 && ` · ${String(search.progress.articles ?? found)} notas detectadas`}
+          {detected}
         </span>
       </div>
     </>

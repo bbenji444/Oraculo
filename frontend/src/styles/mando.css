@@ -1613,3 +1613,49 @@
     display: none;
   }
 }
+
+/* Letreros de la cúpula 3D (map/radar/dome.ts): arriba la región y sus
+   coordenadas, abajo la etapa. Siguen a la cúpula al mover el mapa. */
+.mando-dome-labels {
+  position: absolute;
+  translate: -50% 0;
+  pointer-events: none;
+  transition:
+    left 0.25s linear,
+    top 0.25s linear,
+    height 0.25s linear;
+}
+.mando-dome-title {
+  position: absolute;
+  top: -1.4rem;
+  left: 50%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  translate: -50% -100%;
+  color: var(--hud-cyan);
+  font: 600 10px/1 var(--font-display);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 10px rgb(0 210 255 / 0.6);
+  white-space: nowrap;
+}
+.mando-dome-coords {
+  color: rgb(150 225 240 / 0.85);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+.mando-dome-status {
+  top: 100%;
+  bottom: auto;
+  translate: -50% 1.4rem;
+}
+@media (max-width: 639px) {
+  .mando-dome-coords {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mando-dome-labels {
+    transition: none;
+  }
+}

@@ -357,8 +357,16 @@ def test_concepto_sin_palabras_clave_es_error() -> None:
 # --- Rango de fechas ---
 
 
+def test_hoy_es_solo_hoy_y_7_dias_son_7() -> None:
+    # Benji, 11/11/2026: buscó «Hoy» y salió «10 – 11 nov · 2 días». Los
+    # últimos N días cuentan hoy: «Hoy» es un solo día y «7 días» son 7.
+    today = DateWindow.last_days(1, TODAY)
+    assert (today.date_from, today.date_to) == (TODAY, TODAY)
+    assert (WEEK.date_from, WEEK.date_to) == (date(2026, 10, 10), TODAY)
+    assert (WEEK.date_to - WEEK.date_from).days + 1 == 7
+
+
 def test_ultimos_dias_y_su_descripcion() -> None:
-    assert (WEEK.date_from, WEEK.date_to) == (date(2026, 10, 9), TODAY)
     assert WEEK.describe() == "últimos 7 días"
     assert DateWindow.last_days(1, TODAY).describe() == "último día"
 

@@ -26,6 +26,10 @@ Había dos causas:
    - un hecho anterior al primer día tampoco cuenta.
 2. **Zonas: sin lugar no cuenta en una región menor a un país.** Si se buscó un estado, municipio o localidad, una nota sin ubicación queda **fuera** (`in_region = false`): no se puede asegurar que pasó ahí. En búsquedas de todo el país sigue como antes: cuenta, salvo que el medio sea de otro país (ADR-0041).
 
+3. **«Últimos N días» cuentan hoy** (corrección del mismo 11/11, tras publicar los puntos 1 y 2: «Hoy» seguía trayendo notas del 10).
+   - **Causa:** `DateWindow.last_days` restaba `N` días completos. «Hoy» (N = 1) se volvía «de ayer a hoy» («10 – 11 nov · 2 días»), y «7 días» eran 8. El filtro estricto del punto 1 funcionaba, pero con un periodo mal armado.
+   - **Ahora:** «Hoy» es solo hoy y «7 días» son hoy y los 6 anteriores (`today - (N - 1)`).
+
 ## Alternativas consideradas
 
 - **Dejar las notas sin fecha.** Pueden ser de cualquier día; Benji pidió estricto.

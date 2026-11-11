@@ -122,7 +122,8 @@ async def test_search_envia_la_consulta_y_normaliza() -> None:
     assert str(sent[0].url).startswith(RSS_URL)
     assert sent[0].url.params["q"] == "hackeo CDMX when:7d"
     assert sent[0].url.params["ceid"] == "MX:es-419"
-    assert (response.http_status, len(response.articles)) == (200, 39)
+    # 7 días contando hoy: 4 notas del octavo día quedan fuera (11/11/2026).
+    assert (response.http_status, len(response.articles)) == (200, 35)
     assert provider.estimate_cost(query()) == 0
     assert provider.is_configured() is True
     await http.aclose()
