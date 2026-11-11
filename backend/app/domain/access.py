@@ -137,6 +137,10 @@ class UserAccount:
         created_at: Alta.
         last_seen_at: Última vez que entró.
         active_keys: Llaves vigentes (sin revocar ni vencer).
+        has_password: Si ya tiene contraseña (ADR-0043).
+        must_change_password: Si su contraseña es temporal.
+        totp_enrolled: Si ya dio de alta su Microsoft Authenticator.
+        locked_until: Hasta cuándo está bloqueada por intentos fallidos.
     """
 
     user_id: int
@@ -148,6 +152,10 @@ class UserAccount:
     created_at: datetime
     last_seen_at: datetime | None
     active_keys: int = 0
+    has_password: bool = False
+    must_change_password: bool = False
+    totp_enrolled: bool = False
+    locked_until: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

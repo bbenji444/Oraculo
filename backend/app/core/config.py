@@ -38,16 +38,18 @@ _DEFAULT_GEODATA_WORK_DIR = Path.home() / ".cache" / "monitor-noticias" / "geoda
 # que crea la migración 0038, para que en la PC todo siga a nombre de Benji.
 _DEFAULT_DEV_USER = "benji"
 
-# Llaves de acceso (ADR-0042):
-# - una sesión dura a lo más una jornada (8 h) y se cierra sola tras 60 min
-#   sin uso, como en los paneles bancarios;
+# Acceso (ADR-0042 y ADR-0043):
+# - una sesión dura hasta que la persona da «Salir», con un tope de 30 días
+#   (Benji, 10/11/2026: «como Oráculo, que no me saque»); el tope evita
+#   sesiones eternas en una compu olvidada. Sin cierre por inactividad;
 # - 10 intentos fallidos por IP en 15 min bloquean esa IP hasta que pase la
 #   ventana (adivinar una llave de 238 bits es imposible; esto frena ruido);
 # - cada 5 min la sesión vuelve a revisar en la base que la llave y la persona
 #   sigan activas (revocar también borra las sesiones al instante);
 # - la pimienta mide al menos 32 caracteres (≥ 190 bits con base64).
-_DEFAULT_SESSION_HOURS = 8.0
-_DEFAULT_SESSION_IDLE_MINUTES = 60
+_DEFAULT_SESSION_HOURS = 30 * 24.0
+_MAX_SESSION_HOURS = 30 * 24.0
+_DEFAULT_SESSION_IDLE_MINUTES = 30 * 24 * 60
 _DEFAULT_LOGIN_MAX_FAILURES = 10
 _DEFAULT_LOGIN_WINDOW_MINUTES = 15
 _DEFAULT_SESSION_RECHECK_SECONDS = 300
@@ -185,13 +187,15 @@ class Settings(BaseSettings):
     geodata_work_dir: Path = _DEFAULT_GEODATA_WORK_DIR
 
     # --- Acceso con llave (ADR-0042) ---
-    # keys: cada persona entra con su llave orc_live_… (servidor).
+    # keys: se entra con usuario, contraseña y código de Microsoft
+    # Authenticator; los sistemas, con llave orc_live_… (servidor).
     # dev: sin llave, todo a nombre de DEV_USER como superusuario (PC y pruebas).
     auth_mode: Literal["dev", "keys"] = "keys"
-    # Secreto del servidor para la huella HMAC de las llaves. Sin él, en modo
-    # keys la API no arranca. Si cambia, todas las llaves dejan de servir.
+    # Secreto del servidor: huella de las llaves y llave que cifra el secreto
+    # del código de 6 dígitos. Sin él, en modo keys la API no arranca. Si
+    # cambia, dejan de servir las llaves y todos los Authenticators.
     auth_key_pepper: SecretStr | None = None
-    auth_session_hours: float = Field(default=_DEFAULT_SESSION_HOURS, gt=0, le=24)
+    auth_session_hours: float = Field(default=_DEFAULT_SESSION_HOURS, gt=0, le=_MAX_SESSION_HOURS)
     auth_session_idle_minutes: int = Field(default=_DEFAULT_SESSION_IDLE_MINUTES, ge=5)
     auth_session_recheck_seconds: int = Field(default=_DEFAULT_SESSION_RECHECK_SECONDS, ge=0)
     auth_login_max_failures: int = Field(default=_DEFAULT_LOGIN_MAX_FAILURES, ge=1)

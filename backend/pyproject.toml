@@ -26,6 +26,10 @@ dependencies = [
     "alembic>=1.20.0",
     "celery[redis]>=5.6.3",
     "composio>=0.31,<0.32",
+    # Cifra con AES-GCM el secreto del código de 6 dígitos de cada persona
+    # (ADR-0043). Ya venía instalada por google-genai y composio; se declara
+    # porque ahora la usa el monitor directamente.
+    "cryptography>=44",
     "defusedxml>=0.7.1",
     "fastapi>=0.143.2",
     # google-genai 2.x exige tenacity < 9.2 y el cliente HTTP usa 9.2.1
@@ -38,6 +42,9 @@ dependencies = [
     "pydantic-settings>=2.16.0",
     "rapidfuzz>=3",
     "redis>=6.4.0",
+    # Dibuja el código QR que se escanea con Microsoft Authenticator (ADR-0043).
+    # Python puro y sin dependencias; aprobada por Benji el 10/11/2026.
+    "segno>=1.6",
     "sqlalchemy[asyncio]>=2.1.4",
     "tenacity>=9.2.1",
     "trafilatura>=2",

@@ -1,9 +1,12 @@
-"""Casos de uso del acceso con llave (ADR-0042).
+"""Casos de uso del acceso al monitor (ADR-0042 y ADR-0043).
 
-- ``Authenticator``: entrar con llave (abre sesión), reconocer la sesión o una
-  llave ``Bearer`` en cada petición, y salir.
+- ``Authenticator``: reconocer en cada petición la sesión (el token interno
+  que se abre al entrar con contraseña y código, ver ``login.py``) o una
+  llave ``Bearer`` de un sistema; salir; y decirle a otro módulo de quién es
+  un token (``introspect``).
 - ``AccessAdmin``: lo que hace el superusuario en «Accesos»: dar de alta
-  personas, cambiar su rol o desactivarlas, crear y revocar llaves.
+  personas con contraseña temporal, cambiar su rol o desactivarlas,
+  restablecer su contraseña o su Authenticator, y crear y revocar llaves.
 
 Reglas de seguridad:
 
@@ -48,6 +51,7 @@ from app.domain.access import (
     validated_email,
     validated_username,
 )
+from app.domain.credentials import hash_password, new_temporary_password
 from app.domain.errors import (
     AccessKeyNotFoundError,
     AccessRuleError,
@@ -64,9 +68,11 @@ USER_CREATED = "user.created"
 USER_UPDATED = "user.updated"
 KEY_CREATED = "access_key.created"
 KEY_REVOKED = "access_key.revoked"
+PASSWORD_RESET = "user.password_reset"  # noqa: S105 — nombre de acción de la bitácora, no una contraseña
+TOTP_RESET = "user.totp_reset"
 
 _BAD_KEY = "La llave no es válida, está vencida o fue revocada."
-_NO_SESSION = "Tu sesión terminó. Vuelve a entrar con tu llave."
+_NO_SESSION = "Tu sesión terminó. Vuelve a entrar con tu usuario y contraseña."
 _TOO_MANY = "Demasiados intentos fallidos desde este equipo. Espera unos minutos."
 # Huella de relleno: si la parte pública no existe, igual se calcula una
 # huella y se compara, para que tarde lo mismo que con una llave real.
@@ -167,32 +173,6 @@ class Authenticator:
         await self._store.mark_key_used(record.key_id, ip)
         return record.user, record.key_id
 
-    async def login(self, key: str, ip: str | None) -> OpenedSession:
-        """Revisa la llave y abre una sesión.
-
-        Args:
-            key: La llave que pegó la persona.
-            ip: Desde dónde.
-
-        Returns:
-            La sesión abierta.
-
-        Raises:
-            TooManyAttemptsError: Si esa IP ya falló demasiadas veces.
-            AuthenticationRequiredError: Si la llave no sirve.
-        """
-        user, key_id = await self._verify(key, ip)
-        now = self._clock()
-        token = await self._sessions.create(
-            SessionData(user, key_id, now, now),
-            self._policy.idle_seconds,
-            self._policy.max_seconds,
-        )
-        await self._store.record_event(
-            AuditEntry(Actor(user.username, ip), LOGIN_OK, {"llave_id": key_id}), str(key_id)
-        )
-        return OpenedSession(token, user, self._policy.max_seconds)
-
     async def from_bearer(self, key: str, ip: str | None) -> AuthUser:
         """La persona de una llave mandada en ``Authorization: Bearer`` (integraciones).
 
@@ -218,13 +198,36 @@ class Authenticator:
             await self._sessions.delete(token)
             raise AuthenticationRequiredError(_NO_SESSION)
         if now - data.checked_at >= timedelta(seconds=self._policy.recheck_seconds):
-            record = await self._store.key_record(data.key_id)
-            if record is None or not record.usable(now):
+            current = await self._current_user(data, now)
+            if current is None:
                 await self._sessions.delete(token)
                 raise AuthenticationRequiredError(_NO_SESSION)
-            data = replace(data, user=record.user, checked_at=now)
+            data = replace(data, user=current, checked_at=now)
             await self._sessions.save(token, data, self._policy.idle_seconds)
         return data.user
+
+    async def _current_user(self, data: SessionData, now: datetime) -> AuthUser | None:
+        # Sesión de contraseña: la persona debe seguir activa. Sesión de llave:
+        # la llave debe seguir vigente.
+        if data.key_id is None:
+            creds = await self._store.credentials(data.user.user_id)
+            return creds.user if creds is not None and creds.is_active else None
+        record = await self._store.key_record(data.key_id)
+        return record.user if record is not None and record.usable(now) else None
+
+    async def introspect(self, token: str) -> AuthUser | None:
+        """De quién es un token interno (para otros módulos de Oráculo).
+
+        Args:
+            token: El valor de la cookie ``monitor_sesion`` que le llegó al módulo.
+
+        Returns:
+            La persona, o ``None`` si el token no existe, venció o ya no sirve.
+        """
+        try:
+            return await self.from_session(token)
+        except AuthenticationRequiredError:
+            return None
 
     async def logout(self, token: str) -> None:
         """Cierra la sesión (si no existía, no pasa nada)."""
@@ -242,6 +245,20 @@ class IssuedKey:
 
     key: NewKey
     info: KeyInfo
+
+
+@dataclass(frozen=True, slots=True)
+class CreatedUser:
+    """Una persona recién dada de alta.
+
+    Attributes:
+        account: Sus datos.
+        temporary_password: Su contraseña temporal; se muestra una sola vez y
+            la debe cambiar al primer ingreso.
+    """
+
+    account: UserAccount
+    temporary_password: str
 
 
 class AccessAdmin:
@@ -285,8 +302,11 @@ class AccessAdmin:
         display_name: str,
         email: str | None,
         role: Role,
-    ) -> UserAccount:
-        """Da de alta a una persona (todavía sin llave).
+    ) -> CreatedUser:
+        """Da de alta a una persona con una contraseña temporal.
+
+        Al primer ingreso, la persona cambia la contraseña por una suya y da
+        de alta su Microsoft Authenticator (ADR-0043).
 
         Raises:
             ForbiddenError: Si quien pide no es superusuario.
@@ -300,14 +320,71 @@ class AccessAdmin:
             validated_email(email),
             role,
         )
-        return await self._store.create_user(
+        actor = Actor(admin.username, ip)
+        account = await self._store.create_user(
             user,
             AuditEntry(
-                Actor(admin.username, ip),
+                actor,
                 USER_CREATED,
                 {"username": user.username, "role": user.role.value, "email": user.email},
             ),
         )
+        temporary = new_temporary_password()
+        await self._store.set_password(
+            account.user_id,
+            hash_password(temporary),
+            True,
+            AuditEntry(actor, PASSWORD_RESET, {"username": user.username}),
+        )
+        refreshed = await self._store.get_user(account.user_id)
+        return CreatedUser(refreshed or account, temporary)
+
+    async def reset_password(self, admin: AuthUser, ip: str | None, user_id: int) -> str:
+        """Le da a una persona una contraseña temporal nueva (la olvidó).
+
+        Cierra sus sesiones y la persona la cambia al entrar. Su
+        Authenticator se queda como estaba.
+
+        Returns:
+            La contraseña temporal (se muestra una sola vez).
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+            UserNotFoundError: Si no existe.
+        """
+        require_superuser(admin)
+        account = await self._store.get_user(user_id)
+        if account is None:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        temporary = new_temporary_password()
+        await self._store.set_password(
+            user_id,
+            hash_password(temporary),
+            True,
+            AuditEntry(Actor(admin.username, ip), PASSWORD_RESET, {"username": account.username}),
+        )
+        await self._sessions.delete_for_user(user_id)
+        return temporary
+
+    async def reset_totp(self, admin: AuthUser, ip: str | None, user_id: int) -> None:
+        """Borra el Authenticator de una persona (perdió o cambió de celular).
+
+        Cierra sus sesiones; al volver a entrar escanea un QR nuevo.
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+            UserNotFoundError: Si no existe.
+        """
+        require_superuser(admin)
+        account = await self._store.get_user(user_id)
+        if account is None:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        await self._store.set_totp(
+            user_id,
+            None,
+            AuditEntry(Actor(admin.username, ip), TOTP_RESET, {"username": account.username}),
+        )
+        await self._sessions.delete_for_user(user_id)
 
     async def update_user(
         self, admin: AuthUser, ip: str | None, user_id: int, changes: UserChanges
