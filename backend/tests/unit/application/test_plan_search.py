@@ -78,7 +78,7 @@ async def test_estima_consultas_creditos_y_costo_maximo() -> None:
     search = estimate.search
     assert (search.user_id, search.region_id, search.queries_planned) == ("benji", 3, 4)
     assert (search.date_from, search.date_to, search.credits_estimated) == (
-        date(2026, 10, 10),
+        date(2026, 10, 11),  # 7 días contando hoy (11/11/2026)
         date(2026, 10, 17),
         2,
     )

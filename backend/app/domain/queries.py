@@ -67,10 +67,14 @@ class DateWindow:
 
     @classmethod
     def last_days(cls, days: int, today: date) -> "DateWindow":
-        """Ventana de los últimos ``days`` días hasta hoy.
+        """Ventana de los últimos ``days`` días, contando hoy.
+
+        «Hoy» (``days=1``) es solo hoy y «7 días» son hoy y los 6 anteriores.
+        Antes se restaban ``days`` completos y «Hoy» incluía también ayer
+        (Benji, 11/11/2026: «me siguen saliendo notas del martes 10»).
 
         Args:
-            days: Días hacia atrás (1 a 90).
+            days: Cuántos días, contando hoy (1 a 90).
             today: Fecha de hoy en la Ciudad de México.
 
         Returns:
@@ -85,7 +89,7 @@ class DateWindow:
                 "(GDELT solo cubre los últimos 3 meses).",
                 {"days": days},
             )
-        return cls(today - timedelta(days=days), today, days)
+        return cls(today - timedelta(days=days - 1), today, days)
 
     @classmethod
     def between(cls, date_from: date, date_to: date) -> "DateWindow":

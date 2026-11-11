@@ -61,7 +61,7 @@ def test_rangos_relativos_conocidos(days: int, expected: str) -> None:
 
 def test_otros_rangos_usan_fechas_en_formato_de_searchapi() -> None:
     assert time_params(DateWindow.last_days(14, TODAY)) == {
-        "time_period_min": "10/02/2026",
+        "time_period_min": "10/03/2026",  # 14 días contando hoy
         "time_period_max": "10/16/2026",
     }
 

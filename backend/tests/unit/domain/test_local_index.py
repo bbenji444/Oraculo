@@ -48,7 +48,8 @@ def test_dias_completos_en_hora_de_la_ciudad_de_mexico() -> None:
     criteria = criteria_for(query(None), CDMX_TZ)
 
     # Del 09/10 a las 00:00 al 17/10 a las 00:00 en la CDMX (UTC-6).
-    assert criteria.start == datetime(2026, 10, 9, 6, 0, tzinfo=UTC)
+    # 7 días contando hoy: del 10 al 16 (11/11/2026).
+    assert criteria.start == datetime(2026, 10, 10, 6, 0, tzinfo=UTC)
     assert criteria.end == datetime(2026, 10, 17, 6, 0, tzinfo=UTC)
 
 
