@@ -22,3 +22,6 @@ export const PANEL_TITLE =
 
 /** Botón secundario pequeño (con destello y onda, `.hud-btn`). */
 export const SMALL_BUTTON = 'hud-btn hud-btn--sm';
+
+/** Celular: lo mismo que `sm` de Tailwind, por debajo de 640 px (11/11/2026). */
+export const PHONE_QUERY = '(max-width: 639px)';

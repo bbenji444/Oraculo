@@ -176,7 +176,7 @@ export function SchedulesPanel({ isSuperuser, username }: PanelProps) {
 
   return (
     <HudPanel className="space-y-4 p-5">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase">
             {isSuperuser ? 'Envíos programados' : 'Mis envíos programados'}

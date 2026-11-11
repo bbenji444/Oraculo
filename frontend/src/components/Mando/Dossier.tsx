@@ -68,6 +68,8 @@ interface DossierProps {
   /** Las que se ven en el globo, con los filtros de la cronología. */
   shown: Article[];
   colors: Map<number, string>;
+  /** Celular: lo que ocupa la consola abajo, para no quedar debajo de ella. */
+  bottomReserve?: number;
 }
 
 interface KpiProps {
@@ -98,7 +100,14 @@ function Kpi({ label, value, tone, order, format }: KpiProps) {
 
 const usd = (value: number) => value.toFixed(3);
 
-export function Dossier({ search, articles, relevant, shown, colors }: DossierProps) {
+export function Dossier({
+  search,
+  articles,
+  relevant,
+  shown,
+  colors,
+  bottomReserve,
+}: DossierProps) {
   const open = useMandoStore((s) => s.dossierOpen);
   const setOpen = useMandoStore((s) => s.setDossierOpen);
   const summaryOpen = useMandoStore((s) => s.summaryOpen);
@@ -139,7 +148,8 @@ export function Dossier({ search, articles, relevant, shown, colors }: DossierPr
   return (
     <aside
       aria-label="Expediente de la consulta"
-      className="mando-dossier pointer-events-none absolute inset-y-4 right-4 flex w-[calc(100%-2rem)] flex-col gap-2.5 sm:w-[30rem]"
+      className="mando-dossier pointer-events-none absolute inset-y-3 right-3 flex w-[calc(100%-1.5rem)] flex-col gap-2.5 sm:inset-y-4 sm:right-4 sm:w-[30rem]"
+      style={bottomReserve === undefined ? undefined : { bottom: bottomReserve }}
     >
       <section
         aria-label="Resumen de la consulta"

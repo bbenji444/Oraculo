@@ -22,12 +22,25 @@ interface NewsStackProps {
   onSelect: (articleId: number) => void;
   /** Acercarse hasta separar el grupo; `undefined` si ya no se puede. */
   onZoom?: () => void;
+  /** Sin vidrio ni ancho fijo: dentro de la hoja del celular (PhoneSheet). */
+  fill?: boolean;
   onClose: () => void;
 }
 
-export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }: NewsStackProps) {
+export function NewsStack({
+  articles,
+  colors,
+  total,
+  onSelect,
+  onZoom,
+  onClose,
+  fill = false,
+}: NewsStackProps) {
   return (
-    <section aria-label="Notas en este lugar" className={`${GLASS} w-80 space-y-2 p-3 text-sm`}>
+    <section
+      aria-label="Notas en este lugar"
+      className={fill ? 'space-y-2 text-sm' : `${GLASS} w-80 space-y-2 p-3 text-sm`}
+    >
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-sky-200/80">
           {total} notas en este lugar
@@ -52,7 +65,7 @@ export function NewsStack({ articles, colors, total, onSelect, onZoom, onClose }
           </button>
         </div>
       </div>
-      <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
+      <ul className={fill ? 'space-y-1' : 'max-h-72 space-y-1 overflow-y-auto pr-1'}>
         {articles.map((article) => {
           const concept = article.concepts.find((c) => c.is_relevant) ?? article.concepts[0];
           return (

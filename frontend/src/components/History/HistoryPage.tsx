@@ -209,11 +209,11 @@ export function HistoryPage() {
           }
         />
         {searches.length > 0 && (
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
             {kpis.map((kpi, i) => (
               <HudPanel
                 key={kpi.label}
-                className="hud-reveal px-5 py-4"
+                className="hud-reveal px-3 py-3 sm:px-5 sm:py-4"
                 style={{ '--i': i } as CSSProperties}
               >
                 <p className="hud-kpi-label">{kpi.label}</p>
@@ -221,7 +221,7 @@ export function HistoryPage() {
                   value={kpi.value}
                   // Con más páginas por cargar, la cifra es «al menos»: lleva «+».
                   format={(n) => `${COUNT.format(Math.round(n))}${history.hasNextPage ? '+' : ''}`}
-                  className="hud-kpi-value mt-3 block text-[1.6rem]"
+                  className="hud-kpi-value mt-2 block text-lg sm:mt-3 sm:text-[1.6rem]"
                 />
               </HudPanel>
             ))}
