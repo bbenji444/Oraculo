@@ -22,6 +22,8 @@ interface BulkBarProps {
   detail?: string;
   /** Aviso junto a «Confirmar» (p. ej. qué estatus legal quedará). */
   confirmHint?: string;
+  /** Dónde quedan al descartar: «Descartadas» (entidades) o «Descartados» (vínculos). */
+  discardedTab?: string;
   canConfirm: boolean;
   canDiscard: boolean;
   busy: boolean;
@@ -34,6 +36,7 @@ export function BulkBar({
   count,
   detail,
   confirmHint,
+  discardedTab = 'Descartadas',
   canConfirm,
   canDiscard,
   busy,
@@ -60,7 +63,7 @@ export function BulkBar({
           className="flex flex-wrap items-center gap-2"
         >
           <span className="text-rose-200">
-            ¿Descartar {count}? Quedan en «Descartadas» y se pueden volver a confirmar.
+            ¿Descartar {count}? Quedan en «{discardedTab}» y se pueden volver a confirmar.
           </span>
           <HudButton
             variant="danger"

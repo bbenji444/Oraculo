@@ -50,6 +50,17 @@ describe('acciones en bloque', () => {
     expect(screen.getByRole('button', { name: 'Descartar 5 entidades' })).toBeTruthy();
   });
 
+  it('dice dónde quedan: «Descartadas» en entidades, «Descartados» en vínculos', () => {
+    renderBar();
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar 5 entidades' }));
+    expect(screen.getByText(/Quedan en «Descartadas»/)).toBeTruthy();
+    cleanup();
+
+    renderBar({ count: '3 vínculos', discardedTab: 'Descartados' });
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar 3 vínculos' }));
+    expect(screen.getByText(/¿Descartar 3 vínculos\? Quedan en «Descartados»/)).toBeTruthy();
+  });
+
   it('«Sí, descartar» descarta', () => {
     const props = renderBar();
 

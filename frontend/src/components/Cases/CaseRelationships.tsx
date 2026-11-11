@@ -228,6 +228,7 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
       {canEdit && chosen.length > 0 && (
         <BulkBar
           count={countLabel(chosen.length, 'vínculo', 'vínculos')}
+          discardedTab="Descartados"
           canConfirm={actions.confirm}
           canDiscard={actions.discard}
           busy={busy}
