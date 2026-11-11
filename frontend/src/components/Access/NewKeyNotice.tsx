@@ -9,6 +9,7 @@
  */
 import { useState } from 'react';
 
+import { copyText } from '../../ui/copyText';
 import { Modal } from '../Deliveries/Modal';
 import { HudButton } from '../ui/HudButton';
 
@@ -38,14 +39,9 @@ export function NewKeyNotice({ fullKey, owner, onClose }: NewKeyNoticeProps) {
           variant="solid"
           size="sm"
           onClick={() => {
-            void navigator.clipboard.writeText(fullKey).then(
-              () => {
-                setCopied('si');
-              },
-              () => {
-                setCopied('no');
-              },
-            );
+            void copyText(fullKey).then((ok) => {
+              setCopied(ok ? 'si' : 'no');
+            });
           }}
         >
           Copiar llave
