@@ -9,15 +9,22 @@ Hay dos orígenes en esta fase:
 - **Humano (D7):** lo dibuja el analista. No es una propuesta: nace
   confirmado con su firma y confianza 1.
 
+Desde F12 (ADR-0107) cada vínculo también dice qué tan útil es para
+investigar (``link_strength``): con tres notas casi todo «aparece junto» a
+todo, pero pocas parejas **participan las dos en el mismo hecho** (la IA
+marca en cada mención si la entidad participa o solo se nombra).
+
 Quién lo usa: los casos de uso de vínculos y el repositorio que los deriva.
 
 No hace: no guarda nada ni decide permisos; no propone vínculos con la IA
 (el prompt ``entities_v1`` no los pide).
 """
 
+from enum import StrEnum
+
 from app.domain.concept import clean_text
 from app.domain.errors import RelationshipValidationError
-from app.domain.investigation import RelationshipType
+from app.domain.investigation import Origin, RelationshipType
 
 # Confianza de un vínculo «aparecen juntas» según las notas del caso donde
 # salen las dos entidades (decisión D6 del plan de la 9.5). Una nota puede
@@ -99,3 +106,75 @@ def manual_relationship(
             f"La nota admite hasta {RELATIONSHIP_NOTES_MAX_CHARS} caracteres.", {}
         )
     return relationship, label, note
+
+
+class LinkStrength(StrEnum):
+    """Qué tan útil es un vínculo para investigar (F12, ADR-0107).
+
+    No se guarda: se calcula al leer con la evidencia del momento.
+    """
+
+    # Las dos participan en el mismo hecho en al menos una nota, o lo afirmó
+    # una persona al dibujarlo.
+    STRONG = "strong"
+    # Solo se nombran en la misma nota (una lista de dependencias, una
+    # declaración de un funcionario...): se conserva, pero va al final.
+    WEAK = "weak"
+
+
+LINK_STRENGTH_LABEL: dict[LinkStrength, str] = {
+    LinkStrength.STRONG: "relación fuerte",
+    LinkStrength.WEAK: "solo se mencionan juntas",
+}
+
+
+def link_strength(origin: Origin, same_event_articles: int) -> LinkStrength:
+    """Clasifica un vínculo para ordenarlo y agruparlo (F12, ADR-0107).
+
+    Args:
+        origin: Quién lo propuso.
+        same_event_articles: Notas del caso donde las dos entidades participan
+            en el hecho (rol ``event`` en las dos).
+
+    Returns:
+        ``STRONG`` si participan juntas en algún hecho o si lo dibujó una
+        persona; ``WEAK`` si solo se nombran en las mismas notas.
+
+    Example:
+        >>> link_strength(Origin.COOCCURRENCE, 0)
+        <LinkStrength.WEAK: 'weak'>
+    """
+    if same_event_articles > 0 or origin is Origin.HUMAN:
+        return LinkStrength.STRONG
+    return LinkStrength.WEAK
+
+
+def _notes(count: int) -> str:
+    return f"{count} {'nota' if count == 1 else 'notas'}"
+
+
+def link_reason(origin: Origin, same_event_articles: int, shared_articles: int) -> str:
+    """Por qué se relacionan dos entidades, en una frase para el analista.
+
+    Args:
+        origin: Quién propuso el vínculo.
+        same_event_articles: Notas donde las dos participan en el hecho.
+        shared_articles: Notas del caso donde aparecen las dos.
+
+    Returns:
+        La frase que acompaña al vínculo en la pantalla.
+
+    Example:
+        >>> link_reason(Origin.COOCCURRENCE, 2, 3)
+        'participan en el mismo hecho en 2 notas (aparecen juntas en 3)'
+    """
+    if same_event_articles > 0:
+        reason = f"participan en el mismo hecho en {_notes(same_event_articles)}"
+        if shared_articles > same_event_articles:
+            reason += f" (aparecen juntas en {shared_articles})"
+        return reason
+    if origin is Origin.HUMAN:
+        return "lo afirmó una persona"
+    if shared_articles > 0:
+        return f"solo se mencionan juntas en {_notes(shared_articles)}"
+    return "sin notas en común"

@@ -14,6 +14,7 @@ from app.api.v1.entities import get_entity_repository
 from app.api.v1.relationships import get_relationship_repository
 from app.application.audit import Actor
 from app.application.ports.entities import CaseEntity, MergeSuggestion
+from app.application.ports.relationships import SharedArticle
 from app.domain.entity_resolution import MergeReason
 from app.domain.investigation import CaseMemberRole, LegalStatus, ReviewStatus
 from app.main import create_app
@@ -189,3 +190,26 @@ def test_vinculos_revisar_en_bloque(client: TestClient, world: World) -> None:
     assert counts == {"suggested": 0, "confirmed": 0, "discarded": 2}
     assert missing.status_code == 404
     assert wrong.status_code == 422
+
+
+def test_vinculos_traen_su_fuerza_y_su_razon(client: TestClient, world: World) -> None:
+    case_id = new_case(client, world)
+    for entity_id in (1, 2, 3):
+        world.entities.add_entity(case_id, confirmed(entity_id))
+    shared = SharedArticle(10, "Nota 10", "https://medio.mx/10", None, same_event=True)
+    world.relationships.views[case_id] = [
+        suggested(1, 2),
+        replace(suggested(1, 3), shared_articles=(shared,)),
+    ]
+
+    strong, weak = client.get(f"/api/v1/cases/{case_id}/relationships").json()["items"]
+
+    assert (strong["entity_b"]["id"], strong["strength"], strong["same_event_count"]) == (
+        3,
+        "strong",
+        1,
+    )
+    assert strong["strength_label"] == "relación fuerte"
+    assert strong["reason"] == "participan en el mismo hecho en 1 nota"
+    assert strong["shared_articles"][0]["same_event"] is True
+    assert (weak["strength"], weak["strength_label"]) == ("weak", "solo se mencionan juntas")

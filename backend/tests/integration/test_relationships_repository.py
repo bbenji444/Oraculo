@@ -41,15 +41,15 @@ __all__ = ["clean", "sync_engine"]
 APPEARS = RelationshipType.APPEARS_WITH
 
 
-def mention(engine: Engine, entity: int, article: int, label: str) -> None:
+def mention(engine: Engine, entity: int, article: int, label: str, *, role: str = "event") -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO entity_mentions (entity_id, article_id, mention_text, role, "
-                "confidence, evidence_span, extracted_by) VALUES (:e, :a, :t, 'event', 0.9, "
+                "confidence, evidence_span, extracted_by) VALUES (:e, :a, :t, :r, 0.9, "
                 ":t, 'gpt-6-luna')"
             ),
-            {"e": entity, "a": article, "t": label},
+            {"e": entity, "a": article, "t": label, "r": role},
         )
 
 
@@ -256,3 +256,35 @@ async def test_guardar_varios_es_una_transaccion(
             {"c": str(case_id)},
         ).scalar_one()
     assert logged == 2
+
+
+async def test_cada_nota_dice_si_las_dos_participan_en_el_hecho(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    repo = PostgresRelationshipRepository(test_engine)
+    case_id = new_case(sync_engine)
+    one, two = new_article(sync_engine, case_id), new_article(sync_engine, case_id)
+    # En la nota uno Julián y Ramón participan en el hecho; la fiscalía solo
+    # se nombra. En la nota dos Julián solo se nombra junto a Ramón.
+    julian = seed(sync_engine, case_id, one, "Julián Ortega Ruiz", review="confirmed")
+    ramon = seed(sync_engine, case_id, one, "Ramón Salas", review="confirmed")
+    fiscalia = seed(sync_engine, case_id, two, "Fiscalía", kind="org", review="confirmed")
+    mention(sync_engine, fiscalia, one, "la Fiscalía", role="mentioned")
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text("UPDATE entity_mentions SET role = 'mentioned' WHERE entity_id = :e"),
+            {"e": fiscalia},
+        )
+    mention(sync_engine, julian, two, "Julián", role="mentioned")
+    mention(sync_engine, ramon, two, "Ramón Salas")
+
+    views = {(v.entity_a.entity_id, v.entity_b.entity_id): v for v in await repo.list_case(case_id)}
+
+    pair = views[(julian, ramon)]
+    assert {(a.article_id, a.same_event) for a in pair.shared_articles} == {
+        (one, True),
+        (two, False),
+    }
+    assert (pair.same_event_count, pair.strength.value) == (1, "strong")
+    weak = views[(julian, fiscalia)]
+    assert (weak.same_event_count, weak.strength.value) == (0, "weak")

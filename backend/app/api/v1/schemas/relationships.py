@@ -5,6 +5,9 @@ La salida trae cada valor con su etiqueta en español ("aparecen juntas",
 visible (§9.10). Un vínculo sugerido por coocurrencia todavía no tiene id:
 se revisa con sus dos entidades y su tipo.
 
+Desde F12 (ADR-0107) cada vínculo trae su fuerza («relación fuerte» o «solo
+se mencionan juntas») y la frase de por qué se relacionan.
+
 No hace: no valida reglas de negocio (eso es el dominio).
 """
 
@@ -32,7 +35,12 @@ from app.domain.investigation import (
     RelationshipType,
     ReviewStatus,
 )
-from app.domain.relationships import CUSTOM_LABEL_MAX_CHARS, RELATIONSHIP_NOTES_MAX_CHARS
+from app.domain.relationships import (
+    CUSTOM_LABEL_MAX_CHARS,
+    LINK_STRENGTH_LABEL,
+    RELATIONSHIP_NOTES_MAX_CHARS,
+    LinkStrength,
+)
 
 # El dominio valida el largo ya sin espacios de más (manual_relationship); aquí
 # solo se frena un cuerpo desmedido antes de llegar a él.
@@ -100,11 +108,18 @@ class SharedArticleOut(BaseModel):
     title: str
     url: str
     published_at: datetime | None
+    same_event: bool = Field(description="Si en esta nota las dos participan en el hecho.")
 
     @classmethod
     def from_article(cls, a: SharedArticle) -> "SharedArticleOut":
         """Convierte la nota del caso de uso."""
-        return cls(article_id=a.article_id, title=a.title, url=a.url, published_at=a.published_at)
+        return cls(
+            article_id=a.article_id,
+            title=a.title,
+            url=a.url,
+            published_at=a.published_at,
+            same_event=a.same_event,
+        )
 
 
 class RelationshipOut(BaseModel):
@@ -126,6 +141,10 @@ class RelationshipOut(BaseModel):
     reviewed_at: datetime | None
     notes: str | None
     shared_articles: list[SharedArticleOut]
+    same_event_count: int = Field(description="Notas donde las dos participan en el hecho.")
+    strength: LinkStrength = Field(description="strong o weak (ADR-0107).")
+    strength_label: str
+    reason: str = Field(description="Por qué se relacionan, en una frase.")
 
     @classmethod
     def from_view(cls, v: RelationshipView) -> "RelationshipOut":
@@ -147,6 +166,10 @@ class RelationshipOut(BaseModel):
             reviewed_at=v.reviewed_at,
             notes=v.notes,
             shared_articles=[SharedArticleOut.from_article(a) for a in v.shared_articles],
+            same_event_count=v.same_event_count,
+            strength=v.strength,
+            strength_label=LINK_STRENGTH_LABEL[v.strength],
+            reason=v.reason,
         )
 
 

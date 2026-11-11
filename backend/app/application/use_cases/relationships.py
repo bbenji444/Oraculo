@@ -44,7 +44,11 @@ from app.domain.investigation import (
     ReviewStatus,
     ordered_pair,
 )
-from app.domain.relationships import HUMAN_RELATIONSHIP_CONFIDENCE, manual_relationship
+from app.domain.relationships import (
+    HUMAN_RELATIONSHIP_CONFIDENCE,
+    LinkStrength,
+    manual_relationship,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,7 +121,9 @@ class ListRelationships:
             status: Sugeridos, confirmados o descartados.
 
         Returns:
-            Conteos y vínculos, los de más confianza y más notas primero.
+            Conteos y vínculos: primero los fuertes (participan en el mismo
+            hecho o los dibujó una persona), luego los de más notas en el
+            mismo hecho, más confianza y más notas en común (ADR-0107).
 
         Raises:
             CaseNotFoundError: Si el caso no existe o la persona no es miembro.
@@ -127,6 +133,8 @@ class ListRelationships:
         items = sorted(
             (v for v in views if v.review_status is status),
             key=lambda v: (
+                v.strength is not LinkStrength.STRONG,
+                -v.same_event_count,
                 -v.confidence,
                 -len(v.shared_articles),
                 v.entity_a.label.casefold(),

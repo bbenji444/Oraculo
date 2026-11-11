@@ -26,6 +26,7 @@ from app.domain.investigation import (
     RelationshipType,
     ReviewStatus,
 )
+from app.domain.relationships import LinkStrength, link_reason, link_strength
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,12 +55,15 @@ class SharedArticle:
         title: Título.
         url: Liga a la nota original.
         published_at: Fecha de la nota.
+        same_event: Si en esta nota las dos participan en el hecho (rol
+            ``event`` en las dos) y no solo se nombran (F12, ADR-0107).
     """
 
     article_id: int
     title: str
     url: str
     published_at: datetime | None
+    same_event: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +120,21 @@ class RelationshipView:
     def key(self) -> RelationshipKey:
         """Las dos entidades y el tipo."""
         return RelationshipKey(self.entity_a.entity_id, self.entity_b.entity_id, self.type)
+
+    @property
+    def same_event_count(self) -> int:
+        """En cuántas notas del caso las dos participan en el hecho."""
+        return sum(1 for article in self.shared_articles if article.same_event)
+
+    @property
+    def strength(self) -> LinkStrength:
+        """Qué tan útil es para investigar (``link_strength``, ADR-0107)."""
+        return link_strength(self.origin, self.same_event_count)
+
+    @property
+    def reason(self) -> str:
+        """Por qué se relacionan, en una frase (``link_reason``)."""
+        return link_reason(self.origin, self.same_event_count, len(self.shared_articles))
 
 
 @dataclass(frozen=True, slots=True)
