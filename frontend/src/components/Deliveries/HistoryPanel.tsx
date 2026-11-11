@@ -3,8 +3,10 @@
  *
  * Cada fila es la guía de un envío: a quién, cuándo, estado, intentos y el
  * error en español. Las fallidas tienen «Reintentar». Arriba, «Mandar prueba»
- * manda ya la última corrida a un destinatario. El superusuario elige la
- * cuenta; los demás siempre mandan desde el correo que él eligió (ADR-0045).
+ * manda ya la última corrida a un destinatario desde la cuenta elegida.
+ *
+ * Solo lo ve el superusuario: los demás prueban desde «Mis correos»
+ * (Benji, 11/11/2026).
  *
  * No hace: no crea reglas.
  */

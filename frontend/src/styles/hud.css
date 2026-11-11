@@ -1452,3 +1452,120 @@
     opacity: 1;
   }
 }
+
+/* ── Cápsula de la sesión en el encabezado (Benji, 11/11/2026) ──────────────
+   Persona + nombre, la llave de «Mi contraseña» y el botón de apagado, en una
+   sola pieza redondeada como la barra de Oráculo. */
+.user-capsule {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 4px 0 6px;
+  border: 1px solid var(--hud-cyan-line);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(8 22 38 / 0.82), rgb(3 10 20 / 0.82));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 0 18px rgb(0 210 255 / 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.user-capsule__who {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 2px;
+}
+
+.user-capsule__avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--hud-cyan);
+  background: var(--hud-cyan-soft);
+  box-shadow: 0 0 10px rgb(0 210 255 / 0.25);
+}
+
+.user-capsule__name {
+  max-width: 9rem;
+  overflow: hidden;
+  font: 600 11px/1 var(--font-display);
+  letter-spacing: 0.16em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(226 232 240);
+}
+
+.user-capsule__divider {
+  width: 1px;
+  height: 20px;
+  background: linear-gradient(180deg, transparent, rgb(0 210 255 / 0.35), transparent);
+}
+
+.user-capsule__action,
+.user-capsule__power {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.user-capsule__action {
+  margin: 0 4px;
+  color: var(--hud-cyan);
+}
+
+.user-capsule__action:hover {
+  background: var(--hud-cyan-soft);
+  box-shadow: 0 0 12px rgb(0 210 255 / 0.35);
+}
+
+.user-capsule__power {
+  margin-left: 4px;
+  border: 1px solid rgb(244 63 94 / 0.45);
+  color: rgb(251 113 133);
+  background: rgb(127 29 29 / 0.45);
+  box-shadow: 0 0 12px rgb(244 63 94 / 0.25);
+}
+
+.user-capsule__power:hover {
+  color: rgb(255 228 230);
+  background: rgb(190 18 60 / 0.7);
+  box-shadow: 0 0 18px rgb(244 63 94 / 0.55);
+  transform: scale(1.05);
+}
+
+.user-capsule__power:disabled {
+  cursor: wait;
+  opacity: 0.6;
+  transform: none;
+}
+
+.user-capsule__action:focus-visible,
+.user-capsule__power:focus-visible {
+  outline: 2px solid var(--hud-cyan);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-capsule__action,
+  .user-capsule__power {
+    transition: none;
+  }
+  .user-capsule__power:hover {
+    transform: none;
+  }
+}
