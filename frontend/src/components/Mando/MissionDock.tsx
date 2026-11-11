@@ -643,8 +643,9 @@ export function MissionDock({ active }: MissionDockProps) {
             <LaunchButton launcher={launcher} />
           </div>
         </div>
-        {/* En celular no cabe: ahí la consola es solo la frase y el botón. */}
-        <div className="mando-console-foot hidden sm:block">
+        {/* En celular las consultas anteriores van en una tira deslizable
+            (Benji, 11/11/2026: «no veo mis búsquedas anteriores»). */}
+        <div className="mando-console-foot">
           <RecentMissions />
         </div>
       </section>

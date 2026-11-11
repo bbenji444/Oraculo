@@ -333,6 +333,25 @@ function placeAura(map: MapLibreMap, aura: HTMLElement | null, sun: HTMLElement 
   });
 }
 
+/**
+ * Márgenes del vuelo a una nota en el celular: arriba el encabezado, abajo la
+ * hoja de la ficha (``PHONE_SHEET_SHARE`` del alto de la pantalla).
+ */
+// Celular: lo que tapa el encabezado arriba (6.25rem) y la parte de la pantalla
+// que ocupa la hoja de la ficha al abrirse (su alto inicial, ver PhoneSheet).
+const PHONE_HEADER_PX = 100;
+const PHONE_SHEET_SHARE = 0.55;
+
+function phonePadding(map: MapLibreMap): Insets {
+  const height = map.getContainer().clientHeight;
+  return {
+    top: PHONE_HEADER_PX,
+    bottom: Math.round(height * PHONE_SHEET_SHARE),
+    left: 0,
+    right: 0,
+  };
+}
+
 export function ExploreGlobe({
   articles,
   colors,
@@ -378,6 +397,10 @@ export function ExploreGlobe({
   // En el celular la ficha y la lista de un lugar suben en una hoja aparte
   // (PhoneSheet): flotando sobre el globo se encimaban con los paneles.
   const phone = useMediaQuery(PHONE_QUERY, false);
+  const phoneRef = useRef(phone);
+  useEffect(() => {
+    phoneRef.current = phone;
+  }, [phone]);
 
   // El mapa vive fuera de React: lee estos refs dentro de sus eventos.
   const motionRef = useRef<MotionPreset>(motion);
@@ -1120,8 +1143,10 @@ export function ExploreGlobe({
       map.flyTo({
         center: [lng, lat],
         zoom,
-        padding: insetsRef.current,
-        offset: articleOffset(screenOf(map)),
+        // En el celular la ficha sube en una hoja que tapa la parte de abajo:
+        // el punto se centra en lo que queda libre arriba (Benji, 11/11/2026).
+        padding: phoneRef.current ? phonePadding(map) : insetsRef.current,
+        offset: phoneRef.current ? [0, 0] : articleOffset(screenOf(map)),
         pitch: flyPitch('article'),
         bearing: REGION_BEARING,
         curve: ARTICLE_FLY_CURVE,

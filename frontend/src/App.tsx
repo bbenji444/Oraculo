@@ -120,7 +120,7 @@ function OraculoLink() {
   return (
     <a
       href={url}
-      className="hud-btn hud-btn--sm shrink-0 whitespace-nowrap"
+      className="hud-btn hud-btn--sm shrink-0 whitespace-nowrap bg-[#050d12]/85"
       title="Regresar al sistema principal de Oráculo"
       aria-label="Regresar a Oráculo"
     >
@@ -211,31 +211,36 @@ function Monitor({ me }: { me: Me }) {
           «Oráculo» y la sesión; abajo las pestañas, que se deslizan. El orden
           lo dan las clases order-*, sin repetir componentes. */}
       <header className="encabezado pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center justify-center px-3 sm:px-4">
-        <div className="pointer-events-auto flex w-full min-w-0 max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sm:w-auto sm:flex-nowrap sm:justify-center sm:gap-7">
-          <a
-            href="#/explorar"
-            className="marca-signal order-1 min-w-0 shrink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400"
-          >
-            <BrandGlobe />
-            <span className="flex flex-col items-start">
-              <h1 className="marca-nombre">Monitor de Noticias</h1>
-              <span className="marca-linea">
-                <span className="marca-linea-texto">Oráculo · Noticias geolocalizadas</span>
-                <span className="marca-scan" aria-hidden="true" />
+        <div className="pointer-events-auto flex w-full min-w-0 max-w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:gap-7">
+          {/* Celular: este renglón junta la marca con «Oráculo» y la sesión.
+              En pantallas anchas desaparece (sm:contents) y cada pieza toma
+              su lugar en la fila con su order-*. */}
+          <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:contents">
+            <a
+              href="#/explorar"
+              className="marca-signal min-w-0 shrink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400 sm:order-1"
+            >
+              <BrandGlobe />
+              <span className="flex min-w-0 flex-col items-start">
+                <h1 className="marca-nombre">Monitor de Noticias</h1>
+                <span className="marca-linea">
+                  <span className="marca-linea-texto">Oráculo · Noticias geolocalizadas</span>
+                  <span className="marca-scan" aria-hidden="true" />
+                </span>
               </span>
-            </span>
-          </a>
+            </a>
+            <div className="flex shrink-0 items-center gap-2 sm:order-4 sm:gap-7">
+              <OraculoLink />
+              <UserCapsule me={me} />
+            </div>
+          </div>
           {/* Separador vertical que se desvanece arriba y abajo. */}
           <span
             aria-hidden="true"
-            className="order-2 hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
+            className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:order-2 sm:block"
           />
-          <div className="order-last w-full min-w-0 sm:order-3 sm:w-auto">
+          <div className="w-full min-w-0 sm:order-3 sm:w-auto">
             <HudTabs tabs={tabs} active={tab} label="Secciones" />
-          </div>
-          <div className="order-2 flex shrink-0 items-center gap-2 sm:order-4 sm:gap-7">
-            <OraculoLink />
-            <UserCapsule me={me} />
           </div>
         </div>
       </header>
