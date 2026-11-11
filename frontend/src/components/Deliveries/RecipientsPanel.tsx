@@ -4,13 +4,20 @@
  * - «+ Agregar», arriba a la derecha, abre una ventana para registrar uno nuevo
  *   (un usuario normal, hasta su tope: dos correos).
  * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo o borrarlo.
+ * - «Mandar prueba» manda ya el reporte de la última corrida a ese correo, para
+ *   ver cómo llega (Benji, 11/11/2026: va junto al correo, no en un panel aparte).
  * - Cada persona ve solo los suyos; el superusuario ve todos, con su dueño.
  *
  * No hace: no decide desde qué correo se manda (eso es del superusuario).
  */
 import { useState } from 'react';
 
-import { useDeleteRecipient, useRecipients, useSaveRecipient } from '../../hooks/useDeliveries';
+import {
+  useDeleteRecipient,
+  useRecipients,
+  useSaveRecipient,
+  useSendTest,
+} from '../../hooks/useDeliveries';
 import type { Recipient } from '../../services/deliveries';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
@@ -21,6 +28,41 @@ import { RecipientForm } from './RecipientForm';
 interface Mode {
   /** Superusuario: ve todos, con su dueño, y el campo de WhatsApp. */
   isSuperuser: boolean;
+}
+
+/** «Mandar prueba» de un correo: sale de la cuenta que eligió el superusuario. */
+function TestButton({ recipientId }: { recipientId: number }) {
+  const send = useSendTest();
+  const result = send.data;
+  return (
+    <>
+      <HudButton
+        size="sm"
+        variant="ghost"
+        disabled={send.isPending}
+        title="Manda ya el reporte de la última corrida a este correo"
+        onClick={() => {
+          send.mutate({ recipientId });
+        }}
+      >
+        {send.isPending ? 'Enviando…' : 'Mandar prueba'}
+      </HudButton>
+      {(result ?? send.error) && (
+        <p
+          role="status"
+          className={`basis-full text-xs ${
+            result?.status === 'sent' ? 'text-emerald-300' : 'text-rose-300'
+          }`}
+        >
+          {send.error
+            ? send.error.message
+            : result?.status === 'sent'
+              ? 'Listo: puede tardar unos minutos en llegar.'
+              : `No se pudo mandar: ${result?.last_error ?? 'error desconocido'}`}
+        </p>
+      )}
+    </>
+  );
 }
 
 function RecipientItem({
@@ -50,6 +92,9 @@ function RecipientItem({
         </span>
         {mode.isSuperuser && recipient.owner && <HudChip tone="slate">{recipient.owner}</HudChip>}
         {!recipient.is_active && <HudChip tone="slate">Apagado</HudChip>}
+        {recipient.is_active && recipient.email && !open && (
+          <TestButton recipientId={recipient.id} />
+        )}
         <HudButton size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
           {open ? 'Cerrar' : 'Editar'}
         </HudButton>

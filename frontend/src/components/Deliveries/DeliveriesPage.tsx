@@ -2,9 +2,10 @@
  * Pantalla «Envíos» (F12.11, ADR-0039, ADR-0045, ADR-0046).
  *
  * Cada persona arma sus envíos programados: qué temas, de qué región, a qué
- * horas, qué días y a cuáles de sus correos (hasta dos). El superusuario
- * además conecta la cuenta desde la que se manda y ve los envíos, correos e
- * historial de todos.
+ * horas, qué días y a cuáles de sus correos (hasta dos), y con «Mandar
+ * prueba» ve cómo le llega. El superusuario además conecta la cuenta desde la
+ * que se manda y ve los envíos, correos y la bitácora de correos de todos
+ * (Benji, 11/11/2026: al usuario esa bitácora le sobra).
  *
  * Hoy se manda por correo (vía Composio); WhatsApp aparece como «Próximamente».
  * Está pensada para volverse el módulo de envíos de todo Oráculo: cada envío
@@ -41,7 +42,6 @@ export function DeliveriesPage() {
         )}
         <SchedulesPanel isSuperuser={false} username={username} />
         <RecipientsPanel isSuperuser={false} maxRecipients={data?.max_recipients ?? null} />
-        <HistoryPanel isSuperuser={false} />
       </div>
     );
   }
