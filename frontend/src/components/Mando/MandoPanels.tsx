@@ -18,10 +18,11 @@
  * No hace: no pide datos ni decide qué notas se ven; ExplorePage se las pasa,
  * las mismas que al globo.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Article, Search } from '../../services/searches';
+import { useExplorerStore } from '../../store/explorer';
 import { useMandoStore } from '../../store/mando';
 import { GlobeControls, MyCasesToggle, PrecisionLegend } from '../Explore/Controls';
 import { PHONE_QUERY } from '../Explore/ui';
@@ -75,6 +76,22 @@ export function MandoPanels({
   useEffect(() => {
     if (phone && dossierShown) useMandoStore.getState().setDockMinimized(true);
   }, [phone, dossierShown]);
+
+  // Celular: mientras se ve una noticia, el expediente se aparta para que se
+  // vea el globo volar a su lugar; al cerrarla, regresa (Benji, 11/11/2026).
+  const articleId = useExplorerStore((s) => s.articleId);
+  const hiddenForArticle = useRef(false);
+  useEffect(() => {
+    const store = useMandoStore.getState();
+    if (phone && articleId !== null && store.dossierOpen) {
+      hiddenForArticle.current = true;
+      store.setDossierOpen(false);
+    }
+    if (articleId === null && hiddenForArticle.current) {
+      hiddenForArticle.current = false;
+      store.setDossierOpen(true);
+    }
+  }, [phone, articleId]);
 
   // Celular: al abrir la consola desde la pastilla, el expediente se pliega.
   // Solo en ese cambio (de pastilla a consola), no al llegar a la pantalla.
@@ -132,6 +149,8 @@ export function MandoPanels({
         </div>
       </div>
 
+      {phone && !dossierShown && <PhoneGlobeMenu />}
+
       <div className="pointer-events-none absolute left-4 top-4 hidden flex-col items-start gap-2 sm:flex">
         <div className="pointer-events-auto flex gap-2">
           <MyCasesToggle />
@@ -142,5 +161,58 @@ export function MandoPanels({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Celular: «Mis casos», giro, día o noche, velocidad y la leyenda caben en un
+ * botón redondo arriba a la izquierda; al tocarlo se despliegan (Benji,
+ * 11/11/2026: «de una manera muy comprimida»).
+ */
+function PhoneGlobeMenu() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col items-start gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? 'Cerrar las opciones del globo' : 'Opciones del globo'}
+        title="Opciones del globo"
+        onClick={() => {
+          setOpen((current) => !current);
+        }}
+        className="globo-menu-boton pointer-events-auto"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          {open ? (
+            <path d="M6 6l12 12M18 6 6 18" />
+          ) : (
+            <>
+              <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+              <circle cx="16" cy="7" r="2" />
+              <circle cx="10" cy="17" r="2" />
+            </>
+          )}
+        </svg>
+      </button>
+      {open && (
+        <div className="globo-menu pointer-events-auto flex max-w-[calc(100vw-1.5rem)] flex-col items-start gap-2">
+          <div className="flex flex-wrap gap-2">
+            <MyCasesToggle />
+          </div>
+          <GlobeControls />
+          <PrecisionLegend />
+        </div>
+      )}
+    </div>
   );
 }

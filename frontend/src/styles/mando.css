@@ -1328,19 +1328,26 @@
 /* Hoja de la ficha de una noticia en el celular (PhoneSheet, 11/11/2026):
    opaca, a todo lo ancho, con un asa arriba y un velo que oscurece el globo. */
 .hoja-celular__velo {
-  background: rgb(2 6 12 / 0.6);
-  backdrop-filter: blur(2px);
+  /* Suave: arriba se tiene que ver el globo volar al lugar de la noticia. */
+  background: linear-gradient(180deg, transparent 0%, rgb(2 6 12 / 0.35) 100%);
   animation: hoja-velo 0.2s ease-out both;
 }
 .hoja-celular__cuerpo {
   border: 1px solid var(--hud-cyan-line);
   border-bottom: 0;
   border-radius: 18px 18px 0 0;
-  background: linear-gradient(180deg, #071723, #040b12);
+  /* Un poco transparente: se adivina el globo detrás (Benji, 11/11/2026). */
+  background: linear-gradient(180deg, rgb(7 23 35 / 0.84), rgb(4 11 18 / 0.9));
+  backdrop-filter: blur(10px);
   box-shadow:
-    0 -12px 40px rgb(0 0 0 / 0.55),
+    0 -12px 40px rgb(0 0 0 / 0.45),
     0 0 24px rgb(0 210 255 / 0.08);
   animation: hoja-sube 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Mientras el dedo arrastra, la hoja lo sigue sin retraso. */
+.hoja-celular__cuerpo[data-dragging] {
+  transition: none;
 }
 .hoja-celular__asa {
   display: block;
@@ -1377,8 +1384,52 @@
    abajo a la izquierda: a la derecha quedaba encima del expediente y la
    pastilla de la consola va al centro. */
 @media (max-width: 639px) {
-  .maplibregl-ctrl-bottom-right {
+  /* Más específico que la hoja de MapLibre, que se carga después. */
+  .maplibregl-map .maplibregl-ctrl-bottom-right {
     right: auto;
     left: 0;
+  }
+  .maplibregl-map .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
+    float: left;
+    margin: 0 0 10px 10px;
+  }
+}
+
+/* Celular (11/11/2026): botón redondo de las opciones del globo y su panel, y
+   las consultas anteriores en una tira que se desliza de lado. */
+.globo-menu-boton {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--hud-cyan-line);
+  border-radius: 999px;
+  color: var(--hud-cyan);
+  background: rgb(5 13 18 / 0.85);
+  box-shadow: 0 0 14px rgb(0 210 255 / 0.15);
+  backdrop-filter: blur(6px);
+}
+.globo-menu {
+  padding: 0.6rem;
+  border: 1px solid var(--hud-cyan-line);
+  border-radius: 14px;
+  background: rgb(5 13 18 / 0.92);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+  animation: hud-rise 0.25s var(--hud-ease) both;
+}
+@media (max-width: 639px) {
+  .mando-recents-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+  .mando-recents {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .mando-recents::-webkit-scrollbar {
+    display: none;
   }
 }

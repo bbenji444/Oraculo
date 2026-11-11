@@ -324,8 +324,11 @@ select optgroup {
     height: 20px;
   }
   .marca-nombre {
+    max-width: 100%;
+    overflow: hidden;
     font-size: 11px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
   .marca-linea {
