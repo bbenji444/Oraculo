@@ -34,6 +34,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
+- **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
+  - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira, onda en el piso y un eco por nota encontrada;
+  - la cámara vuela a la zona y se inclina para que se vea el volumen;
+  - al terminar, la cámara se endereza.
 - **Fechas y zonas estrictas (11/11/2026, ADR-0048).** Benji: «si le doy buscar hoy, solo hoy».
   - Una búsqueda manual solo guarda lo publicado en los días pedidos, de 00:00 a 23:59 de la Ciudad de México.
   - En un estado o municipio, una nota sin lugar ya no cuenta como de la zona.
