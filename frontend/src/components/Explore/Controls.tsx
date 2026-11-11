@@ -1,17 +1,15 @@
 /**
- * Controles sobre el globo: giro, día/noche, velocidad de las animaciones y
- * leyenda de precisión (§14.2: lo ubicado solo por estado o país se dibuja con
+ * Controles sobre el globo: «Mis casos», día/noche y la leyenda de precisión
+ * (Benji, 11/11/2026: el giro es automático y la animación siempre lenta, ya
+ * no se eligen) (§14.2: lo ubicado solo por estado o país se dibuja con
  * anillo punteado, para no hacer creer que pasó en el centro exacto).
  * También los botones de Descargas: reporte PDF, datos CSV y GeoJSON, e imprimir
  * (Fase 7, ADR-0018), que van dentro del renglón de la búsqueda terminada, y el
  * aviso de "Búsqueda lista".
  */
 import { type DownloadKind, useDownloads } from '../../hooks/useDownloads';
-import { MOTION_LABELS, MOTION_PRESETS } from '../../map/motion';
-import { HudSelect } from '../ui/HudSelect';
 import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
-import { SpinToggle } from '../GeoExplorer/SpinToggle';
 import type { FinishNotice } from './format';
 import { SMALL_BUTTON } from './ui';
 
@@ -39,35 +37,11 @@ export function MyCasesToggle() {
 }
 
 export function GlobeControls() {
-  const spinning = useExplorerStore((s) => s.spinning);
-  const setSpinning = useExplorerStore((s) => s.setSpinning);
   const earth = useExplorerStore((s) => s.earth);
   const setEarth = useExplorerStore((s) => s.setEarth);
-  const motion = useExplorerStore((s) => s.motion);
-  const setMotion = useExplorerStore((s) => s.setMotion);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <SpinToggle
-        spinning={spinning}
-        onToggle={() => {
-          setSpinning(!spinning);
-        }}
-      />
       <EarthToggle earth={earth} onChange={setEarth} />
-      <div className="flex items-center gap-2 rounded-[10px] border border-sky-400/30 bg-[#050d12]/90 py-1 pr-1 pl-3 font-display text-[9.5px] tracking-[0.16em] text-sky-200/80 uppercase">
-        <span aria-hidden="true">Animación</span>
-        <HudSelect
-          label="Animación"
-          size="sm"
-          className="w-auto min-w-[7.5rem]"
-          value={motion}
-          options={MOTION_PRESETS.map((preset) => ({
-            value: preset,
-            label: MOTION_LABELS[preset],
-          }))}
-          onChange={setMotion}
-        />
-      </div>
     </div>
   );
 }

@@ -23,6 +23,8 @@ export interface AccessUser {
   must_change_password: boolean;
   totp_enrolled: boolean;
   locked_until: string | null;
+  /** Su llave de API enmascarada (orc_live_a1b2c3d4…); null si no tiene (ADR-0047). */
+  api_key?: string | null;
 }
 
 export interface CreatedUser {
@@ -163,4 +165,49 @@ export function keyStatus(
   if (key.revoked_at) return 'revocada';
   if (key.expires_at && new Date(key.expires_at) <= now) return 'vencida';
   return 'vigente';
+}
+
+/** Cómo se entra al monitor (ADR-0047). */
+export interface AuthSettings {
+  /** Si al entrar se pide el código de Microsoft Authenticator. */
+  totp_required: boolean;
+}
+
+function settingsOf(data: unknown): AuthSettings {
+  const value = (data as Partial<AuthSettings> | null)?.totp_required;
+  if (typeof value !== 'boolean') throw badFormat();
+  return { totp_required: value };
+}
+
+export async function getAuthSettings(signal?: AbortSignal): Promise<AuthSettings> {
+  return settingsOf(await requestJson(apiUrl('access/settings'), { signal }));
+}
+
+/** Prende o apaga el código al entrar (aplica desde el siguiente ingreso). */
+export async function saveAuthSettings(settings: AuthSettings): Promise<AuthSettings> {
+  return settingsOf(
+    await requestJson(apiUrl('access/settings'), { method: 'PUT', body: settings }),
+  );
+}
+
+function apiKeyOf(data: unknown): IssuedKey {
+  const value = data as Partial<IssuedKey> | null;
+  if (typeof value?.key !== 'string' || !isKey(value.info)) throw badFormat();
+  return { key: value.key, info: value.info };
+}
+
+/**
+ * La llave de API completa de una persona, para verla o copiarla.
+ *
+ * @throws {ApiError} `access_key_not_found` si todavía no tiene una.
+ */
+export async function showApiKey(userId: number): Promise<IssuedKey> {
+  return apiKeyOf(await requestJson(apiUrl(`access/users/${String(userId)}/api-key`)));
+}
+
+/** Genera la llave de API de una persona; la anterior deja de servir al instante. */
+export async function newApiKey(userId: number): Promise<IssuedKey> {
+  return apiKeyOf(
+    await requestJson(apiUrl(`access/users/${String(userId)}/api-key`), { method: 'POST' }),
+  );
 }

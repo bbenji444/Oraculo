@@ -31,11 +31,11 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 ## Acceso
 
-Se entra igual que a Oráculo: usuario, contraseña y el código de 6 dígitos de Microsoft Authenticator (ADR-0043). Al terminar, la API deja el **token interno** en la cookie `monitor_sesion`, que identifica a la persona en cada petición. Los roles y la seguridad por filas son de ADR-0042.
+Se entra con usuario y contraseña y, si el superusuario lo prende en «Accesos», el código de 6 dígitos de Microsoft Authenticator (ADR-0043, ADR-0047). Al terminar, la API deja el **token interno** en la cookie `monitor_sesion`, que identifica a la persona en cada petición. Los roles y la seguridad por filas son de ADR-0042.
 
 Rutas públicas (sin sesión): `GET /health`, `GET /app-config`, los pasos de `POST /auth/login…` y `POST /auth/logout`. Todas las demás, también `/docs` y `/openapi.json`, piden sesión o llave de sistema.
 
-**Entrar, en pasos.** Cada paso responde un `ticket` (vence en 10 min) que va en el siguiente, y `next` dice qué sigue: `code`, `change_password` o `enroll`.
+**Entrar, en pasos.** Cada paso responde un `ticket` (vence en 10 min) que va en el siguiente, y `next` dice qué sigue: `code`, `change_password`, `enroll` o `done`. Con el código apagado (lo normal desde ADR-0047), `POST /auth/login` ya responde `{"ticket": "", "next": "done", "me": {...}}` y deja la sesión en la cookie; solo una contraseña temporal pide antes `change_password`.
 
 ```bash
 curl -s -c sesion.txt -X POST http://localhost:8080/api/v1/auth/login \
@@ -58,7 +58,7 @@ curl -s -b sesion.txt http://localhost:8080/api/v1/auth/me
 | `POST /auth/logout` | Salir |
 | `POST /auth/introspect` | Para otros módulos: `{"token"}` → `{"active", "username", "display_name", "role"}`. Pide llave de sistema de un superusuario |
 
-**Desde otro sistema (llave de sistema).** La llave en cada petición, sin cookie:
+**Desde otro sistema (llave de API de cada persona o llave de sistema).** La llave en cada petición, sin cookie; actúa como su dueño. Guía completa: `docs/guia-integracion-api.md`.
 
 ```bash
 curl -s -H 'Authorization: Bearer orc_live_…' 'http://localhost:8080/api/v1/searches?limit=1'
@@ -77,6 +77,9 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `GET /access/users` | Personas: rol, si está activa, si su contraseña es temporal (`must_change_password`), si conectó su Authenticator (`totp_enrolled`), bloqueo y llaves vigentes |
 | `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
+| `GET /access/settings` · `PUT /access/settings` | `{"totp_required": true \| false}`: si al entrar se pide el código de 6 dígitos. Aplica desde el siguiente ingreso; queda en la bitácora (ADR-0047) |
+| `GET /access/users/{id}/api-key` | La **llave de API** completa de la persona `{"key", "info"}`, para copiarla. Cada vista queda en la bitácora; `404` si todavía no tiene. En `GET /access/users` cada persona trae `api_key` enmascarada |
+| `POST /access/users/{id}/api-key` | Genera su llave de API (`201`); la anterior deja de servir al instante. Cada persona nueva ya nace con una |
 | `DELETE /access/users/{id}` | Borra a la persona (`204`, borrado lógico): sale de la lista, ya no entra, se revocan sus llaves y se cierran sus sesiones. Sus búsquedas y la bitácora se quedan y su usuario queda reservado. No te puedes borrar a ti mismo ni al último superusuario (`409`) |
 | `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
 | `POST /access/users/{id}/reset-totp` | Borra su Authenticator (`204`); escaneará un QR nuevo. Cierra sus sesiones |

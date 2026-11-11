@@ -41,6 +41,7 @@ class Clock:
 class _Key:
     info: KeyInfo
     key_hash: str
+    sealed: str | None = None
 
 
 @dataclass
@@ -64,6 +65,9 @@ class FakeAccessStore:
     used: list[tuple[int, str | None]] = field(default_factory=list)
     creds: dict[int, _Creds] = field(default_factory=dict)
     deleted: list[int] = field(default_factory=list)
+    # Interruptor del código (ADR-0047). Prendido por omisión, como antes, para
+    # que las pruebas del ingreso con código sigan igual.
+    totp: bool = True
 
     def add_user(self, username: str, role: Role = Role.USER, *, active: bool = True) -> int:
         user_id = len(self.users) + 1
@@ -157,6 +161,14 @@ class FakeAccessStore:
             must_change_password=c.must_change,
             totp_enrolled=c.totp_secret is not None,
             locked_until=c.locked_until,
+            api_key_prefix=next(
+                (
+                    k.info.public_id
+                    for k in reversed(self.keys.values())
+                    if k.info.user_id == user_id and k.sealed and k.info.revoked_at is None
+                ),
+                None,
+            ),
         )
 
     def _record(self, key: _Key) -> KeyRecord:
@@ -235,10 +247,33 @@ class FakeAccessStore:
             None,
             None,
             None,
+            key.secret_sealed is not None,
         )
-        self.keys[key_id] = _Key(info, key.key_hash)
+        self.keys[key_id] = _Key(info, key.key_hash, key.secret_sealed)
         self.events.append((audit, str(key_id)))
         return info
+
+    async def api_key(self, user_id: int) -> tuple[KeyInfo, str] | None:
+        now = self.clock()
+        visible = [
+            k
+            for k in self.keys.values()
+            if k.info.user_id == user_id
+            and k.sealed is not None
+            and k.info.revoked_at is None
+            and (k.info.expires_at is None or k.info.expires_at > now)
+        ]
+        if not visible:
+            return None
+        newest = visible[-1]
+        return newest.info, newest.sealed or ""
+
+    async def totp_required(self) -> bool:
+        return self.totp
+
+    async def set_totp_required(self, required: bool, audit: AuditEntry) -> None:
+        self.totp = required
+        self.events.append((audit, "1"))
 
     async def revoke_key(self, key_id: int, audit: AuditEntry) -> KeyInfo | None:
         key = self.keys.get(key_id)

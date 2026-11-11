@@ -11,6 +11,10 @@ import {
   type UserPatch,
   createUser,
   deleteUser,
+  getAuthSettings,
+  newApiKey,
+  saveAuthSettings,
+  showApiKey,
   issueKey,
   listKeys,
   listUsers,
@@ -82,4 +86,31 @@ export function useResetTotp() {
 export function useRevokeKey() {
   const refresh = useRefresh();
   return useMutation({ mutationFn: (keyId: number) => revokeKey(keyId), onSuccess: refresh });
+}
+
+const SETTINGS_KEY = ['access', 'settings'] as const;
+
+/** Si al entrar se pide el código (ADR-0047). */
+export function useAuthSettings() {
+  return useQuery({ queryKey: SETTINGS_KEY, queryFn: ({ signal }) => getAuthSettings(signal) });
+}
+
+export function useSaveAuthSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (totpRequired: boolean) => saveAuthSettings({ totp_required: totpRequired }),
+    onSuccess: (settings) => {
+      client.setQueryData(SETTINGS_KEY, settings);
+    },
+  });
+}
+
+/** Trae la llave de API completa (no se guarda en la caché: cada vista queda en la bitácora). */
+export function useShowApiKey() {
+  return useMutation({ mutationFn: (userId: number) => showApiKey(userId) });
+}
+
+export function useNewApiKey() {
+  const refresh = useRefresh();
+  return useMutation({ mutationFn: (userId: number) => newApiKey(userId), onSuccess: refresh });
 }

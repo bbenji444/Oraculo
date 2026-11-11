@@ -35,6 +35,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useConcepts } from '../../hooks/useConcepts';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useRegionDetail } from '../../hooks/useRegions';
 import { useSearch, useSearchArticles } from '../../hooks/useSearches';
 import { type Article, isFinished } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
@@ -57,6 +58,7 @@ import { SearchPanel } from './SearchPanel';
 import { Chronology } from './Chronology';
 import { applyTimeline } from './timelineData';
 import { useFinishNotice } from './useFinishNotice';
+import { useIdleSpin } from './useIdleSpin';
 
 // Lista vacía estable: un arreglo nuevo en cada render haría redibujar el globo.
 const NO_ARTICLES: Article[] = [];
@@ -85,6 +87,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   const [mando] = useState(isMandoMode);
   const searchId = useExplorerStore((s) => s.searchId);
   const search = useSearch(searchId).data;
+  // La región buscada: el radar se pone sobre ella mientras se busca (11/11/2026).
+  const searchRegion = useRegionDetail(search?.region_id ?? null).data;
   const finished = search !== undefined && isFinished(search.status);
   const articles = useSearchArticles(searchId, finished).data ?? NO_ARTICLES;
   const concepts = useConcepts().data;
@@ -111,6 +115,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   const setPanelOpen = useExplorerStore((s) => s.setPanelOpen);
   const articleId = useExplorerStore((s) => s.articleId);
   const finishedNotice = useFinishNotice(search);
+  // Tras 5 minutos sin tocar nada, el globo gira solo (Benji, 11/11/2026).
+  useIdleSpin(active);
   const earth = useExplorerStore((s) => s.earth);
   const listOpen = useTimelineStore((s) => s.listOpen);
   const wallCaseId = useExplorerStore((s) => s.wallCaseId);
@@ -198,6 +204,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
           notice={finishedNotice.notice}
           right={insets.right}
           bottom={insets.bottom}
+          map={map}
+          regionBbox={searchRegion?.focus_bbox}
         />
       )}
       {/* Los paneles van debajo del encabezado; el universo y el globo, detrás

@@ -214,8 +214,9 @@ export const useExplorerStore = create<ExplorerState>()(
       panelOpen: true,
       searchCollapsed: false,
       earth: 'night',
-      // "Menos movimiento" del sistema manda sobre la preferencia guardada.
-      motion: prefersReducedMotion() ? 'off' : 'normal',
+      // Siempre lenta (Benji, 11/11/2026: «siempre va a ser animación lenta»);
+      // "Menos movimiento" del sistema la apaga.
+      motion: prefersReducedMotion() ? 'off' : 'slow',
       spinning: !prefersReducedMotion(),
       lastCaseId: null,
       sources: null,
@@ -360,9 +361,22 @@ export const useExplorerStore = create<ExplorerState>()(
       storage: createJSONStorage(() => safeStorage),
       // Preferencias de la persona y la consulta abierta. El último caso usado
       // también: H9.1 agrega varias notas seguidas al mismo caso.
+      // Lo guardado antes (la velocidad que se elegía, ADR-0017) ya no manda:
+      // la animación es siempre lenta. Con una búsqueda o región abierta el
+      // globo no gira: solo en una consulta nueva o tras 5 minutos sin tocar
+      // nada (useIdleSpin, Benji, 11/11/2026).
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<ExplorerState>;
+        const busy = Boolean(saved.searchId) || saved.regionId != null;
+        return {
+          ...current,
+          ...saved,
+          motion: current.motion,
+          spinning: current.spinning && !busy,
+        };
+      },
       partialize: (state) => ({
         earth: state.earth,
-        motion: state.motion,
         lastCaseId: state.lastCaseId,
         // Las fuentes que prefiere el analista se recuerdan entre visitas.
         sources: state.sources,

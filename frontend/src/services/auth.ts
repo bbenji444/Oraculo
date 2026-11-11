@@ -25,12 +25,17 @@ export interface Me {
   auth_mode: 'keys' | 'dev';
 }
 
-/** Qué sigue en el ingreso. */
-export type NextStep = 'code' | 'change_password' | 'enroll';
+/**
+ * Qué sigue en el ingreso. `done`: ya entró, porque el código de 6 dígitos
+ * está apagado en «Accesos» (ADR-0047); la sesión ya quedó en la cookie.
+ */
+export type NextStep = 'code' | 'change_password' | 'enroll' | 'done';
 
 export interface LoginStep {
   ticket: string;
   next: NextStep;
+  /** Quién entró, solo con `done`. */
+  me?: Me | null;
 }
 
 /** Lo necesario para dar de alta Microsoft Authenticator. */
@@ -55,7 +60,10 @@ function isStep(value: unknown): value is LoginStep {
   const step = value as Partial<LoginStep> | null;
   return (
     typeof step?.ticket === 'string' &&
-    (step.next === 'code' || step.next === 'change_password' || step.next === 'enroll')
+    (step.next === 'code' ||
+      step.next === 'change_password' ||
+      step.next === 'enroll' ||
+      (step.next === 'done' && isMe(step.me)))
   );
 }
 

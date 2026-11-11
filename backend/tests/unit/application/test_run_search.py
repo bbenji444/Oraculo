@@ -35,6 +35,7 @@ from app.application.use_cases.run_search import (
     RunSearch,
     SearchNotFoundError,
     plan_queries,
+    strict_window,
 )
 from app.domain.articles import RawArticle
 from app.domain.dedupe import DedupedArticle, KnownArticle
@@ -428,8 +429,9 @@ async def test_el_tope_por_busqueda_deja_notas_sin_enriquecer() -> None:
 
     assert len(llm.requests) == 1
     assert report.skipped_by_cap == 1
-    # Sin ubicación porque no se enriqueció: queda en "Sin ubicación".
-    assert report.unlocated == 1
+    # Sin ubicación porque no se enriqueció. En una búsqueda de un estado (la
+    # CDMX) eso ya no cuenta como dentro: queda fuera (11/11/2026).
+    assert (report.unlocated, report.out_of_region) == (0, 1)
     assert report.status is SearchStatus.COMPLETED
     assert searches.closing is not None
     assert searches.closing.progress["skipped_by_cap"] == 1
@@ -767,3 +769,29 @@ async def test_sin_subdivision_no_cambia_nada() -> None:
 
     assert report.articles == 2
     assert "off_topic" not in searches.progress[-1]
+
+
+def test_buscar_hoy_es_solo_hoy_en_hora_de_mexico() -> None:
+    # Benji, 11/11/2026: «si es 11 de noviembre y le doy buscar hoy, solo hoy»;
+    # ni el 10 en la noche ni el 12 en la madrugada.
+    today = replace(stored_search(), date_from=date(2026, 11, 11), date_to=date(2026, 11, 11))
+
+    window = strict_window(today)
+
+    # Hora de la Ciudad de México (UTC-6): local - (-6 h) = UTC.
+    mexico = timedelta(hours=-6)
+    assert window.start == datetime(2026, 11, 11, 6, tzinfo=UTC)  # 00:00 CDMX
+    assert window.end == datetime(2026, 11, 12, 6, tzinfo=UTC)  # 00:00 del 12, sin incluir
+    assert not window.contains(datetime(2026, 11, 10, 23, 30, tzinfo=UTC) - mexico)
+    assert window.contains(datetime(2026, 11, 11, 10, tzinfo=UTC) - mexico)
+    assert not window.contains(datetime(2026, 11, 12, 0, 10, tzinfo=UTC) - mexico)
+    assert not window.contains(None)
+
+
+def test_una_corrida_automatica_usa_su_propia_ventana() -> None:
+    hours = RunWindow(
+        datetime(2026, 11, 11, 13, tzinfo=UTC), datetime(2026, 11, 11, 21, tzinfo=UTC)
+    )
+    run = replace(stored_search(), time_window=hours)
+
+    assert strict_window(run) == hours

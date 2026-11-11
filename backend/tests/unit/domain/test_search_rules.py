@@ -43,7 +43,8 @@ def test_dentro_de_la_region_por_la_clave() -> None:
     assert in_region(cat.IZTAPALAPA, cat.CDMX) is True
     assert in_region(cat.CDMX, cat.CDMX) is True
     assert in_region(cat.NEZA, cat.CDMX) is False
-    assert in_region(None, cat.CDMX) is None
+    # Sin ubicación no se puede asegurar que pasó en la CDMX (11/11/2026).
+    assert in_region(None, cat.CDMX) is False
 
 
 def test_dentro_de_un_pais() -> None:
@@ -84,3 +85,11 @@ def test_la_localidad_cabecera_homonima_vale_por_su_municipio() -> None:
     assert seat_area(other, cat.MIGUEL_HIDALGO) == other
     assert seat_area(seat, cat.IZTAPALAPA) == seat
     assert seat_area(cat.CDMX, None) == cat.CDMX
+
+
+def test_en_un_estado_o_municipio_una_nota_sin_lugar_no_cuenta() -> None:
+    # Benji, 11/11/2026: «súper estricto de las zonas que yo estoy buscando».
+    assert in_region(None, cat.CDMX, "eluniversal.com.mx") is False
+    assert in_region(None, cat.IZTAPALAPA) is False
+    # En todo el país, una nota de un medio mexicano sin lugar sigue contando.
+    assert in_region(None, cat.MEXICO, "eluniversal.com.mx") is None

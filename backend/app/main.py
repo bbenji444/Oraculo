@@ -151,7 +151,9 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
             schedule=RunSchedule.from_hours(parse_run_hours(settings.automatic_run_hours)),
         ),
     )
-    app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now, starter.give)
+    app.state.access_admin = AccessAdmin(
+        store, sessions, pepper, _utc_now, starter.give, box=AesGcmSecretBox(pepper)
+    )
     if settings.auth_mode == "keys":
         limiter = RedisLoginLimiter(
             redis,

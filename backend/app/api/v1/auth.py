@@ -62,14 +62,16 @@ class StepOut(BaseModel):
     """Qué sigue en el ingreso."""
 
     ticket: str = Field(description="Mándalo en el siguiente paso; vence en 10 minutos.")
-    next: Literal["code", "change_password", "enroll"] = Field(
+    next: Literal["code", "change_password", "enroll", "done"] = Field(
         description="code: escribir el código; change_password: cambiar la temporal; "
-        "enroll: dar de alta Microsoft Authenticator."
+        "enroll: dar de alta Microsoft Authenticator; done: ya entró (el código está "
+        "apagado, ADR-0047) y la sesión viene en la cookie."
     )
+    me: "MeOut | None" = Field(default=None, description="Quién entró, solo con done.")
 
     @classmethod
     def of(cls, step: LoginStep) -> "StepOut":
-        """Desde el caso de uso."""
+        """Desde el caso de uso (sin la sesión: esa la pone ``_step_out``)."""
         return cls(ticket=step.ticket, next=step.next)
 
 
@@ -125,6 +127,10 @@ class MeOut(BaseModel):
             sections=_SUPERUSER_SECTIONS if user.is_superuser else _USER_SECTIONS,
             auth_mode=auth_mode,
         )
+
+
+# StepOut nombra a MeOut, que se define después.
+StepOut.model_rebuild()
 
 
 class IntrospectIn(BaseModel):
@@ -184,6 +190,13 @@ def _with_session(opened: OpenedSession, request: Request, response: Response) -
     return MeOut.of(opened.user, request.app.state.auth_mode)
 
 
+def _step_out(step: LoginStep, request: Request, response: Response) -> StepOut:
+    """El paso que sigue; con ``done`` además deja la sesión en la cookie."""
+    if step.opened is None:
+        return StepOut.of(step)
+    return StepOut(ticket="", next="done", me=_with_session(step.opened, request, response))
+
+
 @router.post(
     "/login",
     response_model=StepOut,
@@ -191,9 +204,10 @@ def _with_session(opened: OpenedSession, request: Request, response: Response) -
     responses=error_responses(401, 409, 429),
 )
 async def login(body: LoginIn, request: Request, response: Response, steps: Login) -> StepOut:
-    """Revisa usuario y contraseña; responde qué sigue (normalmente, el código)."""
+    """Revisa usuario y contraseña; responde qué sigue (el código, o ``done`` si está apagado)."""
     response.headers["Cache-Control"] = "no-store"
-    return StepOut.of(await steps.start(body.username, body.password, client_ip(request)))
+    step = await steps.start(body.username, body.password, client_ip(request))
+    return _step_out(step, request, response)
 
 
 @router.post(
@@ -202,11 +216,12 @@ async def login(body: LoginIn, request: Request, response: Response, steps: Logi
     summary="Primer ingreso: cambiar la contraseña temporal",
     responses=error_responses(401, 409, 422),
 )
-async def first_password(body: NewPasswordIn, request: Request, steps: Login) -> StepOut:
+async def first_password(
+    body: NewPasswordIn, request: Request, response: Response, steps: Login
+) -> StepOut:
     """Al menos 12 caracteres, con letras y números, sin el usuario."""
-    return StepOut.of(
-        await steps.change_password(body.ticket, body.new_password, client_ip(request))
-    )
+    step = await steps.change_password(body.ticket, body.new_password, client_ip(request))
+    return _step_out(step, request, response)
 
 
 @router.post(

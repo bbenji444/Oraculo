@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type AccessKey, createUser, issueKey, keyStatus, listUsers } from './access';
+import {
+  type AccessKey,
+  createUser,
+  issueKey,
+  keyStatus,
+  listUsers,
+  newApiKey,
+  saveAuthSettings,
+  showApiKey,
+} from './access';
 import { looksLikeCode, qrImageSrc, startLogin } from './auth';
 import { ApiError, SESSION_EXPIRED_EVENT } from './http';
 
@@ -143,5 +152,40 @@ describe('sesión', () => {
 
     expect(heard).not.toHaveBeenCalled();
     window.removeEventListener(SESSION_EXPIRED_EVENT, heard);
+  });
+});
+
+describe('código opcional y llave de API (ADR-0047)', () => {
+  it('sin código, el primer paso ya trae a quién entró', async () => {
+    const me = {
+      username: 'benji',
+      display_name: 'Benji',
+      role: 'superuser',
+      sections: ['explorar'],
+      auth_mode: 'keys',
+    };
+    vi.stubGlobal('fetch', reply({ ticket: '', next: 'done', me }));
+
+    const step = await startLogin('benji', 'Contraseña-segura-2026');
+
+    expect(step.next).toBe('done');
+    expect(step.me?.username).toBe('benji');
+  });
+
+  it('trae, genera la llave y cambia el interruptor', async () => {
+    const issued = { key: 'orc_live_AbCd1234_secreto', info: KEY };
+    const spy = reply(issued, 201);
+    vi.stubGlobal('fetch', spy);
+
+    expect((await showApiKey(2)).key).toBe(issued.key);
+    expect((await newApiKey(2)).key).toBe(issued.key);
+
+    const calls = spy.mock.calls as unknown as [string, RequestInit | undefined][];
+    expect(calls.map(([url, init]) => [url, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/access/users/2/api-key', 'GET'],
+      ['/api/v1/access/users/2/api-key', 'POST'],
+    ]);
+    vi.stubGlobal('fetch', reply({ totp_required: true }));
+    expect(await saveAuthSettings({ totp_required: true })).toEqual({ totp_required: true });
   });
 });

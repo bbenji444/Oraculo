@@ -48,6 +48,10 @@ const TITLES: Record<LoginStep['next'] | 'credentials', { title: string; help: s
     title: 'Código de verificación',
     help: 'Abre Microsoft Authenticator y escribe los 6 dígitos de «Oráculo Monitor».',
   },
+  done: {
+    title: 'Entrando…',
+    help: 'Listo.',
+  },
 };
 
 function CredentialsStep({ onDone }: { onDone: (step: LoginStep) => void }) {
@@ -196,6 +200,11 @@ function CodeStep({
 export function LoginScreen() {
   const [step, setStep] = useState<LoginStep | null>(null);
   const openSession = useOpenSession();
+  // Con el código apagado (ADR-0047) la contraseña basta: se entra directo.
+  const advance = (next: LoginStep) => {
+    if (next.next === 'done' && next.me) openSession(next.me);
+    else setStep(next);
+  };
   const finish = useMutation({
     mutationFn: ({ code, enrolling }: { code: string; enrolling: boolean }): Promise<Me> => {
       if (!step) throw new Error('Vuelve a escribir tu usuario y contraseña.');
@@ -217,9 +226,9 @@ export function LoginScreen() {
           <h1 className="mt-2 text-xl font-semibold text-slate-50">{current.title}</h1>
           <p className="mt-2 text-sm text-slate-400">{current.help}</p>
         </div>
-        {step === null && <CredentialsStep onDone={setStep} />}
+        {step === null && <CredentialsStep onDone={advance} />}
         {step?.next === 'change_password' && (
-          <NewPasswordStep ticket={step.ticket} onDone={setStep} />
+          <NewPasswordStep ticket={step.ticket} onDone={advance} />
         )}
         {step?.next === 'enroll' && (
           <EnrollStep

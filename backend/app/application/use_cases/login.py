@@ -1,6 +1,11 @@
-"""Entrar al monitor con usuario, contraseña y código de 6 dígitos (ADR-0043).
+"""Entrar al monitor con usuario, contraseña y, si está prendido, código (ADR-0043, ADR-0047).
 
-Igual que en Oráculo, se entra en pasos:
+El código de 6 dígitos se prende o apaga para todos desde «Accesos»
+(``auth_settings.totp_required``, ADR-0047: «dice mi jefe que es tedioso»).
+Apagado, la contraseña basta: tras el paso 1 (o tras cambiar la temporal)
+se abre la sesión y el paso siguiente es ``done``.
+
+Con el código prendido, igual que en Oráculo, se entra en pasos:
 
 1. **Usuario y contraseña** (``start``). Si están bien, se abre un «ingreso a
    medias» (``LoginTicket``) que vive 10 minutos y dice qué falta.
@@ -75,7 +80,7 @@ _BAD_CODE = "El código no es correcto o ya se usó. Espera el siguiente y vuelv
 _EXPIRED = "El ingreso venció o ya no es válido. Vuelve a escribir tu usuario y contraseña."
 _TOO_MANY = "Demasiados intentos fallidos desde este equipo. Espera unos minutos."
 
-NextStep = Literal["code", "change_password", "enroll"]
+NextStep = Literal["code", "change_password", "enroll", "done"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,11 +90,14 @@ class LoginStep:
     Attributes:
         ticket: Valor que el navegador manda en el siguiente paso.
         next: ``code`` (escribir el código), ``change_password`` (cambiar la
-            temporal) o ``enroll`` (dar de alta Microsoft Authenticator).
+            temporal), ``enroll`` (dar de alta Microsoft Authenticator) o
+            ``done`` (ya entró: el código está apagado).
+        opened: La sesión abierta, solo con ``done``.
     """
 
     ticket: str
     next: NextStep
+    opened: OpenedSession | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +118,8 @@ class Enrollment:
 def _next_step(ticket: LoginTicket) -> NextStep:
     if ticket.must_change_password:
         return "change_password"
+    if not ticket.totp_required:
+        return "done"
     if ticket.needs_enrollment:
         return "enroll"
     return "code"
@@ -197,14 +207,29 @@ class PasswordLogin:
                 "bloqueada" if locked else "contraseña" if creds else "usuario",
             )
             raise AuthenticationRequiredError(_BAD_LOGIN)
+        totp_required = await self._store.totp_required()
         ticket = LoginTicket(
             user_id=creds.user.user_id,
             username=creds.user.username,
             must_change_password=creds.must_change_password,
-            needs_enrollment=creds.totp_secret is None,
+            needs_enrollment=totp_required and creds.totp_secret is None,
+            totp_required=totp_required,
         )
         token = await self._tickets.create(ticket, TICKET_SECONDS)
-        return LoginStep(token, _next_step(ticket))
+        return await self._step(token, ticket, ip, creds)
+
+    async def _step(
+        self,
+        token: str,
+        ticket: LoginTicket,
+        ip: str | None,
+        creds: UserCredentials | None = None,
+    ) -> LoginStep:
+        """Lo que sigue; sin código, abre ya la sesión."""
+        step = _next_step(ticket)
+        if step != "done":
+            return LoginStep(token, step)
+        return LoginStep("", "done", await self._open(token, ticket, ip, creds, "contraseña"))
 
     async def _ticket(self, token: str) -> LoginTicket:
         ticket = await self._tickets.get(token)
@@ -222,7 +247,7 @@ class PasswordLogin:
         """
         ticket = await self._ticket(token)
         if not ticket.must_change_password:
-            return LoginStep(token, _next_step(ticket))
+            return await self._step(token, ticket, ip)
         validated_password(new_password, ticket.username)
         creds = await self._store.credentials(ticket.user_id)
         if creds is None:
@@ -240,7 +265,7 @@ class PasswordLogin:
         )
         updated = replace(ticket, must_change_password=False)
         await self._tickets.save(token, updated, TICKET_SECONDS)
-        return LoginStep(token, _next_step(updated))
+        return await self._step(token, updated, ip)
 
     async def start_enrollment(self, token: str) -> Enrollment:
         """Primer ingreso: genera el QR para Microsoft Authenticator.
@@ -292,7 +317,7 @@ class PasswordLogin:
         if await self._limiter.blocked(ip):
             raise TooManyAttemptsError(_TOO_MANY)
         ticket = await self._ticket(token)
-        if ticket.must_change_password or ticket.needs_enrollment:
+        if ticket.must_change_password or ticket.needs_enrollment or not ticket.totp_required:
             raise AuthenticationRequiredError(_EXPIRED)
         creds = await self._store.credentials(ticket.user_id)
         if creds is None or not creds.is_active or creds.totp_secret is None:
@@ -322,6 +347,7 @@ class PasswordLogin:
         ticket: LoginTicket,
         ip: str | None,
         creds: UserCredentials | None = None,
+        method: str = "contraseña+código",
     ) -> OpenedSession:
         creds = creds or await self._store.credentials(ticket.user_id)
         if creds is None:
@@ -337,7 +363,7 @@ class PasswordLogin:
             self._policy.max_seconds,
         )
         await self._store.record_event(
-            AuditEntry(Actor(user.username, ip), LOGIN_OK, {"metodo": "contraseña+código"}),
+            AuditEntry(Actor(user.username, ip), LOGIN_OK, {"metodo": method}),
             str(user.user_id),
         )
         return OpenedSession(session, user, self._policy.max_seconds)

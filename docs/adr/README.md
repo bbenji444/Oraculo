@@ -60,6 +60,9 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0044](0044-relevancia-estricta.md) | Relevancia estricta: el concepto debe ser el asunto principal (enrich_v4) y un «sí» con menos de 0.6 de confianza no cuenta | Aceptado |
 | [0045](0045-envios-por-usuario.md) | Envíos por usuario: cada quien sus correos (hasta 2) con seguridad por filas; sus horas por correo las reemplaza ADR-0046 | Aceptado |
 | [0046](0046-envios-programados.md) | Envíos programados: cada quien sus temas, región, horas y días (3 corridas al día; 8 el superusuario); las corridas iguales se agrupan | Aceptado |
+| [0047](0047-codigo-opcional-y-llave-de-api-visible.md) | Código de 6 dígitos opcional (interruptor en «Accesos») y llave de API por persona, guardada cifrada y visible solo para superusuarios | Aceptado |
+| [0048](0048-fechas-y-zonas-estrictas.md) | Fechas y zonas estrictas: solo lo publicado en los días pedidos (hora de México) y, en un estado o municipio, solo notas ubicadas ahí | Aceptado |
+$line
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |
