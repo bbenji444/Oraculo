@@ -1,11 +1,12 @@
 /**
- * Pestañas del detalle de un caso (F12, ADR-0107): Entidades, Vínculos y
- * Noticias.
+ * Pestañas del detalle de un caso (F12, ADR-0107): Panorama, Entidades,
+ * Vínculos y Noticias.
  *
  * Antes las tres secciones iban una debajo de otra y había que bajar mucho
  * para llegar a los vínculos. Ahora se ve una a la vez y cada pestaña dice
  * cuánto queda por revisar («Entidades · 12 por revisar»), para saber dónde
- * hace falta trabajo sin abrirlas.
+ * hace falta trabajo sin abrirlas. Abre en el Panorama: quién está en el
+ * caso y con quién se relaciona.
  *
  * También vigila la lectura de la IA: cuando termina, vuelve a pedir
  * duplicados y vínculos aunque se esté viendo otra pestaña.
@@ -18,9 +19,10 @@ import { useCaseEntities, useRefreshWhenAnalysisEnds } from '../../hooks/useEnti
 import { useCaseRelationships } from '../../hooks/useRelationships';
 import { CaseArticles } from './CaseArticles';
 import { CaseEntities } from './CaseEntities';
+import { CaseOverview } from './CaseOverview';
 import { CaseRelationships } from './CaseRelationships';
 
-export type CaseSection = 'entities' | 'relationships' | 'articles';
+export type CaseSection = 'overview' | 'entities' | 'relationships' | 'articles';
 
 interface CaseSectionsProps {
   caseId: string;
@@ -40,13 +42,14 @@ function Pending({ count }: { count: number }) {
 }
 
 export function CaseSections({ caseId, articleCount, canEdit }: CaseSectionsProps) {
-  const [section, setSection] = useState<CaseSection>('entities');
+  const [section, setSection] = useState<CaseSection>('overview');
   // Las mismas consultas que usan las pestañas: TanStack Query no las repite.
   const entities = useCaseEntities(caseId, 'suggested').data;
   const relationships = useCaseRelationships(caseId, 'suggested').data;
   useRefreshWhenAnalysisEnds(caseId, entities?.analysis.queued ?? 0);
 
   const tabs: { value: CaseSection; label: string; pending: number }[] = [
+    { value: 'overview', label: 'Panorama', pending: 0 },
     { value: 'entities', label: 'Entidades', pending: entities?.counts.suggested ?? 0 },
     { value: 'relationships', label: 'Vínculos', pending: relationships?.counts.suggested ?? 0 },
     { value: 'articles', label: `Noticias (${String(articleCount)})`, pending: 0 },
@@ -79,6 +82,9 @@ export function CaseSections({ caseId, articleCount, canEdit }: CaseSectionsProp
         ))}
       </div>
       <div role="tabpanel" id={`caso-panel-${section}`} aria-labelledby={`caso-tab-${section}`}>
+        {section === 'overview' && (
+          <CaseOverview caseId={caseId} canEdit={canEdit} onNavigate={setSection} />
+        )}
         {section === 'entities' && <CaseEntities caseId={caseId} canEdit={canEdit} />}
         {section === 'relationships' && <CaseRelationships caseId={caseId} canEdit={canEdit} />}
         {section === 'articles' && (

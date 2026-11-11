@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { entity, link } from '../../test/caseFixtures';
 import {
+  connectionsOf,
   effectiveLegal,
   groupByType,
   linkEnds,
@@ -107,5 +108,34 @@ describe('filtrar vínculos por entidad', () => {
   it('deja solo los vínculos de la entidad elegida, o todos sin elegir', () => {
     expect(links.filter((r) => touches(r, 4)).map(relationshipKey)).toEqual(['2-4-appears_with']);
     expect(links.filter((r) => touches(r, null))).toHaveLength(4);
+  });
+});
+
+describe('conexiones de una entidad (Panorama)', () => {
+  const confirmedWeak = { ...link(1, 3, 'weak'), review_status: 'confirmed' as const };
+  const strongTwice = { ...link(4, 1, 'strong'), same_event_count: 2 };
+  const discarded = { ...link(1, 5, 'strong'), review_status: 'discarded' as const };
+
+  it('trae lo confirmado y los sugeridos fuertes; nunca débiles sin confirmar ni descartados', () => {
+    const connections = connectionsOf(1, [
+      link(1, 2, 'strong'),
+      link(1, 6, 'weak'),
+      confirmedWeak,
+      strongTwice,
+      discarded,
+      link(7, 8, 'strong'),
+    ]);
+
+    expect(connections.map((c) => [c.other.label, c.pending])).toEqual([
+      // Lo confirmado primero, aunque sea débil: ya lo revisó una persona.
+      ['E3', false],
+      // Luego el de más notas del mismo hecho.
+      ['E4', true],
+      ['E2', true],
+    ]);
+  });
+
+  it('sin vínculos no hay conexiones', () => {
+    expect(connectionsOf(1, [])).toEqual([]);
   });
 });

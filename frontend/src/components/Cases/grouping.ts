@@ -16,7 +16,7 @@
  * No hace: no pide datos ni decide nada (solo ordena lo que recibe).
  */
 import type { Entity, LegalStatus } from '../../services/entities';
-import type { Relationship } from '../../services/relationships';
+import type { Relationship, RelationshipEnd } from '../../services/relationships';
 
 /** Orden de los grupos: quién y con qué, antes que dónde. */
 export const TYPE_ORDER: readonly string[] = [
@@ -183,4 +183,47 @@ export function touches(
   entityId: number | null,
 ): boolean {
   return entityId === null || r.entity_a.id === entityId || r.entity_b.id === entityId;
+}
+
+/** Con quién se relaciona una entidad y por qué (Panorama del caso). */
+export interface Connection {
+  /** La otra entidad del vínculo. */
+  other: RelationshipEnd;
+  relationship: Relationship;
+  /** Lo propuso el sistema y nadie lo ha confirmado. */
+  pending: boolean;
+}
+
+/**
+ * Las conexiones útiles de una entidad: los vínculos confirmados y los
+ * sugeridos **fuertes** (los débiles son ruido en un resumen; siguen en la
+ * pestaña Vínculos). Lo descartado nunca entra.
+ *
+ * @param entityId La entidad del renglón.
+ * @param relationships Vínculos del caso en cualquier estado.
+ * @returns Primero lo confirmado, luego los de más notas del mismo hecho y
+ *   por nombre.
+ */
+export function connectionsOf(
+  entityId: number,
+  relationships: readonly Relationship[],
+): Connection[] {
+  return relationships
+    .filter(
+      (r) =>
+        touches(r, entityId) &&
+        (r.review_status === 'confirmed' ||
+          (r.review_status === 'suggested' && r.strength === 'strong')),
+    )
+    .map((r) => ({
+      other: r.entity_a.id === entityId ? r.entity_b : r.entity_a,
+      relationship: r,
+      pending: r.review_status !== 'confirmed',
+    }))
+    .sort(
+      (a, b) =>
+        Number(a.pending) - Number(b.pending) ||
+        b.relationship.same_event_count - a.relationship.same_event_count ||
+        a.other.label.localeCompare(b.other.label, 'es'),
+    );
 }

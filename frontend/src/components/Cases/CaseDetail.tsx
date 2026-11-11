@@ -7,9 +7,10 @@
  * tampoco.
  *
  * Debajo, desde F12 (ADR-0107), el caso se divide en pestañas
- * (`CaseSections`): Entidades (9.4, lo que la IA propone de sus notas, con
- * sus posibles duplicados), Vínculos (9.5) y Noticias. Cada pestaña dice
- * cuánto queda por revisar. El muro sobre el globo es la 9.6.
+ * (`CaseSections`): Panorama (quién está y con quién se relaciona), Entidades
+ * (9.4, lo que la IA propone de sus notas, con sus posibles duplicados),
+ * Vínculos (9.5) y Noticias. Cada pestaña dice cuánto queda por revisar. El
+ * muro sobre el globo es la 9.6.
  *
  * El dueño puede eliminar el caso (27/10/2026): pide confirmación y es
  * reversible (`CasesPage` ofrece «Deshacer»).
