@@ -68,6 +68,7 @@ USER_CREATED = "user.created"
 USER_UPDATED = "user.updated"
 KEY_CREATED = "access_key.created"
 KEY_REVOKED = "access_key.revoked"
+USER_DELETED = "user.deleted"
 PASSWORD_RESET = "user.password_reset"  # noqa: S105 — nombre de acción de la bitácora, no una contraseña
 TOTP_RESET = "user.totp_reset"
 
@@ -451,6 +452,38 @@ class AccessAdmin:
         if updated.role is not current.role or not updated.is_active:
             await self._sessions.delete_for_user(user_id)
         return updated
+
+    async def delete_user(self, admin: AuthUser, ip: str | None, user_id: int) -> None:
+        """Borra a una persona (borrado lógico) y cierra sus sesiones.
+
+        Desaparece de «Accesos» y ya no puede entrar: se le quitan contraseña,
+        código y llaves. Sus búsquedas y casos se quedan (los ven los
+        superusuarios) y su usuario queda reservado para que nadie nuevo los
+        herede. La bitácora conserva todo.
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+            UserNotFoundError: Si no existe o ya estaba borrada.
+            AccessRuleError: Si es uno mismo o el último superusuario activo.
+        """
+        require_superuser(admin)
+        account = await self._store.get_user(user_id)
+        if account is None:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        if account.user_id == admin.user_id:
+            raise AccessRuleError("No puedes borrarte a ti mismo.")
+        last_admin = account.role is Role.SUPERUSER and account.is_active
+        if last_admin and await self._store.active_superusers() <= 1:
+            raise AccessRuleError("Debe quedar al menos un superusuario activo.")
+        deleted = await self._store.delete_user(
+            user_id,
+            AuditEntry(
+                Actor(admin.username, ip), USER_DELETED, {"before": _account_snapshot(account)}
+            ),
+        )
+        if not deleted:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        await self._sessions.delete_for_user(user_id)
 
     async def user_keys(self, admin: AuthUser, user_id: int) -> list[KeyInfo]:
         """Las llaves de una persona (sin secretos).

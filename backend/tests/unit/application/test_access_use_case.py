@@ -368,3 +368,38 @@ async def test_no_puedes_revocar_tu_unica_llave(world: AccessWorld) -> None:
 async def test_revocar_una_llave_que_no_existe(world: AccessWorld) -> None:
     with pytest.raises(AccessKeyNotFoundError):
         await world.admin.revoke_key(await _admin(world), IP, 42)
+
+
+async def test_borrar_a_una_persona(world: AccessWorld) -> None:
+    admin = await _admin(world)
+    ana = world.store.add_user("ana")
+    await _key_for(world, ana)
+    token = await _session(world, ana)
+
+    await world.admin.delete_user(admin, IP, ana)
+
+    assert await world.store.get_user(ana) is None
+    assert all(k.info.revoked_at is not None for k in world.store.keys.values())
+    assert token not in world.sessions.data
+    assert world.store.events[-1][0].action == "user.deleted"
+    with pytest.raises(UserNotFoundError):
+        await world.admin.delete_user(admin, IP, ana)
+
+
+async def test_nadie_se_borra_a_si_mismo_ni_al_ultimo_superusuario(world: AccessWorld) -> None:
+    admin = await _admin(world)
+    otro = world.store.add_user("otro", Role.SUPERUSER)
+    otro_admin = AuthUser(otro, "otro", "Otro", Role.SUPERUSER)
+
+    with pytest.raises(AccessRuleError, match="ti mismo"):
+        await world.admin.delete_user(admin, IP, 1)
+    await world.admin.update_user(otro_admin, IP, 1, UserChanges(is_active=False))
+    with pytest.raises(AccessRuleError, match="al menos un superusuario"):
+        await world.admin.delete_user(admin, IP, otro)
+
+
+async def test_un_usuario_normal_no_borra(world: AccessWorld) -> None:
+    ana = AuthUser(world.store.add_user("ana"), "ana", "Ana", Role.USER)
+
+    with pytest.raises(ForbiddenError):
+        await world.admin.delete_user(ana, IP, 1)

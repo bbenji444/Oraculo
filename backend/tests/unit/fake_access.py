@@ -63,6 +63,7 @@ class FakeAccessStore:
     events: list[tuple[AuditEntry, str]] = field(default_factory=list)
     used: list[tuple[int, str | None]] = field(default_factory=list)
     creds: dict[int, _Creds] = field(default_factory=dict)
+    deleted: list[int] = field(default_factory=list)
 
     def add_user(self, username: str, role: Role = Role.USER, *, active: bool = True) -> int:
         user_id = len(self.users) + 1
@@ -120,6 +121,17 @@ class FakeAccessStore:
         c = self.creds[user_id]
         c.totp_secret, c.last_counter = secret, None
         self.events.append((audit, str(user_id)))
+
+    async def delete_user(self, user_id: int, audit: AuditEntry) -> bool:
+        if user_id not in self.users:
+            return False
+        del self.users[user_id]
+        for key in self.keys.values():
+            if key.info.user_id == user_id and key.info.revoked_at is None:
+                key.info = replace(key.info, revoked_at=self.clock())
+        self.deleted.append(user_id)
+        self.events.append((audit, str(user_id)))
+        return True
 
     async def use_totp_counter(self, user_id: int, counter: int) -> bool:
         c = self.creds[user_id]

@@ -23,6 +23,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - «Restablecer contraseña» y «Reiniciar autenticador»;
     - etiquetas «Contraseña temporal», «Sin Authenticator» y «Bloqueada».
   - **Cada quien:** botón «Mi contraseña» para cambiar la suya.
+  - **Borrar personas** desde «Accesos» (borrado lógico, migración 0041): ya no entran y su usuario queda reservado; sus búsquedas y la bitácora se quedan.
   - **Llaves `orc_live_…`:** quedan solo para sistemas.
   - **Nuevo comando:** `make acceso` da una contraseña temporal desde la consola del servidor.
   - **Dependencias:**

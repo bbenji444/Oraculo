@@ -10,6 +10,7 @@ import {
   type NewUserInput,
   type UserPatch,
   createUser,
+  deleteUser,
   issueKey,
   listKeys,
   listUsers,
@@ -61,6 +62,11 @@ export function useIssueKey() {
       issueKey(userId, label, days),
     onSuccess: refresh,
   });
+}
+
+export function useDeleteUser() {
+  const refresh = useRefresh();
+  return useMutation({ mutationFn: (id: number) => deleteUser(id), onSuccess: refresh });
 }
 
 export function useResetPassword() {

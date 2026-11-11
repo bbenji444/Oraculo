@@ -108,6 +108,11 @@ export async function resetPassword(id: number): Promise<string> {
   return data.temporary_password;
 }
 
+/** Borra a una persona (borrado lógico): ya no entra; su usuario queda reservado. */
+export async function deleteUser(id: number): Promise<void> {
+  await requestJson(apiUrl(`access/users/${String(id)}`), { method: 'DELETE' });
+}
+
 /** Borra su Microsoft Authenticator (cambió de celular); cierra sus sesiones. */
 export async function resetTotp(id: number): Promise<void> {
   await requestJson(apiUrl(`access/users/${String(id)}/reset-totp`), { method: 'POST' });

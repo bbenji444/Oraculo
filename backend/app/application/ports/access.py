@@ -172,6 +172,14 @@ class AccessStorePort(Protocol):
         """Marca un periodo de código como usado; ``False`` si ya se había usado."""
         ...
 
+    async def delete_user(self, user_id: int, audit: AuditEntry) -> bool:
+        """Borrado lógico: la quita de la lista, le borra credenciales y revoca sus llaves.
+
+        Returns:
+            ``False`` si no existe o ya estaba borrada.
+        """
+        ...
+
     async def find_key(self, public_id: str) -> KeyRecord | None:
         """La llave con esa parte pública y su dueño, o ``None``."""
         ...

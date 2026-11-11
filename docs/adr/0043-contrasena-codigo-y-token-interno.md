@@ -75,6 +75,11 @@ Sus respuestas a las preguntas:
 - «Restablecer contraseña» le da una temporal nueva y cierra sus sesiones. Su Authenticator no cambia.
 - «Reiniciar autenticador» borra su secreto y cierra sus sesiones. Al entrar escanea un QR nuevo.
 - «Mi contraseña»: cada persona cambia la suya; se cierran sus demás sesiones.
+- «Borrar persona» (migración 0041) es un **borrado lógico** (`users.deleted_at`):
+  - la persona sale de la lista y se le quitan contraseña, código y llaves;
+  - sus búsquedas y la bitácora se quedan;
+  - **su usuario queda reservado**: búsquedas y casos guardan el usuario como texto, y si alguien nuevo se llamara igual, la seguridad por filas le mostraría lo de la persona borrada;
+  - nadie se borra a sí mismo y siempre queda un superusuario.
 - Las llaves `orc_live_…` quedan **solo para sistemas** («Llaves de sistema»).
 - `make acceso ARGS="--usuario benji"` da una contraseña temporal desde la consola del servidor, para el primer superusuario o para recuperar el acceso.
 
