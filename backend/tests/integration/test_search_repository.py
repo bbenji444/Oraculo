@@ -8,6 +8,7 @@ import argparse
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -128,11 +129,22 @@ async def new_search(store: PostgresSearchStore, engine: AsyncEngine, concept_id
 
 
 def run_search(
-    engine: AsyncEngine, searches: PostgresSearchStore, articles: PostgresArticleStore, llm: LLM
+    engine: AsyncEngine,
+    searches: PostgresSearchStore,
+    articles: PostgresArticleStore,
+    llm: LLM,
+    published: datetime | None = None,
 ) -> RunSearch:
+    # Con ``published`` las notas simuladas salen con esa fecha: las búsquedas
+    # descartan lo publicado fuera de sus días (ADR-0048).
+    izta_searchapi, madrid, izta_local = (
+        (IZTA_SEARCHAPI, MADRID, IZTA_LOCAL)
+        if published is None
+        else tuple(replace(a, published_at=published) for a in (IZTA_SEARCHAPI, MADRID, IZTA_LOCAL))
+    )
     sources = [
-        Source(Provider.SEARCHAPI, [IZTA_SEARCHAPI, MADRID], cost=1),
-        Source(Provider.LOCAL_INDEX, [IZTA_LOCAL]),
+        Source(Provider.SEARCHAPI, [izta_searchapi, madrid], cost=1),
+        Source(Provider.LOCAL_INDEX, [izta_local]),
     ]
     providers = {s.provider: s for s in sources}
     gazetteer = PostgresGazetteer(engine)
@@ -344,8 +356,21 @@ async def test_el_comando_corre_aqui_y_muestra_el_resultado(
         # En lugar de las piezas reales (red e IA), el pipeline con las simuladas.
         ran.append(search_id)
         searches = PostgresSearchStore(test_engine)
+        # El comando busca los últimos días contados desde hoy: notas de hace
+        # una hora (las de fecha fija quedarían fuera del periodo, ADR-0048).
         await run_search(
-            test_engine, searches, PostgresArticleStore(test_engine), LLM(REPLIES)
+            test_engine,
+            searches,
+            PostgresArticleStore(test_engine),
+            LLM(
+                {
+                    title: replace(reply, event_date=None)
+                    if isinstance(reply, Enrichment)
+                    else reply
+                    for title, reply in REPLIES.items()
+                }
+            ),
+            published=datetime.now(UTC) - timedelta(hours=1),
         ).run(search_id)
 
     with caplog.at_level(logging.INFO):
