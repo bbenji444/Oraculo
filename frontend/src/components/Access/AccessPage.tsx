@@ -1,11 +1,14 @@
 /**
- * Pantalla «Accesos» (solo superusuarios, ADR-0042): quién puede entrar al
- * monitor y con qué llaves.
+ * Pantalla «Accesos» (solo superusuarios, ADR-0042 y ADR-0043): quién puede
+ * entrar al monitor.
  *
- * - «+ Nueva persona» da de alta a alguien (todavía sin llave).
- * - Cada persona muestra su rol, si está activa, su última entrada y cuántas
- *   llaves vigentes tiene; «Llaves» abre sus llaves (crear y revocar) y
- *   «Editar» cambia nombre, correo, rol o la desactiva.
+ * - «+ Nueva persona» da de alta a alguien con una contraseña temporal, que
+ *   se muestra una sola vez; al entrar la cambia y conecta su Authenticator.
+ * - Cada persona muestra su rol, si está activa, si su contraseña es
+ *   temporal, si ya conectó Microsoft Authenticator y si está bloqueada.
+ * - «Editar» cambia nombre, correo, rol o la desactiva, y tiene la sección
+ *   «Seguridad»: restablecer contraseña o reiniciar autenticador.
+ * - «Llaves de sistema» son para otros programas (no para personas).
  *
  * No hace: no aplica reglas (el servidor impide, por ejemplo, quitarte tu
  * propio rol o dejar el sistema sin superusuario).
@@ -21,6 +24,8 @@ import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
 import { SectionHeading } from '../ui/SectionHeading';
+import { SecurityActions } from './SecurityActions';
+import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserForm, type UserFormValues } from './UserForm';
 import { UserKeys } from './UserKeys';
 
@@ -68,15 +73,17 @@ function UserItem({
             <HudChip tone={user.is_active ? 'green' : 'slate'} dot>
               {user.is_active ? 'Activa' : 'Desactivada'}
             </HudChip>
-            <span className="text-xs text-slate-400 tabular-nums">
-              {user.active_keys} llave(s) vigente(s)
-            </span>
+            {user.must_change_password && <HudChip tone="amber">Contraseña temporal</HudChip>}
+            {!user.totp_enrolled && <HudChip tone="slate">Sin Authenticator</HudChip>}
+            {user.locked_until && (
+              <HudChip tone="rose">Bloqueada hasta {formatMexicoCity(user.locked_until)}</HudChip>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <HudButton size="sm" aria-expanded={open} onClick={onToggle}>
-              {open ? 'Ocultar llaves' : 'Llaves'}
+            <HudButton size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
+              {open ? 'Ocultar llaves' : `Llaves de sistema (${String(user.active_keys)})`}
             </HudButton>
-            <HudButton size="sm" variant="ghost" onClick={onEdit}>
+            <HudButton size="sm" onClick={onEdit}>
               Editar
             </HudButton>
           </div>
@@ -105,6 +112,12 @@ export function AccessPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<AccessUser | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  // La contraseña temporal recién creada: solo vive en este aviso.
+  const [temporary, setTemporary] = useState<{
+    password: string;
+    owner: string;
+    username: string;
+  } | null>(null);
   const list = users.data ?? [];
 
   return (
@@ -113,7 +126,7 @@ export function AccessPage() {
         <SectionHeading
           kicker="Solo superusuarios"
           title="Accesos"
-          description="Quién puede entrar al monitor y con qué llave. Cada llave se muestra una sola vez al crearla."
+          description="Quién puede entrar al monitor. Se entra con usuario, contraseña y el código de Microsoft Authenticator, igual que en Oráculo."
           actions={
             <HudButton
               variant="solid"
@@ -173,8 +186,11 @@ export function AccessPage() {
                 {
                   onSuccess: (created) => {
                     setCreating(false);
-                    // Lo siguiente es darle una llave: se abren sus llaves.
-                    setOpenId(created.id);
+                    setTemporary({
+                      password: created.temporary_password,
+                      owner: created.user.display_name,
+                      username: created.user.username,
+                    });
                   },
                 },
               );
@@ -217,7 +233,28 @@ export function AccessPage() {
               );
             }}
           />
+          <SecurityActions
+            user={editing}
+            onTemporaryPassword={(password) => {
+              setTemporary({
+                password,
+                owner: editing.display_name,
+                username: editing.username,
+              });
+              setEditing(null);
+            }}
+          />
         </Modal>
+      )}
+      {temporary && (
+        <TemporaryPasswordNotice
+          password={temporary.password}
+          owner={temporary.owner}
+          username={temporary.username}
+          onClose={() => {
+            setTemporary(null);
+          }}
+        />
       )}
     </div>
   );

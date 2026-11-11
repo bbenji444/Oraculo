@@ -1,13 +1,15 @@
 """El candado de la API: quién hace cada petición (ADR-0042).
 
 Toda ruta bajo ``/api/v1`` pide una de estas dos cosas, salvo las públicas
-(``/health``, ``/app-config``, ``/auth/login`` y ``/auth/logout``):
+(``/health``, ``/app-config``, los pasos de ``/auth/login…`` y
+``/auth/logout``):
 
-- **cookie de sesión** ``monitor_sesion`` (la pantalla): ``HttpOnly`` (el
+- **cookie de sesión** ``monitor_sesion``: el token interno que se abre al
+  entrar con usuario, contraseña y código (ADR-0043). Es ``HttpOnly`` (el
   JavaScript no la puede leer), ``SameSite=Strict`` y, en peticiones que
   cambian algo, el encabezado ``Origin`` debe ser el mismo servidor (CSRF);
-- **llave en** ``Authorization: Bearer orc_live_…`` (integraciones, como
-  las APIs de OpenAI o Claude).
+- **llave de sistema en** ``Authorization: Bearer orc_live_…`` (otros
+  programas, como las APIs de OpenAI o Claude; ADR-0042).
 
 Con ``AUTH_MODE=dev`` (la PC y las pruebas) no se pide nada: todo va a
 nombre de ``DEV_USER`` como superusuario.
@@ -47,12 +49,16 @@ PUBLIC_PATHS = frozenset(
         f"{API_PREFIX}/health",
         f"{API_PREFIX}/app-config",
         f"{API_PREFIX}/auth/login",
+        f"{API_PREFIX}/auth/login/password",
+        f"{API_PREFIX}/auth/login/enroll",
+        f"{API_PREFIX}/auth/login/enroll/confirm",
+        f"{API_PREFIX}/auth/login/code",
         f"{API_PREFIX}/auth/logout",
     }
 )
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _BEARER = "bearer "
-_NEED_KEY = "Entra con tu llave de acceso de Oráculo."
+_NEED_KEY = "Entra con tu usuario y contraseña."
 _BAD_ORIGIN = "Petición rechazada: no viene de la pantalla del monitor."
 
 

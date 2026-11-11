@@ -1,4 +1,6 @@
-"""Seguridad por filas, personas y llaves contra la base y el Redis de pruebas (ADR-0042).
+"""Seguridad por filas, personas, credenciales y llaves contra la base y Redis de pruebas.
+
+ADR-0042 (llaves, roles y RLS) y ADR-0043 (contraseña y código de 6 dígitos).
 
 Usa el mismo engine que la API (``create_api_engine``): cada transacción le
 dice a PostgreSQL quién pregunta, y las políticas de la migración 0039
@@ -7,6 +9,7 @@ aunque una ruta de la API olvidara filtrar.
 """
 
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
@@ -19,16 +22,28 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.cache.redis_sessions import RedisLoginLimiter, RedisSessionStore
+from app.adapters.cache.redis_sessions import (
+    RedisLoginLimiter,
+    RedisLoginTicketStore,
+    RedisSessionStore,
+)
 from app.adapters.persistence.access_repository import PostgresAccessStore
 from app.adapters.persistence.access_scope import as_system, as_user, create_api_engine
 from app.adapters.persistence.search_repository import PostgresSearchStore
+from app.adapters.security.secret_box import AesGcmSecretBox
 from app.application.audit import Actor, AuditEntry
-from app.application.ports.access import NewKeyRow, NewUser, SessionData, UserChanges
+from app.application.ports.access import (
+    LoginTicket,
+    NewKeyRow,
+    NewUser,
+    SessionData,
+    UserChanges,
+)
 from app.application.ports.search_reads import HistoryScope
 from app.application.ports.search_store import NewSearch
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role, key_digest, new_key
+from app.domain.credentials import hash_password, verify_password
 from app.domain.errors import UsernameTakenError
 from app.domain.queries import Provider
 from tests.integration.geo_fixture import load_fixture_catalog
@@ -294,3 +309,96 @@ async def test_freno_de_intentos_en_redis(test_redis: Redis) -> None:
     assert (first, second) == (False, True)
     assert 0 < ttl <= 30
     assert not await limiter.blocked(ip)
+
+
+async def test_credenciales_de_punta_a_punta(api_engine: AsyncEngine) -> None:
+    store = PostgresAccessStore(api_engine)
+    with as_user(JEFA):
+        ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
+    box = AesGcmSecretBox(PEPPER)
+    secret = box.seal("JBSWY3DPEHPK3PXP")
+    lock = datetime.now(UTC) + timedelta(minutes=15)
+
+    # Todo esto pasa antes de saber quién es la persona (como «anonymous»).
+    before = await store.find_credentials(ANA.username)
+    await store.set_password(ana.user_id, hash_password("Clave-segura-2026"), False, AUDIT)
+    await store.login_failed(ana.user_id, 5, lock)
+    locked = await store.credentials(ana.user_id)
+    await store.set_totp(ana.user_id, secret, AUDIT)
+    first = await store.use_totp_counter(ana.user_id, 100)
+    repeated = await store.use_totp_counter(ana.user_id, 100)
+    older = await store.use_totp_counter(ana.user_id, 99)
+    await store.login_succeeded(ana.user_id, "192.168.0.50")
+    after = await store.credentials(ana.user_id)
+    with as_user(JEFA):
+        listed = await store.get_user(ana.user_id)
+
+    assert before is not None and before.password_hash is None and before.must_change_password
+    assert locked is not None and (locked.failed_logins, locked.locked_until) == (5, lock)
+    assert (first, repeated, older) == (True, False, False)
+    assert after is not None
+    assert verify_password("Clave-segura-2026", after.password_hash)
+    assert (after.failed_logins, after.locked_until, after.totp_last_counter) == (0, None, 100)
+    assert after.totp_secret == secret and "JBSWY3DPEHPK3PXP" not in secret
+    assert box.open(after.totp_secret) == "JBSWY3DPEHPK3PXP"
+    assert listed is not None
+    assert (listed.has_password, listed.must_change_password, listed.totp_enrolled) == (
+        True,
+        False,
+        True,
+    )
+    await store.set_totp(ana.user_id, None, AUDIT)
+    reset = await store.credentials(ana.user_id)
+    assert reset is not None and reset.totp_secret is None and reset.totp_last_counter is None
+
+
+async def test_la_contrasena_y_el_secreto_no_quedan_en_claro(
+    api_engine: AsyncEngine, test_engine: AsyncEngine
+) -> None:
+    store = PostgresAccessStore(api_engine)
+    with as_user(JEFA):
+        ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
+    await store.set_password(ana.user_id, hash_password("Clave-secreta-2026"), False, AUDIT)
+    await store.set_totp(ana.user_id, AesGcmSecretBox(PEPPER).seal("SECRETO2026TOTP"), AUDIT)
+
+    async with test_engine.connect() as conn:
+        row = await conn.scalar(
+            text("SELECT u::text FROM users u WHERE username = :u"), {"u": ANA.username}
+        )
+
+    assert row is not None
+    assert "Clave-secreta-2026" not in row
+    assert "SECRETO2026TOTP" not in row
+
+
+async def test_ingreso_a_medias_en_redis(test_redis: Redis) -> None:
+    tickets = RedisLoginTicketStore(test_redis)
+    ticket = LoginTicket(901, ANA.username, True, True)
+
+    token = await tickets.create(ticket, 30)
+    stored = await tickets.get(token)
+    await tickets.save(token, replace(ticket, attempts=2, pending_secret="v1:abc"), 30)
+    updated = await tickets.get(token)
+    names = [k.decode() for k in await test_redis.keys("monitor:ingreso:*")]
+    ttl = max([await test_redis.ttl(n) for n in names] or [0])
+    await tickets.delete(token)
+
+    assert stored == ticket
+    assert updated is not None and (updated.attempts, updated.pending_secret) == (2, "v1:abc")
+    assert all(token not in n for n in names)
+    assert 0 < ttl <= 30
+    assert await tickets.get(token) is None
+
+
+def test_el_secreto_cifrado_no_se_puede_alterar() -> None:
+    box = AesGcmSecretBox(PEPPER)
+    sealed = box.seal("JBSWY3DPEHPK3PXP")
+    tampered = sealed[:-4] + ("AAAA" if not sealed.endswith("AAAA") else "BBBB")
+
+    assert box.seal("JBSWY3DPEHPK3PXP") != sealed
+    with pytest.raises(ValueError, match="alterado"):
+        box.open(tampered)
+    with pytest.raises(ValueError, match="otra pimienta"):
+        AesGcmSecretBox(b"otra-pimienta-de-mas-de-32-caracteres!!").open(sealed)
+    with pytest.raises(ValueError, match="formato"):
+        box.open("v9:xyz")

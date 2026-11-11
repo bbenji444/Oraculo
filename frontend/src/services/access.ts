@@ -1,8 +1,9 @@
 /**
- * Personas y llaves para la pantalla «Accesos» (solo superusuarios, ADR-0042).
+ * Personas y llaves para la pantalla «Accesos» (solo superusuarios, ADR-0042/43).
  *
- * La llave completa llega una sola vez, en la respuesta de `issueKey`; la
- * pantalla la muestra para copiarla y no la guarda en ningún lado.
+ * La contraseña temporal (al dar de alta o restablecer) y la llave de sistema
+ * completa llegan una sola vez; la pantalla las muestra para copiarlas y no
+ * las guarda en ningún lado.
  */
 import { apiUrl } from '../config/api';
 import type { Role } from './auth';
@@ -18,6 +19,15 @@ export interface AccessUser {
   created_at: string;
   last_seen_at: string | null;
   active_keys: number;
+  has_password: boolean;
+  must_change_password: boolean;
+  totp_enrolled: boolean;
+  locked_until: string | null;
+}
+
+export interface CreatedUser {
+  user: AccessUser;
+  temporary_password: string;
 }
 
 export interface AccessKey {
@@ -79,10 +89,28 @@ export async function listUsers(signal?: AbortSignal): Promise<AccessUser[]> {
   return itemsOf(await requestJson(apiUrl('access/users'), { signal }), isUser);
 }
 
-export async function createUser(input: NewUserInput): Promise<AccessUser> {
-  const data = await requestJson(apiUrl('access/users'), { method: 'POST', body: input });
-  if (!isUser(data)) throw badFormat();
-  return data;
+/** Alta con contraseña temporal (sale solo en esta respuesta). */
+export async function createUser(input: NewUserInput): Promise<CreatedUser> {
+  const data = (await requestJson(apiUrl('access/users'), {
+    method: 'POST',
+    body: input,
+  })) as Partial<CreatedUser> | null;
+  if (!isUser(data?.user) || typeof data.temporary_password !== 'string') throw badFormat();
+  return { user: data.user, temporary_password: data.temporary_password };
+}
+
+/** Contraseña temporal nueva (la olvidó); cierra sus sesiones. */
+export async function resetPassword(id: number): Promise<string> {
+  const data = (await requestJson(apiUrl(`access/users/${String(id)}/reset-password`), {
+    method: 'POST',
+  })) as { temporary_password?: unknown } | null;
+  if (typeof data?.temporary_password !== 'string') throw badFormat();
+  return data.temporary_password;
+}
+
+/** Borra su Microsoft Authenticator (cambió de celular); cierra sus sesiones. */
+export async function resetTotp(id: number): Promise<void> {
+  await requestJson(apiUrl(`access/users/${String(id)}/reset-totp`), { method: 'POST' });
 }
 
 export async function updateUser(id: number, patch: UserPatch): Promise<AccessUser> {

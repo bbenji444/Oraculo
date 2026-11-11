@@ -1,5 +1,5 @@
 /**
- * La sesión de la persona con TanStack Query (ADR-0042).
+ * La sesión de la persona con TanStack Query (ADR-0042 y ADR-0043).
  *
  * `useMe` dice quién entró: `null` si no hay sesión (la pantalla muestra
  * «Entrar»). Al entrar, salir o vencerse la sesión se **vacía toda la caché**:
@@ -9,7 +9,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { type Me, getMe, login, logout } from '../services/auth';
+import { type Me, changePassword, getMe, logout } from '../services/auth';
 import { ApiError, SESSION_EXPIRED_EVENT } from '../services/http';
 import { useExplorerStore } from '../store/explorer';
 
@@ -59,14 +59,22 @@ export function useMe() {
   });
 }
 
-/** Entrar con la llave. */
-export function useLogin() {
+/**
+ * Para el último paso del ingreso: deja entrar a la persona que respondió la
+ * API (y olvida todo lo de la anterior).
+ */
+export function useOpenSession(): (me: Me) => void {
   const client = useQueryClient();
+  return (me) => {
+    switchPerson(client, me);
+  };
+}
+
+/** Cambiar mi contraseña (las demás sesiones de la persona se cierran). */
+export function useChangePassword() {
   return useMutation({
-    mutationFn: (key: string) => login(key),
-    onSuccess: (me) => {
-      switchPerson(client, me);
-    },
+    mutationFn: ({ current, next }: { current: string; next: string }) =>
+      changePassword(current, next),
   });
 }
 

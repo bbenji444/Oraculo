@@ -17,7 +17,11 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.adapters.cache.redis_sessions import RedisLoginLimiter, RedisSessionStore
+from app.adapters.cache.redis_sessions import (
+    RedisLoginLimiter,
+    RedisLoginTicketStore,
+    RedisSessionStore,
+)
 from app.adapters.delivery.factory import build_connector, build_senders
 from app.adapters.health.app_probe import AppHealthProbe
 from app.adapters.health.celery_probe import CeleryWorkerHealthProbe
@@ -47,6 +51,8 @@ from app.adapters.persistence.search_repository import PostgresArticleStore, Pos
 from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
+from app.adapters.security.qr import SegnoQrRenderer
+from app.adapters.security.secret_box import AesGcmSecretBox
 from app.api.auth import dev_user, install_auth
 from app.api.errors import register_error_handlers
 from app.api.v1 import OPENAPI_TAGS, api_router
@@ -56,6 +62,7 @@ from app.application.use_cases.access import AccessAdmin, Authenticator, Session
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.deliveries import SendDeliveries
 from app.application.use_cases.entities import QueueExtraction
+from app.application.use_cases.login import PasswordLogin
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
 from app.core.config import APP_VERSION, Settings, get_settings
@@ -118,7 +125,7 @@ _SECONDS_PER_MINUTE = 60
 
 
 def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: Redis) -> None:
-    """Llaves, sesiones y administración de accesos (ADR-0042)."""
+    """Entrar con contraseña y código, sesiones, llaves y «Accesos» (ADR-0042/43)."""
     pepper = (
         settings.auth_key_pepper.get_secret_value().encode()
         if settings.auth_key_pepper
@@ -128,20 +135,32 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
     sessions = RedisSessionStore(redis)
     app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now)
     if settings.auth_mode == "keys":
+        limiter = RedisLoginLimiter(
+            redis,
+            settings.auth_login_max_failures,
+            settings.auth_login_window_minutes * _SECONDS_PER_MINUTE,
+        )
+        policy = SessionPolicy(
+            max_seconds=int(settings.auth_session_hours * _SECONDS_PER_HOUR),
+            idle_seconds=settings.auth_session_idle_minutes * _SECONDS_PER_MINUTE,
+            recheck_seconds=settings.auth_session_recheck_seconds,
+        )
         app.state.authenticator = Authenticator(
             store=store,
             sessions=sessions,
-            limiter=RedisLoginLimiter(
-                redis,
-                settings.auth_login_max_failures,
-                settings.auth_login_window_minutes * _SECONDS_PER_MINUTE,
-            ),
+            limiter=limiter,
             pepper=pepper,
-            policy=SessionPolicy(
-                max_seconds=int(settings.auth_session_hours * _SECONDS_PER_HOUR),
-                idle_seconds=settings.auth_session_idle_minutes * _SECONDS_PER_MINUTE,
-                recheck_seconds=settings.auth_session_recheck_seconds,
-            ),
+            policy=policy,
+            clock=_utc_now,
+        )
+        app.state.password_login = PasswordLogin(
+            store=store,
+            sessions=sessions,
+            tickets=RedisLoginTicketStore(redis),
+            limiter=limiter,
+            box=AesGcmSecretBox(pepper),
+            qr=SegnoQrRenderer(),
+            policy=policy,
             clock=_utc_now,
         )
 

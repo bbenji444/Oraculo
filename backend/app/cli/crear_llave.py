@@ -1,8 +1,9 @@
-"""Comando ``make crear-llave``: crea una llave de acceso desde la consola (ADR-0042).
+"""Comando ``make crear-llave``: crea una llave de sistema desde la consola (ADR-0042).
 
-Sirve para la **primera** llave del superusuario (antes de que exista
-alguien que entre a «Accesos») y para recuperar el acceso si se perdieron
-todas. Después, las llaves se crean desde la pantalla «Accesos».
+Las personas entran con usuario, contraseña y código (ADR-0043, ``make
+acceso``); las llaves son para **sistemas** que se conectan al monitor con
+``Authorization: Bearer``. Normalmente se crean en «Accesos»; este comando
+sirve cuando todavía nadie puede entrar a la pantalla.
 
 La llave completa se muestra **una sola vez** en la terminal (o se escribe en
 un archivo que solo puede leer el dueño, con ``--archivo``) y nunca pasa por
@@ -43,22 +44,32 @@ CONSOLE = AuthUser(0, "consola", "Consola del servidor", Role.SUPERUSER)
 _PRIVATE_FILE_MODE = 0o600
 
 
-class _NoSessions:
-    """La consola no cierra sesiones (no hay al crear una llave)."""
+class NoSessions:
+    """``SessionStorePort`` vacío: desde la consola no hay sesiones que cerrar.
 
-    async def create(self, *_: object) -> str:  # pragma: no cover — no se usa
+    Las sesiones viven en el Redis de la API; si hiciera falta sacar a
+    alguien al instante, se revoca desde «Accesos». De todos modos, cada
+    sesión vuelve a revisar la base cada 5 minutos.
+    """
+
+    async def create(self, *_: object) -> str:
+        """No se usa desde la consola."""
         raise NotImplementedError
 
-    async def get(self, *_: object) -> None:  # pragma: no cover — no se usa
-        return None
+    async def get(self, *_: object) -> None:
+        """No hay sesiones en la consola."""
+        return
 
-    async def save(self, *_: object) -> None:  # pragma: no cover — no se usa
-        return None
+    async def save(self, *_: object) -> None:
+        """No hay sesiones en la consola."""
+        return
 
-    async def delete(self, *_: object) -> None:  # pragma: no cover — no se usa
-        return None
+    async def delete(self, *_: object) -> None:
+        """No hay sesiones en la consola."""
+        return
 
-    async def delete_for_user(self, *_: object) -> int:  # pragma: no cover — no se usa
+    async def delete_for_user(self, *_: object) -> int:
+        """No hay sesiones en la consola: no cierra ninguna."""
         return 0
 
 
@@ -80,7 +91,12 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _write_private(path: Path, content: str) -> None:
+def write_private(path: Path, content: str) -> None:
+    """Escribe un secreto en un archivo nuevo que solo puede leer su dueño (600).
+
+    Raises:
+        FileExistsError: Si el archivo ya existe (no se pisa otro secreto).
+    """
     path = path.expanduser()
     # O_EXCL: no pisa un archivo que ya exista (podría ser otra llave).
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, _PRIVATE_FILE_MODE)
@@ -116,7 +132,7 @@ async def run(args: argparse.Namespace, settings: Settings) -> int:
         store = PostgresAccessStore(engine)
         admin = AccessAdmin(
             store,
-            _NoSessions(),
+            NoSessions(),
             settings.auth_key_pepper.get_secret_value().encode(),
             lambda: datetime.now(UTC),
         )
@@ -134,7 +150,7 @@ async def run(args: argparse.Namespace, settings: Settings) -> int:
             logger.error(error.message)
             return 1
         if args.archivo:
-            _write_private(args.archivo, issued.key.full)
+            write_private(args.archivo, issued.key.full)
             logger.info(f"Llave {issued.key.masked} de {user.username} escrita en {args.archivo}")
             logger.info("Ábrela tú, cópiala y borra el archivo (rm).")
         else:

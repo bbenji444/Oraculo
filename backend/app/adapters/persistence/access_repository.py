@@ -1,18 +1,20 @@
-"""Personas y llaves en PostgreSQL (``users`` y ``access_keys``, ADR-0042).
+"""Personas, credenciales y llaves en PostgreSQL (``users``, ``access_keys``).
 
-Implementa ``AccessStorePort``. De cada llave guarda solo su parte pública y
-su huella HMAC; nunca la llave completa.
+Implementa ``AccessStorePort`` (ADR-0042 y ADR-0043). Guarda solo huellas: de
+cada llave, su parte pública y su huella HMAC; de cada contraseña, su huella
+scrypt; del código de 6 dígitos, su secreto cifrado. Nunca nada en claro.
 
-Las lecturas de entrada (``find_key``, ``key_record``, ``mark_key_used``)
-corren como ``system`` porque todavía no se sabe quién es la persona. Las de
-administración corren con el contexto de la petición: la seguridad por filas
-(migración 0039) solo deja pasar a un superusuario.
+Lo que se usa al entrar (llaves, credenciales, intentos fallidos, alta del
+código) corre como ``system``, porque todavía no se sabe quién es la
+persona. La administración corre con el contexto de la petición: la
+seguridad por filas (migración 0039) solo deja pasar a un superusuario.
 
 No hace: no decide si una llave sirve ni quién puede administrar (eso es de
 ``app.application.use_cases.access``).
 """
 
 import json
+from datetime import datetime
 
 from sqlalchemy import RowMapping, text
 from sqlalchemy.exc import IntegrityError
@@ -20,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.adapters.persistence.access_scope import as_system
 from app.application.audit import AuditEntry
-from app.application.ports.access import NewKeyRow, NewUser, UserChanges
+from app.application.ports.access import NewKeyRow, NewUser, UserChanges, UserCredentials
 from app.domain.access import AuthUser, KeyInfo, KeyRecord, Role, UserAccount
 from app.domain.errors import UsernameTakenError
 
@@ -31,11 +33,41 @@ _KEY_RECORD = """
 """
 _USER_COLUMNS = """
     SELECT u.id, u.username, u.display_name, u.email, u.role, u.is_active, u.created_at,
-           u.last_seen_at,
+           u.last_seen_at, u.password_hash IS NOT NULL AS has_password,
+           u.must_change_password, u.totp_secret IS NOT NULL AS totp_enrolled,
+           CASE WHEN u.locked_until > now() THEN u.locked_until END AS locked_until,
            (SELECT count(*) FROM access_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL
               AND (k.expires_at IS NULL OR k.expires_at > now())) AS active_keys
     FROM users u
 """
+_CREDENTIALS = """
+    SELECT id, username, display_name, role, is_active, password_hash, must_change_password,
+           totp_secret, totp_last_counter, failed_logins, locked_until
+    FROM users
+"""
+# Guarda los fallos seguidos (los calcula el caso de uso) y, con :lock, el
+# bloqueo; sin :lock se borra un bloqueo que ya venció.
+_LOGIN_FAILED = text(
+    "UPDATE users SET failed_logins = :n, locked_until = CAST(:lock AS timestamptz) WHERE id = :id"
+)
+_LOGIN_OK = text(
+    "UPDATE users SET failed_logins = 0, locked_until = NULL, last_seen_at = now() WHERE id = :id"
+)
+_SET_PASSWORD = text(
+    "UPDATE users SET password_hash = :h, must_change_password = :must, "
+    "password_changed_at = now(), failed_logins = 0, locked_until = NULL WHERE id = :id"
+)
+_SET_TOTP = text(
+    "UPDATE users SET totp_secret = CAST(:s AS text), totp_last_counter = NULL, "
+    "totp_enrolled_at = CASE WHEN CAST(:s AS text) IS NULL THEN NULL ELSE now() END "
+    "WHERE id = :id"
+)
+# Atómico: solo avanza si el periodo es más nuevo que el último usado, así un
+# mismo código no sirve dos veces aunque lleguen dos peticiones a la vez.
+_USE_COUNTER = text(
+    "UPDATE users SET totp_last_counter = :c "
+    "WHERE id = :id AND (totp_last_counter IS NULL OR totp_last_counter < :c) RETURNING id"
+)
 _KEY_COLUMNS = (
     "id, user_id, key_prefix, label, created_by, created_at, expires_at, revoked_at, "
     "last_used_at, host(last_used_ip) AS last_used_ip"
@@ -89,6 +121,23 @@ def _account(row: RowMapping) -> UserAccount:
         created_at=row["created_at"],
         last_seen_at=row["last_seen_at"],
         active_keys=row["active_keys"],
+        has_password=row["has_password"],
+        must_change_password=row["must_change_password"],
+        totp_enrolled=row["totp_enrolled"],
+        locked_until=row["locked_until"],
+    )
+
+
+def _credentials(row: RowMapping) -> UserCredentials:
+    return UserCredentials(
+        user=AuthUser(row["id"], row["username"], row["display_name"], Role(row["role"])),
+        is_active=row["is_active"],
+        password_hash=row["password_hash"],
+        must_change_password=row["must_change_password"],
+        totp_secret=row["totp_secret"],
+        totp_last_counter=row["totp_last_counter"],
+        failed_logins=row["failed_logins"],
+        locked_until=row["locked_until"],
     )
 
 
@@ -130,6 +179,65 @@ class PostgresAccessStore:
 
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+
+    async def _one_credentials(self, where: str, value: object) -> UserCredentials | None:
+        with as_system():
+            async with self._engine.connect() as conn:
+                row = (
+                    (await conn.execute(text(f"{_CREDENTIALS} WHERE {where} = :v"), {"v": value}))
+                    .mappings()
+                    .first()
+                )
+        return _credentials(row) if row else None
+
+    async def find_credentials(self, username: str) -> UserCredentials | None:
+        """Ver ``AccessStorePort.find_credentials``."""
+        return await self._one_credentials("username", username)
+
+    async def credentials(self, user_id: int) -> UserCredentials | None:
+        """Ver ``AccessStorePort.credentials``."""
+        return await self._one_credentials("id", user_id)
+
+    async def login_failed(
+        self, user_id: int, failures: int, locked_until: datetime | None
+    ) -> None:
+        """Ver ``AccessStorePort.login_failed``."""
+        with as_system():
+            async with self._engine.begin() as conn:
+                await conn.execute(
+                    _LOGIN_FAILED, {"id": user_id, "n": failures, "lock": locked_until}
+                )
+
+    async def login_succeeded(self, user_id: int, ip: str | None) -> None:
+        """Ver ``AccessStorePort.login_succeeded``."""
+        with as_system():
+            async with self._engine.begin() as conn:
+                await conn.execute(_LOGIN_OK, {"id": user_id})
+
+    async def set_password(
+        self, user_id: int, password_hash: str, must_change: bool, audit: AuditEntry
+    ) -> None:
+        """Ver ``AccessStorePort.set_password``."""
+        with as_system():
+            async with self._engine.begin() as conn:
+                await conn.execute(
+                    _SET_PASSWORD, {"id": user_id, "h": password_hash, "must": must_change}
+                )
+                await _audit(conn, audit, "user", str(user_id))
+
+    async def set_totp(self, user_id: int, secret: str | None, audit: AuditEntry) -> None:
+        """Ver ``AccessStorePort.set_totp``."""
+        with as_system():
+            async with self._engine.begin() as conn:
+                await conn.execute(_SET_TOTP, {"id": user_id, "s": secret})
+                await _audit(conn, audit, "user", str(user_id))
+
+    async def use_totp_counter(self, user_id: int, counter: int) -> bool:
+        """Ver ``AccessStorePort.use_totp_counter``."""
+        with as_system():
+            async with self._engine.begin() as conn:
+                used = await conn.scalar(_USE_COUNTER, {"id": user_id, "c": counter})
+        return used is not None
 
     async def find_key(self, public_id: str) -> KeyRecord | None:
         """Ver ``AccessStorePort.find_key``."""

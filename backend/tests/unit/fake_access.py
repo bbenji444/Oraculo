@@ -1,17 +1,27 @@
-"""Personas, llaves, sesiones y freno de intentos en memoria (pruebas sin base)."""
+"""Personas, credenciales, llaves, sesiones e ingresos en memoria (pruebas sin base)."""
 
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 from app.application.audit import AuditEntry
-from app.application.ports.access import NewKeyRow, NewUser, SessionData, UserChanges
+from app.application.ports.access import (
+    LoginTicket,
+    NewKeyRow,
+    NewUser,
+    SessionData,
+    UserChanges,
+    UserCredentials,
+)
 from app.application.use_cases.access import AccessAdmin, Authenticator, SessionPolicy
+from app.application.use_cases.login import PasswordLogin
 from app.domain.access import AuthUser, KeyInfo, KeyRecord, Role, UserAccount
 from app.domain.errors import UsernameTakenError
 
 PEPPER = b"pimienta-de-prueba-con-mas-de-32-caracteres"
 T0 = datetime(2026, 11, 10, 18, tzinfo=UTC)
-POLICY = SessionPolicy(max_seconds=8 * 3600, idle_seconds=3600, recheck_seconds=300)
+# Igual que el servidor: hasta 30 días sin cierre por inactividad (ADR-0043).
+THIRTY_DAYS = 30 * 24 * 3600
+POLICY = SessionPolicy(max_seconds=THIRTY_DAYS, idle_seconds=THIRTY_DAYS, recheck_seconds=300)
 
 
 class Clock:
@@ -34,6 +44,16 @@ class _Key:
 
 
 @dataclass
+class _Creds:
+    password_hash: str | None = None
+    must_change: bool = True
+    totp_secret: str | None = None
+    last_counter: int | None = None
+    failed: int = 0
+    locked_until: datetime | None = None
+
+
+@dataclass
 class FakeAccessStore:
     """``AccessStorePort`` en memoria."""
 
@@ -42,13 +62,71 @@ class FakeAccessStore:
     keys: dict[int, _Key] = field(default_factory=dict)
     events: list[tuple[AuditEntry, str]] = field(default_factory=list)
     used: list[tuple[int, str | None]] = field(default_factory=list)
+    creds: dict[int, _Creds] = field(default_factory=dict)
 
     def add_user(self, username: str, role: Role = Role.USER, *, active: bool = True) -> int:
         user_id = len(self.users) + 1
         self.users[user_id] = UserAccount(
             user_id, username, username.capitalize(), None, role, active, T0, None
         )
+        self.creds[user_id] = _Creds()
         return user_id
+
+    def _credentials(self, user_id: int) -> UserCredentials:
+        user = self.users[user_id]
+        c = self.creds[user_id]
+        return UserCredentials(
+            AuthUser(user.user_id, user.username, user.display_name, user.role),
+            user.is_active,
+            c.password_hash,
+            c.must_change,
+            c.totp_secret,
+            c.last_counter,
+            c.failed,
+            c.locked_until,
+        )
+
+    async def find_credentials(self, username: str) -> UserCredentials | None:
+        found = next((u for u in self.users.values() if u.username == username), None)
+        return self._credentials(found.user_id) if found else None
+
+    async def credentials(self, user_id: int) -> UserCredentials | None:
+        return self._credentials(user_id) if user_id in self.users else None
+
+    async def login_failed(
+        self, user_id: int, failures: int, locked_until: datetime | None
+    ) -> None:
+        c = self.creds[user_id]
+        c.failed, c.locked_until = failures, locked_until
+
+    async def login_succeeded(self, user_id: int, ip: str | None) -> None:
+        c = self.creds[user_id]
+        c.failed, c.locked_until = 0, None
+        self.users[user_id] = replace(self.users[user_id], last_seen_at=self.clock())
+
+    async def set_password(
+        self, user_id: int, password_hash: str, must_change: bool, audit: AuditEntry
+    ) -> None:
+        c = self.creds[user_id]
+        c.password_hash, c.must_change, c.failed, c.locked_until = (
+            password_hash,
+            must_change,
+            0,
+            None,
+        )
+        self.events.append((audit, str(user_id)))
+
+    async def set_totp(self, user_id: int, secret: str | None, audit: AuditEntry) -> None:
+        c = self.creds[user_id]
+        c.totp_secret, c.last_counter = secret, None
+        self.events.append((audit, str(user_id)))
+
+    async def use_totp_counter(self, user_id: int, counter: int) -> bool:
+        c = self.creds[user_id]
+        if c.last_counter is not None and counter <= c.last_counter:
+            return False
+        c.last_counter = counter
+        return True
 
     def _account(self, user_id: int) -> UserAccount:
         now = self.clock()
@@ -59,7 +137,15 @@ class FakeAccessStore:
             and k.info.revoked_at is None
             and (k.info.expires_at is None or k.info.expires_at > now)
         )
-        return replace(self.users[user_id], active_keys=active)
+        c = self.creds[user_id]
+        return replace(
+            self.users[user_id],
+            active_keys=active,
+            has_password=c.password_hash is not None,
+            must_change_password=c.must_change,
+            totp_enrolled=c.totp_secret is not None,
+            locked_until=c.locked_until,
+        )
 
     def _record(self, key: _Key) -> KeyRecord:
         user = self.users[key.info.user_id]
@@ -184,6 +270,49 @@ class FakeSessions:
         return len(doomed)
 
 
+class FakeTickets:
+    """``LoginTicketStorePort`` en memoria (sin vencimiento)."""
+
+    def __init__(self) -> None:
+        self.data: dict[str, LoginTicket] = {}
+        self.counter = 0
+
+    async def create(self, ticket: LoginTicket, ttl_seconds: int) -> str:
+        self.counter += 1
+        token = f"ingreso-{self.counter}"
+        self.data[token] = ticket
+        return token
+
+    async def get(self, token: str) -> LoginTicket | None:
+        return self.data.get(token)
+
+    async def save(self, token: str, ticket: LoginTicket, ttl_seconds: int) -> None:
+        self.data[token] = ticket
+
+    async def delete(self, token: str) -> None:
+        self.data.pop(token, None)
+
+
+class FakeBox:
+    """``SecretBoxPort`` de juguete: marca el texto para ver que no va en claro."""
+
+    def seal(self, plain: str) -> str:
+        return "sellado:" + plain[::-1]
+
+    def open(self, sealed: str) -> str:
+        if not sealed.startswith("sellado:"):
+            msg = "alterado"
+            raise ValueError(msg)
+        return sealed.removeprefix("sellado:")[::-1]
+
+
+class FakeQr:
+    """``QrRendererPort`` de juguete."""
+
+    def svg(self, content: str) -> str:
+        return f"<svg>{content}</svg>"
+
+
 class FakeLimiter:
     """``LoginLimiterPort`` en memoria."""
 
@@ -211,6 +340,8 @@ class AccessWorld:
     limiter: FakeLimiter
     auth: Authenticator
     admin: AccessAdmin
+    tickets: FakeTickets
+    login: PasswordLogin
 
 
 def access_world() -> AccessWorld:
@@ -228,6 +359,24 @@ def access_world() -> AccessWorld:
         policy=POLICY,
         clock=clock,
     )
+    tickets = FakeTickets()
+    login = PasswordLogin(
+        store=store,
+        sessions=sessions,
+        tickets=tickets,
+        limiter=limiter,
+        box=FakeBox(),
+        qr=FakeQr(),
+        policy=POLICY,
+        clock=clock,
+    )
     return AccessWorld(
-        clock, store, sessions, limiter, auth, AccessAdmin(store, sessions, PEPPER, clock)
+        clock,
+        store,
+        sessions,
+        limiter,
+        auth,
+        AccessAdmin(store, sessions, PEPPER, clock),
+        tickets,
+        login,
     )

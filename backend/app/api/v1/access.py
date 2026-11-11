@@ -1,9 +1,14 @@
-"""Endpoints ``/api/v1/access``: personas y llaves (solo superusuarios, ADR-0042).
+"""Endpoints ``/api/v1/access``: personas y llaves (solo superusuarios).
 
-La pantalla «Accesos» los usa para dar de alta personas, cambiarles el rol,
-desactivarlas, y crear o revocar sus llaves. La llave completa sale **una
-sola vez**, en la respuesta de ``POST /access/users/{id}/keys``; después
-solo se ve su parte pública (``orc_live_a1b2c3d4…``).
+La pantalla «Accesos» los usa para (ADR-0042 y ADR-0043):
+
+- dar de alta personas: la respuesta trae su **contraseña temporal**, que se
+  muestra una sola vez y la persona cambia al primer ingreso;
+- cambiarles el rol o desactivarlas;
+- restablecer su contraseña (la olvidó) o su Microsoft Authenticator
+  (cambió de celular);
+- crear o revocar llaves de sistema. La llave completa sale **una sola
+  vez**; después solo se ve su parte pública (``orc_live_a1b2c3d4…``).
 
 No hace: no aplica las reglas (``AccessAdmin``).
 """
@@ -35,6 +40,10 @@ class UserOut(BaseModel):
     created_at: datetime
     last_seen_at: datetime | None
     active_keys: int = Field(description="Llaves vigentes (sin revocar ni vencer).")
+    has_password: bool = Field(description="Si ya tiene contraseña.")
+    must_change_password: bool = Field(description="Si su contraseña es temporal.")
+    totp_enrolled: bool = Field(description="Si ya dio de alta Microsoft Authenticator.")
+    locked_until: datetime | None = Field(description="Bloqueada por intentos hasta esta hora.")
 
     @classmethod
     def of(cls, user: UserAccount) -> "UserOut":
@@ -49,6 +58,10 @@ class UserOut(BaseModel):
             created_at=user.created_at,
             last_seen_at=user.last_seen_at,
             active_keys=user.active_keys,
+            has_password=user.has_password,
+            must_change_password=user.must_change_password,
+            totp_enrolled=user.totp_enrolled,
+            locked_until=user.locked_until,
         )
 
 
@@ -65,6 +78,21 @@ class UserIn(BaseModel):
     display_name: str = Field(min_length=1, max_length=120, examples=["Ana López"])
     email: str | None = Field(default=None, max_length=254)
     role: Role = Role.USER
+
+
+class CreatedUserOut(BaseModel):
+    """Persona recién creada con su contraseña temporal (solo esta vez)."""
+
+    user: UserOut
+    temporary_password: str = Field(
+        description="Dásela a la persona; la cambia al primer ingreso. No se vuelve a mostrar."
+    )
+
+
+class TemporaryPasswordOut(BaseModel):
+    """Contraseña temporal nueva (solo esta vez)."""
+
+    temporary_password: str
 
 
 class UserPatch(BaseModel):
@@ -147,13 +175,15 @@ async def list_users(admin: Admin, user: SuperUser) -> UserListOut:
 
 @router.post(
     "/users",
-    response_model=UserOut,
+    response_model=CreatedUserOut,
     status_code=status.HTTP_201_CREATED,
     summary="Dar de alta a una persona",
     responses=error_responses(409, 422),
 )
-async def create_user(body: UserIn, request: Request, admin: Admin, user: SuperUser) -> UserOut:
-    """Crea a la persona sin llave; después se le crea una con ``POST …/keys``."""
+async def create_user(
+    body: UserIn, request: Request, response: Response, admin: Admin, user: SuperUser
+) -> CreatedUserOut:
+    """Crea a la persona con contraseña temporal (sale solo en esta respuesta)."""
     created = await admin.create_user(
         user,
         client_ip(request),
@@ -162,7 +192,37 @@ async def create_user(body: UserIn, request: Request, admin: Admin, user: SuperU
         email=body.email,
         role=body.role,
     )
-    return UserOut.of(created)
+    response.headers["Cache-Control"] = "no-store"
+    return CreatedUserOut(
+        user=UserOut.of(created.account), temporary_password=created.temporary_password
+    )
+
+
+@router.post(
+    "/users/{user_id}/reset-password",
+    response_model=TemporaryPasswordOut,
+    summary="Restablecer la contraseña (la olvidó)",
+    responses=error_responses(404),
+)
+async def reset_password(
+    request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
+) -> TemporaryPasswordOut:
+    """Contraseña temporal nueva; cierra sus sesiones. Su Authenticator no cambia."""
+    temporary = await admin.reset_password(user, client_ip(request), user_id)
+    response.headers["Cache-Control"] = "no-store"
+    return TemporaryPasswordOut(temporary_password=temporary)
+
+
+@router.post(
+    "/users/{user_id}/reset-totp",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Reiniciar su Microsoft Authenticator (cambió de celular)",
+    responses=error_responses(404),
+)
+async def reset_totp(request: Request, admin: Admin, user: SuperUser, user_id: UserId) -> Response:
+    """Borra su código; al volver a entrar escanea un QR nuevo. Cierra sus sesiones."""
+    await admin.reset_totp(user, client_ip(request), user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch(

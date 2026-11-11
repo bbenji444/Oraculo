@@ -1,10 +1,15 @@
-"""El candado de la API con llaves (AUTH_MODE=keys), con todo en memoria (ADR-0042).
+"""El candado de la API (AUTH_MODE=keys) con todo en memoria (ADR-0042 y 0043).
 
-Revisa lo que ve un navegador o una integración: sin llave no se pasa; la
-cookie es ``HttpOnly`` y ``SameSite=Strict``; las peticiones que cambian algo
-con cookie necesitan ``Origin`` del mismo servidor (CSRF); la llave en
-``Authorization: Bearer`` funciona sin cookie; y un usuario normal no abre lo
-del superusuario.
+Revisa lo que ve un navegador o un sistema:
+
+- sin sesión no se pasa;
+- se entra con usuario, contraseña y código de 6 dígitos, y el primer
+  ingreso pide cambiar la temporal y dar de alta Microsoft Authenticator;
+- la cookie es ``HttpOnly`` y ``SameSite=Strict``;
+- con cookie, lo que cambia algo pide ``Origin`` del mismo servidor (CSRF);
+- la llave de sistema en ``Authorization: Bearer`` funciona sin cookie;
+- un usuario normal no abre lo del superusuario;
+- otro módulo puede preguntar de quién es un token (``/auth/introspect``).
 """
 
 from collections.abc import Iterator
@@ -17,13 +22,16 @@ from fastapi.testclient import TestClient
 from app.api.auth import SESSION_COOKIE
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role
+from app.domain.credentials import hash_password, new_totp_secret, totp_code, totp_counter
 from app.main import create_app
-from tests.unit.fake_access import PEPPER, AccessWorld, access_world
+from tests.unit.fake_access import PEPPER, AccessWorld, FakeBox, access_world
 
 ME = "/api/v1/auth/me"
 LOGIN = "/api/v1/auth/login"
 USERS = "/api/v1/access/users"
 SAME_ORIGIN = {"Origin": "http://testserver"}
+PASSWORD = "Contraseña-segura-2026"
+BENJI = AuthUser(1, "benji", "Benjamin", Role.SUPERUSER)
 
 
 @pytest.fixture
@@ -31,12 +39,28 @@ def world() -> AccessWorld:
     return access_world()
 
 
+def _ready(world: AccessWorld, user_id: int, secret: str) -> None:
+    """Deja a la persona con contraseña propia y Authenticator dado de alta."""
+    creds = world.store.creds[user_id]
+    creds.password_hash = hash_password(PASSWORD)
+    creds.must_change = False
+    creds.totp_secret = FakeBox().seal(secret)
+
+
+@pytest.fixture
+def secret(world: AccessWorld) -> str:
+    value = new_totp_secret()
+    _ready(world, 1, value)
+    return value
+
+
 @pytest.fixture
 def app(world: AccessWorld) -> FastAPI:
     application = create_app(Settings(auth_mode="keys", auth_key_pepper=PEPPER.decode()))
-    # Sin lifespan: se ponen a mano el autenticador y la administración.
+    # Sin lifespan: se ponen a mano los casos de uso en memoria.
     application.state.authenticator = world.auth
     application.state.access_admin = world.admin
+    application.state.password_login = world.login
     return application
 
 
@@ -45,72 +69,106 @@ def client(app: FastAPI) -> Iterator[TestClient]:
     yield TestClient(app)
 
 
-async def _issue(world: AccessWorld, user_id: int) -> str:
-    admin = AuthUser(1, "benji", "Benjamin", Role.SUPERUSER)
-    return (await world.admin.issue_key(admin, None, user_id, "prueba", None)).key.full
+def _code(world: AccessWorld, secret: str) -> str:
+    return totp_code(secret, totp_counter(world.clock()))
 
 
-def _key(world: AccessWorld, user_id: int) -> str:
+def _enter(client: TestClient, world: AccessWorld, username: str, secret: str) -> None:
+    step = client.post(LOGIN, json={"username": username, "password": PASSWORD}).json()
+    response = client.post(
+        f"{LOGIN}/code", json={"ticket": step["ticket"], "code": _code(world, secret)}
+    )
+    assert response.status_code == 200, response.text
+
+
+def _system_key(world: AccessWorld, user_id: int) -> str:
+    async def issue() -> str:
+        return (await world.admin.issue_key(BENJI, None, user_id, "sistema", None)).key.full
+
     # TestClient es síncrono: la llave se crea con su propio ciclo de asyncio.
-    return anyio.run(_issue, world, user_id)
+    return anyio.run(issue)
 
 
-@pytest.fixture
-def benji_key(world: AccessWorld) -> str:
-    return _key(world, 1)
-
-
-@pytest.fixture
-def ana_key(world: AccessWorld) -> str:
-    return _key(world, world.store.add_user("ana"))
-
-
-def test_sin_llave_no_se_pasa(client: TestClient) -> None:
+def test_sin_sesion_no_se_pasa(client: TestClient) -> None:
     for path in (ME, "/api/v1/concepts", "/api/v1/searches", USERS, "/api/v1/docs"):
         response = client.get(path)
         assert response.status_code == 401, path
         assert response.json()["error"]["code"] == "auth_required"
+        assert "usuario y contraseña" in response.json()["error"]["message"]
 
 
 def test_salir_es_publico_y_no_falla_sin_sesion(client: TestClient) -> None:
     assert client.post("/api/v1/auth/logout").status_code == 204
 
 
-def test_llave_falsa(client: TestClient) -> None:
-    response = client.post(LOGIN, json={"key": "orc_live_ABCDEFGH_" + "x" * 40})
-
-    assert response.status_code == 401
-    assert "no es válida" in response.json()["error"]["message"]
-    assert SESSION_COOKIE not in response.cookies
-
-
-def test_entrar_da_una_cookie_protegida_y_abre_la_sesion(
-    client: TestClient, benji_key: str
+def test_entrar_con_contrasena_y_codigo(
+    client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    response = client.post(LOGIN, json={"key": benji_key})
+    step = client.post(LOGIN, json={"username": "benji", "password": PASSWORD})
 
-    assert response.status_code == 200
-    assert response.json()["role"] == "superuser"
-    assert "estado" in response.json()["sections"]
-    cookie = response.headers["set-cookie"].lower()
+    assert step.status_code == 200
+    assert step.json()["next"] == "code"
+    assert step.headers["cache-control"] == "no-store"
+    assert SESSION_COOKIE not in step.cookies
+    done = client.post(
+        f"{LOGIN}/code", json={"ticket": step.json()["ticket"], "code": _code(world, secret)}
+    )
+
+    assert done.status_code == 200
+    assert done.json()["role"] == "superuser"
+    cookie = done.headers["set-cookie"].lower()
     assert "httponly" in cookie
     assert "samesite=strict" in cookie
     assert "path=/api" in cookie
-    assert benji_key.lower() not in cookie
-    assert response.headers["cache-control"] == "no-store"
+    assert f"max-age={30 * 24 * 3600}" in cookie
     assert client.get(ME).json()["username"] == "benji"
 
 
-def test_salir_cierra_la_sesion(client: TestClient, benji_key: str) -> None:
-    client.post(LOGIN, json={"key": benji_key})
+def test_contrasena_mala_o_codigo_malo(client: TestClient, world: AccessWorld, secret: str) -> None:
+    bad = client.post(LOGIN, json={"username": "benji", "password": "otra-cosa-123"})
+    step = client.post(LOGIN, json={"username": "benji", "password": PASSWORD}).json()
+    wrong = client.post(f"{LOGIN}/code", json={"ticket": step["ticket"], "code": "000000"})
 
-    assert client.post("/api/v1/auth/logout").status_code == 204
-
+    assert bad.status_code == 401
+    assert "incorrectos" in bad.json()["error"]["message"]
+    assert wrong.status_code == 401
+    assert "código" in wrong.json()["error"]["message"]
     assert client.get(ME).status_code == 401
 
 
-def test_con_cookie_los_cambios_piden_el_mismo_origen(client: TestClient, benji_key: str) -> None:
-    client.post(LOGIN, json={"key": benji_key})
+def test_primer_ingreso_por_http(client: TestClient, world: AccessWorld, secret: str) -> None:
+    _enter(client, world, "benji", secret)
+    created = client.post(
+        USERS, json={"username": "ana", "display_name": "Ana"}, headers=SAME_ORIGIN
+    ).json()
+    ana = TestClient(client.app)
+
+    step = ana.post(
+        LOGIN, json={"username": "ana", "password": created["temporary_password"]}
+    ).json()
+    assert step["next"] == "change_password"
+    weak = ana.post(f"{LOGIN}/password", json={"ticket": step["ticket"], "new_password": "corta"})
+    assert weak.status_code == 422
+    step = ana.post(
+        f"{LOGIN}/password",
+        json={"ticket": step["ticket"], "new_password": "Mi-clave-fuerte-2026"},
+    ).json()
+    assert step["next"] == "enroll"
+    enrollment = ana.post(f"{LOGIN}/enroll", json={"ticket": step["ticket"]}).json()
+    assert enrollment["uri"].startswith("otpauth://totp/")
+    done = ana.post(
+        f"{LOGIN}/enroll/confirm",
+        json={"ticket": step["ticket"], "code": _code(world, enrollment["secret"])},
+    )
+
+    assert done.status_code == 200
+    assert ana.get(ME).json()["username"] == "ana"
+
+
+def test_con_cookie_los_cambios_piden_el_mismo_origen(
+    client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    _enter(client, world, "benji", secret)
     body = {"username": "ana", "display_name": "Ana"}
 
     no_origin = client.post(USERS, json=body)
@@ -120,11 +178,15 @@ def test_con_cookie_los_cambios_piden_el_mismo_origen(client: TestClient, benji_
     assert (no_origin.status_code, no_origin.json()["error"]["code"]) == (403, "forbidden")
     assert evil.status_code == 403
     assert ok.status_code == 201
-    assert ok.json()["username"] == "ana"
+    assert ok.json()["user"]["must_change_password"] is True
+    assert len(ok.json()["temporary_password"]) == 16
+    assert ok.headers["cache-control"] == "no-store"
 
 
-def test_la_llave_bearer_sirve_sin_cookie_ni_origen(client: TestClient, benji_key: str) -> None:
-    headers = {"Authorization": f"Bearer {benji_key}"}
+def test_la_llave_de_sistema_sirve_sin_cookie_ni_origen(
+    client: TestClient, world: AccessWorld
+) -> None:
+    headers = {"Authorization": f"Bearer {_system_key(world, 1)}"}
 
     me = client.get(ME, headers=headers)
     created = client.post(USERS, json={"username": "pepe", "display_name": "Pepe"}, headers=headers)
@@ -135,19 +197,23 @@ def test_la_llave_bearer_sirve_sin_cookie_ni_origen(client: TestClient, benji_ke
 
 
 def test_bearer_falso(client: TestClient) -> None:
-    response = client.get(ME, headers={"Authorization": "Bearer orc_live_nada"})
-
-    assert response.status_code == 401
+    assert client.get(ME, headers={"Authorization": "Bearer orc_live_nada"}).status_code == 401
 
 
-def test_un_usuario_normal_no_abre_lo_del_superusuario(client: TestClient, ana_key: str) -> None:
-    me = client.post(LOGIN, json={"key": ana_key}).json()
+def test_un_usuario_normal_no_abre_lo_del_superusuario(
+    client: TestClient, world: AccessWorld
+) -> None:
+    ana = world.store.add_user("ana")
+    ana_secret = new_totp_secret()
+    _ready(world, ana, ana_secret)
+    _enter(client, world, "ana", ana_secret)
+
+    me = client.get(ME).json()
 
     assert me["role"] == "user"
     assert me["sections"] == ["explorar", "casos", "conceptos", "historial"]
     for path in (USERS, "/api/v1/schedule", "/api/v1/deliveries/overview"):
-        response = client.get(path)
-        assert response.status_code == 403, path
+        assert client.get(path).status_code == 403, path
     concept = client.post(
         "/api/v1/concepts", json={"name": "X", "keywords": ["x"]}, headers=SAME_ORIGIN
     )
@@ -155,63 +221,97 @@ def test_un_usuario_normal_no_abre_lo_del_superusuario(client: TestClient, ana_k
     assert "superusuario" in concept.json()["error"]["message"]
 
 
-def test_la_revocacion_saca_al_instante(
-    client: TestClient, world: AccessWorld, ana_key: str
+def test_restablecer_contrasena_saca_al_instante(
+    client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    client.post(LOGIN, json={"key": ana_key})
-    assert client.get(ME).status_code == 200
-    [key] = [k for k in world.store.keys.values() if k.info.user_id == 2]
-    other = TestClient(client.app)
-    other.post(LOGIN, json={"key": _key(world, 1)})
+    ana = world.store.add_user("ana")
+    ana_secret = new_totp_secret()
+    _ready(world, ana, ana_secret)
+    ana_client = TestClient(client.app)
+    _enter(ana_client, world, "ana", ana_secret)
+    _enter(client, world, "benji", secret)
 
-    other.delete(f"/api/v1/access/keys/{key.info.key_id}", headers=SAME_ORIGIN)
+    reset = client.post(f"{USERS}/{ana}/reset-password", headers=SAME_ORIGIN)
+    after = ana_client.get(ME)
 
-    response = client.get(ME)
-    assert response.status_code == 401
+    assert reset.status_code == 200
+    assert len(reset.json()["temporary_password"]) == 16
+    assert after.status_code == 401
     # Y el navegador borra la cookie vencida.
-    assert f"{SESSION_COOKIE}=" in response.headers.get("set-cookie", "")
+    assert f"{SESSION_COOKIE}=" in after.headers.get("set-cookie", "")
 
 
-def test_crear_llave_desde_accesos_la_muestra_una_sola_vez(
-    client: TestClient, benji_key: str
-) -> None:
-    client.post(LOGIN, json={"key": benji_key})
-    user = client.post(USERS, json={"username": "ana", "display_name": "Ana"}, headers=SAME_ORIGIN)
+def test_reiniciar_autenticador(client: TestClient, world: AccessWorld, secret: str) -> None:
+    ana = world.store.add_user("ana")
+    _ready(world, ana, new_totp_secret())
+    _enter(client, world, "benji", secret)
 
-    issued = client.post(
-        f"{USERS}/{user.json()['id']}/keys",
-        json={"label": "Laptop", "days": 30},
+    response = client.post(f"{USERS}/{ana}/reset-totp", headers=SAME_ORIGIN)
+    step = TestClient(client.app).post(LOGIN, json={"username": "ana", "password": PASSWORD})
+
+    assert response.status_code == 204
+    assert step.json()["next"] == "enroll"
+
+
+def test_cambiar_mi_contrasena(client: TestClient, world: AccessWorld, secret: str) -> None:
+    _enter(client, world, "benji", secret)
+
+    wrong = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": "no-es-esta-1", "new_password": "Otra-contraseña-77"},
         headers=SAME_ORIGIN,
     )
-    listed = client.get(f"{USERS}/{user.json()['id']}/keys")
+    ok = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": PASSWORD, "new_password": "Otra-contraseña-77"},
+        headers=SAME_ORIGIN,
+    )
 
-    assert issued.status_code == 201
-    full = issued.json()["key"]
-    assert full.startswith("orc_live_")
-    assert issued.headers["cache-control"] == "no-store"
-    assert full not in listed.text
-    assert listed.json()["items"][0]["masked"] == full[:17] + "…"
-    # La llave nueva sirve para entrar.
-    assert TestClient(client.app).post(LOGIN, json={"key": full}).json()["username"] == "ana"
+    # Equivocarse de contraseña actual no saca a nadie (422, no 401).
+    assert wrong.status_code == 422
+    assert ok.status_code == 200
+    assert client.get(ME).json()["username"] == "benji"
 
 
-def test_demasiados_intentos_responden_429(client: TestClient, benji_key: str) -> None:
+def test_otro_modulo_pregunta_de_quien_es_un_token(
+    client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    _enter(client, world, "benji", secret)
+    token = client.cookies[SESSION_COOKIE]
+    system = {"Authorization": f"Bearer {_system_key(world, 1)}"}
+    stranger = TestClient(client.app)
+
+    found = stranger.post("/api/v1/auth/introspect", json={"token": token}, headers=system)
+    missing = stranger.post("/api/v1/auth/introspect", json={"token": "x" * 40}, headers=system)
+    anonymous = stranger.post("/api/v1/auth/introspect", json={"token": token})
+
+    assert found.json() == {
+        "active": True,
+        "username": "benji",
+        "display_name": "Benji",
+        "role": "superuser",
+    }
+    assert missing.json()["active"] is False
+    assert anonymous.status_code == 401
+
+
+def test_demasiados_intentos_responden_429(client: TestClient, secret: str) -> None:
     for _ in range(3):
-        client.post(LOGIN, json={"key": "mala"})
+        client.post(LOGIN, json={"username": "benji", "password": "mala-contraseña-1"})
 
-    response = client.post(LOGIN, json={"key": benji_key})
+    response = client.post(LOGIN, json={"username": "benji", "password": PASSWORD})
 
     assert response.status_code == 429
     assert response.json()["error"]["code"] == "too_many_attempts"
 
 
-def test_en_modo_dev_se_entra_sin_llave_como_superusuario() -> None:
+def test_en_modo_dev_se_entra_sin_contrasena_como_superusuario() -> None:
     client = TestClient(create_app(Settings(auth_mode="dev", dev_user="benji")))
 
     me = client.get(ME).json()
 
     assert (me["username"], me["role"], me["auth_mode"]) == ("benji", "superuser", "dev")
-    assert client.post(LOGIN, json={"key": "x"}).status_code == 409
+    assert client.post(LOGIN, json={"username": "x", "password": "y"}).status_code == 409
 
 
 def test_en_modo_keys_sin_pimienta_no_arranca() -> None:

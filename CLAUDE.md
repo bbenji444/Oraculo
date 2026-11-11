@@ -285,7 +285,8 @@ make corrida-fgr       # corre ahora la corrida del monitor FGR (la hora del hor
 make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 make ingesta-historial DIAS=7  # mide días anteriores de GDELT y muestra 5 ejemplos; DESCARGAR=si baja todo
 make ngramas-muestra   # prueba real de una hora de ngramas de GDELT: consumo, espacio y 5 ejemplos
-make crear-llave ARGS="--usuario benji --dias 365"  # llave de acceso por consola, se ve una vez (--archivo RUTA; --listar)
+make acceso ARGS="--usuario benji"  # contraseña temporal por consola, se ve una vez (--reiniciar-codigo; --archivo RUTA)
+make crear-llave ARGS="--usuario benji --dias 365"  # llave de sistema por consola, se ve una vez (--archivo RUTA; --listar)
 make db-shell        # consola SQL (psql) en la base de desarrollo
 make db-dump         # respaldo para migrar la base (docs/base-de-datos.md)
 ```

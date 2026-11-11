@@ -1,24 +1,38 @@
-# Guía de acceso al monitor (llaves de Oráculo)
+# Guía de acceso al monitor
 
-Para analistas y administradores. Diseño técnico en ADR-0042.
+Para analistas y administradores. Se entra igual que a Oráculo. Diseño técnico en ADR-0043.
 
-## Para entrar (todas las personas)
+## La primera vez (todas las personas)
 
-1. Abre el monitor (`http://10.244.214.144:8080` por ZeroTier o `http://192.168.0.42:8080` en la oficina).
-2. Pega tu llave en «Entrar con tu llave». Empieza con `orc_live_` y mide 58 caracteres.
-3. Listo. La sesión dura hasta 8 horas y se cierra sola tras 1 hora sin uso. Para salir antes, usa «Salir» (arriba a la derecha).
+El administrador te da tu **usuario** y una **contraseña temporal**.
 
-**Cuida tu llave como una contraseña:**
+1. Abre el monitor: `http://192.168.0.42:8080` en la oficina, o `http://10.244.214.144:8080` por ZeroTier.
+2. Escribe tu usuario y la contraseña temporal.
+3. **Crea tu contraseña:** al menos 12 caracteres, con letras y números, y sin tu usuario.
+4. **Conecta tu celular:**
+   1. abre Microsoft Authenticator;
+   2. toca **+** → **Otra cuenta**;
+   3. escanea el código QR.
+5. Escribe los 6 dígitos que aparecen en la app para «Oráculo Monitor». Listo.
 
-- no la pegues en chats, correos ni documentos;
-- si crees que alguien la vio, pide que la revoquen y te den otra;
-- guárdala en un gestor de contraseñas, no en un archivo de texto en el escritorio.
+## Los demás días
+
+1. Usuario y contraseña.
+2. El código de 6 dígitos de Microsoft Authenticator.
+3. Ya no te pide nada hasta que des **«Salir»** (máximo 30 días).
+
+Para cambiar tu contraseña: botón **«Mi contraseña»**, arriba a la derecha.
+
+**Cuida tu cuenta:**
+- no compartas tu contraseña;
+- no dictes el código de 6 dígitos a nadie: nadie del sistema te lo va a pedir;
+- si cambias de celular, avísale al administrador.
 
 ## Qué ve cada quien
 
 | | Usuario | Superusuario |
 |---|---|---|
-| Explorar, Casos, Historial | Sí; en Historial, solo sus búsquedas | Sí; en Historial, las suyas y las automáticas, y «Ver de todos» |
+| Explorar, Casos, Historial | Sí; en Historial, solo sus búsquedas | Sí; en Historial, las suyas, las automáticas y «Ver de todos» |
 | Conceptos | Los ve y los prueba | Los crea y los cambia |
 | Envíos, Estado del sistema, Accesos | No | Sí |
 
@@ -26,26 +40,30 @@ Las búsquedas de otra persona no existen para ti: la base de datos no las entre
 
 ## Para administrar (superusuarios), pestaña «Accesos»
 
-- **Dar de alta a alguien:** «+ Nueva persona» → usuario sin espacios (`ana.lopez`), nombre, correo opcional y rol.
-- **Darle su llave:** «Llaves» → «+ Nueva llave».
-  - Elige vigencia: 90 días es lo recomendado.
-  - La llave aparece **una sola vez**: cópiala y entrégala en persona o por un canal seguro.
-- **Revocar:** «Llaves» → «Revocar». Deja de servir al instante y la sesión de esa persona se cierra.
-- **Quitar el acceso a alguien:** «Editar» → apaga «Puede entrar». Todas sus llaves dejan de servir.
-- **Cambiar rol:** «Editar» → Rol.
+- **Dar de alta a alguien:** «+ Nueva persona» con usuario sin espacios (`ana.lopez`), nombre y rol.
+  - Aparece su **contraseña temporal una sola vez**: cópiala y entrégala en persona.
+- **Olvidó su contraseña:** «Editar» → **Restablecer contraseña**. Le sale una temporal nueva y sus sesiones se cierran.
+- **Cambió o perdió el celular:** «Editar» → **Reiniciar autenticador**. Al entrar escanea un QR nuevo.
+- **Quitarle el acceso:** «Editar» → apaga «Puede entrar».
+- **Cambiar su rol:** «Editar» → Rol.
 
-El sistema no deja:
+**Etiquetas junto a cada persona:**
+- **«Contraseña temporal»:** todavía no entra por primera vez.
+- **«Sin Authenticator»:** no ha conectado su celular.
+- **«Bloqueada hasta…»:** falló 5 veces seguidas. Se desbloquea sola a los 15 minutos.
 
+**«Llaves de sistema»** son para que otros programas consulten el monitor (como las llaves de la API de ChatGPT). Las personas no las usan para entrar.
+
+**El sistema no deja:**
 - quitarte tu propio rol ni desactivarte;
-- quedarse sin superusuario;
-- revocar tu única llave vigente (crea otra antes).
+- quedarse sin superusuario.
 
-## Si se pierde la llave del superusuario
+## Si el superusuario no puede entrar
 
-En el servidor, por SSH, con el usuario `noticias`:
+Entra al servidor por SSH, con el usuario `noticias`, y corre:
 
 ```bash
-cd ~/monitor-noticias && make crear-llave ARGS="--usuario benji --dias 365"
+cd ~/monitor-noticias && make acceso ARGS="--usuario benji"
 ```
 
-La llave sale una vez en la pantalla de la terminal. Después entra y revoca la vieja en «Accesos».
+Te da una contraseña temporal que se ve una sola vez. Si además cambiaste de celular, agrega `--reiniciar-codigo` para escanear un QR nuevo.

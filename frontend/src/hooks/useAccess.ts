@@ -13,6 +13,8 @@ import {
   issueKey,
   listKeys,
   listUsers,
+  resetPassword,
+  resetTotp,
   revokeKey,
   updateUser,
 } from '../services/access';
@@ -59,6 +61,16 @@ export function useIssueKey() {
       issueKey(userId, label, days),
     onSuccess: refresh,
   });
+}
+
+export function useResetPassword() {
+  const refresh = useRefresh();
+  return useMutation({ mutationFn: (id: number) => resetPassword(id), onSuccess: refresh });
+}
+
+export function useResetTotp() {
+  const refresh = useRefresh();
+  return useMutation({ mutationFn: (id: number) => resetTotp(id), onSuccess: refresh });
 }
 
 export function useRevokeKey() {

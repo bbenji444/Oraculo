@@ -4,7 +4,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 - **Documentación interactiva:** <http://localhost:8080/api/v1/docs>. Ahí se ven todas las rutas, sus parámetros y sus errores posibles, y se pueden probar.
 - **Dónde correr los ejemplos:** en Ubuntu (WSL). Desde PowerShell, entra primero con `wsl`.
-- **Acceso (ADR-0042):** en el servidor toda ruta pide una llave `orc_live_…` (ver «Acceso con llave»). En la PC de desarrollo (`AUTH_MODE=dev`) se entra sin llave como `DEV_USER`, superusuario.
+- **Acceso (ADR-0043):** en el servidor se entra con usuario, contraseña y código de 6 dígitos (ver «Acceso»); los sistemas, con llave `orc_live_…`. En la PC de desarrollo (`AUTH_MODE=dev`) se entra sin nada como `DEV_USER`, superusuario.
 
 ## Reglas comunes
 
@@ -16,7 +16,7 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 | HTTP | Cuándo | Ejemplos de `code` |
 |---|---|---|
-| 401 | Falta la llave, la sesión terminó o la llave no sirve (revocada, vencida) | `auth_required` |
+| 401 | Falta la sesión, terminó, o la contraseña, el código o la llave no sirven | `auth_required` |
 | 403 | Tu rol no permite la acción (por ejemplo, un lector que edita un caso), o una petición con cookie sin `Origin` del mismo servidor | `case_forbidden`, `forbidden` |
 | 404 | Lo pedido no existe (o es un caso del que no eres miembro) | `search_not_found`, `article_not_found`, `concept_not_found`, `region_not_found`, `case_not_found` |
 | 409 | Choca con algo que ya existe, con un tope, con una búsqueda que aún corre o con un caso cerrado | `credit_limit_reached`, `concept_name_taken`, `search_not_finished`, `case_closed`, `username_taken`, `access_rule` |
@@ -29,27 +29,36 @@ Guía para usar la API desde la pantalla, desde el sistema mayor o desde la term
 
 **Fechas.** Se guardan en UTC y se entregan con su zona horaria (`-06:00` = Ciudad de México).
 
-## Acceso con llave
+## Acceso
 
-Cada persona entra con una llave como las de las APIs de OpenAI o Claude: `orc_live_<8 públicos>_<40 secretos>`. La da un superusuario en la pestaña «Accesos» (o `make crear-llave` en el servidor) y se muestra **una sola vez**. La base guarda solo su huella. Diseño completo en ADR-0042.
+Se entra igual que a Oráculo: usuario, contraseña y el código de 6 dígitos de Microsoft Authenticator (ADR-0043). Al terminar, la API deja el **token interno** en la cookie `monitor_sesion`, que identifica a la persona en cada petición. Los roles y la seguridad por filas son de ADR-0042.
 
-Rutas públicas (sin llave): `GET /health`, `GET /app-config`, `POST /auth/login` y `POST /auth/logout`. Todas las demás, también `/docs` y `/openapi.json`, piden llave.
+Rutas públicas (sin sesión): `GET /health`, `GET /app-config`, los pasos de `POST /auth/login…` y `POST /auth/logout`. Todas las demás, también `/docs` y `/openapi.json`, piden sesión o llave de sistema.
 
-**Desde la pantalla (cookie).** `POST /auth/login` con la llave en el cuerpo (nunca en la URL) abre una sesión de hasta 8 h que se cierra tras 60 min sin uso. La cookie `monitor_sesion` es `HttpOnly` y `SameSite=Strict`. Las peticiones que cambian algo deben traer `Origin` del mismo servidor; el navegador lo manda solo.
+**Entrar, en pasos.** Cada paso responde un `ticket` (vence en 10 min) que va en el siguiente, y `next` dice qué sigue: `code`, `change_password` o `enroll`.
 
 ```bash
 curl -s -c sesion.txt -X POST http://localhost:8080/api/v1/auth/login \
-  -H 'Content-Type: application/json' -d '{"key":"orc_live_…"}'
+  -H 'Content-Type: application/json' -d '{"username":"benji","password":"…"}'
+# {"ticket": "…", "next": "code"}
+curl -s -c sesion.txt -X POST http://localhost:8080/api/v1/auth/login/code \
+  -H 'Content-Type: application/json' -d '{"ticket":"…","code":"123456"}'
 curl -s -b sesion.txt http://localhost:8080/api/v1/auth/me
 ```
 
-```json
-{ "username": "benji", "display_name": "Benjamin", "role": "superuser",
-  "sections": ["explorar", "casos", "conceptos", "historial", "envios", "estado", "accesos"],
-  "auth_mode": "keys" }
-```
+| Ruta | Qué hace |
+|---|---|
+| `POST /auth/login` | Usuario y contraseña. 5 fallos seguidos bloquean la cuenta 15 min; 10 por IP, la IP (`429`) |
+| `POST /auth/login/password` | Primer ingreso: `{"ticket", "new_password"}`; al menos 12 caracteres, con letras y números, sin el usuario |
+| `POST /auth/login/enroll` | Primer ingreso: `{"ticket"}` → `{"qr_svg", "secret", "uri"}` para Microsoft Authenticator |
+| `POST /auth/login/enroll/confirm` | Primer ingreso: `{"ticket", "code"}`; confirma el celular y abre la sesión |
+| `POST /auth/login/code` | `{"ticket", "code"}`; abre la sesión (hasta «Salir» o 30 días). Un código no sirve dos veces; 5 errores cancelan el ingreso |
+| `GET /auth/me` | Quién soy y qué pestañas puedo abrir (`sections`) |
+| `POST /auth/password` | Cambiar mi contraseña: `{"current_password", "new_password"}`; cierra mis demás sesiones |
+| `POST /auth/logout` | Salir |
+| `POST /auth/introspect` | Para otros módulos: `{"token"}` → `{"active", "username", "display_name", "role"}`. Pide llave de sistema de un superusuario |
 
-**Desde otro sistema (Bearer).** La llave en cada petición, sin cookie:
+**Desde otro sistema (llave de sistema).** La llave en cada petición, sin cookie:
 
 ```bash
 curl -s -H 'Authorization: Bearer orc_live_…' 'http://localhost:8080/api/v1/searches?limit=1'
@@ -65,11 +74,13 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /access/users` | Personas, con cuántas llaves vigentes tiene cada una |
-| `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` |
+| `GET /access/users` | Personas: rol, si está activa, si su contraseña es temporal (`must_change_password`), si conectó su Authenticator (`totp_enrolled`), bloqueo y llaves vigentes |
+| `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
-| `GET /access/users/{id}/keys` | Sus llaves, sin secretos (`masked`: `orc_live_a1b2c3d4…`), con último uso e IP |
-| `POST /access/users/{id}/keys` | Crea una: `{"label": "Laptop", "days": 90}` (`days` de 1 a 365, o `null` para que no venza). Responde `{"key": "orc_live_…", "info": {…}}`: **única vez que sale la llave completa** |
+| `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
+| `POST /access/users/{id}/reset-totp` | Borra su Authenticator (`204`); escaneará un QR nuevo. Cierra sus sesiones |
+| `GET /access/users/{id}/keys` | Sus llaves de sistema, sin secretos (`masked`: `orc_live_a1b2c3d4…`) |
+| `POST /access/users/{id}/keys` | Crea una llave de sistema: `{"label", "days"}` → `{"key", "info"}` (**única vez que sale**) |
 | `DELETE /access/keys/{id}` | Revoca al instante y cierra las sesiones que entraron con ella |
 
 Reglas (`409 access_rule`):
@@ -78,7 +89,7 @@ Reglas (`409 access_rule`):
 - nadie revoca su única llave vigente;
 - máximo 5 llaves vigentes por persona.
 
-Cada alta, cambio, llave creada o revocada, entrada y entrada fallida queda en la bitácora (`user.created`, `user.updated`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
+**Bitácora:** cada alta, cambio, restablecimiento, entrada y entrada fallida queda registrada (`user.created`, `user.updated`, `user.password_reset`, `user.password_changed`, `user.totp_enrolled`, `user.totp_reset`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
 
 ## Flujo de una búsqueda
 

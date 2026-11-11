@@ -1,10 +1,12 @@
-"""Sesiones del navegador y freno de intentos, en Redis (ADR-0042).
+"""Sesiones, ingresos a medias y freno de intentos, en Redis (ADR-0042 y 0043).
 
 - ``RedisSessionStore``: cada sesión es una llave ``monitor:sesion:<huella>``
   que se borra sola tras el tiempo sin uso. Se guarda la **huella** SHA-256
   del valor de la cookie, no el valor: quien lea Redis no puede usarla. Un
   conjunto ``monitor:sesiones:<user_id>`` permite cerrar de golpe las de
   una persona (al revocar o desactivar).
+- ``RedisLoginTicketStore``: el ingreso a medias entre la contraseña y el
+  código (``monitor:ingreso:<huella>``, 10 min). También se guarda por huella.
 - ``RedisLoginLimiter``: cuenta fallos por IP en una ventana fija.
 
 No hace: no decide si una llave sirve (eso es de los casos de uso).
@@ -17,12 +19,13 @@ from datetime import datetime
 
 from redis.asyncio import Redis
 
-from app.application.ports.access import SessionData
+from app.application.ports.access import LoginTicket, SessionData
 from app.domain.access import AuthUser, Role, new_session_token, session_digest
 
 _SESSION = "monitor:sesion:"
 _USER_SESSIONS = "monitor:sesiones:"
 _FAILURES = "monitor:fallos-llave:"
+_TICKET = "monitor:ingreso:"
 
 
 async def _awaited[T](value: Awaitable[T] | T) -> T:
@@ -112,6 +115,63 @@ class RedisSessionStore:
             closed += int(await self._redis.delete(name))
             await _awaited(self._redis.srem(index, digest))
         return closed
+
+
+class RedisLoginTicketStore:
+    """``LoginTicketStorePort`` sobre Redis.
+
+    Args:
+        client: Cliente de Redis compartido.
+    """
+
+    def __init__(self, client: Redis) -> None:
+        self._redis = client
+
+    @staticmethod
+    def _name(token: str) -> str:
+        return f"{_TICKET}{session_digest(token)}"
+
+    async def create(self, ticket: LoginTicket, ttl_seconds: int) -> str:
+        """Ver ``LoginTicketStorePort.create``."""
+        token = new_session_token()
+        await self.save(token, ticket, ttl_seconds)
+        return token
+
+    async def get(self, token: str) -> LoginTicket | None:
+        """Ver ``LoginTicketStorePort.get``."""
+        raw = await self._redis.get(self._name(token))
+        if raw is None:
+            return None
+        value = json.loads(raw)
+        return LoginTicket(
+            user_id=value["user_id"],
+            username=value["username"],
+            must_change_password=value["must_change_password"],
+            needs_enrollment=value["needs_enrollment"],
+            pending_secret=value["pending_secret"],
+            attempts=value["attempts"],
+        )
+
+    async def save(self, token: str, ticket: LoginTicket, ttl_seconds: int) -> None:
+        """Ver ``LoginTicketStorePort.save``."""
+        await self._redis.set(
+            self._name(token),
+            json.dumps(
+                {
+                    "user_id": ticket.user_id,
+                    "username": ticket.username,
+                    "must_change_password": ticket.must_change_password,
+                    "needs_enrollment": ticket.needs_enrollment,
+                    "pending_secret": ticket.pending_secret,
+                    "attempts": ticket.attempts,
+                }
+            ),
+            ex=ttl_seconds,
+        )
+
+    async def delete(self, token: str) -> None:
+        """Ver ``LoginTicketStorePort.delete``."""
+        await self._redis.delete(self._name(token))
 
 
 class RedisLoginLimiter:

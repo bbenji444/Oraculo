@@ -54,8 +54,9 @@ vi.mock('./components/Explore/ExploreGlobe', async () => {
 vi.mock('./components/Space/SpaceBackground', () => ({ SpaceBackground: () => null }));
 
 const SEARCH_ID = search.search_id;
-// Una llave con la forma correcta (no es real).
-const GOOD_KEY = `orc_live_AbCd1234_${'x'.repeat(40)}`;
+// Credenciales de la API falsa (no son reales).
+const GOOD_PASSWORD = 'Contraseña-segura-2026';
+const GOOD_CODE = '123456';
 // Quién entró (ADR-0042): el superusuario, con todas las pestañas.
 const BENJI: Me = {
   username: 'benji',
@@ -121,15 +122,26 @@ function fakeApi(input: string, init?: RequestInit): Promise<Response> {
   const path = url.pathname.replace('/api/v1/', '');
   if (path === 'auth/me') {
     return Promise.resolve(
-      respond({ error: { code: 'auth_required', message: 'Entra con tu llave.' } }, 401),
+      respond({ error: { code: 'auth_required', message: 'Entra con tu usuario.' } }, 401),
     );
   }
   if (path === 'auth/login' && init?.method === 'POST') {
-    const body = JSON.parse(init.body as string) as { key: string };
+    const body = JSON.parse(init.body as string) as { username: string; password: string };
     return Promise.resolve(
-      body.key === GOOD_KEY
+      body.username === 'benji' && body.password === GOOD_PASSWORD
+        ? respond({ ticket: 'ingreso-1', next: 'code' })
+        : respond(
+            { error: { code: 'auth_required', message: 'Usuario o contraseña incorrectos.' } },
+            401,
+          ),
+    );
+  }
+  if (path === 'auth/login/code' && init?.method === 'POST') {
+    const body = JSON.parse(init.body as string) as { ticket: string; code: string };
+    return Promise.resolve(
+      body.ticket === 'ingreso-1' && body.code === GOOD_CODE
         ? respond(BENJI)
-        : respond({ error: { code: 'auth_required', message: 'La llave no es válida.' } }, 401),
+        : respond({ error: { code: 'auth_required', message: 'El código no es correcto.' } }, 401),
     );
   }
   if (path === 'searches' && init?.method === 'POST') {
@@ -520,26 +532,35 @@ describe('diseño de columna (?clasico, H1)', () => {
   }, 15000);
 });
 
-describe('acceso con llave (ADR-0042)', () => {
-  it('sin sesión pide la llave; una falsa no entra y la buena abre el monitor', async () => {
+describe('acceso con usuario, contraseña y código (ADR-0043)', () => {
+  it('sin sesión pide usuario y contraseña, luego el código, y abre el monitor', async () => {
     renderApp(null);
 
-    const field = await screen.findByLabelText('Llave de acceso');
+    const user = await screen.findByLabelText('Usuario');
+    const password = screen.getByLabelText('Contraseña');
     expect(screen.queryByRole('navigation', { name: 'Secciones' })).toBeNull();
-    expect(field.getAttribute('type')).toBe('password');
-    expect(field.getAttribute('autocomplete')).toBe('off');
-    const enter = screen.getByRole('button', { name: 'Entrar' });
-    fireEvent.change(field, { target: { value: 'no-es-llave' } });
-    expect((enter as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Así no se ve una llave/)).toBeTruthy();
+    expect(password.getAttribute('type')).toBe('password');
+    expect(password.getAttribute('autocomplete')).toBe('current-password');
+    const next = screen.getByRole('button', { name: 'Continuar' });
+    expect((next as HTMLButtonElement).disabled).toBe(true);
 
-    fireEvent.change(field, { target: { value: `orc_live_AbCd1234_${'y'.repeat(40)}` } });
-    fireEvent.click(enter);
-    expect((await screen.findByRole('alert')).textContent).toContain('no es válida');
+    fireEvent.change(user, { target: { value: 'benji' } });
+    fireEvent.change(password, { target: { value: 'equivocada-1' } });
+    fireEvent.click(next);
+    expect((await screen.findByRole('alert')).textContent).toContain('incorrectos');
 
-    fireEvent.change(field, { target: { value: GOOD_KEY } });
-    fireEvent.click(enter);
+    fireEvent.change(password, { target: { value: GOOD_PASSWORD } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+    const code = await screen.findByLabelText('Código de 6 dígitos');
+    expect(code.getAttribute('inputmode')).toBe('numeric');
+    fireEvent.change(code, { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('código');
+
+    fireEvent.change(code, { target: { value: GOOD_CODE } });
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
     expect(await screen.findByRole('button', { name: 'Salir' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mi contraseña' })).toBeTruthy();
     expect(screen.getByText('Benjamin')).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Secciones' });
     expect(within(nav).getByRole('link', { name: 'Accesos' })).toBeTruthy();

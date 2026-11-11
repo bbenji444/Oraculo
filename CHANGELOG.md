@@ -8,6 +8,27 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Se entra al monitor igual que a Oráculo: usuario, contraseña y código de 6 dígitos (10/11/2026, ADR-0043, migración 0040).** Benji: «que puedas acceder con contraseña, y esa contraseña genere un token interno que sea su identificación para los demás módulos».
+  - **Primer ingreso:** contraseña temporal que da el administrador → contraseña propia (12+ caracteres, letras y números) → escanear un QR con Microsoft Authenticator.
+  - **Los demás días:** usuario, contraseña y código. La sesión dura hasta «Salir» (máximo 30 días).
+  - **Token interno:** la sesión vive en una cookie que el JavaScript no puede leer. Otros módulos de Oráculo pueden preguntar de quién es con `POST /api/v1/auth/introspect`, sin pedir contraseña.
+  - **Seguridad:**
+    - contraseñas con huella scrypt;
+    - secreto del código cifrado con AES-256-GCM;
+    - ningún código sirve dos veces;
+    - 5 fallos bloquean la cuenta 15 min y 10 fallos por IP bloquean la IP;
+    - el mismo mensaje para usuario inexistente o contraseña equivocada.
+  - **«Accesos»:**
+    - dar de alta con contraseña temporal (se ve una sola vez);
+    - «Restablecer contraseña» y «Reiniciar autenticador»;
+    - etiquetas «Contraseña temporal», «Sin Authenticator» y «Bloqueada».
+  - **Cada quien:** botón «Mi contraseña» para cambiar la suya.
+  - **Llaves `orc_live_…`:** quedan solo para sistemas.
+  - **Nuevo comando:** `make acceso` da una contraseña temporal desde la consola del servidor.
+  - **Dependencias:**
+    - `segno`, nueva, dibuja el QR;
+    - `cryptography`, ya estaba instalada y ahora se declara.
+
 - **Acceso con llave, usuarios y roles; cada quien su historial (10/11/2026, ADR-0042, migraciones 0038 y 0039).** Benji: «un token como el de la API de ChatGPT», seguridad altísima, y que cada usuario tenga su propio historial con RLS. Es la etapa 1 de 3.
   - **Entrar con llave `orc_live_…`.** La pantalla pide la llave una vez y abre una sesión con cookie `HttpOnly` de hasta 8 h, que se cierra tras 1 h sin uso. Otros sistemas mandan la llave en `Authorization: Bearer`. La base guarda solo una huella con «pimienta», nunca la llave.
   - **Roles.** El superusuario (Benji) ve todo, más «Estado del sistema» y la nueva pestaña **«Accesos»**. El usuario normal ve Explorar, Casos, Conceptos e Historial; cada ruta revisa el rol, no solo la pantalla.
