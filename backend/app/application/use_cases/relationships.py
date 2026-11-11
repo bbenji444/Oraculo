@@ -4,6 +4,8 @@
   los sostienen.
 - ``ReviewRelationship``: confirmar o descartar un vínculo sugerido (por
   ejemplo, «aparecen juntas» derivado de la coocurrencia).
+- ``ReviewRelationships``: confirmar o descartar varios a la vez (F12,
+  ADR-0107), todos o ninguno.
 - ``CreateRelationship``: el analista dibuja un vínculo que el sistema no vio
   ("familiar", "es dueño de", una etiqueta propia).
 
@@ -19,6 +21,7 @@ Reglas que se cumplen aquí:
 No hace: no sabe de HTTP ni SQL; no propone vínculos con la IA.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -33,6 +36,7 @@ from app.application.ports.relationships import (
     find,
 )
 from app.application.use_cases.cases import case_for, require_edit
+from app.domain.bulk_review import BulkReviewResult, check_bulk_review
 from app.domain.errors import RelationshipNotFoundError, RelationshipValidationError
 from app.domain.investigation import (
     InvestigationAction,
@@ -179,24 +183,103 @@ class ReviewRelationship:
         view = await _existing(self._relationships, case_id, key)
         if view.review_status is status:
             return view, False
-        action = (
-            InvestigationAction.RELATIONSHIP_CONFIRMED
-            if status is ReviewStatus.CONFIRMED
-            else InvestigationAction.RELATIONSHIP_DISCARDED
-        )
-        write = RelationshipWrite(
-            relationship_id=view.relationship_id,
-            key=key,
-            custom_label=view.custom_label,
-            origin=view.origin,
-            confidence=view.confidence,
-            review_status=status,
-            reviewer=actor.user_id,
-            notes=None,
-        )
-        audit = AuditEntry(actor, action, {**_payload(view), "before": view.review_status.value})
-        await self._relationships.save(case_id, write, audit)
+        await self._relationships.save(case_id, *_review_write(view, status, actor))
         return await _existing(self._relationships, case_id, key), True
+
+
+class ReviewRelationships:
+    """Confirma o descarta varios vínculos a la vez (F12, ADR-0107)."""
+
+    def __init__(
+        self, cases: CaseRepositoryPort, relationships: RelationshipRepositoryPort
+    ) -> None:
+        """Recibe los repositorios.
+
+        Args:
+            cases: Casos (para los permisos).
+            relationships: Vínculos.
+        """
+        self._cases = cases
+        self._relationships = relationships
+
+    async def execute(
+        self,
+        case_id: UUID,
+        status: ReviewStatus,
+        keys: Sequence[RelationshipKey],
+        actor: Actor,
+    ) -> BulkReviewResult:
+        """Revisa todos o ninguno, con las mismas reglas que uno por uno.
+
+        Los vínculos se calculan una sola vez para toda la petición. Los que
+        ya estaban así no se tocan ni repiten la bitácora.
+
+        Args:
+            case_id: Caso.
+            status: Confirmar o descartar.
+            keys: Entidades y tipo de cada vínculo, como los devolvió la lista
+                (en los simétricos se acepta cualquier orden).
+            actor: Quién decide.
+
+        Returns:
+            Cuántos cambiaron y cuántos ya estaban así.
+
+        Raises:
+            BulkReviewError: Si viene vacía, con repetidos, con demasiados o
+                pide regresar a «sugerido».
+            InvalidRequestError: Si algún vínculo une a una entidad consigo misma.
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si su rol solo permite mirar.
+            CaseClosedError: Si el caso está cerrado o archivado.
+            RelationshipNotFoundError: Si alguno ya no existe entre entidades
+                confirmadas del caso.
+        """
+        wanted = [
+            RelationshipKey(*ordered_pair(k.type, k.entity_a, k.entity_b), k.type) for k in keys
+        ]
+        check_bulk_review(status, wanted)
+        require_edit(await case_for(self._cases, case_id, actor))
+        views = {view.key: view for view in await self._relationships.list_case(case_id)}
+        missing = [key for key in wanted if key not in views]
+        if missing:
+            raise RelationshipNotFoundError(
+                "Alguno de los vínculos elegidos ya no está en el caso; vuelve a cargar la lista.",
+                {"case_id": str(case_id), "missing": len(missing)},
+            )
+        items = [
+            _review_write(views[key], status, actor, bulk=True)
+            for key in wanted
+            if views[key].review_status is not status
+        ]
+        if items:
+            await self._relationships.save_many(case_id, items)
+        return BulkReviewResult(changed=len(items), unchanged=len(wanted) - len(items))
+
+
+def _review_write(
+    view: RelationshipView, status: ReviewStatus, actor: Actor, *, bulk: bool = False
+) -> tuple[RelationshipWrite, AuditEntry]:
+    """Lo que se guarda al confirmar o descartar un vínculo, con su bitácora."""
+    action = (
+        InvestigationAction.RELATIONSHIP_CONFIRMED
+        if status is ReviewStatus.CONFIRMED
+        else InvestigationAction.RELATIONSHIP_DISCARDED
+    )
+    write = RelationshipWrite(
+        relationship_id=view.relationship_id,
+        key=view.key,
+        custom_label=view.custom_label,
+        origin=view.origin,
+        confidence=view.confidence,
+        review_status=status,
+        reviewer=actor.user_id,
+        notes=None,
+    )
+    payload: dict[str, object] = {**_payload(view), "before": view.review_status.value}
+    if bulk:
+        # Para distinguir en la bitácora lo que se decidió en bloque (ADR-0107).
+        payload["bulk"] = True
+    return write, AuditEntry(actor, action, payload)
 
 
 class CreateRelationship:

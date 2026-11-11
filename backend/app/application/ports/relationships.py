@@ -173,6 +173,20 @@ class RelationshipRepositoryPort(Protocol):
         """
         ...
 
+    async def save_many(
+        self, case_id: UUID, items: Sequence[tuple[RelationshipWrite, AuditEntry]]
+    ) -> None:
+        """Guarda varias revisiones en una sola transacción (F12, ADR-0107).
+
+        Cada una con su firma y su entrada de la bitácora; si una falla, no
+        se guarda ninguna.
+
+        Args:
+            case_id: Caso (la bitácora se registra sobre él).
+            items: Qué se guarda de cada vínculo y su registro de la bitácora.
+        """
+        ...
+
 
 def find(views: Sequence[RelationshipView], key: RelationshipKey) -> RelationshipView | None:
     """El vínculo con esa llave, si existe.

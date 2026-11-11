@@ -19,7 +19,7 @@ la tabla reservada de enlaces externos (ADR-0101).
 """
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -60,6 +60,26 @@ _CONFIRMED_SQL = """
     SELECT e.id, e.type, e.canonical_label, e.legal_status FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
     WHERE ce.case_id = :case AND e.merged_into IS NULL AND e.review_status = 'confirmed'
+"""
+# Revisar uno guardado, o guardar uno nuevo (un calculado que alguien revisó
+# o uno que dibujó una persona). La llave única es (entity_a, entity_b, type).
+_UPDATE_SQL = """
+    UPDATE relationships SET review_status = :status, reviewed_by = :by,
+        reviewed_at = now(), custom_label = :label, confidence = :confidence,
+        notes = COALESCE(:notes, notes), updated_at = now()
+    WHERE id = :id
+"""
+_INSERT_SQL = """
+    INSERT INTO relationships (entity_a, entity_b, type, custom_label, origin, confidence,
+        review_status, reviewed_by, reviewed_at, notes)
+    VALUES (:a, :b, :type, :label, :origin, :confidence, :status, :by, now(), :notes)
+    ON CONFLICT (entity_a, entity_b, type) DO UPDATE SET
+        review_status = EXCLUDED.review_status,
+        reviewed_by = EXCLUDED.reviewed_by, reviewed_at = now(),
+        custom_label = EXCLUDED.custom_label,
+        confidence = EXCLUDED.confidence,
+        notes = COALESCE(EXCLUDED.notes, relationships.notes),
+        updated_at = now()
 """
 # Las notas sin fecha van al final de la evidencia.
 _UNDATED = datetime.min.replace(tzinfo=UTC)
@@ -162,6 +182,22 @@ class PostgresRelationshipRepository:
 
     async def save(self, case_id: UUID, write: RelationshipWrite, audit: AuditEntry) -> None:
         """Ver ``RelationshipRepositoryPort.save``."""
+        await self.save_many(case_id, [(write, audit)])
+
+    async def save_many(
+        self, case_id: UUID, items: Sequence[tuple[RelationshipWrite, AuditEntry]]
+    ) -> None:
+        """Ver ``RelationshipRepositoryPort.save_many``."""
+        # Una sola transacción: si una falla, ``begin`` deshace todas (ADR-0107).
+        async with self._engine.begin() as conn:
+            for write, audit in items:
+                await self._write(conn, write)
+                await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+
+    @staticmethod
+    async def _write(conn: AsyncConnection, write: RelationshipWrite) -> None:
+        """Actualiza el vínculo guardado o guarda uno nuevo con su llave."""
         params: dict[str, Any] = {
             "id": write.relationship_id,
             "a": write.key.entity_a,
@@ -174,34 +210,10 @@ class PostgresRelationshipRepository:
             "by": write.reviewer,
             "notes": write.notes,
         }
-        async with self._engine.begin() as conn:
-            if write.relationship_id is not None:
-                await conn.execute(
-                    text(
-                        "UPDATE relationships SET review_status = :status, reviewed_by = :by, "
-                        "reviewed_at = now(), custom_label = :label, confidence = :confidence, "
-                        "notes = COALESCE(:notes, notes), updated_at = now() WHERE id = :id"
-                    ),
-                    params,
-                )
-            else:
-                await conn.execute(
-                    text(
-                        "INSERT INTO relationships (entity_a, entity_b, type, custom_label, "
-                        "origin, confidence, review_status, reviewed_by, reviewed_at, notes) "
-                        "VALUES (:a, :b, :type, :label, :origin, :confidence, :status, :by, "
-                        "now(), :notes) ON CONFLICT (entity_a, entity_b, type) DO UPDATE SET "
-                        "review_status = EXCLUDED.review_status, "
-                        "reviewed_by = EXCLUDED.reviewed_by, reviewed_at = now(), "
-                        "custom_label = EXCLUDED.custom_label, "
-                        "confidence = EXCLUDED.confidence, "
-                        "notes = COALESCE(EXCLUDED.notes, relationships.notes), "
-                        "updated_at = now()"
-                    ),
-                    params,
-                )
-            await write_audit(conn, case_id, audit)
-            await touch(conn, case_id)
+        if write.relationship_id is not None:
+            await conn.execute(text(_UPDATE_SQL), params)
+        else:
+            await conn.execute(text(_INSERT_SQL), params)
 
     async def _stored(
         self,

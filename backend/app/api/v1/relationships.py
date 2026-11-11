@@ -6,6 +6,8 @@
 - ``POST /relationships/confirm`` y ``/discard``: revisar uno sugerido. Van
   con la llave (entidades y tipo) porque un sugerido por coocurrencia todavía
   no tiene id.
+- ``POST /cases/{id}/relationships/review``: confirmar o descartar varios a
+  la vez (F12, ADR-0107), todos o ninguno.
 
 Cada ruta solo traduce HTTP ↔ casos de uso; permisos y reglas viven en
 ``app.application.use_cases.relationships``.
@@ -20,11 +22,13 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.cases import CaseId, Cases, CurrentActor
 from app.api.v1.entities import Entities
+from app.api.v1.schemas.entities import BulkReviewOut
 from app.api.v1.schemas.relationships import (
     CaseRelationshipsOut,
     RelationshipIn,
     RelationshipOut,
     RelationshipReviewIn,
+    RelationshipsReviewIn,
 )
 from app.application.ports.relationships import RelationshipKey, RelationshipRepositoryPort
 from app.application.use_cases.relationships import (
@@ -32,6 +36,7 @@ from app.application.use_cases.relationships import (
     ListRelationships,
     RelationshipInput,
     ReviewRelationship,
+    ReviewRelationships,
 )
 from app.domain.investigation import ReviewStatus
 
@@ -127,3 +132,24 @@ async def discard_relationship(
 ) -> RelationshipOut:
     """Deja de sugerirse sin borrarse (``relationship.discarded``)."""
     return await _review(body, cases, relationships, actor, ReviewStatus.DISCARDED)
+
+
+@router.post(
+    "/cases/{case_id}/relationships/review",
+    response_model=BulkReviewOut,
+    summary="Confirmar o descartar varios vínculos a la vez",
+    responses=error_responses(403, 404, 409, 422),
+)
+async def review_relationships(
+    body: RelationshipsReviewIn,
+    cases: Cases,
+    relationships: Relationships,
+    actor: CurrentActor,
+    case_id: CaseId,
+) -> BulkReviewOut:
+    """Todos o ninguno, cada uno con su firma y su bitácora (``"bulk": true``)."""
+    keys = [RelationshipKey(item.entity_a, item.entity_b, item.type) for item in body.items]
+    result = await ReviewRelationships(cases, relationships).execute(
+        case_id, body.status, keys, actor
+    )
+    return BulkReviewOut.from_result(result)

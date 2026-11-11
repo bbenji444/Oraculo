@@ -12,9 +12,11 @@ from app.application.use_cases.relationships import (
     ListRelationships,
     RelationshipInput,
     ReviewRelationship,
+    ReviewRelationships,
 )
 from app.domain.case import CaseChanges
 from app.domain.errors import (
+    BulkReviewError,
     CaseClosedError,
     CaseForbiddenError,
     InvalidRequestError,
@@ -190,3 +192,62 @@ async def test_en_un_caso_cerrado_no_se_vincula() -> None:
         await CreateRelationship(cases, entities, relationships).execute(
             case_id, RelationshipInput(1, 2, "associate"), BENJI
         )
+
+
+# --- Revisar en bloque (F12, ADR-0107) ---------------------------------------------
+
+
+async def test_confirmar_vinculos_en_bloque_firma_cada_uno() -> None:
+    cases, _, relationships, case_id = await setup()
+    relationships.views[case_id] = [suggested(1, 2), suggested(1, 3), suggested(2, 3)]
+    review = ReviewRelationships(cases, relationships)
+
+    # En los simétricos da igual el orden en que llegan las dos entidades.
+    result = await review.execute(
+        case_id,
+        ReviewStatus.CONFIRMED,
+        [RelationshipKey(1, 2, APPEARS), RelationshipKey(3, 1, APPEARS)],
+        BENJI,
+    )
+    again = await review.execute(
+        case_id,
+        ReviewStatus.CONFIRMED,
+        [RelationshipKey(1, 2, APPEARS), RelationshipKey(2, 3, APPEARS)],
+        BENJI,
+    )
+
+    assert (result.changed, result.unchanged) == (2, 0)
+    assert (again.changed, again.unchanged) == (1, 1)
+    assert relationships.bulk_calls == 2
+    audits = [audit for _, _, audit in relationships.saved]
+    assert all(a.action == InvestigationAction.RELATIONSHIP_CONFIRMED for a in audits)
+    assert all(a.payload["bulk"] is True for a in audits)
+    assert [w.reviewer for _, w, _ in relationships.saved] == ["benji"] * 3
+
+
+async def test_vinculos_en_bloque_todo_o_nada_y_permisos() -> None:
+    cases, _, relationships, case_id = await setup()
+    relationships.views[case_id] = [suggested(1, 2)]
+    review = ReviewRelationships(cases, relationships)
+    one = [RelationshipKey(1, 2, APPEARS)]
+
+    with pytest.raises(RelationshipNotFoundError):
+        await review.execute(
+            case_id, ReviewStatus.DISCARDED, [*one, RelationshipKey(1, 3, APPEARS)], BENJI
+        )
+    with pytest.raises(BulkReviewError):
+        await review.execute(case_id, ReviewStatus.SUGGESTED, one, BENJI)
+    with pytest.raises(BulkReviewError):
+        await review.execute(
+            case_id, ReviewStatus.DISCARDED, [*one, RelationshipKey(2, 1, APPEARS)], BENJI
+        )
+    with pytest.raises(InvalidRequestError):
+        await review.execute(
+            case_id, ReviewStatus.DISCARDED, [RelationshipKey(2, 2, APPEARS)], BENJI
+        )
+    with pytest.raises(CaseForbiddenError):
+        await review.execute(case_id, ReviewStatus.DISCARDED, one, LECTORA)
+    await UpdateCase(cases).execute(case_id, CaseChanges(status=CaseStatus.CLOSED), BENJI)
+    with pytest.raises(CaseClosedError):
+        await review.execute(case_id, ReviewStatus.DISCARDED, one, BENJI)
+    assert relationships.saved == []

@@ -6,6 +6,7 @@ guarda. No calcula coocurrencias: eso lo prueban las pruebas de integración
 del repositorio real.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from uuid import UUID
@@ -53,6 +54,8 @@ class FakeRelationshipRepository:
     views: dict[UUID, list[RelationshipView]] = field(default_factory=dict)
     saved: list[tuple[UUID, RelationshipWrite, AuditEntry]] = field(default_factory=list)
     next_id: int = 500
+    # F12 (ADR-0107): cuántas revisiones en bloque llegaron al repositorio.
+    bulk_calls: int = 0
 
     async def list_case(self, case_id: UUID) -> list[RelationshipView]:
         return list(self.views.get(case_id, []))
@@ -83,3 +86,10 @@ class FakeRelationshipRepository:
                 notes=write.notes if write.notes is not None else current.notes,
             )
         )
+
+    async def save_many(
+        self, case_id: UUID, items: Sequence[tuple[RelationshipWrite, AuditEntry]]
+    ) -> None:
+        for write, audit in items:
+            await self.save(case_id, write, audit)
+        self.bulk_calls += 1

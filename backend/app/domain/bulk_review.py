@@ -16,6 +16,7 @@ No hace: no guarda nada ni revisa permisos.
 """
 
 from collections.abc import Hashable, Sequence
+from dataclasses import dataclass
 
 from app.domain.errors import BulkReviewError
 from app.domain.investigation import ReviewStatus
@@ -26,6 +27,19 @@ from app.domain.investigation import ReviewStatus
 # dejar una transacción abierta mucho tiempo (cada elemento escribe su
 # bitácora).
 BULK_REVIEW_MAX_ITEMS = 500
+
+
+@dataclass(frozen=True, slots=True)
+class BulkReviewResult:
+    """Cómo quedó una revisión en bloque.
+
+    Attributes:
+        changed: Cuántos cambiaron (cada uno con su entrada en la bitácora).
+        unchanged: Cuántos ya estaban así y no se tocaron.
+    """
+
+    changed: int
+    unchanged: int
 
 
 def check_bulk_review(status: ReviewStatus, keys: Sequence[Hashable]) -> None:

@@ -50,7 +50,7 @@ from app.application.ports.llm import (
 )
 from app.application.use_cases.cases import case_for, require_edit
 from app.application.use_cases.reports import LLMPrices
-from app.domain.bulk_review import check_bulk_review
+from app.domain.bulk_review import BulkReviewResult, check_bulk_review
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import (
     CASE_EXTRACTION_MAX_ARTICLES,
@@ -524,19 +524,6 @@ class EntityDecision:
 
     entity_id: int
     legal_status: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class BulkReviewResult:
-    """Cómo quedó una revisión en bloque.
-
-    Attributes:
-        changed: Cuántas cambiaron (cada una con su entrada en la bitácora).
-        unchanged: Cuántas ya estaban así y no se tocaron.
-    """
-
-    changed: int
-    unchanged: int
 
 
 class ReviewEntities:

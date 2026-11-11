@@ -15,7 +15,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.application.ports.entities import CaseAnalysis, CaseEntity, MentionView
-from app.application.use_cases.entities import BulkReviewResult, CaseEntities, PendingRequest
+from app.application.use_cases.entities import CaseEntities, PendingRequest
+from app.domain.bulk_review import BulkReviewResult
 from app.domain.investigation import (
     ENTITY_TYPE_LABEL,
     LEGAL_STATUS_LABEL,

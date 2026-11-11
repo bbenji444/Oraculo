@@ -13,6 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.api.v1.schemas.entities import BulkActionIn
 from app.application.ports.relationships import (
     RelationshipEnd,
     RelationshipView,
@@ -49,13 +50,24 @@ class RelationshipIn(BaseModel):
     notes: str | None = Field(default=None, max_length=RELATIONSHIP_NOTES_MAX_CHARS * _RAW_SLACK)
 
 
-class RelationshipReviewIn(BaseModel):
-    """Cuerpo de confirmar o descartar: el caso y la llave del vínculo."""
+class RelationshipKeyIn(BaseModel):
+    """La llave de un vínculo: sus dos entidades y su tipo, como los trae la lista."""
 
-    case_id: UUID
     entity_a: int
     entity_b: int
     type: RelationshipType
+
+
+class RelationshipReviewIn(RelationshipKeyIn):
+    """Cuerpo de confirmar o descartar: el caso y la llave del vínculo."""
+
+    case_id: UUID
+
+
+class RelationshipsReviewIn(BulkActionIn):
+    """Cuerpo de ``POST /cases/{id}/relationships/review`` (F12, ADR-0107)."""
+
+    items: list[RelationshipKeyIn]
 
 
 class RelationshipEndOut(BaseModel):
