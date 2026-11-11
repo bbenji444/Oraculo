@@ -57,6 +57,7 @@ Sirven para que alguien nuevo entienda *por qué* el proyecto es como es, no sol
 | [0041](0041-notas-fuera-de-la-region.md) | Las notas fuera de la región no cuentan; un medio de otro país sin lugar en la nota cuenta como fuera | Aceptado |
 | [0042](0042-acceso-con-llave-y-seguridad-por-filas.md) | Acceso con llave `orc_live_…` (cookie HttpOnly o Bearer), roles superusuario/usuario y seguridad por filas en PostgreSQL | Aceptado (la forma de entrar la reemplaza la 0043) |
 | [0043](0043-contrasena-codigo-y-token-interno.md) | Entrar como en Oráculo: contraseña (scrypt) + código de 6 dígitos (TOTP); token interno consultable por otros módulos | Aceptado |
+| [0044](0044-relevancia-estricta.md) | Relevancia estricta: el concepto debe ser el asunto principal (enrich_v4) y un «sí» con menos de 0.6 de confianza no cuenta | Aceptado |
 | [0101](0101-entidades-independientes-de-la-fuente.md) | Entidades independientes de la fuente y `external_links` reservada (Fase 9) | Aceptado |
 | [0102](0102-motor-visual-del-muro.md) | Motor visual del muro: capa propia de MapLibre sobre el mismo globo (bloque 0101–0105 de las fases 9–11) | Aceptado |
 | [0103](0103-extraccion-de-entidades.md) | Las entidades se extraen solo de las notas que entran a un caso, en una llamada aparte (Fase 9.4) | Aceptado |

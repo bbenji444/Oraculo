@@ -1,6 +1,6 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v3.md`` para
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v4.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
 caso) y su respuesta se valida con el mismo modelo de Pydantic
@@ -38,13 +38,15 @@ from app.domain.region import RegionLevel
 # v3 (28/10/2026): la fecha y el tipo son los de lo que la nota informa (la
 # sentencia de hoy, no el delito de 2019), para que las corridas dejen fuera
 # solo los hechos de otros días (ADR-0031).
-PROMPT_VERSION = "enrich_v3"
+PROMPT_VERSION = "enrich_v4"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 # Respuestas consistentes: se extraen datos, no se escribe creativo.
 TEMPERATURE = 0.2
-# Tope de la respuesta: un JSON con resumen, conceptos y lugares cabe de
-# sobra; evita respuestas desbocadas que cuestan.
-MAX_OUTPUT_TOKENS = 2048
+# Tope de la respuesta: evita respuestas desbocadas que cuestan. Con 2048,
+# las agendas de marchas (decenas de lugares) llegaban cortadas y la nota se
+# quedaba sin resumen (prueba del 11/11/2026: 2 de 25). enrich_v4 además pide
+# máximo 12 lugares; solo se cobra lo que de verdad se escribe.
+MAX_OUTPUT_TOKENS = 3072
 # Se agrega al prompt en el reintento (§10: "se reintenta una vez con el error").
 RETRY_NOTE = (
     "\n\nTu respuesta anterior no cumplió el esquema. Error: {error}\n"

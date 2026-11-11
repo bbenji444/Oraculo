@@ -25,6 +25,7 @@ from app.application.ports.search_reads import (
 )
 from app.domain.authority import (
     FGR_FEDERAL_EXCLUDED,
+    MIN_RELEVANCE_SCORE,
     Authority,
     RelevanceRule,
     effective_relevance,
@@ -69,9 +70,11 @@ ALL_JUDGEMENTS = """
 # concepto pida la FGR federal y la FGR no actúe. Se arma con los valores del
 # dominio para que el SQL y Python nunca digan cosas distintas.
 _EXCLUDED_SQL = ", ".join(f"'{authority.value}'" for authority in FGR_FEDERAL_EXCLUDED)
+# También pide la confianza mínima de la IA (MIN_RELEVANCE_SCORE, 11/11/2026).
 KEEPS_RELEVANCE = (
     f"NOT (c.relevance_rule = '{RelevanceRule.FGR_FEDERAL.value}' "
-    f"AND a.authority IN ({_EXCLUDED_SQL}))"
+    f"AND a.authority IN ({_EXCLUDED_SQL})) "
+    f"AND COALESCE(ac.relevance_score, 0) >= {MIN_RELEVANCE_SCORE}"
 )
 # Proveedores que la encontraron en cualquier búsqueda.
 ALL_PROVIDERS = """
@@ -177,7 +180,13 @@ def judgement_view(value: Sequence[Any], authority: Authority | None) -> Judgeme
         El juicio con la relevancia final (ADR-0030).
     """
     concept_id, name, relevant, score, reason, rule = value
-    relevant, reason = effective_relevance(relevant, reason, RelevanceRule(rule), authority)
+    relevant, reason = effective_relevance(
+        relevant,
+        reason,
+        RelevanceRule(rule),
+        authority,
+        float(score) if score is not None else None,
+    )
     return JudgementView(concept_id, name, relevant, float(score), reason)
 
 
