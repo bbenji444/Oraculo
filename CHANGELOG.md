@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Bitácora en «Accesos» (11/11/2026).** Benji: «¿a qué bitácora te refieres?».
+  - En «Accesos», el botón **Bitácora** muestra quién hizo qué, cuándo y desde qué IP. Incluye entradas, intentos fallidos, llaves vistas o generadas, búsquedas, reportes, casos y conceptos.
+  - Cada registro se lee como frase («Benji vio la llave de API de Pepe»). Se filtra por tema y por persona, y «Ver más» trae lo anterior.
+  - Solo superusuarios. Nueva ruta `GET /access/audit`, que pagina por cursor. No borra ni cambia nada.
+
 - **Radar sobre la zona buscada (11/11/2026).** Mientras corre una búsqueda:
   - el radar se centra en la región y toma su tamaño;
   - marca la región con esquinas de «objetivo» y sus coordenadas;

@@ -4,14 +4,16 @@
  * La llave recién creada no se guarda en la caché: solo vive en el estado
  * del aviso que la muestra una vez.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  type AuditGroup,
   type NewUserInput,
   type UserPatch,
   createUser,
   deleteUser,
   getAuthSettings,
+  listAudit,
   newApiKey,
   saveAuthSettings,
   showApiKey,
@@ -35,6 +37,21 @@ export function useAccessKeys(userId: number | null) {
     queryKey: ['access', 'keys', userId],
     queryFn: ({ signal }) => listKeys(userId ?? 0, signal),
     enabled: userId !== null,
+  });
+}
+
+/**
+ * La bitácora por páginas, de lo más nuevo a lo más viejo.
+ *
+ * Su llave empieza con 'access': lo que cambia algo en «Accesos» la vuelve a
+ * pedir, así el registro nuevo aparece sin recargar.
+ */
+export function useAuditTrail(group: AuditGroup, actor: string | null) {
+  return useInfiniteQuery({
+    queryKey: ['access', 'audit', group, actor],
+    queryFn: ({ pageParam, signal }) => listAudit(group, actor, pageParam, signal),
+    initialPageParam: null as number | null,
+    getNextPageParam: (last) => last.next_before,
   });
 }
 

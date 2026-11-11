@@ -14,6 +14,8 @@
  * - «Editar» cambia nombre, correo, rol o la desactiva, y tiene la sección
  *   «Seguridad»: restablecer contraseña o reiniciar autenticador.
  * - «Llaves de sistema» son para otros programas (no para personas).
+ * - «Bitácora» (`AuditTrail`): quién entró, quién vio o generó cada llave y
+ *   quién buscó o cambió algo, con la hora y desde dónde.
  *
  * No hace: no aplica reglas (el servidor impide, por ejemplo, quitarte tu
  * propio rol o dejar el sistema sin superusuario).
@@ -33,8 +35,10 @@ import { formatMexicoCity } from '../Explore/format';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
+import { HudSegmented } from '../ui/HudSegmented';
 import { SectionHeading } from '../ui/SectionHeading';
 import { ApiKeyRow } from './ApiKeyRow';
+import { AuditTrail } from './AuditTrail';
 import { LoginSettings } from './LoginSettings';
 import { SecurityActions } from './SecurityActions';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
@@ -43,6 +47,12 @@ import { UserKeys } from './UserKeys';
 
 // Las entradas escalonadas se cortan aquí: una lista larga no debe tardar en aparecer.
 const MAX_STAGGER = 12;
+
+type View = 'personas' | 'bitacora';
+const VIEWS: readonly { value: View; label: string }[] = [
+  { value: 'personas', label: 'Personas' },
+  { value: 'bitacora', label: 'Bitácora' },
+];
 
 function UserItem({
   user,
@@ -129,6 +139,7 @@ export function AccessPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<AccessUser | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [view, setView] = useState<View>('personas');
   // La contraseña temporal recién creada: solo vive en este aviso.
   const [temporary, setTemporary] = useState<{
     password: string;
@@ -143,41 +154,52 @@ export function AccessPage() {
         <SectionHeading
           kicker="Solo superusuarios"
           title="Accesos"
-          description="Quién puede entrar al monitor y la llave de API de cada persona, para conectarla con el resto de Oráculo."
+          description="Quién puede entrar al monitor, la llave de API de cada persona para conectarla con el resto de Oráculo y la bitácora de lo que pasa."
           actions={
-            <HudButton
-              variant="solid"
-              size="sm"
-              onClick={() => {
-                create.reset();
-                setCreating(true);
-              }}
-            >
-              + Nueva persona
-            </HudButton>
+            view === 'personas' && (
+              <HudButton
+                variant="solid"
+                size="sm"
+                onClick={() => {
+                  create.reset();
+                  setCreating(true);
+                }}
+              >
+                + Nueva persona
+              </HudButton>
+            )
           }
         />
-        <LoginSettings />
-        {users.isPending && <p className="mt-6 text-sm text-slate-400">Cargando…</p>}
-        {users.error && <p className="mt-6 text-sm text-rose-300">{users.error.message}</p>}
-        <ul className="mt-6 space-y-3">
-          {list.map((user, index) => (
-            <UserItem
-              key={user.id}
-              user={user}
-              index={index}
-              isSelf={user.username === me?.username}
-              open={openId === user.id}
-              onToggle={() => {
-                setOpenId(openId === user.id ? null : user.id);
-              }}
-              onEdit={() => {
-                update.reset();
-                setEditing(user);
-              }}
-            />
-          ))}
-        </ul>
+        <div className="mt-6">
+          <HudSegmented label="Qué ver" options={VIEWS} value={view} onChange={setView} />
+        </div>
+        {view === 'bitacora' ? (
+          <AuditTrail people={list} />
+        ) : (
+          <>
+            <LoginSettings />
+            {users.isPending && <p className="mt-6 text-sm text-slate-400">Cargando…</p>}
+            {users.error && <p className="mt-6 text-sm text-rose-300">{users.error.message}</p>}
+            <ul className="mt-6 space-y-3">
+              {list.map((user, index) => (
+                <UserItem
+                  key={user.id}
+                  user={user}
+                  index={index}
+                  isSelf={user.username === me?.username}
+                  open={openId === user.id}
+                  onToggle={() => {
+                    setOpenId(openId === user.id ? null : user.id);
+                  }}
+                  onEdit={() => {
+                    update.reset();
+                    setEditing(user);
+                  }}
+                />
+              ))}
+            </ul>
+          </>
+        )}
       </div>
       {creating && (
         <Modal

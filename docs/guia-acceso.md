@@ -49,6 +49,11 @@ Las búsquedas de otra persona no existen para ti: la base de datos no las entre
   - Cada vez que alguien la ve queda en la bitácora.
   - Los usuarios normales no ven llaves. Cómo la usa el otro sistema: `docs/guia-integracion-api.md`.
 
+- **Bitácora** (botón «Bitácora», arriba de la lista): el registro de quién hizo qué. Cada renglón es una frase («Benji vio la llave de API de Pepe») con la hora y desde qué IP.
+  - Trae: quién entró y los **intentos fallidos** (en rojo), quién vio, generó o revocó llaves, altas y cambios de personas, búsquedas, reportes, casos y conceptos.
+  - Se filtra por **Qué** (entradas y llaves, búsquedas, reportes, casos, conceptos) y por **Quién**. «Ver más» trae lo anterior.
+  - No se puede borrar ni editar, y las llaves solo aparecen enmascaradas (`orc_live_a1b2c3d4…`).
+
 - **Dar de alta a alguien:** «+ Nueva persona» con usuario sin espacios (`ana.lopez`), nombre y rol.
   - Aparece su **contraseña temporal una sola vez**: cópiala y entrégala en persona.
 - **Olvidó su contraseña:** «Editar» → **Restablecer contraseña**. Le sale una temporal nueva y sus sesiones se cierran.

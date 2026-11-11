@@ -211,3 +211,59 @@ export async function newApiKey(userId: number): Promise<IssuedKey> {
     await requestJson(apiUrl(`access/users/${String(userId)}/api-key`), { method: 'POST' }),
   );
 }
+
+/** Grupos de la bitácora (los mismos que entiende el servidor). */
+export type AuditGroup = 'all' | 'access' | 'searches' | 'reports' | 'cases' | 'concepts';
+
+/** Un registro de la bitácora: quién hizo qué, cuándo y desde dónde. */
+export interface AuditEvent {
+  id: number;
+  created_at: string;
+  /** Usuario que lo hizo, o `consola`, `semilla`, `anonimo`… si no fue una persona. */
+  actor: string;
+  /** Su nombre en «Accesos», si es una persona. */
+  actor_name: string | null;
+  /** Qué pasó, por ejemplo `access_key.revealed`. */
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  /** Datos del registro; las llaves vienen enmascaradas, nunca completas. */
+  details: Record<string, unknown>;
+  ip: string | null;
+}
+
+export interface AuditPage {
+  items: AuditEvent[];
+  /** Cursor de la página siguiente; null si ya no hay más. */
+  next_before: number | null;
+}
+
+function isAuditEvent(value: unknown): value is AuditEvent {
+  const e = value as Partial<AuditEvent> | null;
+  // Del servidor puede llegar null aunque el tipo diga objeto.
+  const details: unknown = e?.details;
+  return (
+    typeof e?.id === 'number' &&
+    typeof e.created_at === 'string' &&
+    typeof e.actor === 'string' &&
+    typeof e.action === 'string' &&
+    typeof details === 'object' &&
+    details !== null
+  );
+}
+
+/** Una página de la bitácora, de lo más nuevo a lo más viejo (solo superusuarios). */
+export async function listAudit(
+  group: AuditGroup,
+  actor: string | null,
+  before: number | null,
+  signal?: AbortSignal,
+): Promise<AuditPage> {
+  const params = new URLSearchParams({ group });
+  if (actor) params.set('actor', actor);
+  if (before !== null) params.set('before', String(before));
+  const data = await requestJson(`${apiUrl('access/audit')}?${params.toString()}`, { signal });
+  const next = (data as { next_before?: unknown } | null)?.next_before;
+  if (typeof next !== 'number' && next !== null) throw badFormat();
+  return { items: itemsOf(data, isAuditEvent), next_before: next };
+}
