@@ -11,8 +11,8 @@
  * Acceso (ADR-0042 y ADR-0043): sin sesión se ve «Entrar» (usuario,
  * contraseña y código de Microsoft Authenticator, igual que Oráculo). Con
  * sesión, solo las pestañas del rol de la persona: «Estado del sistema» y
- * «Accesos» (#/accesos) son de superusuarios. El nombre y «Salir» van en el
- * encabezado.
+ * «Accesos» (#/accesos) son de superusuarios. La sesión (nombre, «Mi
+ * contraseña» y «Salir») va en una cápsula del encabezado (`UserCapsule`).
  *
  * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
  * el laboratorio del muro de la Fase 9.1 (ADR-0102). Se carga aparte, solo al
@@ -21,8 +21,8 @@
 import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
 import { AccessPage } from './components/Access/AccessPage';
-import { ChangePasswordDialog } from './components/Auth/ChangePasswordDialog';
 import { LoginScreen } from './components/Auth/LoginScreen';
+import { UserCapsule } from './components/Auth/UserCapsule';
 import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
@@ -34,7 +34,7 @@ import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 import { HudTabs } from './components/ui/HudTabs';
 import { useAppConfig } from './hooks/useAppConfig';
-import { useLogout, useMe } from './hooks/useAuth';
+import { useMe } from './hooks/useAuth';
 import type { Me, Section } from './services/auth';
 import { safeOraculoUrl } from './services/appConfig';
 import { installSpotlight } from './ui/spotlight';
@@ -122,52 +122,10 @@ function OraculoLink() {
       href={url}
       className="hud-btn hud-btn--sm shrink-0 whitespace-nowrap"
       title="Regresar al sistema principal de Oráculo"
+      aria-label="Regresar a Oráculo"
     >
-      ← Oráculo
+      ←<span className="hidden sm:inline"> Oráculo</span>
     </a>
-  );
-}
-
-/** Nombre de quien entró, «Mi contraseña» y «Salir» (en modo desarrollo no hay sesión). */
-function UserBadge({ me }: { me: Me }) {
-  const logout = useLogout();
-  const [changing, setChanging] = useState(false);
-  return (
-    <span className="flex shrink-0 items-center gap-2 text-xs text-slate-300">
-      <span className="max-w-[10rem] truncate" title={`${me.display_name} (${me.username})`}>
-        {me.display_name}
-      </span>
-      {me.auth_mode === 'keys' && (
-        <button
-          type="button"
-          className="hud-btn hud-btn--sm hud-btn--ghost whitespace-nowrap"
-          onClick={() => {
-            setChanging(true);
-          }}
-        >
-          Mi contraseña
-        </button>
-      )}
-      {changing && (
-        <ChangePasswordDialog
-          onClose={() => {
-            setChanging(false);
-          }}
-        />
-      )}
-      {me.auth_mode === 'keys' && (
-        <button
-          type="button"
-          className="hud-btn hud-btn--sm whitespace-nowrap"
-          disabled={logout.isPending}
-          onClick={() => {
-            logout.mutate();
-          }}
-        >
-          Salir
-        </button>
-      )}
-    </span>
   );
 }
 
@@ -249,12 +207,14 @@ function Monitor({ me }: { me: Me }) {
       />
       {/* Encabezado sin fondo y centrado, sobre las estrellas (Benji, 26/10/2026):
           la marca de OSINT Oráculo y las pestañas en un solo grupo al centro.
-          En celular las pestañas bajan a su propio renglón y se deslizan. */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center justify-center px-4">
-        <div className="pointer-events-auto flex min-w-0 max-w-full flex-col items-center gap-2.5 sm:flex-row sm:gap-7">
+          En celular (Benji, 11/11/2026) son dos renglones: arriba la marca con
+          «Oráculo» y la sesión; abajo las pestañas, que se deslizan. El orden
+          lo dan las clases order-*, sin repetir componentes. */}
+      <header className="encabezado pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center justify-center px-3 sm:px-4">
+        <div className="pointer-events-auto flex w-full min-w-0 max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sm:w-auto sm:flex-nowrap sm:justify-center sm:gap-7">
           <a
             href="#/explorar"
-            className="marca-signal shrink-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400"
+            className="marca-signal order-1 min-w-0 shrink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400"
           >
             <BrandGlobe />
             <span className="flex flex-col items-start">
@@ -268,11 +228,15 @@ function Monitor({ me }: { me: Me }) {
           {/* Separador vertical que se desvanece arriba y abajo. */}
           <span
             aria-hidden="true"
-            className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
+            className="order-2 hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:block"
           />
-          <HudTabs tabs={tabs} active={tab} label="Secciones" />
-          <OraculoLink />
-          <UserBadge me={me} />
+          <div className="order-last w-full min-w-0 sm:order-3 sm:w-auto">
+            <HudTabs tabs={tabs} active={tab} label="Secciones" />
+          </div>
+          <div className="order-2 flex shrink-0 items-center gap-2 sm:order-4 sm:gap-7">
+            <OraculoLink />
+            <UserCapsule me={me} />
+          </div>
         </div>
       </header>
       {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás

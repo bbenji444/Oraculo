@@ -24,6 +24,7 @@ import {
 } from 'maplibre-gl';
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useRegionDetail } from '../../hooks/useRegions';
 import {
   easeInOutCubic,
@@ -99,9 +100,10 @@ import { useCameraStore } from '../../store/camera';
 import { useExplorerStore } from '../../store/explorer';
 import { NewsCard } from './NewsCard';
 import { NewsStack } from './NewsStack';
+import { PhoneSheet } from './PhoneSheet';
 import { CASES_DOT_LAYER } from './CasesOnGlobe';
 import { GlobeUnavailable } from './GraphicsBoundary';
-import { GLASS } from './ui';
+import { GLASS, PHONE_QUERY } from './ui';
 
 interface ExploreGlobeProps {
   articles: readonly Article[];
@@ -373,6 +375,9 @@ export function ExploreGlobe({
   const homeRequest = useExplorerStore((s) => s.homeRequest);
   const region = useRegionDetail(regionId).data;
   const selected = articles.find((a) => a.article_id === articleId) ?? null;
+  // En el celular la ficha y la lista de un lugar suben en una hoja aparte
+  // (PhoneSheet): flotando sobre el globo se encimaban con los paneles.
+  const phone = useMediaQuery(PHONE_QUERY, false);
 
   // El mapa vive fuera de React: lee estos refs dentro de sus eventos.
   const motionRef = useRef<MotionPreset>(motion);
@@ -1307,7 +1312,28 @@ export function ExploreGlobe({
           {tooltip.detail && <span className="ml-2 text-xs text-slate-400">{tooltip.detail}</span>}
         </div>
       )}
-      {selected && calloutShown && (
+      {selected && phone && (
+        <PhoneSheet
+          label={selected.title}
+          onClose={() => {
+            useExplorerStore.getState().selectArticle(null);
+          }}
+        >
+          {unplaced && (
+            <p className="mb-2 font-display text-[9.5px] tracking-[0.22em] text-sky-300 uppercase">
+              Sin lugar en el mapa · la nota no dice dónde pasó
+            </p>
+          )}
+          <NewsCard
+            article={selected}
+            colors={colors}
+            onClose={() => {
+              useExplorerStore.getState().selectArticle(null);
+            }}
+          />
+        </PhoneSheet>
+      )}
+      {selected && !phone && calloutShown && (
         <>
           <svg
             aria-hidden="true"
@@ -1350,7 +1376,7 @@ export function ExploreGlobe({
           </div>
         </>
       )}
-      {selected && unplaced && (
+      {selected && !phone && unplaced && (
         <div
           className="absolute z-20"
           style={{
@@ -1377,7 +1403,30 @@ export function ExploreGlobe({
           </div>
         </div>
       )}
-      {stack?.request === articleRequest && stackPlacement && (
+      {stack?.request === articleRequest && phone && (
+        <PhoneSheet
+          label="Notas en este lugar"
+          onClose={() => {
+            setStack(null);
+          }}
+        >
+          <NewsStack
+            articles={stackArticles}
+            colors={colors}
+            total={stack.total}
+            fill
+            onSelect={(articleId) => {
+              setStack(null);
+              useExplorerStore.getState().selectArticle(articleId);
+            }}
+            onZoom={stack.expandZoom === null ? undefined : zoomIntoStack}
+            onClose={() => {
+              setStack(null);
+            }}
+          />
+        </PhoneSheet>
+      )}
+      {stack?.request === articleRequest && !phone && stackPlacement && (
         <div
           className="absolute z-30 animate-[fadeIn_150ms_ease-out]"
           style={{ left: stackPlacement.left, top: stackPlacement.top }}

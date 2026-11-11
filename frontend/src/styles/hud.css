@@ -1560,6 +1560,37 @@
   outline-offset: 2px;
 }
 
+/* En celular la cápsula es solo íconos: el nombre se ve al tocar la persona
+   (title) y la sesión cabe junto a la marca. */
+@media (max-width: 639px) {
+  .user-capsule {
+    height: 36px;
+    padding: 0 3px;
+  }
+  .user-capsule__who {
+    padding: 0 2px;
+  }
+  .user-capsule__name {
+    display: none;
+  }
+  .user-capsule__action,
+  .user-capsule__power {
+    width: 30px;
+    height: 30px;
+  }
+  .user-capsule__action {
+    margin: 0 2px;
+  }
+  .user-capsule__power {
+    margin-left: 2px;
+  }
+  /* Pestañas: deslizables a lo ancho, un poco más compactas. */
+  .encabezado .hud-tab {
+    padding: 0.65rem 0.7rem;
+    letter-spacing: 0.16em;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .user-capsule__action,
   .user-capsule__power {

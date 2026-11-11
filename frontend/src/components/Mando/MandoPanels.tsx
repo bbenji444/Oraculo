@@ -10,14 +10,21 @@
  * El radar y el letrero sobre el globo (ScanOverlay) van aparte, debajo de
  * esta capa, porque se dibujan en el centro del globo y no reciben clics.
  *
+ * En el celular (Benji, 11/11/2026: «no se tiene que andar amontonando todo»)
+ * no caben juntos: la consola y el expediente se turnan. Con resultados, el
+ * expediente ocupa la pantalla y la consola queda como una pastilla abajo; al
+ * tocarla, la consola se abre y el expediente se pliega a su pestaña.
+ *
  * No hace: no pide datos ni decide qué notas se ven; ExplorePage se las pasa,
  * las mismas que al globo.
  */
 import { useEffect, useRef } from 'react';
 
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import type { Article, Search } from '../../services/searches';
 import { useMandoStore } from '../../store/mando';
 import { GlobeControls, MyCasesToggle, PrecisionLegend } from '../Explore/Controls';
+import { PHONE_QUERY } from '../Explore/ui';
 import { Dossier } from './Dossier';
 import { MissionDock } from './MissionDock';
 
@@ -57,6 +64,26 @@ export function MandoPanels({
   rightReserve,
 }: MandoPanelsProps) {
   const dockRef = useRef<HTMLDivElement>(null);
+  const phone = useMediaQuery(PHONE_QUERY, false);
+  const dossierOpen = useMandoStore((s) => s.dossierOpen);
+  const minimized = useMandoStore((s) => s.dockMinimized);
+  const dockHeight = useMandoStore((s) => s.dockHeight);
+  const dossierShown = hasResults && dossierOpen;
+  const wasMinimized = useRef(minimized);
+
+  // Celular: al abrirse el expediente, la consola se hace pastilla.
+  useEffect(() => {
+    if (phone && dossierShown) useMandoStore.getState().setDockMinimized(true);
+  }, [phone, dossierShown]);
+
+  // Celular: al abrir la consola desde la pastilla, el expediente se pliega.
+  // Solo en ese cambio (de pastilla a consola), no al llegar a la pantalla.
+  useEffect(() => {
+    if (phone && hasResults && wasMinimized.current && !minimized) {
+      useMandoStore.getState().setDossierOpen(false);
+    }
+    wasMinimized.current = minimized;
+  }, [phone, hasResults, minimized]);
 
   // El alto de la consola, para que el globo flote encima de ella.
   useEffect(() => {
@@ -92,6 +119,7 @@ export function MandoPanels({
           relevant={relevant}
           shown={shown}
           colors={colors}
+          bottomReserve={phone ? dockHeight : undefined}
         />
       )}
 

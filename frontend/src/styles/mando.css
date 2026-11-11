@@ -1316,3 +1316,69 @@
     animation: none;
   }
 }
+
+/* En celular (Benji, 11/11/2026: «esas flechas de más y menos me estorban»):
+   el globo se acerca y se gira con los dedos; los botones del mapa se quitan. */
+@media (max-width: 639px) {
+  .maplibregl-ctrl-top-right {
+    display: none;
+  }
+}
+
+/* Hoja de la ficha de una noticia en el celular (PhoneSheet, 11/11/2026):
+   opaca, a todo lo ancho, con un asa arriba y un velo que oscurece el globo. */
+.hoja-celular__velo {
+  background: rgb(2 6 12 / 0.6);
+  backdrop-filter: blur(2px);
+  animation: hoja-velo 0.2s ease-out both;
+}
+.hoja-celular__cuerpo {
+  border: 1px solid var(--hud-cyan-line);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(180deg, #071723, #040b12);
+  box-shadow:
+    0 -12px 40px rgb(0 0 0 / 0.55),
+    0 0 24px rgb(0 210 255 / 0.08);
+  animation: hoja-sube 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hoja-celular__asa {
+  display: block;
+  width: 42px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: rgb(0 210 255 / 0.35);
+}
+@keyframes hoja-sube {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes hoja-velo {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hoja-celular__velo,
+  .hoja-celular__cuerpo {
+    animation: none;
+  }
+}
+
+/* En celular el aviso de créditos del mapa (la «i») pasa a la esquina de
+   abajo a la izquierda: a la derecha quedaba encima del expediente y la
+   pastilla de la consola va al centro. */
+@media (max-width: 639px) {
+  .maplibregl-ctrl-bottom-right {
+    right: auto;
+    left: 0;
+  }
+}

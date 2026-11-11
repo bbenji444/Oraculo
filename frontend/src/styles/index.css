@@ -309,10 +309,27 @@ select optgroup {
   animation: marca-scan 2.8s linear infinite;
   opacity: 0.85;
 }
-/* En celular, menos espaciado para que quepa en un renglón. */
+/* En celular (Benji, 11/11/2026): la marca en un renglón con «Oráculo» y la
+   sesión; el subtítulo no cabe y se quita. */
 @media (max-width: 639px) {
-  .marca-linea-texto {
-    letter-spacing: 0.2em;
+  .marca-signal {
+    gap: 8px;
+  }
+  .marca-simbolo {
+    width: 24px;
+    height: 24px;
+  }
+  .marca-simbolo svg {
+    width: 20px;
+    height: 20px;
+  }
+  .marca-nombre {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    white-space: nowrap;
+  }
+  .marca-linea {
+    display: none;
   }
 }
 .marca-signal:hover .marca-linea-texto {

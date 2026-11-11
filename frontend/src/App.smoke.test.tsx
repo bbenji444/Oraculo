@@ -344,7 +344,7 @@ describe('flujo principal (H1, Centro de mando)', () => {
 
   it('el encabezado lleva de regreso al sistema principal de Oráculo', async () => {
     renderApp();
-    const link = await screen.findByRole('link', { name: '← Oráculo' });
+    const link = await screen.findByRole('link', { name: 'Regresar a Oráculo' });
     expect(link.getAttribute('href')).toBe('http://172.25.18.234/');
   });
 
