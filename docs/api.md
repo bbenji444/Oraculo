@@ -86,6 +86,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `GET /access/users/{id}/keys` | Sus llaves de sistema, sin secretos (`masked`: `orc_live_a1b2c3d4…`) |
 | `POST /access/users/{id}/keys` | Crea una llave de sistema: `{"label", "days"}` → `{"key", "info"}` (**única vez que sale**) |
 | `DELETE /access/keys/{id}` | Revoca al instante y cierra las sesiones que entraron con ella |
+| `GET /access/audit` | La **bitácora**, de lo más nuevo a lo más viejo: `{"items": [{"id", "created_at", "actor", "actor_name", "action", "entity_type", "entity_id", "details", "ip"}], "next_before"}`. Filtros: `group` (`all`, `access`, `searches`, `reports`, `cases`, `concepts`), `actor` (usuario), `limit` (1 a 200, 50 por omisión) y `before` (el `next_before` de la página anterior; `null` = ya no hay más). Las llaves vienen enmascaradas. Respuesta `no-store` |
 
 Reglas (`409 access_rule`):
 - nadie se quita su propio rol ni se desactiva;

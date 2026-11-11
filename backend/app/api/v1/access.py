@@ -12,7 +12,9 @@ La pantalla «Accesos» los usa para (ADR-0042 y ADR-0043):
 - ver, copiar o regenerar la **llave de API** de cada persona, para
   conectarla con el resto de Oráculo (ADR-0047). Esa sí se guarda cifrada y
   se puede volver a ver; cada vista queda en la bitácora;
-- prender o apagar el código de 6 dígitos al entrar (``/access/settings``).
+- prender o apagar el código de 6 dígitos al entrar (``/access/settings``);
+- leer la **bitácora** (``/access/audit``): quién entró, quién vio o generó
+  cada llave, quién buscó o cambió algo, cuándo y desde qué IP.
 
 No hace: no aplica las reglas (``AccessAdmin``).
 """
@@ -20,14 +22,22 @@ No hace: no aplica las reglas (``AccessAdmin``).
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Request, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.api.auth import SuperUser, client_ip
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.application.ports.access import UserChanges
 from app.application.use_cases.access import AccessAdmin
+from app.application.use_cases.audit_trail import ReadAuditTrail
 from app.domain.access import KEY_PREFIX, KeyInfo, Role, UserAccount
+from app.domain.audit_trail import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    AuditEvent,
+    AuditGroup,
+    AuditQuery,
+)
 
 router = APIRouter(prefix="/access", tags=["acceso"], responses=ERROR_RESPONSES)
 
@@ -178,6 +188,48 @@ class ApiKeyOut(BaseModel):
     info: KeyOut
 
 
+class AuditEventOut(BaseModel):
+    """Un registro de la bitácora."""
+
+    id: int = Field(description="Id del registro; sirve de cursor (``before``).")
+    created_at: datetime
+    actor: str = Field(
+        description="Usuario que lo hizo, o consola, semilla o anonimo si no fue una persona."
+    )
+    actor_name: str | None = Field(description="Su nombre en «Accesos», si es una persona.")
+    action: str = Field(description="Qué pasó, por ejemplo access_key.revealed.")
+    entity_type: str
+    entity_id: str
+    details: dict[str, object] = Field(
+        description="Datos del registro. Las llaves van enmascaradas, nunca completas."
+    )
+    ip: str | None = Field(description="Desde dónde; null si no vino de una petición HTTP.")
+
+    @classmethod
+    def of(cls, event: AuditEvent) -> "AuditEventOut":
+        """Convierte un registro del dominio."""
+        return cls(
+            id=event.event_id,
+            created_at=event.created_at,
+            actor=event.actor,
+            actor_name=event.actor_name,
+            action=event.action,
+            entity_type=event.entity_type,
+            entity_id=event.entity_id,
+            details=dict(event.payload),
+            ip=event.ip,
+        )
+
+
+class AuditPageOut(BaseModel):
+    """Una página de la bitácora, de lo más nuevo a lo más viejo."""
+
+    items: list[AuditEventOut]
+    next_before: int | None = Field(
+        description="Pásalo como before para la página siguiente; null si ya no hay más."
+    )
+
+
 class IssuedKeyOut(BaseModel):
     """La llave recién creada: ``key`` solo se muestra esta vez."""
 
@@ -191,7 +243,14 @@ def get_access_admin(request: Request) -> AccessAdmin:
     return admin
 
 
+def get_audit_trail(request: Request) -> ReadAuditTrail:
+    """La lectura de la bitácora armada al arrancar (las pruebas la reemplazan)."""
+    trail: ReadAuditTrail = request.app.state.audit_trail
+    return trail
+
+
 Admin = Annotated[AccessAdmin, Depends(get_access_admin)]
+Trail = Annotated[ReadAuditTrail, Depends(get_audit_trail)]
 UserId = Annotated[int, Path(description="Id de la persona.")]
 
 
@@ -385,3 +444,27 @@ async def new_api_key(
     issued = await admin.new_api_key(user, client_ip(request), user_id)
     response.headers["Cache-Control"] = "no-store"
     return ApiKeyOut(key=issued.key.full, info=KeyOut.of(issued.info))
+
+
+@router.get("/audit", response_model=AuditPageOut, summary="Bitácora: quién hizo qué")
+async def audit_trail(  # noqa: PLR0913 — filtros de la pantalla y dependencias, por nombre (*)
+    response: Response,
+    trail: Trail,
+    user: SuperUser,
+    *,
+    group: Annotated[AuditGroup, Query(description="Grupo de acciones.")] = AuditGroup.ALL,
+    actor: Annotated[
+        str | None, Query(max_length=64, description="Solo lo que hizo este usuario.")
+    ] = None,
+    before: Annotated[
+        int | None, Query(ge=1, description="Cursor: next_before de la página anterior.")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+) -> AuditPageOut:
+    """Lo más nuevo primero: entradas, llaves vistas o generadas, búsquedas, casos..."""
+    page = await trail.page(user, AuditQuery(group, actor or None, before, limit))
+    # Trae IPs y nombres: que ningún intermediario la guarde.
+    response.headers["Cache-Control"] = "no-store"
+    return AuditPageOut(
+        items=[AuditEventOut.of(event) for event in page.events], next_before=page.next_before
+    )

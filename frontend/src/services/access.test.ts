@@ -6,6 +6,7 @@ import {
   createUser,
   issueKey,
   keyStatus,
+  listAudit,
   listUsers,
   newApiKey,
   saveAuthSettings,
@@ -187,5 +188,38 @@ describe('código opcional y llave de API (ADR-0047)', () => {
     ]);
     vi.stubGlobal('fetch', reply({ totp_required: true }));
     expect(await saveAuthSettings({ totp_required: true })).toEqual({ totp_required: true });
+  });
+});
+
+describe('bitácora', () => {
+  it('pide el grupo, la persona y el cursor, y trae la página siguiente', async () => {
+    const item = {
+      id: 7,
+      created_at: '2026-11-11T18:00:00Z',
+      actor: 'benji',
+      actor_name: 'Benji',
+      action: 'access_key.revealed',
+      entity_type: 'access_key',
+      entity_id: '3',
+      details: { de: 'pepe', llave: 'orc_live_a1b2c3d4…' },
+      ip: '10.244.0.7',
+    };
+    const fetchMock = reply({ items: [item], next_before: 7 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const page = await listAudit('access', 'benji', 20);
+
+    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    expect(url).toBe('/api/v1/access/audit?group=access&actor=benji&before=20');
+    expect(page).toEqual({ items: [item], next_before: 7 });
+  });
+
+  it('sin filtros pide todo y rechaza un formato raro', async () => {
+    const fetchMock = reply({ items: [{ id: 'x' }], next_before: null });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listAudit('all', null, null)).rejects.toThrow(ApiError);
+    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    expect(url).toBe('/api/v1/access/audit?group=all');
   });
 });
