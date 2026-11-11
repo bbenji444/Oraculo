@@ -261,6 +261,23 @@ class MergeSuggestion:
     reasons: frozenset[MergeReason]
 
 
+@dataclass(frozen=True, slots=True)
+class EntityReview:
+    """Una entidad dentro de una revisión en bloque (F12, ADR-0107).
+
+    Attributes:
+        entity_id: Entidad.
+        status: Confirmada o descartada.
+        legal_status: Estatus legal que queda (solo personas).
+        audit: Su propia entrada de la bitácora.
+    """
+
+    entity_id: int
+    status: ReviewStatus
+    legal_status: LegalStatus | None
+    audit: AuditEntry
+
+
 class EntityRepositoryPort(Protocol):
     """Entidades de los casos y lo que la IA leyó de cada nota."""
 
@@ -437,6 +454,37 @@ class EntityRepositoryPort(Protocol):
 
         Returns:
             La entidad como quedó.
+        """
+        ...
+
+    async def get_entities(self, case_id: UUID, entity_ids: Sequence[int]) -> list[CaseEntity]:
+        """Varias entidades del caso de una vez (para revisar en bloque).
+
+        Args:
+            case_id: Caso.
+            entity_ids: Entidades.
+
+        Returns:
+            Las que son de ese caso y no se unieron a otra, sin orden
+            particular; las demás no vienen.
+        """
+        ...
+
+    async def review_many(
+        self, case_id: UUID, reviews: Sequence[EntityReview], *, reviewer: str
+    ) -> None:
+        """Confirma o descarta varias entidades en una sola transacción (ADR-0107).
+
+        Cada una con su firma y su entrada de la bitácora. Si alguna ya no es
+        del caso, no se aplica ninguna.
+
+        Args:
+            case_id: Caso.
+            reviews: Qué queda de cada entidad.
+            reviewer: Quién revisa (``reviewed_by``).
+
+        Raises:
+            EntityNotFoundError: Si alguna no es de ese caso (nada cambia).
         """
         ...
 

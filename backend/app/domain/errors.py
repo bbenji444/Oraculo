@@ -241,6 +241,12 @@ class EntityReviewError(InvalidRequestError):
     code = "invalid_entity_review"
 
 
+class BulkReviewError(InvalidRequestError):
+    """La revisión en bloque no cumple sus reglas (vacía, repetida o demasiado grande)."""
+
+    code = "invalid_bulk_review"
+
+
 class EntityMergeError(InvalidRequestError):
     """La fusión o la separación no cumple sus reglas (por ejemplo, tipos distintos)."""
 

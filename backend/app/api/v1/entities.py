@@ -5,6 +5,8 @@
 - ``POST /cases/{id}/extract``: "Analizar pendientes" (encola en el worker).
 - ``POST /entities/{id}/confirm`` y ``/discard``: la revisión de una persona,
   firmada y en la bitácora.
+- ``POST /cases/{id}/entities/review``: confirmar o descartar varias a la vez
+  (F12, ADR-0107), todas o ninguna.
 
 Cada ruta solo traduce HTTP ↔ casos de uso; permisos y reglas viven en
 ``app.application.use_cases.entities``.
@@ -19,8 +21,10 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.cases import CaseId, Cases, CurrentActor
 from app.api.v1.schemas.entities import (
+    BulkReviewOut,
     CaseEntitiesOut,
     ConfirmIn,
+    EntitiesReviewIn,
     EntityOut,
     ExtractOut,
     ReviewIn,
@@ -30,8 +34,10 @@ from app.application.use_cases.entities import (
     AnalyzePending,
     ConfirmEntity,
     DiscardEntity,
+    EntityDecision,
     ListCaseEntities,
     QueueExtraction,
+    ReviewEntities,
 )
 from app.application.use_cases.reports import LLMPrices
 from app.domain.investigation import ReviewStatus
@@ -132,3 +138,21 @@ async def discard_entity(
     """Deja de proponerse, sin borrarla: su evidencia se conserva."""
     entity, _ = await DiscardEntity(cases, entities).execute(body.case_id, entity_id, actor)
     return EntityOut.from_entity(entity)
+
+
+@router.post(
+    "/cases/{case_id}/entities/review",
+    response_model=BulkReviewOut,
+    summary="Confirmar o descartar varias entidades a la vez",
+    responses=error_responses(403, 404, 409, 422),
+)
+async def review_entities(
+    body: EntitiesReviewIn, cases: Cases, entities: Entities, actor: CurrentActor, case_id: CaseId
+) -> BulkReviewOut:
+    """Todas o ninguna, cada una con su firma y su bitácora. Personas: el estatus de su renglón."""
+    decisions = [
+        EntityDecision(item.entity_id, item.legal_status.value if item.legal_status else None)
+        for item in body.items
+    ]
+    result = await ReviewEntities(cases, entities).execute(case_id, body.status, decisions, actor)
+    return BulkReviewOut.from_result(result)

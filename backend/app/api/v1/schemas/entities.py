@@ -1,4 +1,6 @@
-"""Esquemas de las entidades de un caso (Fases 9.4 y 9.5, historias H9.2 y §9.8).
+"""Esquemas de las entidades de un caso (Fases 9.4 y 9.5, historias H9.2 y §9.8; F12).
+
+Desde F12 (ADR-0107) también el cuerpo y la respuesta de revisar en bloque.
 
 La salida trae cada valor con su etiqueta en español ("persona", "señalado")
 para que la interfaz no traduzca, y el estatus legal siempre visible (§9.10).
@@ -7,12 +9,13 @@ No hace: no valida reglas de negocio (eso es el dominio).
 """
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from app.application.ports.entities import CaseAnalysis, CaseEntity, MentionView
-from app.application.use_cases.entities import CaseEntities, PendingRequest
+from app.application.use_cases.entities import BulkReviewResult, CaseEntities, PendingRequest
 from app.domain.investigation import (
     ENTITY_TYPE_LABEL,
     LEGAL_STATUS_LABEL,
@@ -195,3 +198,41 @@ class ExtractOut(BaseModel):
     def from_request(cls, r: PendingRequest) -> "ExtractOut":
         """Convierte el resultado del caso de uso."""
         return cls(queued=r.queued, estimated_cost_usd=round(r.estimated_cost_usd, 6))
+
+
+class BulkActionIn(BaseModel):
+    """Lo común de revisar en bloque entidades o vínculos (F12, ADR-0107)."""
+
+    action: Literal["confirm", "discard"] = Field(description="confirm o discard.")
+
+    @property
+    def status(self) -> ReviewStatus:
+        """La revisión que queda: confirmada o descartada."""
+        return ReviewStatus.CONFIRMED if self.action == "confirm" else ReviewStatus.DISCARDED
+
+
+class EntityDecisionIn(BaseModel):
+    """Una entidad elegida para revisar en bloque."""
+
+    entity_id: int
+    legal_status: LegalStatus | None = Field(
+        default=None, description="Solo al confirmar personas: el estatus que dice la nota."
+    )
+
+
+class EntitiesReviewIn(BulkActionIn):
+    """Cuerpo de ``POST /cases/{id}/entities/review``."""
+
+    items: list[EntityDecisionIn]
+
+
+class BulkReviewOut(BaseModel):
+    """Cómo quedó una revisión en bloque."""
+
+    changed: int
+    unchanged: int
+
+    @classmethod
+    def from_result(cls, result: BulkReviewResult) -> "BulkReviewOut":
+        """Convierte el resultado del caso de uso."""
+        return cls(changed=result.changed, unchanged=result.unchanged)

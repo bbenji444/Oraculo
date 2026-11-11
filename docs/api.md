@@ -616,6 +616,7 @@ La IA propone las entidades de cada nota que entra a un caso (ADR-0103). Todo na
 | POST | `/cases/{id}/extract` | «Analizar con IA»: encola las notas pendientes o fallidas. Responde `{queued, estimated_cost_usd}`. Gasta tokens. Editor o dueño, caso abierto. |
 | POST | `/entities/{id}/confirm` | Cuerpo `{case_id, legal_status}`. En personas, `legal_status` es obligatorio: `mentioned`, `alleged`, `detained`, `charged`, `victim`, `witness` u `official`; nunca "culpable" (422 `invalid_entity_review`). Firma quién y cuándo y va a la bitácora (`entity.confirmed`). |
 | POST | `/entities/{id}/discard` | Cuerpo `{case_id}`. Deja de proponerse sin borrarse (`entity.discarded`). |
+| POST | `/cases/{id}/entities/review` | Revisar en bloque (F12, ADR-0107). Cuerpo `{action: "confirm" \| "discard", items: [{entity_id, legal_status?}]}`; al confirmar, cada persona lleva su `legal_status` (las mismas reglas que una por una) y lo demás va sin él; al descartar nadie lo lleva. Todas o ninguna: 404 `entity_not_found` si alguna ya no está en el caso, 422 `invalid_entity_review` si a una persona le falta su estatus y 422 `invalid_bulk_review` si viene vacía, con repetidas o con más de 500. Responde `{changed, unchanged}`; las que ya estaban así no se tocan. Cada una deja su `entity.confirmed` o `entity.discarded` con `"bulk": true`. |
 
 Agregar una nota con `POST /cases/{id}/articles` la encola sola. Cada lectura queda en la bitácora como `case.entities_extracted`, con modelo, tokens y costo.
 
