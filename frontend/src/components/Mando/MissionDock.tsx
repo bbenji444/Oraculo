@@ -28,7 +28,7 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { useConcepts } from '../../hooks/useConcepts';
 import { useNow } from '../../hooks/useNow';
 import { useMe } from '../../hooks/useAuth';
-import { useSchedule } from '../../hooks/useSchedule';
+import { useSchedules } from '../../hooks/useDeliveries';
 import { useRegionDetail } from '../../hooks/useRegions';
 import { useSearchHistory } from '../../hooks/useSearches';
 import { isFinished, type Search, subdivisionsOf } from '../../services/searches';
@@ -100,16 +100,20 @@ function isTyping(target: EventTarget | null): boolean {
 /**
  * Reloj de la Ciudad de México y cuenta regresiva a la próxima corrida.
  *
- * Las corridas automáticas son del superusuario (ADR-0042): a un usuario
- * normal solo se le muestra el reloj.
+ * La próxima corrida es la más cercana de los envíos programados de la
+ * persona que tienen correos (ADR-0046); sin ninguno, solo se ve el reloj.
  */
 function MissionClock() {
   const now = useNow();
-  const isSuperuser = useMe().data?.role === 'superuser';
-  const next = nextAutomaticRun(now, useSchedule(isSuperuser).data?.upcoming);
+  const username = useMe().data?.username;
+  const upcoming = (useSchedules().data?.items ?? [])
+    .filter((s) => s.owner === username && s.is_active && s.recipient_ids.length > 0)
+    .flatMap((s) => s.upcoming)
+    .sort();
+  const next = nextAutomaticRun(now, upcoming);
   return (
     <div className="flex items-center gap-3 text-[11px] text-slate-400">
-      {isSuperuser && (
+      {upcoming.length > 0 && (
         <span className="mando-next-run">
           Próxima corrida automática <span className="text-slate-200">{next.time}</span> · en{' '}
           {countdownLabel(next.seconds)}

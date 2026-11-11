@@ -41,6 +41,9 @@ from app.adapters.persistence.categories_repository import PostgresCategoryStore
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
 from app.adapters.persistence.delivery_reports import PostgresRunReports
+from app.adapters.persistence.delivery_schedules_repository import (
+    PostgresDeliveryScheduleStore,
+)
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
@@ -61,6 +64,7 @@ from app.api.v1.deliveries import OverviewOut, SourceOut
 from app.application.use_cases.access import AccessAdmin, Authenticator, SessionPolicy
 from app.application.use_cases.check_health import CheckSystemHealth
 from app.application.use_cases.deliveries import SendDeliveries
+from app.application.use_cases.delivery_schedules import StarterSchedule, StarterTemplate
 from app.application.use_cases.entities import QueueExtraction
 from app.application.use_cases.login import PasswordLogin
 from app.application.use_cases.plan_search import PlanSearch
@@ -109,6 +113,7 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
         whatsapp_available=False,
         sources=[SourceOut(id=k, label=v) for k, v in SOURCES.items()],
     )
+    app.state.delivery_schedule_store = PostgresDeliveryScheduleStore(engine)
     app.state.schedule_store = PostgresScheduleStore(engine)
     app.state.schedule_default = RunSchedule.from_hours(
         parse_run_hours(settings.automatic_run_hours)
@@ -121,6 +126,8 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
 # la PC no sirven en el servidor (allá la pimienta es otra y secreta).
 _DEV_PEPPER = b"solo-desarrollo-no-usar-en-servidor"
 _SECONDS_PER_HOUR = 3600
+# Nombre del envío con que empieza cada persona nueva (Benji, 11/11/2026).
+STARTER_SCHEDULE_NAME = "Monitor FGR"
 _SECONDS_PER_MINUTE = 60
 
 
@@ -133,7 +140,18 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
     )
     store = PostgresAccessStore(engine)
     sessions = RedisSessionStore(redis)
-    app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now)
+    starter = StarterSchedule(
+        PostgresDeliveryScheduleStore(engine),
+        PostgresConceptRepository(engine),
+        PostgresRegionRepository(engine),
+        StarterTemplate(
+            name=STARTER_SCHEDULE_NAME,
+            concept=settings.automatic_concept,
+            region_code=settings.automatic_region_code,
+            schedule=RunSchedule.from_hours(parse_run_hours(settings.automatic_run_hours)),
+        ),
+    )
+    app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now, starter.give)
     if settings.auth_mode == "keys":
         limiter = RedisLoginLimiter(
             redis,

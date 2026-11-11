@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.access_scope import as_user, create_api_engine
 from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
+from app.adapters.persistence.delivery_schedules_repository import (
+    PostgresDeliveryScheduleStore,
+)
 from app.application.pagination import TimeCursor
 from app.application.ports.deliveries import AttemptRecord, NewDelivery, RuleDraft
 from app.core.config import Settings
@@ -27,7 +30,10 @@ from app.domain.deliveries import (
     DeliveryStatus,
     RecipientDraft,
 )
+from app.domain.delivery_schedules import ScheduleDraft
 from app.domain.errors import DeliveryNotFoundError
+from app.domain.schedule import RunSchedule
+from tests.integration.geo_fixture import load_fixture_catalog
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -38,6 +44,9 @@ NOW = datetime(2026, 11, 7, 13, 5, tzinfo=UTC)
 def _empty(engine: Engine) -> None:
     with engine.begin() as conn:
         for table in (
+            "delivery_schedule_claims",
+            "delivery_schedule_recipients",
+            "delivery_schedules",
             "delivery_attempts",
             "deliveries",
             "delivery_rules",
@@ -197,9 +206,7 @@ async def test_cada_persona_ve_y_cambia_solo_sus_correos(
 ) -> None:
     store = PostgresDeliveryStore(api_engine)
     with as_user(ANA):
-        mine = await store.create_recipient(
-            RecipientDraft("Ana", "ana@x.mx", None, True, (420, 900)), ANA.username
-        )
+        mine = await store.create_recipient(RecipientDraft("Ana", "ana@x.mx", None), ANA.username)
     with as_user(PEPE):
         await store.create_recipient(RecipientDraft("Pepe", "pepe@x.mx", None), PEPE.username)
         # Pepe no ve, no edita ni borra el de Ana.
@@ -218,7 +225,7 @@ async def test_cada_persona_ve_y_cambia_solo_sus_correos(
     # Sin contexto (anónimo) no se ve nada.
     assert await store.list_recipients() == []
 
-    assert (own.owner, own.data.hours) == (ANA.username, (420, 900))
+    assert own.owner == ANA.username
     assert everyone == {ANA.username, PEPE.username}
     # El worker (sin contexto en su engine) ve a todos para mandar la corrida.
     assert len(await PostgresDeliveryStore(test_engine).list_recipients()) == 2
@@ -266,4 +273,52 @@ async def test_lo_que_existia_queda_a_nombre_de_benji(
         )
     [old] = await PostgresDeliveryStore(test_engine).list_recipients()
 
-    assert (old.owner, old.data.hours) == (DEFAULT_OWNER, ())
+    assert old.owner == DEFAULT_OWNER
+
+
+# --- Envíos programados (migración 0043, ADR-0046) ---
+
+
+@pytest.fixture
+def region_id(sync_engine: Engine, settings: Settings, tmp_path: Path) -> int:
+    load_fixture_catalog(sync_engine, settings, tmp_path)
+    with sync_engine.connect() as conn:
+        return int(conn.execute(text("SELECT id FROM regions ORDER BY id LIMIT 1")).scalar_one())
+
+
+def _schedule(region: int, times: tuple[int, ...], recipients: tuple[int, ...]) -> ScheduleDraft:
+    return ScheduleDraft("Extorsión tarde", (3, 7), region, RunSchedule(times, (1, 5)), recipients)
+
+
+async def test_envios_programados_de_cada_persona(
+    sync_engine: Engine, test_engine: AsyncEngine, api_engine: AsyncEngine, region_id: int
+) -> None:
+    recipients = PostgresDeliveryStore(api_engine)
+    schedules = PostgresDeliveryScheduleStore(api_engine)
+    with as_user(ANA):
+        mail = await recipients.create_recipient(
+            RecipientDraft("Ana", "ana@x.mx", None), "rls-envios-ana"
+        )
+        saved = await schedules.create_schedule(
+            _schedule(region_id, (960, 1200), (mail.id,)), ANA.username
+        )
+        edited = await schedules.update_schedule(saved.id, _schedule(region_id, (1000,), ()))
+    with as_user(PEPE):
+        assert await schedules.list_schedules() == []
+        assert await schedules.get_schedule(saved.id) is None
+        assert not await schedules.delete_schedule(saved.id)
+        with pytest.raises(DBAPIError, match="row-level security"):
+            await schedules.create_schedule(_schedule(region_id, (960,), ()), ANA.username)
+    with as_user(JEFA):
+        assert [s.owner for s in await schedules.list_schedules()] == [ANA.username]
+    worker = PostgresDeliveryScheduleStore(test_engine)
+
+    assert (saved.data.schedule.times, saved.data.schedule.days) == ((960, 1200), (1, 5))
+    assert (saved.data.concept_ids, saved.data.recipient_ids) == ((3, 7), (mail.id,))
+    assert (edited.data.schedule.times, edited.data.recipient_ids) == ((1000,), ())
+    assert [s.id for s in await worker.list_schedules()] == [saved.id]
+    # Cada corrida se aparta una sola vez, aunque dos revisiones lleguen juntas.
+    assert await worker.claim_run("c=3,7|r=1|2026-11-11T12:00|2026-11-11T16:00")
+    assert not await worker.claim_run("c=3,7|r=1|2026-11-11T12:00|2026-11-11T16:00")
+    with as_user(ANA):
+        assert await schedules.delete_schedule(saved.id)

@@ -1,6 +1,6 @@
 # ADR-0045: Envíos por usuario: cada quien sus correos y sus horas
 
-- **Estado:** aceptada
+- **Estado:** aceptada; las horas por correo (punto 3) las reemplaza [ADR-0046](0046-envios-programados.md)
 - **Fecha:** 2026-11-11
 - **Fase:** F12
 - **Relacionadas:** ADR-0039 (envíos), ADR-0040 (horario único), ADR-0042 (seguridad por filas), ADR-0043 (acceso con contraseña)

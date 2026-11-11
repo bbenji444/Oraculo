@@ -11,9 +11,16 @@ from app.application.clock import MEXICO_CITY
 from app.application.use_cases.ingest import IngestReport, PurgeReport
 from app.application.use_cases.run_search import SearchReport
 from app.core.config import Settings
+from app.domain.delivery_schedules import DueRun
+from app.domain.schedule import RunWindow
 from app.domain.search import SearchStatus
 from app.worker import tasks
-from app.worker.automatic_jobs import automatic_settings, report_file_name
+from app.worker.automatic_jobs import (
+    automatic_settings,
+    report_file_name,
+    run_from_payload,
+    run_to_payload,
+)
 from app.worker.celery_app import (
     AUTOMATIC_RUN_TASK,
     SCHEDULE_TICK_TASK,
@@ -36,9 +43,9 @@ def test_el_reloj_programa_la_ingesta_y_la_limpieza() -> None:
     assert purge["schedule"] == crontab(hour=9, minute=30)
 
 
-def test_el_reloj_revisa_el_horario_unico_cada_minuto() -> None:
-    # ADR-0040: el horario vive en la base y se edita desde «Envíos»; el reloj
-    # revisa cada minuto si toca una corrida, sin reiniciarse al cambiarlo.
+def test_el_reloj_revisa_los_envios_programados_cada_minuto() -> None:
+    # ADR-0046: los envíos programados viven en la base y se editan en «Envíos»;
+    # el reloj revisa cada minuto qué corridas tocan, sin reiniciarse.
     monitor = build_beat_schedule(Settings(automatic_runs_enabled=True))["monitor-fgr"]
 
     assert monitor["task"] == SCHEDULE_TICK_TASK
@@ -126,3 +133,41 @@ def test_la_busqueda_corre_y_devuelve_su_resumen(monkeypatch: pytest.MonkeyPatch
         "credits_used": 1,
         "llm_cost_usd": 0.0041,
     }
+
+
+RUN = DueRun(
+    topic="c=3|r=14",
+    concept_ids=(3,),
+    region_id=14,
+    window=RunWindow(
+        datetime(2026, 11, 11, 12, 0, tzinfo=MEXICO_CITY),
+        datetime(2026, 11, 11, 16, 0, tzinfo=MEXICO_CITY),
+    ),
+    schedule_ids=(4, 9),
+)
+
+
+def test_cada_corrida_viaja_por_la_cola_sin_perder_nada() -> None:
+    assert run_from_payload(run_to_payload(RUN)) == RUN
+
+
+def test_el_pdf_de_un_envio_programado_lleva_su_busqueda() -> None:
+    # A la misma hora puede haber varias corridas de temas distintos.
+    name = report_file_name(RUN.slot, UUID("abcdef12-0000-4000-8000-000000000000"))
+    assert name == "corrida_2026-11-11_1600_abcdef12.pdf"
+
+
+def test_el_reloj_encola_una_tarea_por_corrida(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: list[dict[str, object]] = []
+
+    async def fake_due(settings: Settings) -> list[DueRun]:
+        return [RUN]
+
+    def fake_apply(*, kwargs: dict[str, object], expires: int) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr(tasks, "check_due_runs", fake_due)
+    monkeypatch.setattr(tasks.automatic_run, "apply_async", fake_apply)
+
+    assert tasks.schedule_tick() == [RUN.run_key]
+    assert sent == [{"run": run_to_payload(RUN)}]

@@ -23,13 +23,7 @@ import { HudPanel } from '../ui/HudPanel';
 import { HudSelect } from '../ui/HudSelect';
 import { DELIVERY_STATUS, whenLabel } from './labels';
 
-function TestSend({
-  isSuperuser,
-  senderAddress,
-}: {
-  isSuperuser: boolean;
-  senderAddress: string | null;
-}) {
+function TestSend({ isSuperuser }: { isSuperuser: boolean }) {
   const recipients = (useRecipients().data ?? []).filter((r) => r.is_active && r.email);
   const accounts = (useDeliveryAccounts(isSuperuser).data ?? []).filter(
     (a) => a.channel === 'email' && a.status === 'active',
@@ -46,9 +40,7 @@ function TestSend({
       <p className="text-xs text-slate-400">
         {isSuperuser
           ? 'Manda ya el reporte de la última corrida a una persona. Funciona aunque los envíos automáticos estén apagados.'
-          : `Te manda ya el reporte de la última corrida, para que veas cómo llega${
-              senderAddress ? ` (desde ${senderAddress})` : ''
-            }.`}
+          : 'Te manda ya el reporte de la última corrida, para que veas cómo llega.'}
       </p>
       <div
         className={`grid gap-3 sm:items-end ${
@@ -117,13 +109,7 @@ function TestSend({
   );
 }
 
-export function HistoryPanel({
-  isSuperuser,
-  senderAddress = null,
-}: {
-  isSuperuser: boolean;
-  senderAddress?: string | null;
-}) {
+export function HistoryPanel({ isSuperuser }: { isSuperuser: boolean }) {
   const history = useDeliveryHistory();
   const retry = useRetryDelivery();
   const items = history.data?.items ?? [];
@@ -139,7 +125,7 @@ export function HistoryPanel({
         </p>
       </div>
 
-      <TestSend isSuperuser={isSuperuser} senderAddress={senderAddress} />
+      <TestSend isSuperuser={isSuperuser} />
 
       {history.isPending && <p className="text-sm text-slate-400">Cargando historial…</p>}
       {history.data && items.length === 0 && (

@@ -18,6 +18,7 @@ from app.api.v1.deliveries import OverviewOut, SourceOut
 from app.application.ports.deliveries import RuleDraft
 from app.application.use_cases.deliveries import SendDeliveries
 from app.core.config import Settings
+from app.domain.concept import ConceptDraft
 from app.domain.credentials import hash_password, new_totp_secret, totp_code, totp_counter
 from app.domain.deliveries import (
     SOURCE_FGR_RUN,
@@ -29,6 +30,7 @@ from app.domain.deliveries import (
 from app.domain.schedule import RunSchedule
 from app.main import create_app
 from tests.unit.fake_access import PEPPER, AccessWorld, FakeBox, access_world
+from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_deliveries import (
     NOW,
     FakeConnector,
@@ -36,6 +38,8 @@ from tests.unit.fake_deliveries import (
     FakeReports,
     FakeSender,
 )
+from tests.unit.fake_delivery_schedules import FakeDeliveryScheduleStore
+from tests.unit.fake_regions import CDMX, FakeRegionRepository
 
 LOGIN = "/api/v1/auth/login"
 RECIPIENTS = "/api/v1/deliveries/recipients"
@@ -60,6 +64,18 @@ class _World:
         self.access: AccessWorld = access_world()
         self.store = FakeDeliveryStore()
         self.sender = FakeSender()
+        self.schedules = FakeDeliveryScheduleStore()
+        self.concepts = FakeConceptRepository()
+        self.concepts.add(
+            ConceptDraft.validated(
+                name="Extorsión",
+                description="",
+                keywords=("extorsión",),
+                exclude_terms=(),
+                color="#00D2FF",
+                is_active=True,
+            )
+        )
 
 
 @pytest.fixture
@@ -90,6 +106,9 @@ def client(world: _World) -> Iterator[TestClient]:
     app.state.schedule_store = _NoStoredSchedule()
     app.state.schedule_default = RunSchedule.from_hours(FGR_HOURS)
     app.state.automatic_runs_enabled = True
+    app.state.delivery_schedule_store = world.schedules
+    app.state.concept_repository = world.concepts
+    app.state.region_repository = FakeRegionRepository()
 
     async def sender_account() -> None:
         account = await world.store.save_account(
@@ -118,11 +137,9 @@ def _enter(client: TestClient, world: _World, username: str) -> None:
     assert response.status_code == 200, response.text
 
 
-def _add(client: TestClient, email: str, hours: list[str] | None = None) -> dict[str, object]:
+def _add(client: TestClient, email: str) -> dict[str, object]:
     response = client.post(
-        RECIPIENTS,
-        json={"name": "Mi correo", "email": email, "hours": hours or []},
-        headers=SAME_ORIGIN,
+        RECIPIENTS, json={"name": "Mi correo", "email": email}, headers=SAME_ORIGIN
     )
     return {"status": response.status_code, **response.json()}
 
@@ -130,26 +147,16 @@ def _add(client: TestClient, email: str, hours: list[str] | None = None) -> dict
 def test_un_usuario_agrega_hasta_dos_correos_a_su_nombre(client: TestClient, world: _World) -> None:
     _enter(client, world, "ana")
 
-    first = _add(client, "ana@x.mx", ["07:00", "15:00"])
+    first = _add(client, "ana@x.mx")
     second = _add(client, "ana@fgr.mx")
     third = _add(client, "ana3@x.mx")
 
-    assert (first["status"], first["owner"], first["hours"]) == (201, "ana", ["07:00", "15:00"])
-    assert (second["status"], second["hours"]) == (201, [])
+    assert (first["status"], first["owner"]) == (201, "ana")
+    assert second["status"] == 201
     assert third["status"] == 422
     overview = client.get("/api/v1/deliveries/overview").json()
-    assert (overview["max_recipients"], overview["sender_address"]) == (
-        2,
-        "ovitech_22@hotmail.com",
-    )
-
-
-def test_solo_horas_del_horario_y_con_forma_hh_mm(client: TestClient, world: _World) -> None:
-    _enter(client, world, "ana")
-
-    assert _add(client, "ana@x.mx", ["08:00"])["status"] == 422
-    assert _add(client, "ana@x.mx", ["siete"])["status"] == 422
-    assert _add(client, "ana@x.mx", ["23:00"])["status"] == 201
+    # Benji, 11/11/2026: al usuario no se le dice desde qué correo se manda.
+    assert (overview["max_recipients"], overview["sender_address"]) == (2, None)
 
 
 def test_el_usuario_no_elige_la_cuenta_que_envia(client: TestClient, world: _World) -> None:
@@ -180,4 +187,69 @@ def test_cuentas_reglas_y_horario_son_del_superusuario(client: TestClient, world
     assert client.get("/api/v1/deliveries/accounts").status_code == 200
     for n in range(3):
         assert _add(client, f"lista{n}@x.mx")["status"] == 201
-    assert client.get("/api/v1/deliveries/overview").json()["max_recipients"] is None
+    overview = client.get("/api/v1/deliveries/overview").json()
+    assert (overview["max_recipients"], overview["sender_address"]) == (
+        None,
+        "ovitech_22@hotmail.com",
+    )
+
+
+SCHEDULES = "/api/v1/deliveries/schedules"
+
+
+def _schedule(client: TestClient, times: list[str], recipients: list[object]) -> dict[str, object]:
+    body = {
+        "name": "Extorsión CDMX tarde",
+        "concept_ids": [1],
+        "region_id": CDMX.id,
+        "times": times,
+        "days": [1, 2, 3, 4, 5],
+        "recipient_ids": recipients,
+    }
+    response = client.post(SCHEDULES, json=body, headers=SAME_ORIGIN)
+    return {"status": response.status_code, **response.json()}
+
+
+def test_un_usuario_programa_su_envio_a_la_hora_que_quiera(
+    client: TestClient, world: _World
+) -> None:
+    _enter(client, world, "ana")
+    mail = _add(client, "ana@x.mx")
+
+    saved = _schedule(client, ["16:00", "20:00"], [mail["id"]])
+    too_many = _schedule(client, ["09:30", "12:00"], [mail["id"]])
+    listing = client.get(SCHEDULES).json()
+
+    assert saved["status"] == 201, saved
+    assert (saved["owner"], saved["times"], saved["concept_names"]) == (
+        "ana",
+        ["16:00", "20:00"],
+        ["Extorsión"],
+    )
+    assert (saved["region_name"], saved["runs_per_day"]) == (CDMX.name, 2)
+    # 2 + 2 pasa de su tope de 3 corridas al día.
+    assert too_many["status"] == 422
+    assert (listing["daily_runs"], listing["daily_limit"]) == (2, 3)
+
+
+def test_cambiar_y_borrar_un_envio_programado(client: TestClient, world: _World) -> None:
+    _enter(client, world, "ana")
+    saved = _schedule(client, ["16:00"], [])
+
+    changed = client.put(
+        f"{SCHEDULES}/{saved['id']}",
+        json={
+            "name": "Solo en la noche",
+            "concept_ids": [1],
+            "region_id": CDMX.id,
+            "times": ["21:15"],
+            "is_active": False,
+        },
+        headers=SAME_ORIGIN,
+    )
+    deleted = client.delete(f"{SCHEDULES}/{saved['id']}", headers=SAME_ORIGIN)
+
+    assert changed.status_code == 200, changed.text
+    assert (changed.json()["times"], changed.json()["upcoming"]) == (["21:15"], [])
+    assert deleted.status_code == 204
+    assert client.get(SCHEDULES).json()["items"] == []

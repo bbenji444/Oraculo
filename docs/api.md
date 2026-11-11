@@ -664,6 +664,8 @@ Todas están en la documentación interactiva.
 
 ## Horario de las corridas (`/schedule`, ADR-0040)
 
+> **Sin uso desde ADR-0046:** el reloj ya no lo lee; cada persona programa sus envíos en `/deliveries/schedules`. Se borra con permiso de Benji.
+
 Un solo horario para todos. Lo ven todos (cada quien elige de ahí a qué horas recibe, ADR-0045) y solo el superusuario lo cambia. A cada hora se hace una corrida nueva (búsqueda + IA + PDF) con lo publicado desde la hora anterior, y su reporte se manda a cada destinatario activo que quiera esa hora. Con 07:00, 15:00, 19:00 y 23:00, la de las 19:00 cubre de 15:00 a 19:00 y la de las 23:00 de 19:00 a 23:00. Un cambio aplica en el minuto siguiente.
 
 | Ruta | Qué hace |
@@ -679,17 +681,19 @@ curl -s -X PUT http://localhost:8080/api/v1/schedule -H 'Content-Type: applicati
 
 Qué se manda, a quién y por qué canal. Hoy, el reporte de cada corrida FGR (`source = monitor.corrida_fgr`) por correo vía Composio. WhatsApp todavía no.
 
-- **Cada persona** da de alta sus correos (un usuario normal, hasta 2) y elige a qué horas del horario le llegan.
-- **El superusuario** decide desde qué cuenta se manda y el horario (rutas marcadas «superusuario»).
+- **Cada persona** da de alta sus correos (un usuario normal, hasta 2) y programa sus envíos: temas, región, horas y días (`/deliveries/schedules`, ADR-0046).
+- **El superusuario** decide desde qué cuenta se manda (rutas marcadas «superusuario»).
 - **Quién ve qué lo decide la base** (seguridad por filas, migración 0042): cada persona ve solo sus destinatarios y su historial; el superusuario ve todos, con su `owner`.
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /deliveries/overview` | Si las corridas mandan (`enabled`), si el correo está listo, las fuentes, desde qué correo se manda (`sender_address`) y cuántos correos puede tener la persona (`max_recipients`; `null` = sin tope) |
+| `GET /deliveries/overview` | Si las corridas mandan (`enabled`), si el correo está listo, las fuentes y cuántos correos puede tener la persona (`max_recipients`; `null` = sin tope). Desde qué correo se manda (`sender_address`) solo se le dice al superusuario |
 | `GET /deliveries/accounts` | Superusuario. Cuentas de envío |
 | `POST /deliveries/accounts` | Superusuario. `{provider: "outlook" \| "gmail", label}`. Crea la cuenta pendiente y devuelve `connect_url` para autorizarla. `503 delivery_channel_unavailable` con WhatsApp o sin `COMPOSIO_API_KEY` |
 | `POST /deliveries/accounts/{id}/refresh` | Superusuario. Pregunta a Composio si ya quedó autorizada y lee su dirección |
-| `GET`, `POST /deliveries/recipients` · `PUT`, `DELETE /deliveries/recipients/{id}` | Destinatarios `{name, email, phone, is_active, hours}`; la respuesta trae además `id` y `owner`. `is_active` = «Recibe envíos». `hours`: horas del horario («HH:MM») a las que recibe; vacío = a todas. Un nuevo destinatario queda a nombre de quien lo crea. `422 invalid_delivery` con `details.problemas` si los datos no son válidos, si pasa de 2 correos (usuario normal) o si una hora no está en el horario. Al borrar a alguien, su historial se conserva |
+| `GET`, `POST /deliveries/recipients` · `PUT`, `DELETE /deliveries/recipients/{id}` | Destinatarios `{name, email, phone, is_active}`; la respuesta trae además `id` y `owner`. `is_active` = «Recibe envíos». Un nuevo destinatario queda a nombre de quien lo crea. `422 invalid_delivery` con `details.problemas` si los datos no son válidos o si pasa de 2 correos (usuario normal). Al borrar a alguien, su historial se conserva |
+| `GET /deliveries/schedules` | Envíos programados de la persona (el superusuario ve todos): `{items, daily_runs, daily_limit, average_run_cost_usd}`. Cada uno trae `owner`, `concept_names`, `region_name`, `runs_per_day` y `upcoming` (próximas 3 corridas) |
+| `POST /deliveries/schedules` · `PUT`, `DELETE /deliveries/schedules/{id}` | `{name, concept_ids, region_id, times: ["16:00", …], days: [1, …], recipient_ids, is_active}`. Horas al minuto (CDMX), máximo 8 por envío y con una hora de separación; días vacíos = todos. `422 invalid_delivery` si pasa de 3 corridas al día sumando sus envíos (8 el superusuario), si un tema o la región no existen o si un correo no es suyo. Aplica en el minuto siguiente. Los envíos que piden lo mismo a la misma hora comparten una corrida |
 | `GET /deliveries/rules` · `PUT /deliveries/rules` | Superusuario. Cómo se manda cada fuente: `{source, channel, account_id, is_active}`. Una por fuente y canal; `PUT` la crea o la reemplaza (migración 0037) |
 | `GET /deliveries/history?cursor=&limit=` | Guías de envío de la persona, de la más nueva a la más vieja. El destino va enmascarado. `scheduled_for` es la corrida programada que las creó; `owner`, de quién es |
 | `GET /deliveries/history/{id}` | Una guía con todos sus intentos (`attempt_log`) |
@@ -697,6 +701,7 @@ Qué se manda, a quién y por qué canal. Hoy, el reporte de cada corrida FGR (`
 | `POST /deliveries/test` | `{recipient_id, account_id?}`. Manda ya la última corrida y devuelve cómo quedó. Sin `account_id` sale de la cuenta que eligió el superusuario; un usuario normal no puede elegir otra (se ignora). `404` si nadie ha elegido cuenta |
 
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/deliveries/recipients -H 'Content-Type: application/json' -d '{"name":"Ana","email":"ana@x.mx","hours":["07:00","23:00"]}'
+curl -s -X POST http://localhost:8080/api/v1/deliveries/recipients -H 'Content-Type: application/json' -d '{"name":"Ana","email":"ana@x.mx"}'
+curl -s -X POST http://localhost:8080/api/v1/deliveries/schedules -H 'Content-Type: application/json' -d '{"name":"Extorsión Jalisco tarde","concept_ids":[3],"region_id":14,"times":["16:00","20:00"],"days":[1,2,3,4,5],"recipient_ids":[1]}'
 curl -s -X POST http://localhost:8080/api/v1/deliveries/test -H 'Content-Type: application/json' -d '{"recipient_id":1}'
 ```

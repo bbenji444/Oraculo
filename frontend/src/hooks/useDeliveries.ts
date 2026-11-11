@@ -11,23 +11,29 @@ import {
   type AccountProvider,
   connectAccount,
   deleteRecipient,
+  deleteSchedule,
   getDeliveryOverview,
   listAccounts,
   listDeliveries,
   listRecipients,
   listRules,
+  listSchedules,
   type RecipientInput,
   refreshAccount,
   retryDelivery,
   type RuleInput,
   saveRecipient,
   saveRule,
+  saveSchedule,
+  type ScheduleInput,
   sendTest,
 } from '../services/deliveries';
 
 const KEY = ['deliveries'] as const;
 // Mientras algo está por mandarse, el historial se vuelve a pedir cada 5 s.
 const LIVE_REFRESH_MS = 5000;
+// Las próximas corridas cambian con el reloj: una vez por minuto basta.
+const SCHEDULES_REFRESH_MS = 60_000;
 
 export function useDeliveryOverview() {
   return useQuery({
@@ -50,6 +56,28 @@ export function useRecipients() {
     queryKey: [...KEY, 'recipients'],
     queryFn: ({ signal }) => listRecipients(signal),
   });
+}
+
+/** Envíos programados; se refrescan cada minuto para que «Próxima corrida» siga al día. */
+export function useSchedules() {
+  return useQuery({
+    queryKey: [...KEY, 'schedules'],
+    queryFn: ({ signal }) => listSchedules(signal),
+    refetchInterval: SCHEDULES_REFRESH_MS,
+  });
+}
+
+export function useSaveSchedule() {
+  const invalidate = useInvalidate('schedules');
+  return useMutation({
+    mutationFn: ({ input, id }: { input: ScheduleInput; id?: number }) => saveSchedule(input, id),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteSchedule() {
+  const invalidate = useInvalidate('schedules');
+  return useMutation({ mutationFn: (id: number) => deleteSchedule(id), onSuccess: invalidate });
 }
 
 export function useRules() {
@@ -103,7 +131,7 @@ export function useDeleteRecipient() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteRecipient(id),
-    // El historial muestra su nombre: se refresca todo.
+    // El historial y los envíos programados muestran su nombre: se refresca todo.
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   });
 }

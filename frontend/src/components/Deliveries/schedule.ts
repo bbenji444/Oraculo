@@ -1,6 +1,6 @@
 /**
- * Lógica pura del horario único de las corridas (ADR-0040): días, horas, los
- * topes que también revisa el servidor y lo que cuesta al día.
+ * Lógica pura de las horas y días de las corridas (ADR-0040, ADR-0046):
+ * días, horas, los topes que también revisa el servidor y lo que cuesta.
  *
  * Revisar los topes aquí solo sirve para avisar antes de guardar; quien decide
  * es el servidor.
@@ -9,24 +9,43 @@
  */
 
 /**
- * Prende o apaga una hora de las que recibe una persona (ADR-0045).
+ * Agrega una hora a un envío: en orden y sin repetir.
  *
- * @returns Las horas en orden, sin repetir.
+ * @example addTime(['20:00'], '16:00') // ['16:00', '20:00']
  */
-export function toggleHour(hours: readonly string[], time: string): string[] {
-  return hours.includes(time) ? hours.filter((h) => h !== time) : sortTimes([...hours, time]);
+export function addTime(times: readonly string[], time: string): string[] {
+  return sortTimes([...new Set([...times, time])]);
 }
 
 /**
- * Cómo se lee a qué horas recibe: sin horas elegidas, a todas las del horario.
+ * Prende o apaga un día de la semana (vacío = todos los días).
  *
- * @param hours Las que eligió.
- * @param times Las del horario vigente.
+ * @example toggleDay([1, 2], 3) // [1, 2, 3]
  */
-export function hoursLabel(hours: readonly string[], times: readonly string[]): string {
-  const valid = sortTimes(hours.filter((h) => times.includes(h)));
-  if (valid.length === 0 || valid.length === times.length) return 'A todas las horas del horario';
-  return `A las ${valid.join(', ')}`;
+export function toggleDay(days: readonly number[], day: number): number[] {
+  return days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b);
+}
+
+/**
+ * Cuántas corridas al día sumaría la persona con este envío cambiado.
+ *
+ * Cuenta el día de la semana con más corridas, igual que el servidor.
+ *
+ * @param others Los demás envíos prendidos de la persona: horas y días.
+ * @param edited El envío que se está armando.
+ */
+export function dailyRunsWith(
+  others: readonly { times: readonly string[]; days: readonly number[] }[],
+  edited: { times: readonly string[]; days: readonly number[] },
+): number {
+  let max = 0;
+  for (let day = 1; day <= 7; day += 1) {
+    const total = [...others, edited]
+      .filter((s) => s.days.length === 0 || s.days.includes(day))
+      .reduce((sum, s) => sum + s.times.length, 0);
+    max = Math.max(max, total);
+  }
+  return max;
 }
 
 /** Días ISO en orden de lunes a domingo, como se leen. */

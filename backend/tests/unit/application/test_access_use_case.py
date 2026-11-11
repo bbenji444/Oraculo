@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from app.application.ports.access import SessionData, UserChanges
+from app.application.use_cases.access import AccessAdmin
 from app.domain.access import MAX_ACTIVE_KEYS_PER_USER, AuthUser, Role
 from app.domain.credentials import verify_password
 from app.domain.errors import (
@@ -17,7 +18,7 @@ from app.domain.errors import (
     UsernameTakenError,
     UserNotFoundError,
 )
-from tests.unit.fake_access import POLICY, AccessWorld, access_world
+from tests.unit.fake_access import PEPPER, POLICY, AccessWorld, access_world
 
 pytestmark = pytest.mark.anyio
 
@@ -403,3 +404,18 @@ async def test_un_usuario_normal_no_borra(world: AccessWorld) -> None:
 
     with pytest.raises(ForbiddenError):
         await world.admin.delete_user(ana, IP, 1)
+
+
+async def test_una_persona_nueva_recibe_su_envio_inicial(world: AccessWorld) -> None:
+    # ADR-0046: cada usuario nuevo empieza con su copia del monitor FGR.
+    given: list[str] = []
+
+    async def welcome(username: str) -> None:
+        given.append(username)
+
+    admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock, welcome)
+    await admin.create_user(
+        await _admin(world), IP, username="pepe", display_name="Pepe", email=None, role=Role.USER
+    )
+
+    assert given == ["pepe"]

@@ -75,7 +75,7 @@ def _account(row: Row) -> DeliveryAccount:
 def _recipient(row: Row) -> Recipient:
     return Recipient(
         row.id,
-        RecipientDraft(row.name, row.email, row.phone, row.is_active, tuple(row.hours or ())),
+        RecipientDraft(row.name, row.email, row.phone, row.is_active),
         row.owner,
     )
 
@@ -213,7 +213,7 @@ class PostgresDeliveryStore:
         async with self._engine.connect() as conn:
             rows = await conn.execute(
                 text(
-                    "SELECT id, name, email, phone, is_active, hours, owner "
+                    "SELECT id, name, email, phone, is_active, owner "
                     "FROM delivery_recipients "
                     "ORDER BY name, id"
                 )
@@ -226,7 +226,7 @@ class PostgresDeliveryStore:
             row = (
                 await conn.execute(
                     text(
-                        "SELECT id, name, email, phone, is_active, hours, owner "
+                        "SELECT id, name, email, phone, is_active, owner "
                         "FROM delivery_recipients "
                         "WHERE id = :id"
                     ),
@@ -241,17 +241,15 @@ class PostgresDeliveryStore:
             row = (
                 await conn.execute(
                     text(
-                        "INSERT INTO delivery_recipients (name, email, phone, is_active, hours, "
-                        "owner) VALUES (:name, :email, :phone, :active, "
-                        "CAST(:hours AS smallint[]), :owner) "
-                        "RETURNING id, name, email, phone, is_active, hours, owner"
+                        "INSERT INTO delivery_recipients (name, email, phone, is_active, owner) "
+                        "VALUES (:name, :email, :phone, :active, :owner) "
+                        "RETURNING id, name, email, phone, is_active, owner"
                     ),
                     {
                         "name": data.name,
                         "email": data.email,
                         "phone": data.phone,
                         "active": data.is_active,
-                        "hours": list(data.hours),
                         "owner": owner,
                     },
                 )
@@ -265,9 +263,8 @@ class PostgresDeliveryStore:
                 await conn.execute(
                     text(
                         "UPDATE delivery_recipients SET name = :name, email = :email, "
-                        "phone = :phone, is_active = :active, "
-                        "hours = CAST(:hours AS smallint[]), updated_at = now() "
-                        "WHERE id = :id RETURNING id, name, email, phone, is_active, hours, owner"
+                        "phone = :phone, is_active = :active, updated_at = now() "
+                        "WHERE id = :id RETURNING id, name, email, phone, is_active, owner"
                     ),
                     {
                         "id": recipient_id,
@@ -275,7 +272,6 @@ class PostgresDeliveryStore:
                         "email": data.email,
                         "phone": data.phone,
                         "active": data.is_active,
-                        "hours": list(data.hours),
                     },
                 )
             ).first()

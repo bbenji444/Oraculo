@@ -1,6 +1,6 @@
 # ADR-0040: Horario único de las corridas, editable por el administrador
 
-- **Estado:** aceptada
+- **Estado:** reemplazada por [ADR-0046](0046-envios-programados.md) (envíos programados)
 - **Fecha:** 2026-11-06
 - **Fase:** F12
 - **Relacionadas:** ADR-0031 (corridas automáticas), ADR-0034 (auditoría de corridas), ADR-0039 (envíos auditables)

@@ -1,11 +1,13 @@
-"""Una corrida automática del monitor FGR de punta a punta (F12.8, ADR-0031).
+"""Una corrida automática de punta a punta (F12.8, ADR-0031, ADR-0046).
 
-La lanza el reloj de Celery a cada hora del horario único que edita el
-administrador en «Envíos» (ADR-0040), o una persona con ``make corrida-fgr``.
+La lanza el reloj de Celery cuando llega una hora de algún envío programado
+(«Mis envíos», ADR-0046): los envíos que piden lo mismo a la misma hora
+comparten una corrida. ``make corrida-fgr`` corre a mano la del monitor FGR.
 Hace lo mismo que alguien en Explorar, sin pantalla:
 
-1. arma la petición (``PrepareAutomaticRun``): FGR, todo México, solo las
-   horas desde la corrida anterior, Google News RSS y el índice local (0 créditos);
+1. arma la petición (``PrepareAutomaticRun``): los temas y la región del
+   envío, solo las horas desde su corrida anterior, Google News RSS y el
+   índice local (0 créditos);
 2. la crea con las mismas reglas que una manual (``StartSearch``: tope de
    consultas, llave de la IA, tope de créditos) y la marca como automática;
 3. la corre aquí mismo con el pipeline de siempre (``run_search_job``): extrae,
@@ -17,9 +19,9 @@ Hace lo mismo que alguien en Explorar, sin pantalla:
 Todo queda en PostgreSQL: la búsqueda, sus notas, la bitácora y el reporte.
 
 5. si los envíos están prendidos (``DELIVERIES_ENABLED``), manda el reporte
-   a todos los destinatarios activos (ADR-0039, ADR-0040).
+   a los correos de los envíos que la pidieron (ADR-0039, ADR-0046).
 
-``check_due_run`` es lo que hace el reloj cada minuto: ¿toca una corrida?
+``check_due_runs`` es lo que hace el reloj cada minuto: ¿qué corridas tocan?
 
 No hace: no guarda el horario (eso es la API) ni programa el reloj (``celery_app``).
 """
@@ -29,29 +31,33 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from app.adapters.llm.factory import MissingLLMKeyError, build_summarizer, llm_info
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
+from app.adapters.persistence.delivery_schedules_repository import (
+    PostgresDeliveryScheduleStore,
+)
 from app.adapters.persistence.provider_queries_repository import PostgresProviderQueryLog
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.reports_repository import PostgresReportStore
-from app.adapters.persistence.schedule_repository import PostgresScheduleStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
 from app.application.audit import Actor
 from app.application.clock import MEXICO_CITY
 from app.application.use_cases.automatic_run import AutomaticProfile, PrepareAutomaticRun
-from app.application.use_cases.plan_search import PlanSearch
+from app.application.use_cases.delivery_schedules import PendingRuns
+from app.application.use_cases.plan_search import PlanSearch, SearchRequest
 from app.application.use_cases.reports import BuildReport, LLMPrices, ReportFormat
 from app.application.use_cases.run_search import SearchReport
-from app.application.use_cases.schedule import DueRun, GetSchedule
 from app.application.use_cases.start_search import StartSearch
 from app.core.config import Settings
-from app.domain.schedule import RunSchedule, parse_run_hours
+from app.domain.delivery_schedules import DueRun, topic_key
+from app.domain.schedule import RunSchedule, RunWindow, parse_run_hours
 from app.domain.sources import parse_sources
 from app.worker.delivery_jobs import deliver_run
 from app.worker.search_jobs import build_providers, run_search_job
@@ -122,52 +128,87 @@ def default_schedule(settings: Settings) -> RunSchedule:
     return RunSchedule.from_hours(parse_run_hours(settings.automatic_run_hours))
 
 
-def schedule_reader(settings: Settings, engine: AsyncEngine) -> GetSchedule:
-    """Lector del horario vigente.
-
-    Args:
-        settings: Configuración (para el horario inicial).
-        engine: Motor de la base.
-
-    Returns:
-        El caso de uso ``GetSchedule``.
-    """
-    return GetSchedule(
-        PostgresScheduleStore(engine), default_schedule(settings), lambda: datetime.now(UTC)
-    )
-
-
-async def check_due_run(settings: Settings, now: datetime | None = None) -> datetime | None:
-    """Lo que hace el reloj cada minuto: ¿toca lanzar una corrida?
+async def check_due_runs(settings: Settings, now: datetime | None = None) -> list[DueRun]:
+    """Lo que hace el reloj cada minuto: ¿qué corridas de los envíos programados tocan?
 
     Args:
         settings: Configuración.
         now: Este momento (por defecto, ahora).
 
     Returns:
-        La hora programada (CDMX), ya apartada para que nadie más la lance,
-        o ``None`` si no toca.
+        Las corridas, ya agrupadas y apartadas para que nadie más las lance.
     """
     engine = create_async_engine(settings.database_url())
     try:
-        reader = schedule_reader(settings, engine)
-        return await DueRun(PostgresScheduleStore(engine), reader, DUE_GRACE).execute(
-            now or datetime.now(UTC)
+        pending = PendingRuns(
+            PostgresDeliveryScheduleStore(engine),
+            DUE_GRACE,
+            timedelta(minutes=settings.automatic_window_margin_minutes),
         )
+        return await pending.execute(now or datetime.now(UTC))
     finally:
         await engine.dispose()
 
 
-def report_file_name(scheduled_for: datetime) -> str:
+def run_to_payload(run: DueRun) -> dict[str, Any]:
+    """Una corrida apartada, en datos simples para la cola de Celery (JSON).
+
+    Args:
+        run: La corrida.
+
+    Returns:
+        Lo que recibe ``run_from_payload``.
+    """
+    return {
+        "topic": run.topic,
+        "concept_ids": list(run.concept_ids),
+        "region_id": run.region_id,
+        "start": run.window.start.isoformat(),
+        "end": run.window.end.isoformat(),
+        "schedule_ids": list(run.schedule_ids),
+    }
+
+
+def run_from_payload(payload: dict[str, Any]) -> DueRun:
+    """Lo contrario de ``run_to_payload``.
+
+    Args:
+        payload: Lo que viajó por la cola.
+
+    Returns:
+        La corrida.
+    """
+    return DueRun(
+        topic=str(payload["topic"]),
+        concept_ids=tuple(int(c) for c in payload["concept_ids"]),
+        region_id=int(payload["region_id"]),
+        window=RunWindow(
+            datetime.fromisoformat(payload["start"]), datetime.fromisoformat(payload["end"])
+        ),
+        schedule_ids=tuple(int(s) for s in payload["schedule_ids"]),
+    )
+
+
+def report_file_name(scheduled_for: datetime, search_id: UUID | None = None) -> str:
     """Nombre del PDF de una corrida: ``fgr_2026-10-26_0700.pdf``.
+
+    Las corridas de los envíos programados llevan además el inicio del id de
+    su búsqueda, porque a la misma hora puede haber varias de temas distintos.
 
     Args:
         scheduled_for: Hora programada (CDMX).
+        search_id: La búsqueda de la corrida, si es de un envío programado.
 
     Returns:
         El nombre, ordenable por fecha en cualquier explorador de archivos.
+
+    Example:
+        >>> report_file_name(datetime(2026, 11, 11, 16, 0), UUID(int=0xABCDEF12 << 96))
+        'corrida_2026-11-11_1600_abcdef12.pdf'
     """
-    return f"fgr_{scheduled_for:%Y-%m-%d_%H%M}.pdf"
+    if search_id is None:
+        return f"fgr_{scheduled_for:%Y-%m-%d_%H%M}.pdf"
+    return f"corrida_{scheduled_for:%Y-%m-%d_%H%M}_{search_id.hex[:8]}.pdf"
 
 
 def automatic_settings(settings: Settings) -> Settings:
@@ -188,16 +229,59 @@ def automatic_settings(settings: Settings) -> Settings:
     )
 
 
-async def run_automatic_job(
-    settings: Settings, now: datetime | None = None, slot: datetime | None = None
-) -> AutomaticRunSummary:
-    """Corre una corrida automática completa.
+async def run_scheduled_job(settings: Settings, run: DueRun) -> AutomaticRunSummary:
+    """Corre la corrida de uno o varios envíos programados y les manda el reporte.
 
     Args:
         settings: Configuración.
-        now: Momento de la corrida (por defecto, ahora). Sin ``slot``, define a
-            qué hora del horario pertenece (``make corrida-fgr``).
-        slot: Hora programada que apartó el reloj (``check_due_run``).
+        run: La corrida que apartó el reloj (``check_due_runs``).
+
+    Returns:
+        La búsqueda creada, su resultado y la ruta del PDF.
+
+    Raises:
+        LLMNotConfiguredError, ServiceUnavailableError: Ver ``StartSearch``.
+    """
+    settings = automatic_settings(settings)
+    slot = run.slot.astimezone(MEXICO_CITY)
+    engine = create_async_engine(settings.database_url())
+    try:
+        concepts = PostgresConceptRepository(engine)
+        regions = PostgresRegionRepository(engine)
+        request = PrepareAutomaticRun(concepts, regions, profile_from(settings)).request_for(run)
+        search_id = await _start(settings, engine, request)
+        await PostgresDeliveryScheduleStore(engine).set_topic(search_id, run.topic)
+    finally:
+        await engine.dispose()
+    logger.info(
+        "Corrida automática creada",
+        extra={
+            "search_id": str(search_id),
+            "corrida": slot.isoformat(),
+            "tema": run.topic,
+            "envios": list(run.schedule_ids),
+        },
+    )
+    report = await run_search_job(settings, search_id)
+    pdf_path = await _save_report(settings, search_id, report_file_name(slot, search_id))
+    await deliver_run(settings, search_id, slot, run.schedule_ids)
+    return AutomaticRunSummary(search_id, slot, report, pdf_path)
+
+
+async def run_automatic_job(
+    settings: Settings, now: datetime | None = None, slot: datetime | None = None
+) -> AutomaticRunSummary:
+    """Corre a mano la corrida del monitor FGR (``make corrida-fgr``).
+
+    Usa el perfil fijo de la configuración (FGR, todo México) y el horario
+    ``AUTOMATIC_RUN_HOURS`` para saber qué periodo cubre. Guarda la búsqueda y
+    su PDF, pero no manda correos: eso lo hacen los envíos programados.
+
+    Args:
+        settings: Configuración.
+        now: Momento de la corrida (por defecto, ahora). Define a qué hora del
+            horario pertenece.
+        slot: Hora programada, si se quiere una en particular.
 
     Returns:
         La búsqueda creada, su resultado y la ruta del PDF.
@@ -208,11 +292,19 @@ async def run_automatic_job(
     """
     settings = automatic_settings(settings)
     local_now = (now or datetime.now(UTC)).astimezone(MEXICO_CITY)
+    schedule = default_schedule(settings)
+    slot = (slot or schedule.slot_at_or_before(local_now)).astimezone(MEXICO_CITY)
     engine = create_async_engine(settings.database_url())
     try:
-        schedule = await schedule_reader(settings, engine).current()
-        slot = (slot or schedule.slot_at_or_before(local_now)).astimezone(MEXICO_CITY)
-        search_id = await _create(settings, engine, schedule, slot)
+        concepts = PostgresConceptRepository(engine)
+        regions = PostgresRegionRepository(engine)
+        prepare = PrepareAutomaticRun(concepts, regions, profile_from(settings))
+        # Solo desde la corrida programada anterior a esta.
+        request = await prepare.request(slot, schedule)
+        search_id = await _start(settings, engine, request)
+        await PostgresDeliveryScheduleStore(engine).set_topic(
+            search_id, topic_key(request.concept_ids, request.region_id)
+        )
     finally:
         await engine.dispose()
     logger.info(
@@ -220,14 +312,11 @@ async def run_automatic_job(
         extra={"search_id": str(search_id), "corrida": slot.isoformat()},
     )
     report = await run_search_job(settings, search_id)
-    pdf_path = await _save_report(settings, search_id, slot)
-    await deliver_run(settings, search_id, slot, frozenset(schedule.times))
+    pdf_path = await _save_report(settings, search_id, report_file_name(slot))
     return AutomaticRunSummary(search_id, slot, report, pdf_path)
 
 
-async def _create(
-    settings: Settings, engine: AsyncEngine, schedule: RunSchedule, slot: datetime
-) -> UUID:
+async def _start(settings: Settings, engine: AsyncEngine, request: SearchRequest) -> UUID:
     concepts = PostgresConceptRepository(engine)
     regions = PostgresRegionRepository(engine)
     profile = profile_from(settings)
@@ -241,15 +330,13 @@ async def _create(
         credits_limit=settings.searchapi_monthly_credit_limit,
         default_sources=profile.sources,
     )
-    # Solo desde la corrida programada anterior a esta en el horario vigente.
-    request = await PrepareAutomaticRun(concepts, regions, profile).request(slot, schedule)
     started = await StartSearch(
         planner, PostgresSearchStore(engine), _RunsHere(), settings.max_queries_per_search
     ).execute(request)
     return started.search_id
 
 
-async def _save_report(settings: Settings, search_id: UUID, slot: datetime) -> Path | None:
+async def _save_report(settings: Settings, search_id: UUID, file_name: str) -> Path | None:
     """Arma el reporte de la corrida y guarda su PDF; si falla, la corrida sigue valiendo."""
     engine = create_async_engine(settings.database_url())
     try:
@@ -259,7 +346,7 @@ async def _save_report(settings: Settings, search_id: UUID, slot: datetime) -> P
         )
         # WeasyPrint es lento y síncrono (~1 s por 50 notas): en otro hilo.
         pdf = await asyncio.to_thread(ReportRenderer().pdf, data)
-        path = settings.reports_dir / report_file_name(slot)
+        path = settings.reports_dir / file_name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(pdf)
         await store.set_pdf_path(search_id, str(path))
