@@ -6,7 +6,24 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **Relevancia mucho más estricta (11/11/2026, ADR-0044).** Benji: «me está arrojando información basura».
+  - La IA (`enrich_v4`) solo marca una nota como relevante si el tema es **el asunto principal**. Ya no cuentan las agendas de marchas, los resúmenes del día ni las menciones de pasada.
+  - Sí cuentan el activismo de víctimas y colectivos, y las acciones oficiales de una institución como la FGR.
+  - Un «sí» de la IA con menos de 60 % de confianza ya no cuenta. Esto también aplica a las búsquedas pasadas.
+  - **Prueba real:** de 14 notas «relevantes» de una búsqueda quedaron 5, todas correctas, y se quitaron 8 notas basura.
+
+### Corregido
+
+- Las notas con muchos lugares (agendas) ya no se quedan sin resumen por una respuesta cortada de la IA (2 de 25 en la prueba).
+- «Copiar contraseña», «Copiar llave» y «Copiar consulta» funcionan también por `http://`.
+- El letrero de una nota ya no queda encimado con la ventana «N notas en este lugar».
+- Las etapas «Mapa» y «Región» ahora se llaman «Ubicar» y «Zona».
+
 ### Agregado
+
+- Al volver al monitor desde otro módulo de Oráculo, se retoma la búsqueda abierta en la etapa en que va.
 
 - **Se entra al monitor igual que a Oráculo: usuario, contraseña y código de 6 dígitos (10/11/2026, ADR-0043, migración 0040).** Benji: «que puedas acceder con contraseña, y esa contraseña genere un token interno que sea su identificación para los demás módulos».
   - **Primer ingreso:** contraseña temporal que da el administrador → contraseña propia (12+ caracteres, letras y números) → escanear un QR con Microsoft Authenticator.

@@ -79,8 +79,19 @@ def parse_authority(value: str | None) -> Authority | None:
         return Authority.UNKNOWN
 
 
+# Confianza mínima para que un «sí es relevante» de la IA cuente (Benji,
+# 11/11/2026: «sé mucho más estricto»). Por debajo, la IA misma dice que el
+# tema es secundario o dudoso (enrich_v4 pide menos de 0.6 en ese caso).
+MIN_RELEVANCE_SCORE = 0.6
+LOW_CONFIDENCE_REASON = "La IA no está segura de que sea el asunto principal de la nota."
+
+
 def effective_relevance(
-    ai_relevant: bool, ai_reason: str | None, rule: RelevanceRule, authority: Authority | None
+    ai_relevant: bool,
+    ai_reason: str | None,
+    rule: RelevanceRule,
+    authority: Authority | None,
+    score: float | None = None,
 ) -> tuple[bool, str | None]:
     """Relevancia final de una nota para un concepto, con su razón.
 
@@ -89,10 +100,12 @@ def effective_relevance(
         ai_reason: Su razón.
         rule: Regla del concepto.
         authority: Quién actúa (``None`` si la nota no se ha clasificado).
+        score: Confianza de la IA (0 a 1), si se conoce.
 
     Returns:
-        ``(relevante, razón)``. Solo cambia cuando la regla es ``fgr_federal``
-        y la nota dice que no actuó la FGR.
+        ``(relevante, razón)``. Cambia cuando la regla es ``fgr_federal`` y la
+        nota dice que no actuó la FGR, o cuando la IA dijo que sí pero con
+        menos de ``MIN_RELEVANCE_SCORE`` de confianza.
 
     Example:
         >>> effective_relevance(True, "Menciona a la FGR", RelevanceRule.FGR_FEDERAL,
@@ -101,4 +114,6 @@ def effective_relevance(
     """
     if rule is RelevanceRule.FGR_FEDERAL and authority in FGR_FEDERAL_EXCLUDED:
         return False, FGR_FEDERAL_EXCLUDED[authority]
+    if ai_relevant and score is not None and score < MIN_RELEVANCE_SCORE:
+        return False, LOW_CONFIDENCE_REASON
     return ai_relevant, ai_reason
