@@ -1,16 +1,18 @@
 /**
- * Pantalla «Envíos» (F12.11, ADR-0039).
+ * Pantalla «Envíos» (F12.11, ADR-0039, ADR-0045).
  *
- * Solo para el administrador (ADR-0040): un horario único de corridas y el
- * reporte de cada una a todos los destinatarios activos. Hoy, por correo (vía
- * Composio); WhatsApp aparece como «Próximamente».
+ * Cada persona da de alta sus correos (hasta dos) y elige a qué horas del
+ * horario le llega el reporte de la FGR. El correo que envía y el horario los
+ * decide el superusuario: él ve, además, las cuentas de envío, el horario y
+ * los correos e historial de todos.
+ *
+ * Hoy se manda por correo (vía Composio); WhatsApp aparece como «Próximamente».
  * Está pensada para volverse el módulo de envíos de todo Oráculo: cada envío
  * lleva su «fuente», y mañana habrá más fuentes que el monitor.
- *
- * Arriba, el estado: si las corridas automáticas ya mandan (DELIVERIES_ENABLED)
- * y si el correo está listo.
  */
+import { useMe } from '../../hooks/useAuth';
 import { useDeliveryOverview } from '../../hooks/useDeliveries';
+import { useSchedule } from '../../hooks/useSchedule';
 import { HudChip } from '../ui/HudChip';
 import { SectionHeading } from '../ui/SectionHeading';
 import { AccountsPanel } from './AccountsPanel';
@@ -18,16 +20,73 @@ import { HistoryPanel } from './HistoryPanel';
 import { RecipientsPanel } from './RecipientsPanel';
 import { SchedulePanel } from './SchedulePanel';
 
+/** Lo que ve un usuario normal: sus correos, sus horas y lo que se le ha mandado. */
+function MyDeliveries({
+  senderAddress,
+  maxRecipients,
+}: {
+  senderAddress: string | null;
+  maxRecipients: number | null;
+}) {
+  const times = useSchedule().data?.times ?? [];
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+      <SectionHeading
+        kicker="Automatizaciones"
+        title="Mis envíos"
+        description="Agrega tu correo y te llegará el reporte de la Fiscalía General de la República después de cada corrida automática."
+      />
+      <p className="rounded-lg border border-sky-400/20 bg-sky-400/5 px-4 py-3 text-sm text-slate-300">
+        {times.length > 0 ? (
+          <>
+            Las corridas son a las <b className="text-slate-100">{times.join(', ')}</b> (hora de la
+            Ciudad de México).
+          </>
+        ) : (
+          'Las corridas siguen el horario que define el administrador.'
+        )}{' '}
+        {senderAddress ? (
+          <>
+            Te llega desde <b className="text-slate-100">{senderAddress}</b>.
+          </>
+        ) : (
+          'El correo desde el que se manda lo define el administrador.'
+        )}
+      </p>
+      <RecipientsPanel isSuperuser={false} maxRecipients={maxRecipients} />
+      <HistoryPanel isSuperuser={false} senderAddress={senderAddress} />
+    </div>
+  );
+}
+
 export function DeliveriesPage() {
   const overview = useDeliveryOverview();
+  const isSuperuser = useMe().data?.role === 'superuser';
   const data = overview.data;
+
+  if (!isSuperuser) {
+    return (
+      <>
+        {overview.error && (
+          <p role="alert" className="mx-auto max-w-4xl px-6 pt-6 text-sm text-rose-300">
+            {overview.error.message}
+          </p>
+        )}
+        <MyDeliveries
+          senderAddress={data?.sender_address ?? null}
+          maxRecipients={data?.max_recipients ?? null}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
       <SectionHeading
         kicker="Automatizaciones"
         title="Envíos"
-        description="Un solo horario para todos: a cada hora se hace un reporte nuevo y se manda a todos los destinatarios. Cada envío queda registrado."
+        description="Un solo horario para todos: a cada hora se hace un reporte nuevo y se manda a cada persona a las horas que eligió. Cada envío queda registrado."
         actions={
           data && (
             <div className="flex flex-wrap gap-2">
@@ -56,10 +115,10 @@ export function DeliveriesPage() {
       )}
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <AccountsPanel emailConfigured={data?.email_configured ?? false} />
-        <RecipientsPanel />
+        <RecipientsPanel isSuperuser />
       </div>
       <SchedulePanel />
-      <HistoryPanel />
+      <HistoryPanel isSuperuser senderAddress={data?.sender_address ?? null} />
     </div>
   );
 }

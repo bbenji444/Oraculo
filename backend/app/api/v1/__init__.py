@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 
-from app.api.auth import require_superuser_user, superuser_for_changes
+from app.api.auth import superuser_for_changes
 from app.api.v1.access import router as access_router
 from app.api.v1.app_config import router as app_config_router
 from app.api.v1.articles import router as articles_router
@@ -30,7 +30,6 @@ api_router.include_router(access_router)
 api_router.include_router(regions_router)
 # Etapa 1 (ADR-0042): todos leen; solo el superusuario cambia.
 _CHANGES_BY_SUPERUSER = [Depends(superuser_for_changes)]
-_SUPERUSER_ONLY = [Depends(require_superuser_user)]
 api_router.include_router(concepts_router, dependencies=_CHANGES_BY_SUPERUSER)
 api_router.include_router(searches_router)
 api_router.include_router(sources_router)
@@ -43,9 +42,10 @@ api_router.include_router(cases_router)
 api_router.include_router(entities_router)
 api_router.include_router(resolution_router)
 api_router.include_router(relationships_router)
-# Envíos y horario: del superusuario hasta la etapa 3 (envíos por persona).
-api_router.include_router(deliveries_router, dependencies=_SUPERUSER_ONLY)
-api_router.include_router(schedule_router, dependencies=_SUPERUSER_ONLY)
+# Envíos por persona (ADR-0045): cada quien sus correos; cuentas, reglas y
+# cambiar el horario piden superusuario en cada ruta. Ver el horario, todos.
+api_router.include_router(deliveries_router)
+api_router.include_router(schedule_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
 OPENAPI_TAGS = [
@@ -76,8 +76,9 @@ OPENAPI_TAGS = [
     {
         "name": "envíos",
         "description": (
-            "Qué se manda, a quién y por qué canal (F12.11, ADR-0039): cuentas de correo "
-            "vía Composio, destinatarios, cómo se manda cada fuente e historial auditable."
+            "Qué se manda, a quién y por qué canal (F12.11, ADR-0039, ADR-0045): cada persona "
+            "sus correos (hasta 2) y sus horas, e historial auditable; cuentas de correo vía "
+            "Composio y cómo se manda cada fuente, solo superusuarios."
         ),
     },
     {
@@ -120,8 +121,9 @@ OPENAPI_TAGS = [
     {
         "name": "horario",
         "description": (
-            "Horario único de las corridas automáticas (ADR-0040): un solo horario para todos, "
-            "lo maneja el administrador. Cada hora es una corrida nueva con IA (máx. 8 al día)."
+            "Horario único de las corridas automáticas (ADR-0040): un solo horario para todos; "
+            "todos lo ven y solo un superusuario lo cambia. Cada hora es una corrida nueva con "
+            "IA (máx. 8 al día)."
         ),
     },
 ]

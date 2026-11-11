@@ -1,7 +1,13 @@
 /** Servicio de envíos (`/api/v1/deliveries`, ADR-0039). */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { daysLabel, scheduleProblem, weeklyCost } from '../components/Deliveries/schedule';
+import {
+  daysLabel,
+  hoursLabel,
+  scheduleProblem,
+  toggleHour,
+  weeklyCost,
+} from '../components/Deliveries/schedule';
 import { deliveryFieldErrors, saveRecipient, sendTest } from './deliveries';
 import { ApiError } from './http';
 
@@ -90,5 +96,31 @@ describe('horario único de las corridas (ADR-0040)', () => {
     expect(weeklyCost(['07:00', '15:00', '23:00'], [], 0.04)).toBeCloseTo(0.84);
     expect(weeklyCost(['07:00'], [1, 2, 3, 4, 5], 0.04)).toBeCloseTo(0.2);
     expect(weeklyCost(['07:00'], [], null)).toBeNull();
+  });
+});
+
+describe('envíos por persona (ADR-0045)', () => {
+  it('sin cuenta, la prueba no la manda y sale del correo del superusuario', async () => {
+    const spy = respond({ id: 'd1', status: 'sent' });
+
+    await sendTest(3);
+
+    const [, init] = spy.mock.calls[0] ?? [];
+    expect(JSON.parse(init?.body as string)).toEqual({ recipient_id: 3 });
+  });
+
+  it('prende y apaga horas en orden y sin repetir', () => {
+    expect(toggleHour(['15:00'], '07:00')).toEqual(['07:00', '15:00']);
+    expect(toggleHour(['07:00', '15:00'], '07:00')).toEqual(['15:00']);
+  });
+
+  it('dice a qué horas llega; sin elegir, a todas', () => {
+    const times = ['07:00', '15:00', '23:00'];
+
+    expect(hoursLabel([], times)).toBe('A todas las horas del horario');
+    expect(hoursLabel(['23:00', '07:00'], times)).toBe('A las 07:00, 23:00');
+    // Una hora que ya salió del horario no cuenta.
+    expect(hoursLabel(['09:00'], times)).toBe('A todas las horas del horario');
+    expect(hoursLabel(times, times)).toBe('A todas las horas del horario');
   });
 });

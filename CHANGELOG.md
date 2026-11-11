@@ -6,6 +6,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Agregado
+
+- **Envíos por usuario (11/11/2026, ADR-0045, migración 0042).** Benji: «que ellos agreguen su correo y ya les van a estar empezando a llegar las noticias».
+  - Cada usuario ve «Mis envíos»: agrega hasta 2 correos y elige a qué horas de las corridas de la FGR le llegan (07:00, 15:00 y 23:00; sin elegir, a todas).
+  - El correo que envía y el horario los decide el superusuario; el usuario solo ve desde qué correo le llega.
+  - Cada persona ve solo sus correos y su historial: lo cuida la base (seguridad por filas). El superusuario ve todo, con el dueño de cada correo.
+  - Lo que ya existía queda a nombre de Benji y sigue igual.
+
 ### Cambiado
 
 - **Relevancia mucho más estricta (11/11/2026, ADR-0044).** Benji: «me está arrojando información basura».

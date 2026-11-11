@@ -1,17 +1,25 @@
 """Pantalla «Envíos» (``/deliveries``, F12.11, ADR-0039).
 
-Qué se manda, a quién y por qué canal. Solo la administra el equipo interno:
-se manda el reporte de cada corrida del horario único (``/schedule``,
-ADR-0040) a todos los destinatarios activos; no hay envíos por persona.
+Qué se manda, a quién y por qué canal. El reporte de cada corrida del
+horario único (``/schedule``, ADR-0040) llega a los destinatarios activos que
+quieren esa hora. Cada persona da de alta sus correos (hasta dos) y elige
+sus horas; el correo que envía y el horario los decide el superusuario
+(ADR-0045).
 
-- ``GET /deliveries/overview``: si están prendidos, si Composio está listo y
-  las fuentes;
+- ``GET /deliveries/overview``: si están prendidos, si Composio está listo,
+  desde qué correo se manda y cuántos correos puede tener la persona;
 - ``/deliveries/accounts``: cuentas de envío (conectar Outlook o Gmail y
-  revisar si ya quedaron autorizadas; WhatsApp «próximamente»);
-- ``/deliveries/recipients``: destinatarios;
-- ``/deliveries/rules``: por qué canal y desde qué cuenta se manda cada fuente;
-- ``/deliveries/history``: la guía de cada envío, con sus intentos y «Reintentar»;
+  revisar si ya quedaron autorizadas; WhatsApp «próximamente»). Superusuario;
+- ``/deliveries/recipients``: los destinatarios de la persona (el
+  superusuario ve todos, con su dueño);
+- ``/deliveries/rules``: por qué canal y desde qué cuenta se manda cada
+  fuente. Superusuario;
+- ``/deliveries/history``: la guía de cada envío de la persona, con sus
+  intentos y «Reintentar»;
 - ``POST /deliveries/test``: «Mandar prueba» con la última corrida.
+
+Quién ve qué lo decide la seguridad por filas de la base (migración 0042):
+aquí solo se dice a nombre de quién se crea cada destinatario.
 
 No hace: ninguna regla de negocio; traduce entre HTTP y los casos de uso.
 """
@@ -23,7 +31,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Path, Query, Request, status
 from pydantic import BaseModel, Field
 
+from app.api.auth import CurrentUser, SuperUser
 from app.api.errors import ERROR_RESPONSES, error_responses
+from app.api.v1.schedule import Reader
 from app.application.pagination import TimeCursor, decode_time_cursor, encode_time_cursor
 from app.application.ports.deliveries import (
     AccountConnectorPort,
@@ -40,18 +50,24 @@ from app.application.use_cases.deliveries import (
     ManageAccounts,
     ManageRecipients,
     ManageRules,
+    RecipientScope,
     RetryDelivery,
     SendDeliveries,
     SendTest,
+    sender_account_id,
 )
+from app.domain.access import AuthUser
 from app.domain.deliveries import (
+    MAX_RECIPIENTS_PER_USER,
     SOURCE_FGR_RUN,
     SOURCES,
     AccountProvider,
     DeliveryChannel,
+    RecipientDraft,
     mask_destination,
 )
 from app.domain.errors import DeliveryNotFoundError
+from app.domain.schedule import format_time, parse_time
 
 router = APIRouter(prefix="/deliveries", tags=["envíos"], responses=ERROR_RESPONSES)
 
@@ -107,6 +123,14 @@ class OverviewOut(BaseModel):
     email_configured: bool = Field(description="Si hay llave de Composio para el correo.")
     whatsapp_available: bool = Field(description="WhatsApp: todavía no.")
     sources: list[SourceOut]
+    sender_address: str | None = Field(
+        default=None,
+        description="Desde qué correo se manda (lo elige el superusuario).",
+        examples=["ovitech_22@hotmail.com"],
+    )
+    max_recipients: int | None = Field(
+        default=None, description="Cuántos correos puede tener la persona; null = sin tope."
+    )
 
 
 def get_delivery_settings(request: Request) -> OverviewOut:
@@ -162,18 +186,43 @@ class RecipientIn(BaseModel):
     email: str | None = Field(default=None, examples=["benjamon_300@hotmail.com"])
     phone: str | None = Field(default=None, examples=["525512345678"])
     is_active: bool = True
+    hours: list[str] = Field(
+        default_factory=list,
+        max_length=24,
+        examples=[["07:00", "15:00"]],
+        description="Horas del horario a las que recibe («HH:MM», CDMX); vacío = a todas.",
+    )
+
+    def draft(self) -> RecipientDraft:
+        """Los datos validados para el caso de uso.
+
+        Raises:
+            DeliveryValidationError: Si los datos no son válidos.
+            ScheduleValidationError: Si una hora no tiene forma «HH:MM».
+        """
+        hours = tuple(parse_time(h) for h in self.hours)
+        return RecipientDraft.validated(self.name, self.email, self.phone, self.is_active, hours)
 
 
 class RecipientOut(RecipientIn):
     """Un destinatario guardado."""
 
     id: int
+    owner: str = Field(description="De quién es (usuario).", examples=["benji"])
 
     @classmethod
     def of(cls, r: Recipient) -> "RecipientOut":
         """Convierte del caso de uso."""
         d = r.data
-        return cls(id=r.id, name=d.name, email=d.email, phone=d.phone, is_active=d.is_active)
+        return cls(
+            id=r.id,
+            name=d.name,
+            email=d.email,
+            phone=d.phone,
+            is_active=d.is_active,
+            hours=[format_time(h) for h in d.hours],
+            owner=r.owner,
+        )
 
 
 class RuleIn(BaseModel):
@@ -265,6 +314,7 @@ class DeliveryOut(BaseModel):
     scheduled_for: datetime | None = Field(
         default=None, description="Hora programada que lo mandó."
     )
+    owner: str = Field(default="", description="De quién es el envío (usuario).")
     attempt_log: list[AttemptOut] = Field(default_factory=list)
 
     @classmethod
@@ -292,6 +342,7 @@ class DeliveryOut(BaseModel):
             sent_at=d.sent_at,
             next_attempt_at=d.next_attempt_at,
             scheduled_for=d.scheduled_for,
+            owner=d.owner,
             attempt_log=[AttemptOut.of(a) for a in attempts or []],
         )
 
@@ -308,23 +359,48 @@ class TestIn(BaseModel):
 
     source: Literal["monitor.corrida_fgr"] = "monitor.corrida_fgr"
     recipient_id: int
-    account_id: int
+    account_id: int | None = Field(
+        default=None,
+        description=(
+            "Desde qué cuenta (solo superusuario); sin ella, la que eligió el superusuario."
+        ),
+    )
 
 
 DeliveryId = Annotated[UUID, Path(description="Id del envío.")]
+
+
+async def _scope(user: AuthUser, reader: Reader) -> RecipientScope:
+    """Dueño, tope y horas permitidas de quien da de alta o edita."""
+    schedule = await reader.current()
+    return RecipientScope(
+        owner=user.username,
+        limit=None if user.is_superuser else MAX_RECIPIENTS_PER_USER,
+        allowed_hours=frozenset(schedule.times),
+    )
 
 
 # --- Rutas ---
 
 
 @router.get("/overview", response_model=OverviewOut, summary="Estado de los envíos")
-async def overview(settings: Overview, connector: Connector) -> OverviewOut:
-    """Si están prendidos, si el correo está listo, las fuentes y las horas."""
-    return settings.model_copy(update={"email_configured": connector.is_configured()})
+async def overview(
+    settings: Overview, connector: Connector, store: Store, user: CurrentUser
+) -> OverviewOut:
+    """Si están prendidos, si el correo está listo, desde qué correo se manda y el tope."""
+    account_id = await sender_account_id(store, SOURCE_FGR_RUN)
+    account = await store.get_account(account_id) if account_id else None
+    return settings.model_copy(
+        update={
+            "email_configured": connector.is_configured(),
+            "sender_address": account.address if account else None,
+            "max_recipients": None if user.is_superuser else MAX_RECIPIENTS_PER_USER,
+        }
+    )
 
 
 @router.get("/accounts", response_model=list[AccountOut], summary="Cuentas de envío")
-async def list_accounts(store: Store) -> list[AccountOut]:
+async def list_accounts(_: SuperUser, store: Store) -> list[AccountOut]:
     """Las cuentas desde las que se manda."""
     return [AccountOut.of(a) for a in await store.list_accounts()]
 
@@ -336,7 +412,9 @@ async def list_accounts(store: Store) -> list[AccountOut]:
     summary="Conectar una cuenta de correo",
     responses=error_responses(503),
 )
-async def connect_account(body: AccountIn, store: Store, connector: Connector) -> ConnectOut:
+async def connect_account(
+    _: SuperUser, body: AccountIn, store: Store, connector: Connector
+) -> ConnectOut:
     """Crea la cuenta como pendiente y devuelve el link para autorizarla."""
     account, url = await ManageAccounts(store, connector).connect(body.provider, body.label)
     return ConnectOut(account=AccountOut.of(account), connect_url=url)
@@ -348,14 +426,16 @@ async def connect_account(body: AccountIn, store: Store, connector: Connector) -
     summary="Revisar si la cuenta ya quedó autorizada",
     responses=error_responses(404, 503),
 )
-async def refresh_account(account_id: int, store: Store, connector: Connector) -> AccountOut:
+async def refresh_account(
+    _: SuperUser, account_id: int, store: Store, connector: Connector
+) -> AccountOut:
     """Pregunta al proveedor el estado de la cuenta y su dirección."""
     return AccountOut.of(await ManageAccounts(store, connector).refresh(account_id))
 
 
 @router.get("/recipients", response_model=list[RecipientOut], summary="Destinatarios")
 async def list_recipients(store: Store) -> list[RecipientOut]:
-    """Todos los destinatarios."""
+    """Los destinatarios de la persona (el superusuario ve todos)."""
     return [RecipientOut.of(r) for r in await store.list_recipients()]
 
 
@@ -365,11 +445,11 @@ async def list_recipients(store: Store) -> list[RecipientOut]:
     status_code=status.HTTP_201_CREATED,
     summary="Agregar destinatario",
 )
-async def create_recipient(body: RecipientIn, store: Store) -> RecipientOut:
-    """Da de alta un destinatario."""
-    created = await ManageRecipients(store).create(
-        body.name, body.email, body.phone, body.is_active
-    )
+async def create_recipient(
+    body: RecipientIn, store: Store, user: CurrentUser, reader: Reader
+) -> RecipientOut:
+    """Da de alta un destinatario a nombre de la persona (un usuario, hasta dos)."""
+    created = await ManageRecipients(store).create(body.draft(), await _scope(user, reader))
     return RecipientOut.of(created)
 
 
@@ -379,10 +459,12 @@ async def create_recipient(body: RecipientIn, store: Store) -> RecipientOut:
     summary="Editar destinatario",
     responses=error_responses(404),
 )
-async def update_recipient(recipient_id: int, body: RecipientIn, store: Store) -> RecipientOut:
+async def update_recipient(
+    recipient_id: int, body: RecipientIn, store: Store, user: CurrentUser, reader: Reader
+) -> RecipientOut:
     """Reemplaza los datos de un destinatario (también para desactivarlo)."""
     updated = await ManageRecipients(store).update(
-        recipient_id, body.name, body.email, body.phone, body.is_active
+        recipient_id, body.draft(), await _scope(user, reader)
     )
     return RecipientOut.of(updated)
 
@@ -399,13 +481,13 @@ async def delete_recipient(recipient_id: int, store: Store) -> None:
 
 
 @router.get("/rules", response_model=list[RuleOut], summary="Cómo se manda cada fuente")
-async def list_rules(store: Store) -> list[RuleOut]:
+async def list_rules(_: SuperUser, store: Store) -> list[RuleOut]:
     """Las reglas: una por fuente y canal."""
     return [RuleOut.of(r) for r in await store.list_rules()]
 
 
 @router.put("/rules", response_model=RuleOut, summary="Guardar cómo se manda")
-async def save_rule(body: RuleIn, store: Store) -> RuleOut:
+async def save_rule(_: SuperUser, body: RuleIn, store: Store) -> RuleOut:
     """Guarda la regla de su fuente y canal (la crea o la reemplaza)."""
     return RuleOut.of(await ManageRules(store).save(body.draft()))
 
@@ -416,7 +498,7 @@ async def history(
     cursor: Annotated[str | None, Query(description="Cursor de la página anterior.")] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_HISTORY_LIMIT)] = DEFAULT_HISTORY_LIMIT,
 ) -> HistoryOut:
-    """Las guías de envío, de la más nueva a la más vieja."""
+    """Las guías de envío de la persona, de la más nueva a la más vieja."""
     after = decode_time_cursor(cursor) if cursor else None
     rows = await store.history(after, limit + 1)
     page, more = rows[:limit], len(rows) > limit
@@ -460,9 +542,16 @@ async def retry(delivery_id: DeliveryId, store: Store, sender: Sender) -> Delive
     summary="Mandar prueba",
     responses=error_responses(404),
 )
-async def send_test(body: TestIn, store: Store, reports: Reports, sender: Sender) -> DeliveryOut:
-    """Manda ya la última corrida a un destinatario y devuelve cómo quedó."""
+async def send_test(
+    body: TestIn, store: Store, reports: Reports, sender: Sender, user: CurrentUser
+) -> DeliveryOut:
+    """Manda ya la última corrida a un destinatario y devuelve cómo quedó.
+
+    Un usuario normal no elige la cuenta: siempre sale del correo que eligió
+    el superusuario.
+    """
+    account_id = body.account_id if user.is_superuser else None
     delivery = await SendTest(store, reports, sender).execute(
-        body.source, body.recipient_id, body.account_id
+        body.source, body.recipient_id, account_id
     )
     return DeliveryOut.of(delivery, await store.attempts_of(delivery.id))

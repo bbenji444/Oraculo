@@ -8,6 +8,27 @@
  * No hace: no llama a la API.
  */
 
+/**
+ * Prende o apaga una hora de las que recibe una persona (ADR-0045).
+ *
+ * @returns Las horas en orden, sin repetir.
+ */
+export function toggleHour(hours: readonly string[], time: string): string[] {
+  return hours.includes(time) ? hours.filter((h) => h !== time) : sortTimes([...hours, time]);
+}
+
+/**
+ * Cómo se lee a qué horas recibe: sin horas elegidas, a todas las del horario.
+ *
+ * @param hours Las que eligió.
+ * @param times Las del horario vigente.
+ */
+export function hoursLabel(hours: readonly string[], times: readonly string[]): string {
+  const valid = sortTimes(hours.filter((h) => times.includes(h)));
+  if (valid.length === 0 || valid.length === times.length) return 'A todas las horas del horario';
+  return `A las ${valid.join(', ')}`;
+}
+
 /** Días ISO en orden de lunes a domingo, como se leen. */
 export const DAYS: readonly { value: number; short: string; long: string }[] = [
   { value: 1, short: 'L', long: 'lunes' },

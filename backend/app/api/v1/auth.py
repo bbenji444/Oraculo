@@ -42,8 +42,9 @@ router = APIRouter(prefix="/auth", tags=["acceso"], responses=ERROR_RESPONSES)
 # Secciones de la pantalla por rol (Benji, 10/11/2026). «Envíos» se suma a
 # los usuarios normales en la etapa 3 (envíos por persona, ADR-0042); hoy sus
 # rutas son solo del superusuario.
-_USER_SECTIONS = ["explorar", "casos", "conceptos", "historial"]
-_SUPERUSER_SECTIONS = [*_USER_SECTIONS, "envios", "estado", "accesos"]
+# «envios» para todos desde ADR-0045: cada quien sus correos y sus horas.
+_USER_SECTIONS = ["explorar", "casos", "conceptos", "historial", "envios"]
+_SUPERUSER_SECTIONS = [*_USER_SECTIONS, "estado", "accesos"]
 # Topes de tamaño de lo que llega (un usuario mide 60; un ticket, 43).
 _MAX_USERNAME = 60
 _MAX_TICKET = 100

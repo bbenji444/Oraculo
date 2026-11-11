@@ -27,13 +27,19 @@ from app.domain.deliveries import SOURCE_FGR_RUN
 logger = logging.getLogger(__name__)
 
 
-async def deliver_run(settings: Settings, search_id: UUID, slot: datetime) -> SendReport | None:
+async def deliver_run(
+    settings: Settings,
+    search_id: UUID,
+    slot: datetime,
+    schedule: frozenset[int] | None = None,
+) -> SendReport | None:
     """Crea y manda los envíos de una corrida.
 
     Args:
         settings: Configuración.
         search_id: La corrida.
         slot: Su hora programada.
+        schedule: Horas del horario vigente (cada quien recibe a las que eligió).
 
     Returns:
         Cuántos se intentaron y mandaron, o ``None`` si los envíos están apagados.
@@ -44,7 +50,7 @@ async def deliver_run(settings: Settings, search_id: UUID, slot: datetime) -> Se
     try:
         created = await PlanDeliveries(
             PostgresDeliveryStore(engine), PostgresRunReports(engine)
-        ).for_run(SOURCE_FGR_RUN, str(search_id), slot)
+        ).for_run(SOURCE_FGR_RUN, str(search_id), slot, schedule)
         report = await build_sender(settings, engine).send_due()
         logger.info(
             "Envíos de la corrida",

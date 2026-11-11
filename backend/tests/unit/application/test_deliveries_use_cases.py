@@ -1,26 +1,31 @@
-"""Casos de uso de los envíos (ADR-0039), con piezas en memoria."""
+"""Casos de uso de los envíos (ADR-0039, ADR-0045), con piezas en memoria."""
 
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from app.application.ports.deliveries import RemoteAccount, RuleDraft, SendResult
+from app.application.ports.deliveries import Recipient, RemoteAccount, RuleDraft, SendResult
 from app.application.use_cases.deliveries import (
     ManageAccounts,
     ManageRecipients,
     ManageRules,
     PlanDeliveries,
+    RecipientScope,
     RetryDelivery,
     SendDeliveries,
     SendTest,
+    minute_of_day,
+    sender_account_id,
 )
 from app.domain.deliveries import (
+    MAX_RECIPIENTS_PER_USER,
     SOURCE_FGR_RUN,
     AccountProvider,
     AccountStatus,
     DeliveryChannel,
     DeliveryStatus,
+    RecipientDraft,
 )
 from app.domain.errors import (
     DeliveryChannelUnavailableError,
@@ -41,6 +46,21 @@ pytestmark = pytest.mark.anyio
 # Horas de la Ciudad de México (UTC-6) expresadas en UTC.
 AT_0700 = datetime(2026, 11, 6, 13, 0, tzinfo=UTC)
 AT_1500 = datetime(2026, 11, 6, 21, 0, tzinfo=UTC)
+BENJI = RecipientScope("benji")
+
+
+async def add(
+    store: FakeDeliveryStore,
+    name: str,
+    email: str | None,
+    *,
+    phone: str | None = None,
+    is_active: bool = True,
+    hours: tuple[int, ...] = (),
+    scope: RecipientScope = BENJI,
+) -> Recipient:
+    data = RecipientDraft.validated(name, email, phone, is_active, hours)
+    return await ManageRecipients(store).create(data, scope)
 
 
 def draft(
@@ -56,7 +76,7 @@ def draft(
 async def store_with_rule(rule: RuleDraft | None = None) -> FakeDeliveryStore:
     store = FakeDeliveryStore()
     await store.save_account(AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE)
-    await ManageRecipients(store).create("Benjamin", "benji@hotmail.com", None)
+    await add(store, "Benjamin", "benji@hotmail.com")
     await ManageRules(store).save(rule or draft())
     return store
 
@@ -88,12 +108,11 @@ async def test_cada_corrida_manda_su_reporte_una_sola_vez() -> None:
 
 
 async def test_la_corrida_va_a_todos_los_activos_con_correo() -> None:
-    # Benji, 06/11/2026: un solo reporte para todos; nada por persona.
+    # Benji, 06/11/2026: un solo reporte para todos (ADR-0040).
     store = await store_with_rule()
-    recipients = ManageRecipients(store)
-    await recipients.create("Geovanni", "geo@x.mx", None)
-    await recipients.create("Tadeo", "tadeo@x.mx", None, False)
-    await recipients.create("Solo WhatsApp", None, "525512345678")
+    await add(store, "Geovanni", "geo@x.mx")
+    await add(store, "Tadeo", "tadeo@x.mx", is_active=False)
+    await add(store, "Solo WhatsApp", None, phone="525512345678")
 
     await PlanDeliveries(store, FakeReports()).for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500)
 
@@ -114,7 +133,8 @@ async def test_con_la_regla_apagada_no_se_manda_nada() -> None:
 
 async def test_destinatario_apagado_o_corrida_inexistente_no_crean_guias() -> None:
     store = await store_with_rule()
-    await ManageRecipients(store).update(1, "Benjamin", "benji@hotmail.com", None, False)
+    off = RecipientDraft.validated("Benjamin", "benji@hotmail.com", None, False)
+    await ManageRecipients(store).update(1, off, BENJI)
     plan = PlanDeliveries(store, FakeReports())
 
     assert await plan.for_run(SOURCE_FGR_RUN, "corrida-1", AT_0700) == []
@@ -269,4 +289,112 @@ async def test_revisar_una_cuenta_que_sigue_pendiente() -> None:
 
 async def test_editar_destinatario_que_no_existe() -> None:
     with pytest.raises(DeliveryNotFoundError):
-        await ManageRecipients(FakeDeliveryStore()).update(1, "Ana", "ana@x.mx", None, True)
+        await ManageRecipients(FakeDeliveryStore()).update(
+            1, RecipientDraft.validated("Ana", "ana@x.mx", None), BENJI
+        )
+
+
+# --- Envíos por usuario (ADR-0045) ---
+
+
+async def test_cada_quien_recibe_solo_a_las_horas_que_eligio() -> None:
+    store = await store_with_rule()  # Benjamin: sin horas = a todas
+    await add(store, "Ana", "ana@x.mx", hours=(420,), scope=RecipientScope("ana"))
+    morning, afternoon = FakeReports("corrida-0700"), FakeReports("corrida-1500")
+
+    await PlanDeliveries(store, morning).for_run(SOURCE_FGR_RUN, "corrida-0700", AT_0700)
+    await PlanDeliveries(store, afternoon).for_run(SOURCE_FGR_RUN, "corrida-1500", AT_1500)
+
+    sent = sorted((d.source_ref, d.destination) for d in store.deliveries.values())
+    assert sent == [
+        ("corrida-0700", "ana@x.mx"),
+        ("corrida-0700", "benji@hotmail.com"),
+        ("corrida-1500", "benji@hotmail.com"),
+    ]
+
+
+async def test_si_sus_horas_salieron_del_horario_recibe_todas() -> None:
+    # Ana eligió las 08:00; luego el superusuario dejó solo 07:00 y 15:00.
+    store = await store_with_rule()
+    await add(store, "Ana", "ana@x.mx", hours=(480,), scope=RecipientScope("ana"))
+    plan = PlanDeliveries(store, FakeReports())
+
+    await plan.for_run(SOURCE_FGR_RUN, "corrida-1", AT_1500, frozenset({420, 900}))
+
+    assert sorted(d.destination for d in store.deliveries.values()) == [
+        "ana@x.mx",
+        "benji@hotmail.com",
+    ]
+
+
+async def test_cada_envio_queda_a_nombre_del_dueno_del_correo() -> None:
+    store = await store_with_rule()
+    await add(store, "Ana", "ana@x.mx", scope=RecipientScope("ana"))
+
+    await PlanDeliveries(store, FakeReports()).for_run(SOURCE_FGR_RUN, "corrida-1", AT_0700)
+
+    owners = {d.destination: d.owner for d in store.deliveries.values()}
+    assert owners == {"benji@hotmail.com": "benji", "ana@x.mx": "ana"}
+
+
+async def test_un_usuario_tiene_hasta_dos_correos_y_el_superusuario_sin_tope() -> None:
+    store = FakeDeliveryStore()
+    ana = RecipientScope("ana", limit=MAX_RECIPIENTS_PER_USER)
+    await add(store, "Ana", "ana@x.mx", scope=ana)
+    await add(store, "Ana trabajo", "ana@fgr.mx", scope=ana)
+    # Los de otra persona no cuentan para su tope.
+    await add(store, "Benjamin", "benji@hotmail.com")
+
+    with pytest.raises(DeliveryValidationError, match="hasta 2 correos"):
+        await add(store, "Ana otro", "ana2@x.mx", scope=ana)
+    for n in range(3):
+        await add(store, f"Lista {n}", f"lista{n}@x.mx")
+    assert len(await store.list_recipients()) == 6
+
+
+async def test_solo_se_eligen_horas_del_horario() -> None:
+    store = await store_with_rule()
+    scope = RecipientScope("ana", allowed_hours=frozenset({420, 900}))
+
+    with pytest.raises(DeliveryValidationError, match="horario"):
+        await add(store, "Ana", "ana@x.mx", hours=(480,), scope=scope)
+    saved = await add(store, "Ana", "ana@x.mx", hours=(900, 420, 420), scope=scope)
+    assert saved.data.hours == (420, 900)
+    with pytest.raises(DeliveryValidationError, match="horario"):
+        await ManageRecipients(store).update(
+            saved.id, RecipientDraft.validated("Ana", "ana@x.mx", None, True, (60,)), scope
+        )
+
+
+def test_horas_fuera_del_dia_no_son_validas() -> None:
+    with pytest.raises(DeliveryValidationError) as error:
+        RecipientDraft.validated("Ana", "ana@x.mx", None, True, (1440,))
+
+    assert error.value.details["problemas"] == [
+        {"campo": "hours", "mensaje": "Una de las horas no es válida."}
+    ]
+
+
+def test_minuto_del_dia_en_hora_de_la_ciudad_de_mexico() -> None:
+    assert (minute_of_day(AT_0700), minute_of_day(AT_1500)) == (420, 900)
+    assert minute_of_day(datetime(2026, 11, 6, 7, 30)) == 450  # noqa: DTZ001 — ya es hora local
+
+
+async def test_la_prueba_sale_de_la_cuenta_que_eligio_el_superusuario() -> None:
+    store = await store_with_rule()
+    use, fake = sender_for(store, SendResult(True, "202"))
+
+    sent = await SendTest(store, FakeReports(), use).execute(SOURCE_FGR_RUN, 1)
+
+    assert (sent.status, sent.account_id) == (DeliveryStatus.SENT, 1)
+    assert len(fake.sent) == 1
+
+
+async def test_sin_cuenta_elegida_la_prueba_lo_dice() -> None:
+    store = FakeDeliveryStore()
+    await add(store, "Ana", "ana@x.mx")
+    use, _ = sender_for(store)
+
+    assert await sender_account_id(store, SOURCE_FGR_RUN) is None
+    with pytest.raises(DeliveryNotFoundError, match="administrador"):
+        await SendTest(store, FakeReports(), use).execute(SOURCE_FGR_RUN, 1)

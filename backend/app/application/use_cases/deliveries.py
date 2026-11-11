@@ -1,9 +1,11 @@
 """Casos de uso de los envíos (F12.11, ADR-0039).
 
-- ``ManageRecipients``, ``ManageRules`` y ``ManageAccounts``: lo que el
-  administrador maneja en la pantalla «Envíos».
+- ``ManageRecipients``: los correos de cada persona y a qué horas los
+  quiere (ADR-0045); un usuario normal tiene hasta dos.
+- ``ManageRules`` y ``ManageAccounts``: lo que solo el superusuario maneja:
+  desde qué cuenta se manda y si los envíos están prendidos.
 - ``PlanDeliveries``: al terminar cada corrida del horario único, crea una
-  guía por destinatario activo (ADR-0040): el mismo reporte para todos.
+  guía por destinatario activo que quiera esa hora (ADR-0040, ADR-0045).
 - ``SendDeliveries``: manda las guías pendientes, con reintentos (1, 5 y 30
   minutos) y un registro por intento.
 - ``SendTest``: «Mandar prueba»: la última corrida a un destinatario, ya.
@@ -16,6 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from app.application.ports.deliveries import (
     AccountConnectorPort,
@@ -47,10 +50,13 @@ from app.domain.errors import (
     DeliveryNotFoundError,
     DeliveryValidationError,
 )
+from app.domain.schedule import MINUTES_PER_HOUR
 
 # Guías que se mandan por pasada: una corrida con muchos destinatarios se
 # reparte en varias pasadas del reloj (cada minuto).
 SEND_BATCH = 50
+# Las horas del horario (y las que elige cada persona) son de la Ciudad de México.
+MEXICO_CITY = ZoneInfo("America/Mexico_City")
 
 
 def _utc_now() -> datetime:
@@ -61,8 +67,24 @@ def _invalid(field: str, message: str) -> DeliveryValidationError:
     return DeliveryValidationError(message, {"problemas": [{"campo": field, "mensaje": message}]})
 
 
+@dataclass(frozen=True, slots=True)
+class RecipientScope:
+    """Quién da de alta o edita destinatarios y qué se le permite (ADR-0045).
+
+    Attributes:
+        owner: A nombre de quién quedan los nuevos (``username``).
+        limit: Cuántos puede tener; ``None`` = sin tope (superusuario).
+        allowed_hours: Horas del horario vigente (minutos del día) entre las
+            que se elige; ``None`` = no se revisa.
+    """
+
+    owner: str
+    limit: int | None = None
+    allowed_hours: frozenset[int] | None = None
+
+
 class ManageRecipients:
-    """Alta y edición de destinatarios."""
+    """Alta y edición de destinatarios: los correos de cada persona."""
 
     def __init__(self, store: DeliveryStorePort) -> None:
         """Recibe el almacén de envíos.
@@ -72,32 +94,38 @@ class ManageRecipients:
         """
         self._store = store
 
-    async def create(
-        self, name: str, email: str | None, phone: str | None, is_active: bool = True
-    ) -> Recipient:
-        """Da de alta un destinatario.
+    async def create(self, data: RecipientDraft, scope: RecipientScope) -> Recipient:
+        """Da de alta un destinatario a nombre de quien lo pide.
+
+        Args:
+            data: Datos ya validados (``RecipientDraft.validated``).
+            scope: Dueño, tope de destinatarios y horas permitidas.
 
         Raises:
-            DeliveryValidationError: Si los datos no son válidos.
+            DeliveryValidationError: Si pasa del tope o eligió una hora que no
+                está en el horario.
         """
-        return await self._store.create_recipient(
-            RecipientDraft.validated(name, email, phone, is_active)
-        )
+        _check_hours(data, scope)
+        if scope.limit is not None:
+            own = [r for r in await self._store.list_recipients() if r.owner == scope.owner]
+            if len(own) >= scope.limit:
+                raise _invalid("email", f"Puedes tener hasta {scope.limit} correos.")
+        return await self._store.create_recipient(data, scope.owner)
 
     async def update(
-        self, recipient_id: int, name: str, email: str | None, phone: str | None, is_active: bool
+        self, recipient_id: int, data: RecipientDraft, scope: RecipientScope
     ) -> Recipient:
-        """Reemplaza los datos de un destinatario.
+        """Reemplaza los datos de un destinatario; su dueño no cambia.
 
         Raises:
-            DeliveryNotFoundError: Si no existe.
-            DeliveryValidationError: Si los datos no son válidos.
+            DeliveryNotFoundError: Si no existe o no es de quien lo pide (la
+                seguridad por filas no se lo deja ver).
+            DeliveryValidationError: Si eligió una hora que no está en el horario.
         """
         if await self._store.get_recipient(recipient_id) is None:
             raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
-        return await self._store.update_recipient(
-            recipient_id, RecipientDraft.validated(name, email, phone, is_active)
-        )
+        _check_hours(data, scope)
+        return await self._store.update_recipient(recipient_id, data)
 
     async def delete(self, recipient_id: int) -> None:
         """Borra un destinatario; sus envíos pasados siguen en el historial.
@@ -107,6 +135,22 @@ class ManageRecipients:
         """
         if not await self._store.delete_recipient(recipient_id):
             raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
+
+
+def _check_hours(data: RecipientDraft, scope: RecipientScope) -> None:
+    if scope.allowed_hours is not None and not set(data.hours) <= scope.allowed_hours:
+        raise _invalid("hours", "Elige horas del horario de las corridas.")
+
+
+def minute_of_day(moment: datetime) -> int:
+    """Minuto del día de un momento, en hora de la Ciudad de México.
+
+    Example:
+        >>> minute_of_day(datetime(2026, 11, 6, 13, 0, tzinfo=UTC))  # 07:00 en CDMX
+        420
+    """
+    local = moment.astimezone(MEXICO_CITY) if moment.tzinfo else moment
+    return local.hour * MINUTES_PER_HOUR + local.minute
 
 
 class ManageRules:
@@ -197,13 +241,24 @@ class PlanDeliveries:
         self._store = store
         self._reports = reports
 
-    async def for_run(self, source: str, source_ref: str, slot: datetime) -> list[UUID]:
+    async def for_run(
+        self,
+        source: str,
+        source_ref: str,
+        slot: datetime,
+        schedule: frozenset[int] | None = None,
+    ) -> list[UUID]:
         """Al terminar una corrida: manda su reporte por cada regla prendida.
+
+        Cada destinatario lo recibe solo si eligió esa hora o no eligió
+        ninguna (ADR-0045).
 
         Args:
             source: Fuente («monitor.corrida_fgr»).
             source_ref: La corrida (id de la búsqueda).
             slot: Hora programada de la corrida.
+            schedule: Horas del horario vigente (minutos del día), para no
+                dejar sin nada a quien eligió horas que ya no están.
 
         Returns:
             Las guías creadas (las que ya existían no se repiten).
@@ -211,7 +266,12 @@ class PlanDeliveries:
         content = await self._reports.content_for(source, source_ref)
         if content is None:
             return []
-        active = [r for r in await self._store.list_recipients() if r.data.is_active]
+        minute = minute_of_day(slot)
+        active = [
+            r
+            for r in await self._store.list_recipients()
+            if r.data.is_active and r.data.receives_at(minute, schedule)
+        ]
         planned = [
             _new_delivery(
                 _Target(rule.data.channel, recipient, rule.id, rule.data.account_id),
@@ -261,6 +321,7 @@ def _new_delivery(
         idempotency_key=f"test|{uuid4()}|{key}" if is_test else key,
         is_test=is_test,
         scheduled_for=scheduled_for,
+        owner=target.recipient.owner or None,
     )
 
 
@@ -371,8 +432,16 @@ class SendTest:
         self._reports = reports
         self._sender = sender
 
-    async def execute(self, source: str, recipient_id: int, account_id: int) -> Delivery:
+    async def execute(
+        self, source: str, recipient_id: int, account_id: int | None = None
+    ) -> Delivery:
         """Crea una guía de prueba y la manda ya.
+
+        Args:
+            source: Fuente («monitor.corrida_fgr»).
+            recipient_id: A quién.
+            account_id: Desde qué cuenta; sin ella, la de la regla de correo
+                de la fuente (la que eligió el superusuario, ADR-0045).
 
         Returns:
             La guía con el resultado del intento.
@@ -386,8 +455,13 @@ class SendTest:
             raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
         if not recipient.data.email:
             raise _invalid("recipient_id", "Ese destinatario no tiene correo.")
-        if await self._store.get_account(account_id) is None:
-            raise DeliveryNotFoundError("No existe esa cuenta de envío.", {"id": account_id})
+        if account_id is None:
+            account_id = await sender_account_id(self._store, source)
+        if account_id is None or await self._store.get_account(account_id) is None:
+            raise DeliveryNotFoundError(
+                "Todavía no hay una cuenta que envíe; pídesela al administrador.",
+                {"id": account_id},
+            )
         ref = await self._reports.latest_ref(source)
         content = await self._reports.content_for(source, ref) if ref else None
         if content is None:
@@ -401,6 +475,23 @@ class SendTest:
         await self._sender.send_one(delivery)
         final = await self._store.get_delivery(created)
         return final or delivery
+
+
+async def sender_account_id(store: DeliveryStorePort, source: str) -> int | None:
+    """La cuenta de correo desde la que se manda una fuente.
+
+    Es la de su regla de correo; si hay varias, la prendida primero.
+
+    Returns:
+        El id de la cuenta, o ``None`` si nadie la ha elegido.
+    """
+    rules = [
+        r
+        for r in await store.list_rules(source)
+        if r.data.channel is DeliveryChannel.EMAIL and r.data.account_id is not None
+    ]
+    rules.sort(key=lambda r: (not r.data.is_active, r.id))
+    return rules[0].data.account_id if rules else None
 
 
 class RetryDelivery:

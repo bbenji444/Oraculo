@@ -75,13 +75,15 @@ class FakeDeliveryStore:
     async def get_recipient(self, recipient_id: int) -> Recipient | None:
         return self.recipients.get(recipient_id)
 
-    async def create_recipient(self, data: RecipientDraft) -> Recipient:
-        recipient = Recipient(len(self.recipients) + 1, data)
+    async def create_recipient(self, data: RecipientDraft, owner: str) -> Recipient:
+        recipient = Recipient(len(self.recipients) + 1, data, owner)
         self.recipients[recipient.id] = recipient
         return recipient
 
     async def update_recipient(self, recipient_id: int, data: RecipientDraft) -> Recipient:
-        self.recipients[recipient_id] = Recipient(recipient_id, data)
+        self.recipients[recipient_id] = Recipient(
+            recipient_id, data, self.recipients[recipient_id].owner
+        )
         return self.recipients[recipient_id]
 
     async def delete_recipient(self, recipient_id: int) -> bool:
@@ -132,6 +134,7 @@ class FakeDeliveryStore:
                 sent_at=None,
                 next_attempt_at=NOW,
                 scheduled_for=d.scheduled_for,
+                owner=d.owner or "",
             )
             created.append(d.id)
         return created
