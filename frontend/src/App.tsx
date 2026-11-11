@@ -8,7 +8,8 @@
  * #/estado) para que se pueda compartir o recargar
  * sin perderla; #/geodatos sigue llevando a Explorar. No hace llamadas HTTP.
  *
- * Acceso con llave (ADR-0042): sin sesión se ve «Entrar con tu llave». Con
+ * Acceso (ADR-0042 y ADR-0043): sin sesión se ve «Entrar» (usuario,
+ * contraseña y código de Microsoft Authenticator, igual que Oráculo). Con
  * sesión, solo las pestañas del rol de la persona: «Estado del sistema» y
  * «Accesos» (#/accesos) son de superusuarios. El nombre y «Salir» van en el
  * encabezado.
@@ -20,6 +21,7 @@
 import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
 import { AccessPage } from './components/Access/AccessPage';
+import { ChangePasswordDialog } from './components/Auth/ChangePasswordDialog';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
@@ -126,14 +128,33 @@ function OraculoLink() {
   );
 }
 
-/** Nombre de quien entró y «Salir» (en modo desarrollo no hay llave que cerrar). */
+/** Nombre de quien entró, «Mi contraseña» y «Salir» (en modo desarrollo no hay sesión). */
 function UserBadge({ me }: { me: Me }) {
   const logout = useLogout();
+  const [changing, setChanging] = useState(false);
   return (
     <span className="flex shrink-0 items-center gap-2 text-xs text-slate-300">
       <span className="max-w-[10rem] truncate" title={`${me.display_name} (${me.username})`}>
         {me.display_name}
       </span>
+      {me.auth_mode === 'keys' && (
+        <button
+          type="button"
+          className="hud-btn hud-btn--sm hud-btn--ghost whitespace-nowrap"
+          onClick={() => {
+            setChanging(true);
+          }}
+        >
+          Mi contraseña
+        </button>
+      )}
+      {changing && (
+        <ChangePasswordDialog
+          onClose={() => {
+            setChanging(false);
+          }}
+        />
+      )}
       {me.auth_mode === 'keys' && (
         <button
           type="button"

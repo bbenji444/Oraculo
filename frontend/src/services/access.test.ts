@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type AccessKey, issueKey, keyStatus, listUsers } from './access';
-import { looksLikeKey } from './auth';
+import { type AccessKey, createUser, issueKey, keyStatus, listUsers } from './access';
+import { looksLikeCode, qrImageSrc, startLogin } from './auth';
 import { ApiError, SESSION_EXPIRED_EVENT } from './http';
 
 const KEY: AccessKey = {
@@ -41,12 +41,6 @@ describe('llaves', () => {
     expect(keyStatus({ ...KEY, revoked_at: '2026-11-10T18:10:00Z' }, NOW)).toBe('revocada');
   });
 
-  it('reconoce la forma de una llave antes de mandarla', () => {
-    expect(looksLikeKey(`  orc_live_AbCd1234_${'a'.repeat(40)}\n`)).toBe(true);
-    expect(looksLikeKey('sk-proj-123')).toBe(false);
-    expect(looksLikeKey(`orc_live_AbCd1234_${'a'.repeat(39)}`)).toBe(false);
-  });
-
   it('la llave nueva llega completa una sola vez, con sus datos', async () => {
     const fetchMock = reply({ key: `orc_live_AbCd1234_${'a'.repeat(40)}`, info: KEY }, 201);
     vi.stubGlobal('fetch', fetchMock);
@@ -58,6 +52,67 @@ describe('llaves', () => {
     expect(url).toBe('/api/v1/access/users/2/keys');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ label: 'Laptop', days: 90 });
+  });
+});
+
+describe('entrar', () => {
+  it('reconoce un código de 6 dígitos (con o sin espacio)', () => {
+    expect(looksLikeCode('123456')).toBe(true);
+    expect(looksLikeCode('123 456')).toBe(true);
+    expect(looksLikeCode('12345')).toBe(false);
+    expect(looksLikeCode('abcdef')).toBe(false);
+  });
+
+  it('el QR se muestra como imagen data:, nunca como código incrustado', () => {
+    const src = qrImageSrc('<svg><script>alert(1)</script></svg>');
+
+    expect(src.startsWith('data:image/svg+xml;charset=utf-8,')).toBe(true);
+    expect(src).not.toContain('<script>');
+  });
+
+  it('la contraseña viaja en el cuerpo, nunca en la URL', async () => {
+    const fetchMock = reply({ ticket: 't', next: 'code' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const step = await startLogin('benji', 'Secreta-2026');
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(step).toEqual({ ticket: 't', next: 'code' });
+    expect(url).toBe('/api/v1/auth/login');
+    expect(url).not.toContain('Secreta');
+    expect(JSON.parse(init.body as string)).toEqual({
+      username: 'benji',
+      password: 'Secreta-2026',
+    });
+  });
+
+  it('el alta devuelve la contraseña temporal una sola vez', async () => {
+    const user = {
+      id: 3,
+      username: 'ana',
+      display_name: 'Ana',
+      email: null,
+      role: 'user',
+      is_active: true,
+      created_at: '2026-11-10T18:00:00Z',
+      last_seen_at: null,
+      active_keys: 0,
+      has_password: true,
+      must_change_password: true,
+      totp_enrolled: false,
+      locked_until: null,
+    };
+    vi.stubGlobal('fetch', reply({ user, temporary_password: 'Abcd2345Efgh6789' }, 201));
+
+    const created = await createUser({
+      username: 'ana',
+      display_name: 'Ana',
+      email: null,
+      role: 'user',
+    });
+
+    expect(created.temporary_password).toBe('Abcd2345Efgh6789');
+    expect(created.user.must_change_password).toBe(true);
   });
 });
 

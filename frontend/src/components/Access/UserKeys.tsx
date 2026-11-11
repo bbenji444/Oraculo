@@ -88,6 +88,11 @@ export function UserKeys({ user }: { user: AccessUser }) {
 
   return (
     <div className="mt-4 rounded-lg border border-white/5 bg-black/20 p-4">
+      <p className="mb-3 text-xs text-slate-400">
+        Las llaves de sistema son para que <strong>otros programas</strong> consulten el monitor a
+        nombre de esta persona (como las llaves de la API de ChatGPT). Para entrar a la pantalla no
+        se usan: se entra con usuario, contraseña y código.
+      </p>
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
