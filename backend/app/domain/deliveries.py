@@ -68,7 +68,9 @@ class DeliveryStatus(StrEnum):
 # Fuente de los reportes de las corridas automáticas del monitor FGR.
 SOURCE_FGR_RUN = "monitor.corrida_fgr"
 # Nombre en pantalla de cada fuente conocida (crecerá con otros módulos).
-SOURCES: dict[str, str] = {SOURCE_FGR_RUN: "Monitor de noticias · reporte de la corrida FGR"}
+# El valor se quedó «corrida_fgr» por el historial; desde ADR-0046 cubre las
+# corridas de todos los envíos programados, no solo la FGR.
+SOURCES: dict[str, str] = {SOURCE_FGR_RUN: "Monitor de noticias · reporte de corrida automática"}
 
 # Esperas entre intentos (minutos): reintentar enseguida casi nunca sirve
 # (plan de automatización §4.1). Con 3 esperas hay 4 intentos en total.
@@ -86,7 +88,6 @@ MAX_RECIPIENTS_PER_USER = 2
 # Dueño de los destinatarios y envíos que existían antes de los envíos por
 # usuario (migración 0042): el superusuario que los dio de alta.
 DEFAULT_OWNER = "benji"
-_MINUTES_PER_DAY = 24 * 60
 
 
 def next_attempt_at(attempts: int, now: datetime) -> datetime | None:
@@ -149,42 +150,16 @@ class RecipientDraft:
         email: Correo, en minúsculas, o ``None``.
         phone: WhatsApp, solo dígitos con lada de país, o ``None``.
         is_active: Si recibe envíos.
-        hours: A qué horas del horario recibe (minutos del día, 07:00 = 420);
-            vacío = a todas (ADR-0045).
     """
 
     name: str
     email: str | None
     phone: str | None
     is_active: bool = True
-    hours: tuple[int, ...] = ()
-
-    def receives_at(self, minute_of_day: int, schedule: frozenset[int] | None = None) -> bool:
-        """Si recibe la corrida de esa hora (sin horas elegidas, recibe todas).
-
-        Args:
-            minute_of_day: Hora de la corrida (minutos del día).
-            schedule: Horas del horario vigente. Si ninguna de las que eligió
-                sigue en el horario (el superusuario lo cambió), recibe todas,
-                como le muestra la pantalla, en vez de quedarse sin nada.
-
-        Example:
-            >>> RecipientDraft("Ana", "ana@x.mx", None, hours=(420,)).receives_at(900)
-            False
-        """
-        hours = set(self.hours)
-        if schedule is not None:
-            hours &= schedule
-        return not hours or minute_of_day in hours
 
     @classmethod
     def validated(
-        cls,
-        name: str,
-        email: str | None,
-        phone: str | None,
-        is_active: bool = True,
-        hours: tuple[int, ...] = (),
+        cls, name: str, email: str | None, phone: str | None, is_active: bool = True
     ) -> "RecipientDraft":
         """Limpia y valida los datos.
 
@@ -193,15 +168,13 @@ class RecipientDraft:
             email: Correo (vacío = sin correo).
             phone: WhatsApp (se quitan espacios, guiones y «+»).
             is_active: Si recibe envíos.
-            hours: Minutos del día a los que recibe; vacío = a todas.
 
         Returns:
-            El destinatario limpio (horas sin repetir y en orden).
+            El destinatario limpio.
 
         Raises:
-            DeliveryValidationError: Sin nombre, sin ningún contacto, con un
-                correo o número que no tienen forma válida, o con una hora
-                fuera del día.
+            DeliveryValidationError: Sin nombre, sin ningún contacto, o con un
+                correo o número que no tienen forma válida.
         """
         problems: list[dict[str, str]] = []
         clean_name = " ".join(name.split())
@@ -219,8 +192,6 @@ class RecipientDraft:
             )
         if not clean_email and not clean_phone:
             problems.append({"campo": "email", "mensaje": "Pon al menos un correo o un WhatsApp."})
-        if any(not 0 <= h < _MINUTES_PER_DAY for h in hours):
-            problems.append({"campo": "hours", "mensaje": "Una de las horas no es válida."})
         if problems:
             raise DeliveryValidationError("El destinatario no es válido.", {"problemas": problems})
-        return cls(clean_name, clean_email, clean_phone, is_active, tuple(sorted(set(hours))))
+        return cls(clean_name, clean_email, clean_phone, is_active)

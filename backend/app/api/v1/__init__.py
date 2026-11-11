@@ -12,6 +12,7 @@ from app.api.v1.cases import router as cases_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.concepts import router as concepts_router
 from app.api.v1.deliveries import router as deliveries_router
+from app.api.v1.delivery_schedules import router as delivery_schedules_router
 from app.api.v1.entities import router as entities_router
 from app.api.v1.health import router as health_router
 from app.api.v1.regions import router as regions_router
@@ -45,6 +46,7 @@ api_router.include_router(relationships_router)
 # Envíos por persona (ADR-0045): cada quien sus correos; cuentas, reglas y
 # cambiar el horario piden superusuario en cada ruta. Ver el horario, todos.
 api_router.include_router(deliveries_router)
+api_router.include_router(delivery_schedules_router)
 api_router.include_router(schedule_router)
 
 # Descripción de cada grupo de rutas en la documentación (/api/v1/docs).
@@ -121,9 +123,9 @@ OPENAPI_TAGS = [
     {
         "name": "horario",
         "description": (
-            "Horario único de las corridas automáticas (ADR-0040): un solo horario para todos; "
-            "todos lo ven y solo un superusuario lo cambia. Cada hora es una corrida nueva con "
-            "IA (máx. 8 al día)."
+            "Horario único de las corridas (ADR-0040), sin uso desde ADR-0046: el reloj lee los "
+            "envíos programados de cada persona (/deliveries/schedules). Se borrará con "
+            "permiso."
         ),
     },
 ]

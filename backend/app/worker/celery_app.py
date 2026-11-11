@@ -7,9 +7,9 @@ el revisor de salud del worker.
 
 El reloj (``beat_schedule``) dispara la ingesta al índice local cada
 ``INGEST_INTERVAL_MINUTES``, la limpieza por retención una vez al día
-(ADR-0013) y, cada minuto, la revisión del horario único de las corridas del
-monitor FGR (ADR-0040): el administrador lo edita en «Envíos» y el cambio
-aplica sin reiniciar nada. Las tareas están en ``app.worker.tasks``.
+(ADR-0013) y, cada minuto, la revisión de los envíos programados de cada
+persona (ADR-0046): cada quien los edita en «Envíos» y el cambio aplica sin
+reiniciar nada. Las tareas están en ``app.worker.tasks``.
 
 No hace: no contiene lógica de las tareas.
 """
@@ -29,7 +29,7 @@ _SECONDS_PER_MINUTE = 60
 _PURGE_HOUR_UTC = 9
 _PURGE_MINUTE = 30
 AUTOMATIC_RUN_TASK = "monitor.automatic_run"
-# Revisión del horario (ADR-0040): cada minuto, porque las horas se eligen al
+# Revisión de los envíos programados (ADR-0046): cada minuto, porque las horas se eligen al
 # minuto (09:30) y pueden cambiar en cualquier momento desde la pantalla.
 SCHEDULE_TICK_TASK = "monitor.schedule_tick"
 _SCHEDULE_TICK_SECONDS = 60

@@ -8,9 +8,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Envíos totalmente personalizables (11/11/2026, ADR-0046, migración 0043).** Benji: «que los envíos sean totalmente moldeables y personalizables», para los usuarios y para él.
+  - Cada persona programa sus envíos: qué temas, de dónde (país, estado o municipio), a qué horas (las que quiera, al minuto), qué días y a cuáles de sus correos.
+  - Tope de 3 corridas al día por usuario y 8 para el superusuario.
+  - Los envíos que piden lo mismo a la misma hora comparten una sola corrida con IA.
+  - El horario único de la FGR pasó a ser el envío «Monitor FGR» de Benji. Cada usuario, nuevo o existente, empieza con su copia: solo agrega su correo.
+  - Ya no se muestra desde qué correo se envía.
+  - `make corrida-fgr` ya no manda correos; eso lo hacen los envíos programados.
+
 - **Envíos por usuario (11/11/2026, ADR-0045, migración 0042).** Benji: «que ellos agreguen su correo y ya les van a estar empezando a llegar las noticias».
-  - Cada usuario ve «Mis envíos»: agrega hasta 2 correos y elige a qué horas de las corridas de la FGR le llegan (07:00, 15:00 y 23:00; sin elegir, a todas).
-  - El correo que envía y el horario los decide el superusuario; el usuario solo ve desde qué correo le llega.
+  - Cada usuario agrega hasta 2 correos en «Mis envíos».
+  - El correo que envía lo decide el superusuario.
   - Cada persona ve solo sus correos y su historial: lo cuida la base (seguridad por filas). El superusuario ve todo, con el dueño de cada correo.
   - Lo que ya existía queda a nombre de Benji y sigue igual.
 

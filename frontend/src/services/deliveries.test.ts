@@ -2,10 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  addTime,
+  dailyRunsWith,
   daysLabel,
-  hoursLabel,
   scheduleProblem,
-  toggleHour,
+  toggleDay,
   weeklyCost,
 } from '../components/Deliveries/schedule';
 import { deliveryFieldErrors, saveRecipient, sendTest } from './deliveries';
@@ -99,8 +100,8 @@ describe('horario único de las corridas (ADR-0040)', () => {
   });
 });
 
-describe('envíos por persona (ADR-0045)', () => {
-  it('sin cuenta, la prueba no la manda y sale del correo del superusuario', async () => {
+describe('envíos por persona y programados (ADR-0045, ADR-0046)', () => {
+  it('sin cuenta, la prueba sale del correo que eligió el superusuario', async () => {
     const spy = respond({ id: 'd1', status: 'sent' });
 
     await sendTest(3);
@@ -109,18 +110,19 @@ describe('envíos por persona (ADR-0045)', () => {
     expect(JSON.parse(init?.body as string)).toEqual({ recipient_id: 3 });
   });
 
-  it('prende y apaga horas en orden y sin repetir', () => {
-    expect(toggleHour(['15:00'], '07:00')).toEqual(['07:00', '15:00']);
-    expect(toggleHour(['07:00', '15:00'], '07:00')).toEqual(['15:00']);
+  it('agrega horas en orden y sin repetir, y prende o apaga días', () => {
+    expect(addTime(['20:00', '16:00'], '16:00')).toEqual(['16:00', '20:00']);
+    expect(addTime(['20:00'], '09:30')).toEqual(['09:30', '20:00']);
+    expect(toggleDay([1, 5], 3)).toEqual([1, 3, 5]);
+    expect(toggleDay([1, 3, 5], 3)).toEqual([1, 5]);
   });
 
-  it('dice a qué horas llega; sin elegir, a todas', () => {
-    const times = ['07:00', '15:00', '23:00'];
+  it('cuenta las corridas del día con más corridas, como el servidor', () => {
+    const diario = { times: ['07:00', '15:00'], days: [] };
+    const lunes = { times: ['10:00'], days: [1] };
 
-    expect(hoursLabel([], times)).toBe('A todas las horas del horario');
-    expect(hoursLabel(['23:00', '07:00'], times)).toBe('A las 07:00, 23:00');
-    // Una hora que ya salió del horario no cuenta.
-    expect(hoursLabel(['09:00'], times)).toBe('A todas las horas del horario');
-    expect(hoursLabel(times, times)).toBe('A todas las horas del horario');
+    expect(dailyRunsWith([diario], lunes)).toBe(3);
+    expect(dailyRunsWith([diario], { times: ['20:00'], days: [2] })).toBe(3);
+    expect(dailyRunsWith([], { times: ['16:00', '20:00'], days: [6, 7] })).toBe(2);
   });
 });

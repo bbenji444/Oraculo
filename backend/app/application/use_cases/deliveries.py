@@ -1,11 +1,11 @@
 """Casos de uso de los envíos (F12.11, ADR-0039).
 
-- ``ManageRecipients``: los correos de cada persona y a qué horas los
-  quiere (ADR-0045); un usuario normal tiene hasta dos.
+- ``ManageRecipients``: los correos de cada persona (ADR-0045); un usuario
+  normal tiene hasta dos.
 - ``ManageRules`` y ``ManageAccounts``: lo que solo el superusuario maneja:
   desde qué cuenta se manda y si los envíos están prendidos.
-- ``PlanDeliveries``: al terminar cada corrida del horario único, crea una
-  guía por destinatario activo que quiera esa hora (ADR-0040, ADR-0045).
+- ``PlanDeliveries``: al terminar cada corrida, crea una guía por cada
+  correo de los envíos programados que la reciben (ADR-0046).
 - ``SendDeliveries``: manda las guías pendientes, con reintentos (1, 5 y 30
   minutos) y un registro por intento.
 - ``SendTest``: «Mandar prueba»: la última corrida a un destinatario, ya.
@@ -14,11 +14,10 @@
 No hace: no sabe de Composio, Outlook ni del monitor; usa los puertos.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo
 
 from app.application.ports.deliveries import (
     AccountConnectorPort,
@@ -50,13 +49,10 @@ from app.domain.errors import (
     DeliveryNotFoundError,
     DeliveryValidationError,
 )
-from app.domain.schedule import MINUTES_PER_HOUR
 
 # Guías que se mandan por pasada: una corrida con muchos destinatarios se
 # reparte en varias pasadas del reloj (cada minuto).
 SEND_BATCH = 50
-# Las horas del horario (y las que elige cada persona) son de la Ciudad de México.
-MEXICO_CITY = ZoneInfo("America/Mexico_City")
 
 
 def _utc_now() -> datetime:
@@ -74,13 +70,10 @@ class RecipientScope:
     Attributes:
         owner: A nombre de quién quedan los nuevos (``username``).
         limit: Cuántos puede tener; ``None`` = sin tope (superusuario).
-        allowed_hours: Horas del horario vigente (minutos del día) entre las
-            que se elige; ``None`` = no se revisa.
     """
 
     owner: str
     limit: int | None = None
-    allowed_hours: frozenset[int] | None = None
 
 
 class ManageRecipients:
@@ -99,13 +92,11 @@ class ManageRecipients:
 
         Args:
             data: Datos ya validados (``RecipientDraft.validated``).
-            scope: Dueño, tope de destinatarios y horas permitidas.
+            scope: Dueño y tope de destinatarios.
 
         Raises:
-            DeliveryValidationError: Si pasa del tope o eligió una hora que no
-                está en el horario.
+            DeliveryValidationError: Si pasa del tope.
         """
-        _check_hours(data, scope)
         if scope.limit is not None:
             own = [r for r in await self._store.list_recipients() if r.owner == scope.owner]
             if len(own) >= scope.limit:
@@ -120,11 +111,9 @@ class ManageRecipients:
         Raises:
             DeliveryNotFoundError: Si no existe o no es de quien lo pide (la
                 seguridad por filas no se lo deja ver).
-            DeliveryValidationError: Si eligió una hora que no está en el horario.
         """
         if await self._store.get_recipient(recipient_id) is None:
             raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
-        _check_hours(data, scope)
         return await self._store.update_recipient(recipient_id, data)
 
     async def delete(self, recipient_id: int) -> None:
@@ -135,22 +124,6 @@ class ManageRecipients:
         """
         if not await self._store.delete_recipient(recipient_id):
             raise DeliveryNotFoundError("No existe ese destinatario.", {"id": recipient_id})
-
-
-def _check_hours(data: RecipientDraft, scope: RecipientScope) -> None:
-    if scope.allowed_hours is not None and not set(data.hours) <= scope.allowed_hours:
-        raise _invalid("hours", "Elige horas del horario de las corridas.")
-
-
-def minute_of_day(moment: datetime) -> int:
-    """Minuto del día de un momento, en hora de la Ciudad de México.
-
-    Example:
-        >>> minute_of_day(datetime(2026, 11, 6, 13, 0, tzinfo=UTC))  # 07:00 en CDMX
-        420
-    """
-    local = moment.astimezone(MEXICO_CITY) if moment.tzinfo else moment
-    return local.hour * MINUTES_PER_HOUR + local.minute
 
 
 class ManageRules:
@@ -234,7 +207,7 @@ class ManageAccounts:
 
 
 class PlanDeliveries:
-    """Crea las guías de una corrida: su reporte a todos los destinatarios activos."""
+    """Crea las guías de una corrida: su reporte a los correos que la reciben."""
 
     def __init__(self, store: DeliveryStorePort, reports: ReportSourcePort) -> None:
         """Recibe el almacén y la fuente de reportes."""
@@ -246,19 +219,16 @@ class PlanDeliveries:
         source: str,
         source_ref: str,
         slot: datetime,
-        schedule: frozenset[int] | None = None,
+        recipients: Sequence[Recipient],
     ) -> list[UUID]:
         """Al terminar una corrida: manda su reporte por cada regla prendida.
-
-        Cada destinatario lo recibe solo si eligió esa hora o no eligió
-        ninguna (ADR-0045).
 
         Args:
             source: Fuente («monitor.corrida_fgr»).
             source_ref: La corrida (id de la búsqueda).
             slot: Hora programada de la corrida.
-            schedule: Horas del horario vigente (minutos del día), para no
-                dejar sin nada a quien eligió horas que ya no están.
+            recipients: A quién: los correos de los envíos programados que
+                pidieron esta corrida (``recipients_of``, ADR-0046).
 
         Returns:
             Las guías creadas (las que ya existían no se repiten).
@@ -266,12 +236,7 @@ class PlanDeliveries:
         content = await self._reports.content_for(source, source_ref)
         if content is None:
             return []
-        minute = minute_of_day(slot)
-        active = [
-            r
-            for r in await self._store.list_recipients()
-            if r.data.is_active and r.data.receives_at(minute, schedule)
-        ]
+        active = [r for r in recipients if r.data.is_active]
         planned = [
             _new_delivery(
                 _Target(rule.data.channel, recipient, rule.id, rule.data.account_id),

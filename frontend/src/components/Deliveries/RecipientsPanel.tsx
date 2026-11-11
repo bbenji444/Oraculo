@@ -3,8 +3,7 @@
  *
  * - «+ Agregar», arriba a la derecha, abre una ventana para registrar uno nuevo
  *   (un usuario normal, hasta su tope: dos correos).
- * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo, elegir
- *   sus horas o borrarlo.
+ * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo o borrarlo.
  * - Cada persona ve solo los suyos; el superusuario ve todos, con su dueño.
  *
  * No hace: no decide desde qué correo se manda (eso es del superusuario).
@@ -12,20 +11,16 @@
 import { useState } from 'react';
 
 import { useDeleteRecipient, useRecipients, useSaveRecipient } from '../../hooks/useDeliveries';
-import { useSchedule } from '../../hooks/useSchedule';
 import type { Recipient } from '../../services/deliveries';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
 import { Modal } from './Modal';
 import { RecipientForm } from './RecipientForm';
-import { hoursLabel } from './schedule';
 
 interface Mode {
   /** Superusuario: ve todos, con su dueño, y el campo de WhatsApp. */
   isSuperuser: boolean;
-  /** Horas del horario vigente. */
-  times: string[];
 }
 
 function RecipientItem({
@@ -52,11 +47,6 @@ function RecipientItem({
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-slate-100">{recipient.name}</span>
           <span className="block truncate text-xs text-slate-400">{contact}</span>
-          {mode.times.length > 0 && (
-            <span className="block text-xs text-slate-500">
-              {hoursLabel(recipient.hours ?? [], mode.times)}
-            </span>
-          )}
         </span>
         {mode.isSuperuser && recipient.owner && <HudChip tone="slate">{recipient.owner}</HudChip>}
         {!recipient.is_active && <HudChip tone="slate">Apagado</HudChip>}
@@ -68,7 +58,6 @@ function RecipientItem({
         <div className="border-t border-sky-400/10 px-3 py-3">
           <RecipientForm
             initial={recipient}
-            times={mode.times}
             showPhone={mode.isSuperuser}
             submitLabel="Guardar cambios"
             pending={save.isPending}
@@ -131,8 +120,7 @@ export function RecipientsPanel({
 }) {
   const recipients = useRecipients();
   const create = useSaveRecipient();
-  const times = useSchedule().data?.times ?? [];
-  const mode: Mode = { isSuperuser, times };
+  const mode: Mode = { isSuperuser };
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   const count = recipients.data?.length ?? 0;
@@ -197,7 +185,6 @@ export function RecipientsPanel({
           }}
         >
           <RecipientForm
-            times={times}
             showPhone={isSuperuser}
             submitLabel="Agregar"
             pending={create.isPending}

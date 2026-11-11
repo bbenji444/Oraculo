@@ -250,7 +250,7 @@ Se ejecutan en Ubuntu (WSL). Desde PowerShell, en la carpeta del proyecto: `wsl 
 
 ```
 make bootstrap       # instala servicios y dependencias (se puede repetir)
-make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta y horario del monitor FGR) y nginx (http://localhost:8080)
+make up              # levanta PostgreSQL, Redis, API, worker, reloj de Celery (ingesta y envíos programados) y nginx (http://localhost:8080)
 make down            # los detiene
 make status          # qué corre y resultado de /health
 make logs            # sigue los logs de la API, del worker y del reloj
@@ -281,7 +281,7 @@ make comparar-fuentes ARGS="--concepto X --dias 2"  # mide cuánto aporta Search
 make clasificar      # la IA clasifica por categoría y quién actúa 5 notas de la última búsqueda sin guardar (ARGS="--notas 1382,1463": casos elegidos; ARGS=--aplicar: todas las pendientes); muestra costo y pide "si"
 make reubicar          # vuelve a ubicar las notas de la última búsqueda sin pagar a la IA (ARGS="--busqueda <id>"; --con-ia las vuelve a pasar por la IA desde su texto guardado, pide "si")
 make gdelt-diagnostico  # reintento diario de D1 en GDELT (ADR-0012); avisa si se cumple el criterio
-make corrida-fgr       # corre ahora la corrida del monitor FGR (la hora del horario único a la que toca): pide "si", guarda la búsqueda y su PDF y muestra 5 notas (ADR-0031, ADR-0040)
+make corrida-fgr       # corre ahora la corrida del monitor FGR (la hora de AUTOMATIC_RUN_HOURS a la que toca): pide "si", guarda la búsqueda y su PDF y muestra 5 notas; no manda correos (ADR-0031, ADR-0046)
 make ingesta           # corre la ingesta al índice local una vez y muestra 5 ejemplos (ADR-0013)
 make ingesta-historial DIAS=7  # mide días anteriores de GDELT y muestra 5 ejemplos; DESCARGAR=si baja todo
 make ngramas-muestra   # prueba real de una hora de ngramas de GDELT: consumo, espacio y 5 ejemplos

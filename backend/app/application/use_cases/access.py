@@ -21,7 +21,7 @@ Reglas de seguridad:
 No hace: no sabe de cookies ni de HTTP (eso es de ``app.api``).
 """
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
@@ -271,6 +271,7 @@ class AccessAdmin:
         sessions: SessionStorePort,
         pepper: bytes,
         clock: Callable[[], datetime],
+        on_user_created: Callable[[str], Awaitable[object]] | None = None,
     ) -> None:
         """Recibe sus colaboradores.
 
@@ -279,11 +280,14 @@ class AccessAdmin:
             sessions: Para cerrar sesiones al revocar o desactivar.
             pepper: Secreto del servidor para las huellas.
             clock: Hora actual (UTC).
+            on_user_created: Qué más darle a una persona nueva (su envío
+                inicial de la FGR, ADR-0046); recibe su ``username``.
         """
         self._store = store
         self._sessions = sessions
         self._pepper = pepper
         self._clock = clock
+        self._on_user_created = on_user_created
 
     async def list_users(self, admin: AuthUser) -> list[UserAccount]:
         """Todas las personas.
@@ -337,6 +341,8 @@ class AccessAdmin:
             True,
             AuditEntry(actor, PASSWORD_RESET, {"username": user.username}),
         )
+        if self._on_user_created is not None:
+            await self._on_user_created(user.username)
         refreshed = await self._store.get_user(account.user_id)
         return CreatedUser(refreshed or account, temporary)
 

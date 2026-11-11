@@ -26,7 +26,7 @@ export interface DeliveryOverview {
   email_configured: boolean;
   whatsapp_available: boolean;
   sources: { id: string; label: string }[];
-  /** Desde qué correo se manda (lo elige el superusuario). */
+  /** Desde qué correo se manda; solo se le dice al superusuario. */
   sender_address?: string | null;
   /** Cuántos correos puede tener la persona; `null` = sin tope. */
   max_recipients?: number | null;
@@ -46,8 +46,6 @@ export interface RecipientInput {
   email: string | null;
   phone: string | null;
   is_active: boolean;
-  /** Horas del horario a las que recibe («HH:MM»); vacío = a todas. */
-  hours?: string[];
 }
 
 export interface Recipient extends RecipientInput {
@@ -234,6 +232,73 @@ export async function sendTest(recipientId: number, accountId?: number): Promise
   });
   if (!isDelivery(body)) throw badFormat();
   return body as Delivery;
+}
+
+/** Un envío programado: qué temas, de dónde, a qué horas, qué días y a qué correos (ADR-0046). */
+export interface ScheduleInput {
+  name: string;
+  concept_ids: number[];
+  region_id: number;
+  /** «HH:MM», hora de la Ciudad de México. */
+  times: string[];
+  /** 1 = lunes … 7 = domingo; vacío = todos. */
+  days: number[];
+  recipient_ids: number[];
+  is_active: boolean;
+}
+
+export interface DeliverySchedule extends ScheduleInput {
+  id: number;
+  owner: string;
+  concept_names: string[];
+  region_name: string | null;
+  /** Corridas en su día con más corridas. */
+  runs_per_day: number;
+  /** Próximas corridas (ISO); vacío si está apagado. */
+  upcoming: string[];
+}
+
+export interface ScheduleList {
+  items: DeliverySchedule[];
+  /** Corridas al día que suman los envíos de la persona. */
+  daily_runs: number;
+  /** Su tope de corridas al día. */
+  daily_limit: number;
+  average_run_cost_usd: number | null;
+}
+
+/** Envíos programados (los de la persona; el superusuario ve todos). */
+export async function listSchedules(signal?: AbortSignal): Promise<ScheduleList> {
+  const body = await requestJson(url('/schedules'), { signal });
+  if (
+    !isRecord(body) ||
+    !Array.isArray(body.items) ||
+    !body.items.every(hasId) ||
+    typeof body.daily_limit !== 'number'
+  ) {
+    throw badFormat();
+  }
+  return body as unknown as ScheduleList;
+}
+
+/**
+ * Guarda un envío programado nuevo o editado.
+ *
+ * @throws {ApiError} `invalid_delivery` si pasa del tope de corridas al día o
+ *   un dato no es válido (con `details.problemas` por campo).
+ */
+export async function saveSchedule(input: ScheduleInput, id?: number): Promise<DeliverySchedule> {
+  const body = await requestJson(id ? url(`/schedules/${String(id)}`) : url('/schedules'), {
+    method: id ? 'PUT' : 'POST',
+    body: input,
+  });
+  if (!hasId(body)) throw badFormat();
+  return body as DeliverySchedule;
+}
+
+/** Borra un envío programado (lo ya mandado sigue en el historial). */
+export async function deleteSchedule(id: number): Promise<void> {
+  await requestJson(url(`/schedules/${String(id)}`), { method: 'DELETE' });
 }
 
 /**

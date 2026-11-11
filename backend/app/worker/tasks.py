@@ -17,12 +17,19 @@ No hace: no contiene lógica de negocio.
 import asyncio
 import logging
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from app.adapters.queue.celery_queue import ENTITIES_TASK, SEARCH_TASK
 from app.application.use_cases.ingest import IngestReport
 from app.core.config import get_settings
-from app.worker.automatic_jobs import check_due_run, run_automatic_job
+from app.worker.automatic_jobs import (
+    check_due_runs,
+    run_automatic_job,
+    run_from_payload,
+    run_scheduled_job,
+    run_to_payload,
+)
 from app.worker.celery_app import (
     AUTOMATIC_RUN_EXPIRES_SECONDS,
     AUTOMATIC_RUN_TASK,
@@ -144,38 +151,44 @@ def extract_case_entities(case_id: str, article_id: int, requested_by: str) -> d
 
 
 @celery_app.task(name=SCHEDULE_TICK_TASK)
-def schedule_tick() -> str | None:
-    """Revisión de cada minuto: si llegó una hora del horario, encola su corrida.
+def schedule_tick() -> list[str]:
+    """Revisión de cada minuto: encola las corridas de los envíos programados que tocan.
 
-    La hora queda apartada en la base antes de encolar, así que aunque el
-    worker tarde en tomarla, la siguiente revisión no la vuelve a lanzar.
+    Cada corrida queda apartada en la base antes de encolar, así que aunque
+    el worker tarde en tomarla, la siguiente revisión no la vuelve a lanzar.
+    Los envíos que piden lo mismo a la misma hora comparten una (ADR-0046).
 
     Returns:
-        La hora programada encolada (ISO), o ``None`` si no tocaba.
+        Las llaves de las corridas encoladas (vacío si no tocaba ninguna).
     """
-    slot = asyncio.run(check_due_run(get_settings()))
-    if slot is None:
-        return None
-    automatic_run.apply_async(
-        kwargs={"slot": slot.isoformat()}, expires=AUTOMATIC_RUN_EXPIRES_SECONDS
-    )
-    logger.info("Corrida automática encolada", extra={"corrida": slot.isoformat()})
-    return slot.isoformat()
+    runs = asyncio.run(check_due_runs(get_settings()))
+    for run in runs:
+        automatic_run.apply_async(
+            kwargs={"run": run_to_payload(run)}, expires=AUTOMATIC_RUN_EXPIRES_SECONDS
+        )
+        logger.info(
+            "Corrida automática encolada",
+            extra={"corrida": run.run_key, "envios": list(run.schedule_ids)},
+        )
+    return [run.run_key for run in runs]
 
 
 @celery_app.task(name=AUTOMATIC_RUN_TASK)
-def automatic_run(slot: str | None = None) -> dict[str, object]:
-    """Corrida automática del monitor FGR, a cada hora del horario único.
+def automatic_run(slot: str | None = None, run: dict[str, Any] | None = None) -> dict[str, object]:
+    """Corrida automática: la de un envío programado o, sin él, la del monitor FGR.
 
     Args:
-        slot: Hora programada que apartó ``schedule_tick`` (ISO). Sin ella,
-            se usa la hora del horario a la que pertenece este momento.
+        slot: Hora programada (ISO) de la corrida FGR a mano. Se ignora con ``run``.
+        run: La corrida que apartó ``schedule_tick`` (``run_to_payload``).
 
     Returns:
         La búsqueda creada, su estado, notas, costo y la ruta del PDF.
     """
+    settings = get_settings()
     summary = asyncio.run(
-        run_automatic_job(get_settings(), slot=datetime.fromisoformat(slot) if slot else None)
+        run_scheduled_job(settings, run_from_payload(run))
+        if run is not None
+        else run_automatic_job(settings, slot=datetime.fromisoformat(slot) if slot else None)
     )
     result: dict[str, object] = {
         "search_id": str(summary.search_id),

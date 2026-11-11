@@ -1,8 +1,9 @@
-"""Qué busca cada corrida automática del monitor FGR (F12.8, ADR-0031).
+"""Qué busca cada corrida automática (F12.8, ADR-0031, ADR-0046).
 
-El reloj de Celery lanza una corrida a las 07:00, 15:00 y 23:00 de la Ciudad
-de México. Este caso de uso arma su petición, la misma que haría una persona
-en Explorar:
+Desde ADR-0046 cada envío programado dice sus temas, su región y sus horas;
+``request_for`` arma la petición de una de esas corridas. ``request`` arma la
+del monitor FGR de siempre (``make corrida-fgr``), la misma que haría una
+persona en Explorar:
 - **concepto:** «Fiscalia General de la Republica» (con su regla FGR federal);
 - **región:** todo México: la geolocalización reparte las notas por estado;
 - **fechas:** solo las horas desde la corrida programada anterior del horario
@@ -23,6 +24,7 @@ from app.application.pagination import NameCursor
 from app.application.ports.concepts import ConceptRepositoryPort
 from app.application.ports.regions import RegionRepositoryPort
 from app.application.use_cases.plan_search import SearchRequest
+from app.domain.delivery_schedules import DueRun
 from app.domain.errors import DomainError
 from app.domain.names import normalize_name
 from app.domain.queries import DateWindow, Provider
@@ -122,17 +124,58 @@ class PrepareAutomaticRun:
             time_window=hours,
         )
 
-    async def _concept_id(self) -> int:
-        wanted = normalize_name(self._profile.concept)
-        after: NameCursor | None = None
-        while page := await self._concepts.list_concepts(None, after, _PAGE):
-            for concept in page:
-                if concept.data.name_norm == wanted:
-                    return concept.id
-            last = page[-1]
-            after = NameCursor(last.data.name_norm, last.id)
-        raise AutomaticRunConfigError(
-            f"No existe el concepto «{self._profile.concept}» del monitor automático; "
-            "créalo con make seed.",
-            {"concepto": self._profile.concept},
+    def request_for(self, run: DueRun) -> SearchRequest:
+        """La petición de la corrida de un envío programado (ADR-0046).
+
+        Busca sus temas en su región, solo en el periodo desde la hora
+        anterior del envío; las fuentes y la firma son las del perfil.
+
+        Args:
+            run: La corrida que apartó el reloj.
+
+        Returns:
+            La petición, marcada como automática.
+        """
+        local_start = run.window.start.astimezone(MEXICO_CITY)
+        local_end = run.window.end.astimezone(MEXICO_CITY)
+        return SearchRequest(
+            user_id=self._profile.user_id,
+            concept_ids=run.concept_ids,
+            region_id=run.region_id,
+            window=DateWindow.between(local_start.date(), local_end.date()),
+            providers=self._profile.sources,
+            trigger=SearchTrigger.AUTOMATIC,
+            scheduled_for=run.slot,
+            time_window=run.window,
         )
+
+    async def _concept_id(self) -> int:
+        found = await find_concept_id(self._concepts, self._profile.concept)
+        if found is None:
+            raise AutomaticRunConfigError(
+                f"No existe el concepto «{self._profile.concept}» del monitor automático; "
+                "créalo con make seed.",
+                {"concepto": self._profile.concept},
+            )
+        return found
+
+
+async def find_concept_id(concepts: ConceptRepositoryPort, name: str) -> int | None:
+    """El id del concepto vigente con ese nombre (sin importar acentos ni mayúsculas).
+
+    Args:
+        concepts: Conceptos.
+        name: Nombre («Fiscalia General de la Republica»).
+
+    Returns:
+        El id, o ``None`` si no existe.
+    """
+    wanted = normalize_name(name)
+    after: NameCursor | None = None
+    while page := await concepts.list_concepts(None, after, _PAGE):
+        for concept in page:
+            if concept.data.name_norm == wanted:
+                return concept.id
+        last = page[-1]
+        after = NameCursor(last.data.name_norm, last.id)
+    return None

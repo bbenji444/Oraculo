@@ -1,7 +1,8 @@
 """Envíos desde el worker (F12.11, ADR-0039).
 
 - ``deliver_run``: al terminar una corrida automática, crea una guía por
-  destinatario activo y las manda (ADR-0040). Solo si ``DELIVERIES_ENABLED``.
+  cada correo de los envíos programados que la pidieron y las manda
+  (ADR-0046). Solo si ``DELIVERIES_ENABLED``.
 - ``send_due_deliveries``: lo lanza el reloj cada minuto. Manda lo pendiente,
   incluidos los reintentos.
 
@@ -12,6 +13,7 @@ No hace: no decide reglas (eso es ``app.application.use_cases.deliveries``).
 """
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
@@ -20,7 +22,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.adapters.delivery.factory import build_sender
 from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
 from app.adapters.persistence.delivery_reports import PostgresRunReports
+from app.adapters.persistence.delivery_schedules_repository import (
+    PostgresDeliveryScheduleStore,
+)
 from app.application.use_cases.deliveries import PlanDeliveries, SendReport
+from app.application.use_cases.delivery_schedules import recipients_of
 from app.core.config import Settings
 from app.domain.deliveries import SOURCE_FGR_RUN
 
@@ -31,7 +37,7 @@ async def deliver_run(
     settings: Settings,
     search_id: UUID,
     slot: datetime,
-    schedule: frozenset[int] | None = None,
+    schedule_ids: Sequence[int],
 ) -> SendReport | None:
     """Crea y manda los envíos de una corrida.
 
@@ -39,7 +45,7 @@ async def deliver_run(
         settings: Configuración.
         search_id: La corrida.
         slot: Su hora programada.
-        schedule: Horas del horario vigente (cada quien recibe a las que eligió).
+        schedule_ids: Envíos programados que la pidieron (sus correos la reciben).
 
     Returns:
         Cuántos se intentaron y mandaron, o ``None`` si los envíos están apagados.
@@ -48,9 +54,11 @@ async def deliver_run(
         return None
     engine = create_async_engine(settings.database_url())
     try:
-        created = await PlanDeliveries(
-            PostgresDeliveryStore(engine), PostgresRunReports(engine)
-        ).for_run(SOURCE_FGR_RUN, str(search_id), slot, schedule)
+        store = PostgresDeliveryStore(engine)
+        recipients = await recipients_of(PostgresDeliveryScheduleStore(engine), store, schedule_ids)
+        created = await PlanDeliveries(store, PostgresRunReports(engine)).for_run(
+            SOURCE_FGR_RUN, str(search_id), slot, recipients
+        )
         report = await build_sender(settings, engine).send_due()
         logger.info(
             "Envíos de la corrida",

@@ -468,7 +468,8 @@ class PostgresSearchStore:
 
     async def previous_automatic_run(self, search_id: UUID) -> PreviousRun | None:
         """Ver ``PreviousRunPort.previous_automatic_run``."""
-        # Usa el índice parcial searches_automatic (created_at DESC). Una
+        # La anterior del mismo tema (ADR-0046): mismos conceptos y región.
+        # Usa el índice parcial searches_topic_created. Una
         # corrida que falló no cuenta: no dejó reporte que «ya lo dijera».
         async with self._engine.connect() as conn:
             previous = (
@@ -476,6 +477,7 @@ class PostgresSearchStore:
                     text(
                         "SELECT p.id, p.scheduled_for FROM searches s "
                         "JOIN searches p ON p.trigger = :automatic AND p.created_at < s.created_at "
+                        "AND p.topic_key IS NOT DISTINCT FROM s.topic_key "
                         "AND p.deleted_at IS NULL AND p.status IN ('completed', 'partial') "
                         "WHERE s.id = :id ORDER BY p.created_at DESC, p.id DESC LIMIT 1"
                     ),

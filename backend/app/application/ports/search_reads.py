@@ -212,7 +212,7 @@ class PreviousRunPort(Protocol):
     """Encuentra la corrida automática anterior a una búsqueda."""
 
     async def previous_automatic_run(self, search_id: UUID) -> PreviousRun | None:
-        """La última corrida automática terminada que se creó antes que esta.
+        """La última corrida automática terminada del mismo tema, creada antes que esta.
 
         Args:
             search_id: La búsqueda de referencia.

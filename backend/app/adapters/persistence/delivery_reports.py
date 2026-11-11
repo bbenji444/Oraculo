@@ -1,8 +1,10 @@
-"""Lo que se manda de cada corrida FGR (F12.11, ADR-0039).
+"""Lo que se manda de cada corrida automática (F12.11, ADR-0039, ADR-0046).
 
-Implementa ``ReportSourcePort`` para la fuente ``monitor.corrida_fgr``: lee de
-PostgreSQL la corrida, su ventana de horas, cuántas notas trajo, los delitos
-con más notas y la ruta de su PDF, y arma el asunto y el cuerpo del correo.
+Implementa ``ReportSourcePort`` para la fuente ``monitor.corrida_fgr`` (el
+nombre se quedó por el historial: cubre las corridas de todos los envíos
+programados). Lee de PostgreSQL la corrida, sus temas y su región, su ventana
+de horas, cuántas notas trajo, los delitos con más notas y la ruta de su PDF,
+y arma el asunto y el cuerpo del correo.
 
 El cuerpo es corto a propósito: resumen y PDF adjunto. Nunca reproduce notas
 completas (CLAUDE.md §8).
@@ -29,11 +31,17 @@ from app.domain.deliveries import SOURCE_FGR_RUN
 MEXICO_CITY = ZoneInfo("America/Mexico_City")
 # Delitos que se listan en el cuerpo del correo: los que más salen.
 TOP_CATEGORIES = 5
+# Nombre del concepto del monitor FGR (AUTOMATIC_CONCEPT por omisión).
+_FGR_LONG = "Fiscalia General de la Republica"
 
 _RUN = text(
     """
-    SELECT s.id, s.scheduled_for, s.window_start, s.window_end, s.results_count, r.pdf_path
+    SELECT s.id, s.scheduled_for, s.window_start, s.window_end, s.results_count, r.pdf_path,
+           g.name AS region_name,
+           (SELECT string_agg(sc.concept_name, ', ' ORDER BY sc.concept_name)
+            FROM search_concepts sc WHERE sc.search_id = s.id) AS topics
     FROM searches s LEFT JOIN reports r ON r.search_id = s.id
+    LEFT JOIN regions g ON g.id = s.region_id
     WHERE s.id = CAST(:id AS uuid) AND s.trigger = 'automatic' AND s.deleted_at IS NULL
     """
 )
@@ -57,7 +65,7 @@ _LATEST = text(
 
 
 class PostgresRunReports:
-    """``ReportSourcePort`` para los reportes de las corridas FGR."""
+    """``ReportSourcePort`` para los reportes de las corridas automáticas."""
 
     def __init__(self, engine: AsyncEngine) -> None:
         """Recibe el motor de la base.
@@ -97,20 +105,41 @@ class PostgresRunReports:
             period = f"{start} a {end}"
         highlights = tuple(f"{c.name}: {c.notes}" for c in categories)
         pdf = Path(run.pdf_path) if run.pdf_path else None
-        title = f"Reporte FGR · corrida de las {slot.strftime('%H:%M') if slot else '—'}"
+        topic = _topic(run.topics, run.region_name)
+        title = f"Reporte {topic} · corrida de las {slot.strftime('%H:%M') if slot else '—'}"
         return ReportContent(
             source_ref=source_ref,
             title=title,
-            subject=f"Reporte FGR · corrida {when} (CDMX)",
-            html_body=_body(when, period, run.results_count, highlights, pdf),
+            subject=f"Reporte {topic} · corrida {when} (CDMX)",
+            html_body=_body(
+                topic,
+                when=when,
+                period=period,
+                notes=run.results_count,
+                highlights=highlights,
+                pdf=pdf,
+            ),
             pdf_path=pdf if pdf and pdf.is_file() else None,
             slot_hour=slot.hour if slot else None,
             highlights=highlights,
         )
 
 
-def _body(
-    when: str, period: str, notes: int | None, highlights: tuple[str, ...], pdf: Path | None
+def _topic(topics: str | None, region: str | None) -> str:
+    """«FGR · México»: qué buscó la corrida, corto para el asunto del correo."""
+    # La FGR, el tema de siempre, se reconoce mejor por sus siglas.
+    named = (topics or "noticias").replace(_FGR_LONG, "FGR")
+    return f"{named} · {region}" if region else named
+
+
+def _body(  # noqa: PLR0913 — cada dato del correo, por nombre (*)
+    topic: str,
+    *,
+    when: str,
+    period: str,
+    notes: int | None,
+    highlights: tuple[str, ...],
+    pdf: Path | None,
 ) -> str:
     items = "".join(f"<li>{escape(h)}</li>" for h in highlights)
     period_line = f"<li><b>Periodo cubierto:</b> {escape(period)}</li>" if period else ""
@@ -122,7 +151,7 @@ def _body(
     return (
         "<p>Hola,</p>"
         f"<p>Este es el reporte automático del Monitor de Noticias (Oráculo).</p>"
-        f"<h3>Corrida automática FGR · {escape(when)} (CDMX)</h3>"
+        f"<h3>Corrida automática {escape(topic)} · {escape(when)} (CDMX)</h3>"
         f"<ul>{period_line}<li><b>Notas encontradas:</b> {notes or 0}</li></ul>"
         + (f"<p><b>Delitos con más notas:</b></p><ol>{items}</ol>" if items else "")
         + attachment

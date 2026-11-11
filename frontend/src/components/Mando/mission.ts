@@ -164,8 +164,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * La próxima corrida automática y cuánto falta.
  *
  * @param now Momento actual.
- * @param upcoming Próximas corridas del horario único (ISO, de `/schedule`).
- *   Sin ellas se usan las horas iniciales (7, 15 y 23).
+ * @param upcoming Próximas corridas (ISO), en orden: las de los envíos
+ *   programados (`/deliveries/schedules`). Sin ellas se usan las horas
+ *   iniciales (7, 15 y 23).
  * @returns La hora «HH:MM» de la Ciudad de México y los segundos que faltan.
  * @example nextAutomaticRun(new Date('2026-10-27T19:00:00Z')) // { time: '15:00', seconds: 7200 } (13:00 en CDMX)
  */
