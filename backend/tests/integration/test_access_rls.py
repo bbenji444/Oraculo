@@ -430,3 +430,40 @@ async def test_borrar_a_una_persona_en_la_base(api_engine: AsyncEngine) -> None:
     assert creds is None
     assert found_key is not None and found_key.revoked_at is not None
     assert not found_key.user_active
+
+
+async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncEngine) -> None:
+    # ADR-0047: la llave de API se guarda cifrada y solo un superusuario la lee.
+    store = PostgresAccessStore(api_engine)
+    box = AesGcmSecretBox(PEPPER)
+    key = new_key()
+    with as_user(JEFA):
+        ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
+        await store.create_key(
+            NewKeyRow(
+                ana.user_id,
+                key.public_id,
+                key_digest(key.full, PEPPER),
+                "Llave de API",
+                None,
+                box.seal(key.full),
+            ),
+            AUDIT,
+        )
+        found = await store.api_key(ana.user_id)
+        listed = await store.get_user(ana.user_id)
+        before = await store.totp_required()
+        await store.set_totp_required(True, AUDIT)
+        after = await store.totp_required()
+        await store.set_totp_required(before, AUDIT)
+    with as_user(ANA):
+        # Un usuario normal no lee llaves (seguridad por filas de access_keys).
+        hidden = await store.api_key(ana.user_id)
+
+    assert found is not None
+    info, sealed = found
+    assert (box.open(sealed), info.revealable) == (key.full, True)
+    assert key.full not in sealed
+    assert listed is not None and listed.api_key_prefix == key.public_id
+    assert (before, after) == (False, True)
+    assert hidden is None

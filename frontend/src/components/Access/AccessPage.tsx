@@ -1,6 +1,11 @@
 /**
- * Pantalla «Accesos» (solo superusuarios, ADR-0042 y ADR-0043): quién puede
- * entrar al monitor.
+ * Pantalla «Accesos» (solo superusuarios, ADR-0042, ADR-0043 y ADR-0047):
+ * quién puede entrar al monitor.
+ *
+ * - Arriba, el interruptor «Pedir código de Microsoft Authenticator al entrar»
+ *   (`LoginSettings`): apagado, basta usuario y contraseña.
+ * - Cada persona trae su **llave de API** (`ApiKeyRow`) para conectarla con
+ *   el resto de Oráculo: ver, copiar o generar otra.
  *
  * - «+ Nueva persona» da de alta a alguien con una contraseña temporal, que
  *   se muestra una sola vez; al entrar la cambia y conecta su Authenticator.
@@ -15,7 +20,12 @@
  */
 import { type CSSProperties, useState } from 'react';
 
-import { useAccessUsers, useCreateUser, useUpdateUser } from '../../hooks/useAccess';
+import {
+  useAccessUsers,
+  useAuthSettings,
+  useCreateUser,
+  useUpdateUser,
+} from '../../hooks/useAccess';
 import { useMe } from '../../hooks/useAuth';
 import type { AccessUser } from '../../services/access';
 import { Modal } from '../Deliveries/Modal';
@@ -24,6 +34,8 @@ import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
 import { SectionHeading } from '../ui/SectionHeading';
+import { ApiKeyRow } from './ApiKeyRow';
+import { LoginSettings } from './LoginSettings';
 import { SecurityActions } from './SecurityActions';
 import { TemporaryPasswordNotice } from './TemporaryPasswordNotice';
 import { UserForm, type UserFormValues } from './UserForm';
@@ -47,6 +59,8 @@ function UserItem({
   onToggle: () => void;
   onEdit: () => void;
 }) {
+  // «Sin Authenticator» solo importa si al entrar se pide el código.
+  const totpRequired = useAuthSettings().data?.totp_required ?? false;
   return (
     <li className="hud-reveal" style={{ '--i': Math.min(index, MAX_STAGGER) } as CSSProperties}>
       <HudPanel className={`px-5 py-4 ${user.is_active ? '' : 'opacity-70'}`}>
@@ -74,7 +88,9 @@ function UserItem({
               {user.is_active ? 'Activa' : 'Desactivada'}
             </HudChip>
             {user.must_change_password && <HudChip tone="amber">Contraseña temporal</HudChip>}
-            {!user.totp_enrolled && <HudChip tone="slate">Sin Authenticator</HudChip>}
+            {totpRequired && !user.totp_enrolled && (
+              <HudChip tone="slate">Sin Authenticator</HudChip>
+            )}
             {user.locked_until && (
               <HudChip tone="rose">Bloqueada hasta {formatMexicoCity(user.locked_until)}</HudChip>
             )}
@@ -88,6 +104,7 @@ function UserItem({
             </HudButton>
           </div>
         </div>
+        <ApiKeyRow user={user} />
         {open && <UserKeys user={user} />}
       </HudPanel>
     </li>
@@ -126,7 +143,7 @@ export function AccessPage() {
         <SectionHeading
           kicker="Solo superusuarios"
           title="Accesos"
-          description="Quién puede entrar al monitor. Se entra con usuario, contraseña y el código de Microsoft Authenticator, igual que en Oráculo."
+          description="Quién puede entrar al monitor y la llave de API de cada persona, para conectarla con el resto de Oráculo."
           actions={
             <HudButton
               variant="solid"
@@ -140,6 +157,7 @@ export function AccessPage() {
             </HudButton>
           }
         />
+        <LoginSettings />
         {users.isPending && <p className="mt-6 text-sm text-slate-400">Cargando…</p>}
         {users.error && <p className="mt-6 text-sm text-rose-300">{users.error.message}</p>}
         <ul className="mt-6 space-y-3">

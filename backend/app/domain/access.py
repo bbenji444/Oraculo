@@ -141,6 +141,8 @@ class UserAccount:
         must_change_password: Si su contraseña es temporal.
         totp_enrolled: Si ya dio de alta su Microsoft Authenticator.
         locked_until: Hasta cuándo está bloqueada por intentos fallidos.
+        api_key_prefix: Parte pública de su llave de API visible (ADR-0047),
+            o ``None`` si todavía no tiene.
     """
 
     user_id: int
@@ -156,6 +158,7 @@ class UserAccount:
     must_change_password: bool = False
     totp_enrolled: bool = False
     locked_until: datetime | None = None
+    api_key_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +176,8 @@ class KeyInfo:
         revoked_at: Cuándo se revocó.
         last_used_at: Último uso.
         last_used_ip: Desde dónde.
+        revealable: Si se guardó cifrada y el superusuario la puede volver a
+            ver (las llaves de API de cada usuario, ADR-0047).
     """
 
     key_id: int
@@ -185,6 +190,7 @@ class KeyInfo:
     revoked_at: datetime | None
     last_used_at: datetime | None
     last_used_ip: str | None
+    revealable: bool = False
 
     @property
     def masked(self) -> str:

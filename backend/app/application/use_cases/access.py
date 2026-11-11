@@ -31,6 +31,7 @@ from app.application.ports.access import (
     LoginLimiterPort,
     NewKeyRow,
     NewUser,
+    SecretBoxPort,
     SessionData,
     SessionStorePort,
     UserChanges,
@@ -68,6 +69,11 @@ USER_CREATED = "user.created"
 USER_UPDATED = "user.updated"
 KEY_CREATED = "access_key.created"
 KEY_REVOKED = "access_key.revoked"
+# ADR-0047: ver la llave de API de alguien y prender o apagar el código.
+KEY_REVEALED = "access_key.revealed"
+TOTP_SETTING = "auth.totp_setting"
+# Etiqueta de la llave de API de cada persona (la que se puede volver a ver).
+API_KEY_LABEL = "Llave de API"
 USER_DELETED = "user.deleted"
 PASSWORD_RESET = "user.password_reset"  # noqa: S105 — nombre de acción de la bitácora, no una contraseña
 TOTP_RESET = "user.totp_reset"
@@ -265,13 +271,15 @@ class CreatedUser:
 class AccessAdmin:
     """Administración de personas y llaves (solo superusuarios)."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 — cada colaborador por nombre
         self,
         store: AccessStorePort,
         sessions: SessionStorePort,
         pepper: bytes,
         clock: Callable[[], datetime],
         on_user_created: Callable[[str], Awaitable[object]] | None = None,
+        *,
+        box: SecretBoxPort | None = None,
     ) -> None:
         """Recibe sus colaboradores.
 
@@ -282,12 +290,15 @@ class AccessAdmin:
             clock: Hora actual (UTC).
             on_user_created: Qué más darle a una persona nueva (su envío
                 inicial de la FGR, ADR-0046); recibe su ``username``.
+            box: Cifra la llave de API de cada persona para poder volver a
+                mostrarla (ADR-0047). Sin ella, no hay llaves visibles.
         """
         self._store = store
         self._sessions = sessions
         self._pepper = pepper
         self._clock = clock
         self._on_user_created = on_user_created
+        self._box = box
 
     async def list_users(self, admin: AuthUser) -> list[UserAccount]:
         """Todas las personas.
@@ -343,6 +354,9 @@ class AccessAdmin:
         )
         if self._on_user_created is not None:
             await self._on_user_created(user.username)
+        # Cada persona nace con su llave de API (ADR-0047).
+        if self._box is not None:
+            await self._new_api_key(admin, ip, account)
         refreshed = await self._store.get_user(account.user_id)
         return CreatedUser(refreshed or account, temporary)
 
@@ -556,6 +570,114 @@ class AccessAdmin:
             ),
         )
         return IssuedKey(key, info)
+
+    async def show_api_key(self, admin: AuthUser, ip: str | None, user_id: int) -> IssuedKey:
+        """La llave de API de una persona, completa, para verla o copiarla (ADR-0047).
+
+        Cada vez queda en la bitácora (``key.revealed``).
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+            UserNotFoundError: Si no existe la persona.
+            AccessKeyNotFoundError: Si todavía no tiene una llave visible.
+        """
+        require_superuser(admin)
+        user = await self._store.get_user(user_id)
+        if user is None:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        found = await self._store.api_key(user_id) if self._box else None
+        if found is None:
+            raise AccessKeyNotFoundError(
+                "Esta persona todavía no tiene llave de API: genera una.", {"id": user_id}
+            )
+        info, sealed = found
+        full = self._box.open(sealed) if self._box else ""
+        await self._store.record_event(
+            AuditEntry(
+                Actor(admin.username, ip),
+                KEY_REVEALED,
+                {"de": user.username, "llave": info.masked},
+            ),
+            str(info.key_id),
+        )
+        return IssuedKey(NewKey(full, info.public_id), info)
+
+    async def new_api_key(self, admin: AuthUser, ip: str | None, user_id: int) -> IssuedKey:
+        """Genera la llave de API de una persona; la anterior deja de servir (ADR-0047).
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+            UserNotFoundError: Si no existe la persona.
+            AccessRuleError: Si la persona está desactivada o el servidor no
+                puede cifrar llaves.
+        """
+        require_superuser(admin)
+        user = await self._store.get_user(user_id)
+        if user is None:
+            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
+        if not user.is_active:
+            raise AccessRuleError("Activa a la persona antes de darle una llave.")
+        return await self._new_api_key(admin, ip, user)
+
+    async def _new_api_key(self, admin: AuthUser, ip: str | None, user: UserAccount) -> IssuedKey:
+        if self._box is None:
+            raise AccessRuleError(
+                "El servidor no puede guardar llaves visibles (falta la pimienta)."
+            )
+        actor = Actor(admin.username, ip)
+        # La anterior se revoca: una sola llave de API por persona.
+        for old in await self._store.user_keys(user.user_id):
+            if old.revealable and old.revoked_at is None:
+                await self._store.revoke_key(
+                    old.key_id, AuditEntry(actor, KEY_REVOKED, {"llave_id": old.key_id})
+                )
+                await self._sessions.delete_for_user(user.user_id, old.key_id)
+        key = new_key()
+        info = await self._store.create_key(
+            NewKeyRow(
+                user.user_id,
+                key.public_id,
+                key_digest(key.full, self._pepper),
+                API_KEY_LABEL,
+                None,
+                self._box.seal(key.full),
+            ),
+            AuditEntry(
+                actor,
+                KEY_CREATED,
+                {
+                    "para": user.username,
+                    "llave": key.masked,
+                    "dias": None,
+                    "etiqueta": API_KEY_LABEL,
+                },
+            ),
+        )
+        return IssuedKey(key, info)
+
+    async def totp_required(self, admin: AuthUser) -> bool:
+        """Si al entrar se pide el código de 6 dígitos.
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+        """
+        require_superuser(admin)
+        return await self._store.totp_required()
+
+    async def set_totp_required(self, admin: AuthUser, ip: str | None, required: bool) -> bool:
+        """Prende o apaga el código de 6 dígitos para todos (ADR-0047).
+
+        Aplica en el siguiente ingreso; las sesiones abiertas siguen.
+
+        Raises:
+            ForbiddenError: Si quien pide no es superusuario.
+        """
+        require_superuser(admin)
+        await self._store.set_totp_required(
+            required,
+            AuditEntry(Actor(admin.username, ip), TOTP_SETTING, {"pedir_codigo": required}),
+        )
+        return required
 
     async def revoke_key(self, admin: AuthUser, ip: str | None, key_id: int) -> KeyInfo:
         """Revoca una llave y cierra las sesiones de su dueño.

@@ -18,7 +18,7 @@ from app.domain.errors import (
     UsernameTakenError,
     UserNotFoundError,
 )
-from tests.unit.fake_access import PEPPER, POLICY, AccessWorld, access_world
+from tests.unit.fake_access import PEPPER, POLICY, AccessWorld, FakeBox, access_world
 
 pytestmark = pytest.mark.anyio
 
@@ -419,3 +419,62 @@ async def test_una_persona_nueva_recibe_su_envio_inicial(world: AccessWorld) -> 
     )
 
     assert given == ["pepe"]
+
+
+# --- Llave de API visible por persona (ADR-0047) ---
+
+
+def _admin_with_box(world: AccessWorld) -> AccessAdmin:
+    return AccessAdmin(world.store, world.sessions, PEPPER, world.clock, box=FakeBox())
+
+
+async def test_cada_persona_nace_con_su_llave_y_el_superusuario_la_ve(world: AccessWorld) -> None:
+    admin = _admin_with_box(world)
+    benji = await _admin(world)
+
+    created = await admin.create_user(
+        benji, IP, username="pepe", display_name="Pepe", email=None, role=Role.USER
+    )
+    shown = await admin.show_api_key(benji, IP, created.account.user_id)
+    again = await admin.show_api_key(benji, IP, created.account.user_id)
+
+    assert shown.key.full == again.key.full and shown.key.full.startswith("orc_live_")
+    # Guardada cifrada, nunca en claro.
+    stored = world.store.keys[shown.info.key_id].sealed or ""
+    assert shown.key.full not in stored
+    # Y sirve para entrar al API como esa persona.
+    assert (await world.auth.from_bearer(shown.key.full, IP)).username == "pepe"
+    assert (created.account.api_key_prefix, world.store.events[-1][0].action) == (
+        shown.info.public_id,
+        "access_key.revealed",
+    )
+
+
+async def test_generar_otra_llave_deja_sin_servir_la_anterior(world: AccessWorld) -> None:
+    admin = _admin_with_box(world)
+    benji = await _admin(world)
+    pepe = world.store.add_user("pepe")
+
+    first = await admin.new_api_key(benji, IP, pepe)
+    second = await admin.new_api_key(benji, IP, pepe)
+
+    assert (await admin.show_api_key(benji, IP, pepe)).key.full == second.key.full
+    with pytest.raises(AuthenticationRequiredError):
+        await world.auth.from_bearer(first.key.full, IP)
+
+
+async def test_solo_el_superusuario_ve_llaves_y_cambia_el_codigo(world: AccessWorld) -> None:
+    admin = _admin_with_box(world)
+    pepe_id = world.store.add_user("pepe")
+    pepe = AuthUser(pepe_id, "pepe", "Pepe", Role.USER)
+
+    with pytest.raises(ForbiddenError):
+        await admin.show_api_key(pepe, IP, pepe_id)
+    with pytest.raises(ForbiddenError):
+        await admin.set_totp_required(pepe, IP, False)
+    with pytest.raises(AccessKeyNotFoundError):
+        await admin.show_api_key(await _admin(world), IP, pepe_id)
+
+    assert await admin.set_totp_required(await _admin(world), IP, False) is False
+    assert world.store.totp is False
+    assert world.store.events[-1][0].action == "auth.totp_setting"

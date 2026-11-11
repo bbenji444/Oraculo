@@ -8,7 +8,11 @@ La pantalla «Accesos» los usa para (ADR-0042 y ADR-0043):
 - restablecer su contraseña (la olvidó) o su Microsoft Authenticator
   (cambió de celular);
 - crear o revocar llaves de sistema. La llave completa sale **una sola
-  vez**; después solo se ve su parte pública (``orc_live_a1b2c3d4…``).
+  vez**; después solo se ve su parte pública (``orc_live_a1b2c3d4…``);
+- ver, copiar o regenerar la **llave de API** de cada persona, para
+  conectarla con el resto de Oráculo (ADR-0047). Esa sí se guarda cifrada y
+  se puede volver a ver; cada vista queda en la bitácora;
+- prender o apagar el código de 6 dígitos al entrar (``/access/settings``).
 
 No hace: no aplica las reglas (``AccessAdmin``).
 """
@@ -23,7 +27,7 @@ from app.api.auth import SuperUser, client_ip
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.application.ports.access import UserChanges
 from app.application.use_cases.access import AccessAdmin
-from app.domain.access import KeyInfo, Role, UserAccount
+from app.domain.access import KEY_PREFIX, KeyInfo, Role, UserAccount
 
 router = APIRouter(prefix="/access", tags=["acceso"], responses=ERROR_RESPONSES)
 
@@ -44,6 +48,10 @@ class UserOut(BaseModel):
     must_change_password: bool = Field(description="Si su contraseña es temporal.")
     totp_enrolled: bool = Field(description="Si ya dio de alta Microsoft Authenticator.")
     locked_until: datetime | None = Field(description="Bloqueada por intentos hasta esta hora.")
+    api_key: str | None = Field(
+        default=None,
+        description="Su llave de API, enmascarada (orc_live_a1b2c3d4…); null si no tiene.",
+    )
 
     @classmethod
     def of(cls, user: UserAccount) -> "UserOut":
@@ -62,6 +70,7 @@ class UserOut(BaseModel):
             must_change_password=user.must_change_password,
             totp_enrolled=user.totp_enrolled,
             locked_until=user.locked_until,
+            api_key=f"{KEY_PREFIX}{user.api_key_prefix}…" if user.api_key_prefix else None,
         )
 
 
@@ -148,6 +157,25 @@ class KeyIn(BaseModel):
     days: int | None = Field(
         default=90, ge=1, le=365, description="Días de vigencia; null = no vence."
     )
+
+
+class AuthSettingsOut(BaseModel):
+    """Cómo se entra al monitor."""
+
+    totp_required: bool = Field(
+        description="Si al entrar se pide el código de Microsoft Authenticator."
+    )
+
+
+class AuthSettingsIn(AuthSettingsOut):
+    """Prender o apagar el código al entrar."""
+
+
+class ApiKeyOut(BaseModel):
+    """La llave de API de una persona, completa (ADR-0047)."""
+
+    key: str = Field(description="La llave completa (Authorization: Bearer <key>).")
+    info: KeyOut
 
 
 class IssuedKeyOut(BaseModel):
@@ -303,3 +331,57 @@ async def revoke_key(
 ) -> KeyOut:
     """Deja de servir al instante y cierra las sesiones que entraron con ella."""
     return KeyOut.of(await admin.revoke_key(user, client_ip(request), key_id))
+
+
+@router.get(
+    "/settings",
+    response_model=AuthSettingsOut,
+    summary="Cómo se entra al monitor",
+)
+async def auth_settings(admin: Admin, user: SuperUser) -> AuthSettingsOut:
+    """Si al entrar se pide el código de 6 dígitos."""
+    return AuthSettingsOut(totp_required=await admin.totp_required(user))
+
+
+@router.put(
+    "/settings",
+    response_model=AuthSettingsOut,
+    summary="Prender o apagar el código al entrar",
+)
+async def save_auth_settings(
+    body: AuthSettingsIn, request: Request, admin: Admin, user: SuperUser
+) -> AuthSettingsOut:
+    """Aplica desde el siguiente ingreso; las sesiones abiertas siguen."""
+    required = await admin.set_totp_required(user, client_ip(request), body.totp_required)
+    return AuthSettingsOut(totp_required=required)
+
+
+@router.get(
+    "/users/{user_id}/api-key",
+    response_model=ApiKeyOut,
+    summary="Ver la llave de API de una persona",
+    responses=error_responses(404),
+)
+async def show_api_key(
+    request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
+) -> ApiKeyOut:
+    """La llave completa, para copiarla; queda en la bitácora quién la vio."""
+    shown = await admin.show_api_key(user, client_ip(request), user_id)
+    response.headers["Cache-Control"] = "no-store"
+    return ApiKeyOut(key=shown.key.full, info=KeyOut.of(shown.info))
+
+
+@router.post(
+    "/users/{user_id}/api-key",
+    response_model=ApiKeyOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generar la llave de API de una persona",
+    responses=error_responses(404, 409),
+)
+async def new_api_key(
+    request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
+) -> ApiKeyOut:
+    """Crea una llave nueva; la anterior deja de servir al instante."""
+    issued = await admin.new_api_key(user, client_ip(request), user_id)
+    response.headers["Cache-Control"] = "no-store"
+    return ApiKeyOut(key=issued.key.full, info=KeyOut.of(issued.info))

@@ -1,6 +1,6 @@
 # ADR-0043: Entrar con contraseña y código de 6 dígitos; token interno
 
-- **Estado:** aceptada (reemplaza la forma de entrar de ADR-0042; sus roles, RLS y llaves de sistema siguen)
+- **Estado:** aceptada (reemplaza la forma de entrar de ADR-0042; sus roles, RLS y llaves de sistema siguen). Desde [ADR-0047](0047-codigo-opcional-y-llave-de-api-visible.md) el código de 6 dígitos es opcional
 - **Fecha:** 2026-11-10
 - **Fase:** F12
 - **Relacionadas:** ADR-0042 (llaves, roles y seguridad por filas), `docs/PLAN_AUTENTICACION.md`

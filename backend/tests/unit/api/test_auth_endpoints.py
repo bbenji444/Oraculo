@@ -20,6 +20,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import SESSION_COOKIE
+from app.application.use_cases.access import AccessAdmin
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role
 from app.domain.credentials import hash_password, new_totp_secret, totp_code, totp_counter
@@ -347,3 +348,44 @@ def test_borrar_a_una_persona_la_saca_y_ya_no_entra(
     assert "ana" not in [u["username"] for u in client.get(USERS).json()["items"]]
     login = TestClient(client.app).post(LOGIN, json={"username": "ana", "password": PASSWORD})
     assert login.status_code == 401
+
+
+# --- Código opcional y llave de API visible (ADR-0047) ---
+
+
+def test_sin_codigo_la_contrasena_abre_la_sesion(client: TestClient, world: AccessWorld) -> None:
+    _ready(world, 1, new_totp_secret())
+    world.store.totp = False
+
+    step = client.post(LOGIN, json={"username": "benji", "password": PASSWORD})
+
+    assert step.status_code == 200, step.text
+    assert (step.json()["next"], step.json()["me"]["username"]) == ("done", "benji")
+    assert SESSION_COOKIE in client.cookies
+    assert client.get(ME).json()["username"] == "benji"
+
+
+def test_el_superusuario_prende_el_codigo_y_copia_llaves(
+    app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    app.state.access_admin = AccessAdmin(
+        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
+    )
+    pepe = world.store.add_user("pepe")
+    _enter(client, world, "benji", secret)
+
+    switched = client.put(
+        "/api/v1/access/settings", json={"totp_required": False}, headers=SAME_ORIGIN
+    )
+    created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+    shown = client.get(f"{USERS}/{pepe}/api-key")
+    listed = client.get(USERS).json()["items"]
+
+    assert switched.json() == {"totp_required": False}
+    assert client.get("/api/v1/access/settings").json() == {"totp_required": False}
+    assert created.status_code == 201
+    assert shown.json()["key"] == created.json()["key"]
+    assert shown.headers["Cache-Control"] == "no-store"
+    pepe_row = next(u for u in listed if u["username"] == "pepe")
+    assert pepe_row["api_key"].endswith("…")
+    assert created.json()["key"] not in pepe_row["api_key"]

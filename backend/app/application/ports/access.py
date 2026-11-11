@@ -64,6 +64,8 @@ class NewKeyRow:
         key_hash: Huella HMAC.
         label: Para qué es.
         expires_at: Vencimiento.
+        secret_sealed: La llave completa cifrada, si se debe poder volver a
+            ver (llave de API del usuario, ADR-0047); ``None`` en las demás.
     """
 
     user_id: int
@@ -71,6 +73,7 @@ class NewKeyRow:
     key_hash: str
     label: str
     expires_at: datetime | None
+    secret_sealed: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +130,8 @@ class LoginTicket:
         needs_enrollment: Debe dar de alta su Authenticator antes.
         pending_secret: Secreto nuevo **cifrado**, mientras da de alta su app.
         attempts: Códigos equivocados en este ingreso.
+        totp_required: Si al entrar se pide el código (interruptor de
+            «Accesos», ADR-0047); sin él basta la contraseña.
     """
 
     user_id: int
@@ -135,6 +140,7 @@ class LoginTicket:
     needs_enrollment: bool
     pending_secret: str | None = None
     attempts: int = 0
+    totp_required: bool = True
 
 
 class AccessStorePort(Protocol):
@@ -228,6 +234,18 @@ class AccessStorePort(Protocol):
 
     async def create_key(self, key: NewKeyRow, audit: AuditEntry) -> KeyInfo:
         """Guarda la huella de una llave nueva."""
+        ...
+
+    async def api_key(self, user_id: int) -> tuple[KeyInfo, str] | None:
+        """La llave de API visible más nueva y vigente, con su texto cifrado (ADR-0047)."""
+        ...
+
+    async def totp_required(self) -> bool:
+        """Si al entrar se pide el código de 6 dígitos."""
+        ...
+
+    async def set_totp_required(self, required: bool, audit: AuditEntry) -> None:
+        """Prende o apaga el código de 6 dígitos para todos."""
         ...
 
     async def revoke_key(self, key_id: int, audit: AuditEntry) -> KeyInfo | None:

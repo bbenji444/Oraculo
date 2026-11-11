@@ -235,3 +235,46 @@ async def test_cambiar_mi_contrasena_cierra_las_demas_sesiones(world: AccessWorl
     assert other.token not in world.sessions.data
     assert fresh.token in world.sessions.data
     assert verify_password("Nueva-contraseña-99", world.store.creds[1].password_hash)
+
+
+# --- Código apagado (ADR-0047: «dice mi jefe que es tedioso») ---
+
+
+async def test_con_el_codigo_apagado_la_contrasena_basta(world: AccessWorld) -> None:
+    world.store.totp = False
+
+    step = await world.login.start("benji", PASSWORD, IP)
+
+    assert (step.next, step.ticket) == ("done", "")
+    assert step.opened is not None
+    assert (await world.auth.from_session(step.opened.token)).username == "benji"
+    assert world.store.events[-1][0].payload == {"metodo": "contraseña"}
+    # Sin un ingreso a medias abierto, el paso del código ya no sirve.
+    with pytest.raises(AuthenticationRequiredError):
+        await world.login.verify_code(step.ticket, _code(world), IP)
+
+
+async def test_primer_ingreso_sin_codigo_entra_al_cambiar_la_temporal(world: AccessWorld) -> None:
+    world.store.totp = False
+    admin_user = AuthUser(1, "benji", "Benji", Role.SUPERUSER)
+    created = await world.admin.create_user(
+        admin_user, IP, username="ana", display_name="Ana", email=None, role=Role.USER
+    )
+
+    step = await world.login.start("ana", created.temporary_password, IP)
+    done = await world.login.change_password(step.ticket, "Mi-contraseña-nueva-7", IP)
+
+    assert step.next == "change_password"
+    assert done.next == "done" and done.opened is not None
+    assert done.opened.user.username == "ana"
+    # Nunca se le pidió dar de alta Authenticator.
+    assert world.store.creds[created.account.user_id].totp_secret is None
+
+
+async def test_al_prender_el_codigo_se_vuelve_a_pedir(world: AccessWorld) -> None:
+    world.store.totp = False
+    assert (await world.login.start("benji", PASSWORD, IP)).next == "done"
+
+    world.store.totp = True
+
+    assert (await world.login.start("benji", PASSWORD, IP)).next == "code"

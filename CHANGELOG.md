@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Código opcional y llave de API por persona (11/11/2026, ADR-0047, migración 0044).** Benji: «dice mi jefe que es tedioso» y «cada usuario debe tener su propia API key».
+  - En «Accesos», el interruptor **Pedir código de Microsoft Authenticator al entrar**. Arranca apagado: se entra con usuario y contraseña.
+  - Cada persona tiene su **llave de API**, que el superusuario puede ver, copiar o cambiar. Se guarda cifrada y cada vista queda en la bitácora. Los usuarios normales no la ven.
+  - Guía para conectar otro sistema: `docs/guia-integracion-api.md`.
+
 - **Envíos totalmente personalizables (11/11/2026, ADR-0046, migración 0043).** Benji: «que los envíos sean totalmente moldeables y personalizables», para los usuarios y para él.
   - Cada persona programa sus envíos: qué temas, de dónde (país, estado o municipio), a qué horas (las que quiera, al minuto), qué días y a cuáles de sus correos.
   - Tope de 3 corridas al día por usuario y 8 para el superusuario.
