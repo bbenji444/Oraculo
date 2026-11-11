@@ -1,17 +1,19 @@
 /**
- * Sección «Vínculos» del detalle de un caso (Fase 9.5, decisiones D6 a D8).
+ * Pestaña «Vínculos» del detalle de un caso (Fase 9.5, decisiones D6 a D8).
  *
- * - Pestañas Sugeridos, Confirmados y Descartados.
- * - Cada vínculo se lee en una línea («Julián N — aparecen juntas — Ramón
- *   Salas»), con el estatus legal de las personas siempre visible, su origen
- *   («aparecen en la misma nota» o «dibujado por una persona»), su confianza
- *   y las notas del caso que lo sostienen.
+ * - Un filtro por estado: Por revisar, Confirmados y Descartados.
+ * - Desde F12 (ADR-0107) cada estado se parte en dos grupos:
+ *   - **Relaciones fuertes**: las dos entidades participan en el hecho de al
+ *     menos una nota, o el vínculo lo dibujó una persona. Va abierto.
+ *   - **Solo se mencionan juntas**: comparten notas, pero al menos una solo se
+ *     nombra. Va plegado (nunca escondido para siempre, D4).
+ * - Cada vínculo (`RelationshipItem`) dice por qué se relacionan.
  * - Quien puede editar confirma o descarta los sugeridos y dibuja vínculos
  *   nuevos entre entidades confirmadas («Nuevo vínculo»).
  *
  * No hace: no dibuja el muro sobre el globo (9.6).
  */
-import { type CSSProperties, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { useCaseEntities } from '../../hooks/useEntities';
 import {
@@ -20,138 +22,27 @@ import {
   useReviewRelationship,
 } from '../../hooks/useRelationships';
 import type { ReviewStatus } from '../../services/entities';
-import type { Relationship, RelationshipEnd } from '../../services/relationships';
-import { formatDay } from '../Explore/format';
-import { confidencePercent, relationshipPhrase } from './labels';
+import type { Relationship } from '../../services/relationships';
+import { relationshipKey, splitByStrength } from './grouping';
 import { RelationshipForm } from './RelationshipForm';
-import { ExternalLink } from '../ExternalLink';
+import { RelationshipItem } from './RelationshipItem';
+import { HudSegmented } from '../ui/HudSegmented';
 
-const TABS: { value: ReviewStatus; label: string }[] = [
-  { value: 'suggested', label: 'Sugeridos' },
+const STATES: { value: ReviewStatus; label: string }[] = [
+  { value: 'suggested', label: 'Por revisar' },
   { value: 'confirmed', label: 'Confirmados' },
   { value: 'discarded', label: 'Descartados' },
 ];
-
-// Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
-const BUTTON = 'hud-btn hud-btn--sm';
 
 interface CaseRelationshipsProps {
   caseId: string;
   canEdit: boolean;
 }
 
-function End({ end }: { end: RelationshipEnd }) {
-  return (
-    <span className="text-slate-100">
-      {end.label}
-      {end.legal_status_label && (
-        <span className="ml-1 text-[11px] font-medium text-amber-200">
-          ({end.legal_status_label})
-        </span>
-      )}
-    </span>
-  );
-}
-
-function RelationshipItem({
-  relationship,
-  canEdit,
-  busy,
-  onReview,
-}: {
-  relationship: Relationship;
-  canEdit: boolean;
-  busy: boolean;
-  onReview: (action: 'confirm' | 'discard') => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const notes = relationship.shared_articles.length;
-
-  return (
-    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1 text-sm">
-          <p>
-            <End end={relationship.entity_a} />
-            <span className="mx-2 text-slate-400">{relationshipPhrase(relationship)}</span>
-            <End end={relationship.entity_b} />
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            {relationship.origin_label} · confianza {confidencePercent(relationship.confidence)}
-            {notes > 0 && (
-              <>
-                {' · '}
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() => {
-                    setOpen(!open);
-                  }}
-                  className="text-sky-300 underline-offset-2 hover:underline"
-                >
-                  {notes} {notes === 1 ? 'nota en común' : 'notas en común'}
-                </button>
-              </>
-            )}
-            {relationship.reviewed_by &&
-              ` · ${relationship.review_status_label} por ${relationship.reviewed_by}${
-                relationship.reviewed_at ? ` el ${formatDay(relationship.reviewed_at)}` : ''
-              }`}
-          </p>
-          {relationship.notes && (
-            <p className="mt-1 text-xs text-slate-300">Nota: {relationship.notes}</p>
-          )}
-        </div>
-        {canEdit && (
-          <div className="flex shrink-0 gap-2">
-            {relationship.review_status !== 'confirmed' && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onReview('confirm');
-                }}
-                className={`${BUTTON} border-emerald-400/50 text-emerald-100`}
-              >
-                Confirmar
-              </button>
-            )}
-            {relationship.review_status !== 'discarded' && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onReview('discard');
-                }}
-                className={`${BUTTON} hud-btn--danger`}
-              >
-                Descartar
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      {open && (
-        <ul className="mt-2 space-y-1 border-l-2 border-sky-400/30 pl-3 text-xs">
-          {relationship.shared_articles.map((a) => (
-            <li key={a.article_id}>
-              <ExternalLink href={a.url} className="text-sky-300 hover:underline">
-                {a.title} ↗
-              </ExternalLink>
-              {a.published_at && (
-                <span className="text-slate-400"> · {formatDay(a.published_at)}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
 export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
   const [tab, setTab] = useState<ReviewStatus>('suggested');
   const [drawing, setDrawing] = useState(false);
+  const [showWeak, setShowWeak] = useState(false);
   const relationships = useCaseRelationships(caseId, tab);
   const confirmed = useCaseEntities(caseId, 'confirmed').data?.items ?? [];
   const review = useReviewRelationship(caseId);
@@ -159,12 +50,24 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
   const data = relationships.data;
   const busy = review.isPending || create.isPending;
   const error = relationships.error ?? review.error ?? create.error;
+  const { strong, weak } = splitByStrength(data?.items ?? []);
+
+  function item(r: Relationship) {
+    return (
+      <RelationshipItem
+        key={relationshipKey(r)}
+        relationship={r}
+        canEdit={canEdit}
+        busy={busy}
+        onReview={(action) => {
+          review.mutate({ relationship: r, action });
+        }}
+      />
+    );
+  }
 
   return (
-    <div
-      className="hud-panel hud-spot hud-reveal overflow-hidden"
-      style={{ '--i': 3 } as CSSProperties}
-    >
+    <div className="hud-panel hud-spot hud-reveal overflow-hidden">
       <div className="hud-section-head">
         <h3 className="hud-section-title">Vínculos</h3>
         {canEdit && !drawing && confirmed.length >= 2 && (
@@ -196,25 +99,16 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
           }}
         />
       )}
-      <div
-        role="tablist"
-        aria-label="Estado de los vínculos"
-        className="flex gap-1 border-b border-sky-400/10 px-3"
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.value}
-            onClick={() => {
-              setTab(t.value);
-            }}
-            className="hud-subtab focus-visible:outline-2 focus-visible:outline-sky-400"
-          >
-            {t.label} ({data?.counts[t.value] ?? 0})
-          </button>
-        ))}
+      <div className="border-b border-sky-400/10 px-5 py-3">
+        <HudSegmented
+          label="Estado de los vínculos"
+          value={tab}
+          onChange={setTab}
+          options={STATES.map((s) => ({
+            value: s.value,
+            label: `${s.label} (${String(data?.counts[s.value] ?? 0)})`,
+          }))}
+        />
       </div>
       {error && (
         <p role="alert" className="px-4 pt-2 text-xs text-rose-300">
@@ -225,23 +119,71 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
       {data?.items.length === 0 && (
         <p className="p-4 text-sm text-slate-400">
           {tab === 'suggested'
-            ? 'Sin sugerencias. Cuando confirmes entidades que aparecen en las mismas notas, aquí se propone vincularlas.'
+            ? 'Nada por revisar. Cuando confirmes entidades que aparecen en las mismas notas, aquí se propone vincularlas.'
             : 'Nada por aquí todavía.'}
         </p>
       )}
-      <ul className="divide-y divide-sky-400/10">
-        {data?.items.map((r) => (
-          <RelationshipItem
-            key={`${String(r.entity_a.id)}-${String(r.entity_b.id)}-${r.type}`}
-            relationship={r}
-            canEdit={canEdit}
-            busy={busy}
-            onReview={(action) => {
-              review.mutate({ relationship: r, action });
-            }}
-          />
-        ))}
-      </ul>
+      {strong.length > 0 && (
+        <LinkGroup
+          title={`Relaciones fuertes · ${String(strong.length)}`}
+          hint="Las dos participan en el mismo hecho, o lo dibujó una persona."
+          open
+        >
+          {strong.map(item)}
+        </LinkGroup>
+      )}
+      {weak.length > 0 && (
+        <LinkGroup
+          title={`Solo se mencionan juntas · ${String(weak.length)}`}
+          hint="Comparten notas, pero al menos una solo se nombra. Suelen servir menos."
+          open={showWeak}
+          onToggle={() => {
+            setShowWeak(!showWeak);
+          }}
+        >
+          {weak.map(item)}
+        </LinkGroup>
+      )}
     </div>
+  );
+}
+
+interface LinkGroupProps {
+  title: string;
+  hint: string;
+  open: boolean;
+  /** Sin él, el grupo no se pliega. */
+  onToggle?: () => void;
+  children: ReactNode;
+}
+
+function LinkGroup({ title, hint, open, onToggle, children }: LinkGroupProps) {
+  const heading = (
+    <span className="font-display text-[11px] tracking-[0.16em] text-sky-100 uppercase">
+      {title}
+    </span>
+  );
+  return (
+    <section aria-label={title} className="border-b border-sky-400/10 last:border-b-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-sky-400/[0.02] px-5 py-2">
+        {onToggle ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-sky-400"
+          >
+            <span aria-hidden="true" className="text-sky-300">
+              {open ? '▾' : '▸'}
+            </span>
+            {heading}
+          </button>
+        ) : (
+          heading
+        )}
+        <span className="text-xs text-slate-400">{hint}</span>
+      </div>
+      {open && <ul className="divide-y divide-sky-400/10">{children}</ul>}
+    </section>
   );
 }

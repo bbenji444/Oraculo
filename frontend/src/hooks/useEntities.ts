@@ -1,20 +1,24 @@
 /**
  * Hooks de las entidades de un caso con TanStack Query (Fases 9.4 y 9.5).
  *
- * Confirmar o descartar también vuelve a pedir duplicados y vínculos
- * (`caseKeys`). Las claves empiezan con `cases` para que cualquier cambio del caso las
- * invalide junto con el resto. Mientras haya notas en la cola del worker, la
- * lista se vuelve a pedir cada `POLL_MS` para que las sugerencias aparezcan
- * solas.
+ * Confirmar o descartar (una o varias a la vez, F12) también vuelve a pedir
+ * duplicados y vínculos (`caseKeys`). Las claves empiezan con `cases` para
+ * que cualquier cambio del caso las invalide junto con el resto. Mientras
+ * haya notas en la cola del worker, la lista se vuelve a pedir cada
+ * `POLL_MS` para que las sugerencias aparezcan solas.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import {
   analyzePending,
+  type BulkAction,
   confirmEntity,
   discardEntity,
+  type EntityDecision,
   type LegalStatus,
   listCaseEntities,
+  reviewEntities,
   type ReviewStatus,
 } from '../services/entities';
 import { entitiesKey, invalidateCaseEntities } from './caseKeys';
@@ -57,4 +61,29 @@ export function useReviewEntity(caseId: string) {
         : discardEntity(caseId, input.entityId),
     onSuccess: invalidate,
   });
+}
+
+/** Confirmar o descartar varias entidades a la vez (F12, ADR-0107). */
+export function useReviewEntities(caseId: string) {
+  const invalidate = useInvalidate(caseId);
+  return useMutation({
+    mutationFn: (input: { action: BulkAction; items: EntityDecision[] }) =>
+      reviewEntities(caseId, input.action, input.items),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Cuando la IA termina de leer las notas en cola, vuelve a pedir duplicados y
+ * vínculos: las sugerencias nuevas pueden traer pares nuevos. Lo usa el
+ * detalle del caso (siempre montado), no la pestaña Entidades, para que
+ * funcione aunque se esté viendo otra pestaña.
+ */
+export function useRefreshWhenAnalysisEnds(caseId: string, queued: number): void {
+  const client = useQueryClient();
+  const before = useRef(queued);
+  useEffect(() => {
+    if (before.current > 0 && queued === 0) void invalidateCaseEntities(client, caseId);
+    before.current = queued;
+  }, [client, caseId, queued]);
 }

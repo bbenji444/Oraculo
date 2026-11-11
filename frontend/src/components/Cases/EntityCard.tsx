@@ -1,8 +1,9 @@
 /**
  * Una entidad propuesta por la IA en un caso (Fase 9.4, historia H9.2).
  *
- * Muestra tipo, nombre, estatus legal (siempre visible, §9.10) y cuántas
- * menciones tiene; al desplegarla, cada cita con la nota de donde salió. Quien
+ * Muestra nombre, si participa en el hecho de alguna nota (el tipo ya lo dice
+ * su grupo, F12), estatus legal (siempre visible, §9.10) y cuántas menciones
+ * tiene; al desplegarla, cada cita con la nota de donde salió. Quien
  * puede editar la confirma (en personas, eligiendo el estatus legal según la
  * nota; no existe "culpable") o la descarta.
  *
@@ -17,6 +18,7 @@ import { useState } from 'react';
 import type { ResolutionAction } from '../../hooks/useResolution';
 import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
+import { participatesInEvent } from './grouping';
 import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
 import { ExternalLink } from '../ExternalLink';
 import { HudSelect } from '../ui/HudSelect';
@@ -50,6 +52,7 @@ export function EntityCard({
   const own = entity.mentions.filter((m) => m.entity_id === entity.id);
   const canSplit = canEdit && own.length > 1;
   const isPerson = entity.type === 'person';
+  const inEvent = participatesInEvent(entity);
   const [legal, setLegal] = useState<LegalStatus>(
     entity.legal_status ?? entity.suggested_legal_status ?? 'mentioned',
   );
@@ -60,10 +63,13 @@ export function EntityCard({
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-100">
-            <span className="mr-2 rounded-md border border-sky-400/20 bg-sky-400/5 px-1.5 py-0.5 text-[11px] text-slate-200">
-              {entity.type_label}
-            </span>
             {entity.label}
+            {/* El tipo ya lo dice el grupo (F12); aquí, si participa en el hecho. */}
+            {inEvent && (
+              <span className="ml-2 rounded-md border border-emerald-400/30 bg-emerald-400/5 px-1.5 py-0.5 text-[11px] text-emerald-100">
+                participa en el hecho
+              </span>
+            )}
           </p>
           <p className="mt-1 text-xs text-slate-400">
             {isPerson && (

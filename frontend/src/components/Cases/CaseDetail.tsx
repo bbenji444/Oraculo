@@ -6,9 +6,10 @@
  * o archivado es de solo lectura: no ofrece editar ni quitar notas. Un lector
  * tampoco.
  *
- * Debajo, la sección Entidades (9.4): lo que la IA propone de sus notas para
- * confirmar o descartar, con sus posibles duplicados, y la sección Vínculos
- * (9.5). El muro sobre el globo llega en la 9.6.
+ * Debajo, desde F12 (ADR-0107), el caso se divide en pestañas
+ * (`CaseSections`): Entidades (9.4, lo que la IA propone de sus notas, con
+ * sus posibles duplicados), Vínculos (9.5) y Noticias. Cada pestaña dice
+ * cuánto queda por revisar. El muro sobre el globo es la 9.6.
  *
  * El dueño puede eliminar el caso (27/10/2026): pide confirmación y es
  * reversible (`CasesPage` ofrece «Deshacer»).
@@ -18,23 +19,13 @@
  *
  * No hace: no agrega notas (eso es el botón "Agregar al caso" de Explorar).
  */
-import type { CSSProperties } from 'react';
-
-import {
-  useCase,
-  useCaseArticles,
-  useDeleteCase,
-  useRemoveCaseArticle,
-  useUpdateCase,
-} from '../../hooks/useCases';
+import { useCase, useDeleteCase, useUpdateCase } from '../../hooks/useCases';
 import type { Case, CaseStatus } from '../../services/cases';
-import { formatDay, PRECISION_LABEL } from '../Explore/format';
+import { formatDay } from '../Explore/format';
 import { wallHash } from '../../map/muro/orbit';
-import { CaseEntities } from './CaseEntities';
-import { CaseRelationships } from './CaseRelationships';
+import { CaseSections } from './CaseSections';
 import { SENSITIVITY_TONE, STATUS_TONE } from './labels';
 import { ConfirmDelete } from '../ConfirmDelete';
-import { ExternalLink } from '../ExternalLink';
 import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
@@ -49,9 +40,7 @@ interface CaseDetailProps {
 
 export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
   const detail = useCase(caseId);
-  const articles = useCaseArticles(caseId);
   const update = useUpdateCase();
-  const remove = useRemoveCaseArticle();
   const deleteCase = useDeleteCase();
 
   if (detail.isPending) return <p className="text-sm text-slate-400">Abriendo el caso…</p>;
@@ -176,69 +165,11 @@ export function CaseDetail({ caseId, onEdit, onDeleted }: CaseDetailProps) {
         )}
       </HudPanel>
 
-      <HudPanel className="hud-reveal overflow-hidden" style={{ '--i': 1 } as CSSProperties}>
-        <h3 className="border-b border-sky-400/10 px-5 py-3 font-display text-[11px] tracking-[0.2em] text-sky-100 uppercase">
-          Noticias del caso ({item.article_count})
-        </h3>
-        {articles.isPending && <p className="p-4 text-sm text-slate-400">Cargando noticias…</p>}
-        {articles.error && (
-          <p role="alert" className="p-4 text-sm text-rose-300">
-            {articles.error.message}
-          </p>
-        )}
-        {articles.isSuccess && articles.data.length === 0 && (
-          <p className="p-4 text-sm text-slate-400">
-            Todavía no tiene noticias. En{' '}
-            <a href="#/explorar" className="text-sky-300 underline">
-              Explorar
-            </a>
-            , abre una noticia y presiona «Agregar al caso».
-          </p>
-        )}
-        {remove.error && (
-          <p role="alert" className="px-4 pt-3 text-xs text-rose-300">
-            {remove.error.message}
-          </p>
-        )}
-        <ul className="p-2">
-          {articles.data?.map((article) => {
-            const location = article.primary_location;
-            return (
-              <li key={article.article_id} className="hud-row flex-wrap cursor-default items-start">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-100">{article.title}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {article.source_name ?? article.source_domain ?? 'Medio sin nombre'}
-                    {article.published_at && ` · ${formatDay(article.published_at)}`}
-                    {' · '}
-                    {location?.place ?? PRECISION_LABEL.unknown}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
-                    Ver nota original ↗
-                  </ExternalLink>
-                  {canEdit && isOpen && (
-                    <HudButton
-                      variant="danger"
-                      size="sm"
-                      disabled={remove.isPending}
-                      onClick={() => {
-                        remove.mutate({ caseId: item.id, articleId: article.article_id });
-                      }}
-                    >
-                      Quitar
-                    </HudButton>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </HudPanel>
-
-      <CaseEntities caseId={item.id} canEdit={canEdit && isOpen} />
-      <CaseRelationships caseId={item.id} canEdit={canEdit && isOpen} />
+      <CaseSections
+        caseId={item.id}
+        articleCount={item.article_count}
+        canEdit={canEdit && isOpen}
+      />
     </section>
   );
 }

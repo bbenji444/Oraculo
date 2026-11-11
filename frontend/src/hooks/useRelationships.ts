@@ -6,13 +6,15 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { ReviewStatus } from '../services/entities';
+import type { BulkAction, ReviewStatus } from '../services/entities';
 import {
   createRelationship,
   listRelationships,
   type Relationship,
   type RelationshipDraft,
+  type RelationshipKey,
   reviewRelationship,
+  reviewRelationships,
 } from '../services/relationships';
 import { relationshipsKey } from './caseKeys';
 
@@ -44,6 +46,16 @@ export function useCreateRelationship(caseId: string) {
   const invalidate = useInvalidate(caseId);
   return useMutation({
     mutationFn: (draft: RelationshipDraft) => createRelationship(caseId, draft),
+    onSuccess: invalidate,
+  });
+}
+
+/** Confirmar o descartar varios vínculos a la vez (F12, ADR-0107). */
+export function useReviewRelationships(caseId: string) {
+  const invalidate = useInvalidate(caseId);
+  return useMutation({
+    mutationFn: (input: { action: BulkAction; items: RelationshipKey[] }) =>
+      reviewRelationships(caseId, input.action, input.items),
     onSuccess: invalidate,
   });
 }
