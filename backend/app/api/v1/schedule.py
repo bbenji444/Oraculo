@@ -1,6 +1,7 @@
 """Horario único de las corridas automáticas (``/schedule``, ADR-0040).
 
-Solo para el administrador (el equipo interno): un horario para todos. A cada
+Un horario para todos: lo ven todos (cada quien elige de ahí a qué horas
+recibe, ADR-0045) y solo el superusuario lo cambia. A cada
 hora programada se hace una corrida nueva (búsqueda + IA + PDF) que cubre lo
 publicado desde la hora anterior, y su reporte se manda a todos los
 destinatarios activos. Cada hora extra es una corrida más: la respuesta trae
@@ -9,9 +10,6 @@ el costo promedio de una corrida para avisarlo en la pantalla.
 - ``GET /schedule``: el horario, sus topes y las próximas corridas.
 - ``PUT /schedule``: lo reemplaza (queda en la bitácora). Aplica en el
   siguiente minuto, sin reiniciar nada.
-
-Todavía no hay inicio de sesión: la restricción a administradores llega con
-la integración a Oráculo (decisión de Benji, 06/11/2026).
 
 No hace: ninguna regla del horario; traduce entre HTTP y los casos de uso.
 """
@@ -22,6 +20,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
+from app.api.auth import SuperUser
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.concepts import get_actor
 from app.application.audit import Actor
@@ -111,7 +110,7 @@ async def get_schedule(request: Request, reader: Reader) -> ScheduleOut:
     responses=error_responses(422),
 )
 async def put_schedule(
-    body: ScheduleIn, request: Request, reader: Reader, actor: CurrentActor
+    _: SuperUser, body: ScheduleIn, request: Request, reader: Reader, actor: CurrentActor
 ) -> ScheduleOut:
     """Reemplaza el horario de todos; aplica en el siguiente minuto.
 

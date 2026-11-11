@@ -211,9 +211,12 @@ def test_un_usuario_normal_no_abre_lo_del_superusuario(
     me = client.get(ME).json()
 
     assert me["role"] == "user"
-    assert me["sections"] == ["explorar", "casos", "conceptos", "historial"]
-    for path in (USERS, "/api/v1/schedule", "/api/v1/deliveries/overview"):
+    # «Envíos» sí (sus correos, ADR-0045); cuentas, reglas y horario no.
+    assert me["sections"] == ["explorar", "casos", "conceptos", "historial", "envios"]
+    for path in (USERS, "/api/v1/deliveries/accounts", "/api/v1/deliveries/rules"):
         assert client.get(path).status_code == 403, path
+    put_schedule = client.put("/api/v1/schedule", json={"times": ["07:00"]}, headers=SAME_ORIGIN)
+    assert put_schedule.status_code == 403
     concept = client.post(
         "/api/v1/concepts", json={"name": "X", "keywords": ["x"]}, headers=SAME_ORIGIN
     )

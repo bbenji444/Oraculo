@@ -36,10 +36,12 @@ export function useDeliveryOverview() {
   });
 }
 
-export function useDeliveryAccounts() {
+/** Cuentas de envío; solo las pide el superusuario (a los demás la API les dice 403). */
+export function useDeliveryAccounts(enabled = true) {
   return useQuery({
     queryKey: [...KEY, 'accounts'],
     queryFn: ({ signal }) => listAccounts(signal),
+    enabled,
   });
 }
 
@@ -114,7 +116,7 @@ export function useRetryDelivery() {
 export function useSendTest() {
   const invalidate = useInvalidate('history');
   return useMutation({
-    mutationFn: ({ recipientId, accountId }: { recipientId: number; accountId: number }) =>
+    mutationFn: ({ recipientId, accountId }: { recipientId: number; accountId?: number }) =>
       sendTest(recipientId, accountId),
     onSuccess: invalidate,
   });

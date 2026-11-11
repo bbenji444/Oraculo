@@ -1,29 +1,43 @@
 /**
- * Destinatarios: a quién se le manda (ADR-0039).
+ * Destinatarios: a quién se le manda (ADR-0039, ADR-0045).
  *
- * - «+ Agregar», arriba a la derecha, abre una ventana para registrar uno nuevo.
- * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo o borrarlo.
+ * - «+ Agregar», arriba a la derecha, abre una ventana para registrar uno nuevo
+ *   (un usuario normal, hasta su tope: dos correos).
+ * - «Editar» despliega el perfil ahí mismo para cambiarlo, apagarlo, elegir
+ *   sus horas o borrarlo.
+ * - Cada persona ve solo los suyos; el superusuario ve todos, con su dueño.
  *
- * No hace: no decide qué recibe cada quien (eso es la programación de envíos).
+ * No hace: no decide desde qué correo se manda (eso es del superusuario).
  */
 import { useState } from 'react';
 
 import { useDeleteRecipient, useRecipients, useSaveRecipient } from '../../hooks/useDeliveries';
+import { useSchedule } from '../../hooks/useSchedule';
 import type { Recipient } from '../../services/deliveries';
 import { HudButton } from '../ui/HudButton';
 import { HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
 import { Modal } from './Modal';
 import { RecipientForm } from './RecipientForm';
+import { hoursLabel } from './schedule';
+
+interface Mode {
+  /** Superusuario: ve todos, con su dueño, y el campo de WhatsApp. */
+  isSuperuser: boolean;
+  /** Horas del horario vigente. */
+  times: string[];
+}
 
 function RecipientItem({
   recipient,
   open,
   onToggle,
+  mode,
 }: {
   recipient: Recipient;
   open: boolean;
   onToggle: () => void;
+  mode: Mode;
 }) {
   const save = useSaveRecipient();
   const remove = useDeleteRecipient();
@@ -38,7 +52,13 @@ function RecipientItem({
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-slate-100">{recipient.name}</span>
           <span className="block truncate text-xs text-slate-400">{contact}</span>
+          {mode.times.length > 0 && (
+            <span className="block text-xs text-slate-500">
+              {hoursLabel(recipient.hours ?? [], mode.times)}
+            </span>
+          )}
         </span>
+        {mode.isSuperuser && recipient.owner && <HudChip tone="slate">{recipient.owner}</HudChip>}
         {!recipient.is_active && <HudChip tone="slate">Apagado</HudChip>}
         <HudButton size="sm" variant="ghost" aria-expanded={open} onClick={onToggle}>
           {open ? 'Cerrar' : 'Editar'}
@@ -48,6 +68,8 @@ function RecipientItem({
         <div className="border-t border-sky-400/10 px-3 py-3">
           <RecipientForm
             initial={recipient}
+            times={mode.times}
+            showPhone={mode.isSuperuser}
             submitLabel="Guardar cambios"
             pending={save.isPending}
             error={save.error}
@@ -99,29 +121,43 @@ function RecipientItem({
   );
 }
 
-export function RecipientsPanel() {
+export function RecipientsPanel({
+  isSuperuser,
+  maxRecipients = null,
+}: {
+  isSuperuser: boolean;
+  /** Tope de correos de la persona (`null` = sin tope). */
+  maxRecipients?: number | null;
+}) {
   const recipients = useRecipients();
   const create = useSaveRecipient();
+  const times = useSchedule().data?.times ?? [];
+  const mode: Mode = { isSuperuser, times };
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
+  const count = recipients.data?.length ?? 0;
+  const full = maxRecipients !== null && count >= maxRecipients;
 
   return (
     <HudPanel className="space-y-4 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase">
-            Destinatarios
+            {isSuperuser ? 'Destinatarios' : 'Mis correos'}
           </h2>
           <p className="mt-1 text-xs text-slate-400">
-            A quién se le manda.
+            {isSuperuser ? 'A quién se le manda.' : 'A dónde te llega el reporte.'}
             {recipients.data
               ? ` ${String(recipients.data.filter((r) => r.is_active).length)} activos.`
               : ''}
+            {maxRecipients !== null && ` Puedes tener hasta ${String(maxRecipients)}.`}
           </p>
         </div>
         <HudButton
           size="sm"
           variant="solid"
+          disabled={full}
+          title={full ? 'Ya tienes el máximo de correos' : undefined}
           onClick={() => {
             create.reset();
             setAdding(true);
@@ -133,7 +169,11 @@ export function RecipientsPanel() {
 
       {recipients.isPending && <p className="text-sm text-slate-400">Cargando destinatarios…</p>}
       {recipients.data?.length === 0 && (
-        <p className="text-sm text-slate-400">Todavía no hay destinatarios. Agrega el primero.</p>
+        <p className="text-sm text-slate-400">
+          {isSuperuser
+            ? 'Todavía no hay destinatarios. Agrega el primero.'
+            : 'Todavía no tienes correos. Agrega el tuyo y te empezará a llegar el reporte.'}
+        </p>
       )}
       <ul className="space-y-2">
         {recipients.data?.map((r) => (
@@ -141,6 +181,7 @@ export function RecipientsPanel() {
             key={r.id}
             recipient={r}
             open={openId === r.id}
+            mode={mode}
             onToggle={() => {
               setOpenId((current) => (current === r.id ? null : r.id));
             }}
@@ -150,12 +191,14 @@ export function RecipientsPanel() {
 
       {adding && (
         <Modal
-          title="Agregar destinatario"
+          title={isSuperuser ? 'Agregar destinatario' : 'Agregar mi correo'}
           onClose={() => {
             setAdding(false);
           }}
         >
           <RecipientForm
+            times={times}
+            showPhone={isSuperuser}
             submitLabel="Agregar"
             pending={create.isPending}
             error={create.error}

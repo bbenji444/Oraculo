@@ -40,10 +40,17 @@ class DeliveryAccount:
 
 @dataclass(frozen=True, slots=True)
 class Recipient:
-    """Un destinatario guardado."""
+    """Un destinatario guardado.
+
+    Attributes:
+        id: Id.
+        data: Sus datos.
+        owner: De quién es (``username``, ADR-0045).
+    """
 
     id: int
     data: RecipientDraft
+    owner: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +99,9 @@ class NewDelivery:
     idempotency_key: str
     is_test: bool = False
     scheduled_for: datetime | None = None
+    # De quién es el envío (el dueño del destinatario); ``None`` = el dueño
+    # del destinatario lo pone la base.
+    owner: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +128,7 @@ class Delivery:
     sent_at: datetime | None
     next_attempt_at: datetime | None
     scheduled_for: datetime | None = None
+    owner: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,19 +232,23 @@ class DeliveryStorePort(Protocol):
         ...
 
     async def list_recipients(self) -> list[Recipient]:
-        """Todos los destinatarios, en orden alfabético."""
+        """Los destinatarios que ve quien pregunta, en orden alfabético.
+
+        En la API la seguridad por filas deja ver a cada persona solo los
+        suyos; el superusuario y el worker ven todos (ADR-0045).
+        """
         ...
 
     async def get_recipient(self, recipient_id: int) -> Recipient | None:
         """Un destinatario por id."""
         ...
 
-    async def create_recipient(self, data: RecipientDraft) -> Recipient:
-        """Guarda un destinatario."""
+    async def create_recipient(self, data: RecipientDraft, owner: str) -> Recipient:
+        """Guarda un destinatario a nombre de ``owner``."""
         ...
 
     async def update_recipient(self, recipient_id: int, data: RecipientDraft) -> Recipient:
-        """Reemplaza los datos de un destinatario."""
+        """Reemplaza los datos de un destinatario (su dueño no cambia)."""
         ...
 
     async def delete_recipient(self, recipient_id: int) -> bool:

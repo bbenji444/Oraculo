@@ -1,8 +1,9 @@
 """Envíos en PostgreSQL (F12.11, ADR-0039).
 
-Implementa ``DeliveryStorePort`` sobre las tablas de las migraciones 0035 y
-0037: cuentas, destinatarios, la regla de cada fuente, guías de envío y sus
-intentos.
+Implementa ``DeliveryStorePort`` sobre las tablas de las migraciones 0035,
+0037 y 0042: cuentas, destinatarios, la regla de cada fuente, guías de envío y
+sus intentos. Destinatarios y guías tienen dueño y seguridad por filas: con
+el engine de la API cada persona lee y escribe solo lo suyo (ADR-0045).
 
 No hace: no manda nada ni decide reintentos (eso es del caso de uso).
 """
@@ -26,6 +27,7 @@ from app.application.ports.deliveries import (
     RuleDraft,
 )
 from app.domain.deliveries import (
+    DEFAULT_OWNER,
     AccountProvider,
     AccountStatus,
     DeliveryChannel,
@@ -54,7 +56,7 @@ _DELIVERY_SELECT = """
     SELECT d.id, d.rule_id, d.source, d.source_ref, d.channel, d.account_id, d.recipient_id,
            r.name AS recipient_name, d.destination, d.subject, d.attachment_name, d.status,
            d.attempts, d.last_error, d.provider_ref, d.is_test, d.created_at, d.sent_at,
-           d.next_attempt_at, d.scheduled_for
+           d.next_attempt_at, d.scheduled_for, d.owner
     FROM deliveries d LEFT JOIN delivery_recipients r ON r.id = d.recipient_id
 """
 
@@ -71,7 +73,11 @@ def _account(row: Row) -> DeliveryAccount:
 
 
 def _recipient(row: Row) -> Recipient:
-    return Recipient(row.id, RecipientDraft(row.name, row.email, row.phone, row.is_active))
+    return Recipient(
+        row.id,
+        RecipientDraft(row.name, row.email, row.phone, row.is_active, tuple(row.hours or ())),
+        row.owner,
+    )
 
 
 def _rule(row: Row) -> DeliveryRule:
@@ -108,6 +114,7 @@ def _delivery(row: Row) -> Delivery:
         sent_at=row.sent_at,
         next_attempt_at=row.next_attempt_at,
         scheduled_for=row.scheduled_for,
+        owner=row.owner,
     )
 
 
@@ -206,8 +213,9 @@ class PostgresDeliveryStore:
         async with self._engine.connect() as conn:
             rows = await conn.execute(
                 text(
-                    "SELECT id, name, email, phone, is_active FROM delivery_recipients ORDER BY "
-                    "name, id"
+                    "SELECT id, name, email, phone, is_active, hours, owner "
+                    "FROM delivery_recipients "
+                    "ORDER BY name, id"
                 )
             )
             return [_recipient(r) for r in rows]
@@ -218,29 +226,33 @@ class PostgresDeliveryStore:
             row = (
                 await conn.execute(
                     text(
-                        "SELECT id, name, email, phone, is_active FROM delivery_recipients WHERE "
-                        "id = :id"
+                        "SELECT id, name, email, phone, is_active, hours, owner "
+                        "FROM delivery_recipients "
+                        "WHERE id = :id"
                     ),
                     {"id": recipient_id},
                 )
             ).first()
         return _recipient(row) if row else None
 
-    async def create_recipient(self, data: RecipientDraft) -> Recipient:
+    async def create_recipient(self, data: RecipientDraft, owner: str) -> Recipient:
         """Ver ``DeliveryStorePort.create_recipient``."""
         async with self._engine.begin() as conn:
             row = (
                 await conn.execute(
                     text(
-                        "INSERT INTO delivery_recipients (name, email, phone, is_active) "
-                        "VALUES (:name, :email, :phone, :active) RETURNING id, name, email, phone, "
-                        "is_active"
+                        "INSERT INTO delivery_recipients (name, email, phone, is_active, hours, "
+                        "owner) VALUES (:name, :email, :phone, :active, "
+                        "CAST(:hours AS smallint[]), :owner) "
+                        "RETURNING id, name, email, phone, is_active, hours, owner"
                     ),
                     {
                         "name": data.name,
                         "email": data.email,
                         "phone": data.phone,
                         "active": data.is_active,
+                        "hours": list(data.hours),
+                        "owner": owner,
                     },
                 )
             ).one()
@@ -253,8 +265,9 @@ class PostgresDeliveryStore:
                 await conn.execute(
                     text(
                         "UPDATE delivery_recipients SET name = :name, email = :email, "
-                        "phone = :phone, is_active = :active, updated_at = now() "
-                        "WHERE id = :id RETURNING id, name, email, phone, is_active"
+                        "phone = :phone, is_active = :active, "
+                        "hours = CAST(:hours AS smallint[]), updated_at = now() "
+                        "WHERE id = :id RETURNING id, name, email, phone, is_active, hours, owner"
                     ),
                     {
                         "id": recipient_id,
@@ -262,6 +275,7 @@ class PostgresDeliveryStore:
                         "email": data.email,
                         "phone": data.phone,
                         "active": data.is_active,
+                        "hours": list(data.hours),
                     },
                 )
             ).first()
@@ -320,11 +334,12 @@ class PostgresDeliveryStore:
                         text(
                             "INSERT INTO deliveries (id, rule_id, source, source_ref, channel, "
                             "account_id, recipient_id, destination, subject, attachment_name, "
-                            "idempotency_key, is_test, scheduled_for, next_attempt_at) VALUES "
-                            "(:id, :rule_id, "
+                            "idempotency_key, is_test, scheduled_for, next_attempt_at, owner) "
+                            "VALUES (:id, :rule_id, "
                             ":source, :source_ref, :channel, :account_id, :recipient_id, "
                             ":destination, :subject, :attachment, :key, :is_test, :scheduled_for, "
-                            "now()) "
+                            "now(), COALESCE(CAST(:owner AS text), (SELECT r.owner FROM "
+                            "delivery_recipients r WHERE r.id = :recipient_id), :default_owner)) "
                             "ON CONFLICT (idempotency_key) DO NOTHING RETURNING id"
                         ),
                         {
@@ -341,6 +356,8 @@ class PostgresDeliveryStore:
                             "key": d.idempotency_key,
                             "is_test": d.is_test,
                             "scheduled_for": d.scheduled_for,
+                            "owner": d.owner,
+                            "default_owner": DEFAULT_OWNER,
                         },
                     )
                 ).first()

@@ -221,7 +221,7 @@ async def run_automatic_job(
     )
     report = await run_search_job(settings, search_id)
     pdf_path = await _save_report(settings, search_id, slot)
-    await deliver_run(settings, search_id, slot)
+    await deliver_run(settings, search_id, slot, frozenset(schedule.times))
     return AutomaticRunSummary(search_id, slot, report, pdf_path)
 
 

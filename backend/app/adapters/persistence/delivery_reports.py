@@ -7,6 +7,11 @@ con más notas y la ruta de su PDF, y arma el asunto y el cuerpo del correo.
 El cuerpo es corto a propósito: resumen y PDF adjunto. Nunca reproduce notas
 completas (CLAUDE.md §8).
 
+Lee como el sistema (``as_system``): las corridas automáticas son de todos
+los que reciben envíos, aunque la búsqueda quede a nombre de quien la lanzó.
+Solo toca búsquedas con ``trigger = 'automatic'``; nunca las de una persona
+(ADR-0045).
+
 No hace: no genera el PDF (eso es la corrida) ni manda nada.
 """
 
@@ -17,6 +22,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.persistence.access_scope import as_system
 from app.application.ports.deliveries import ReportContent
 from app.domain.deliveries import SOURCE_FGR_RUN
 
@@ -65,21 +71,23 @@ class PostgresRunReports:
         """Ver ``ReportSourcePort.latest_ref``."""
         if source != SOURCE_FGR_RUN:
             return None
-        async with self._engine.connect() as conn:
-            row = (await conn.execute(_LATEST)).first()
+        with as_system():
+            async with self._engine.connect() as conn:
+                row = (await conn.execute(_LATEST)).first()
         return str(row.id) if row else None
 
     async def content_for(self, source: str, source_ref: str) -> ReportContent | None:
         """Ver ``ReportSourcePort.content_for``."""
         if source != SOURCE_FGR_RUN:
             return None
-        async with self._engine.connect() as conn:
-            run = (await conn.execute(_RUN, {"id": source_ref})).first()
-            if run is None:
-                return None
-            categories = (
-                await conn.execute(_CATEGORIES, {"id": source_ref, "limit": TOP_CATEGORIES})
-            ).all()
+        with as_system():
+            async with self._engine.connect() as conn:
+                run = (await conn.execute(_RUN, {"id": source_ref})).first()
+                if run is None:
+                    return None
+                categories = (
+                    await conn.execute(_CATEGORIES, {"id": source_ref, "limit": TOP_CATEGORIES})
+                ).all()
         slot = run.scheduled_for.astimezone(MEXICO_CITY) if run.scheduled_for else None
         when = slot.strftime("%d/%m/%Y, %H:%M") if slot else "sin hora"
         period = ""

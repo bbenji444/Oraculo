@@ -1,5 +1,8 @@
 /**
- * Servicio de envíos (`/api/v1/deliveries`; docs/api.md, ADR-0039).
+ * Servicio de envíos (`/api/v1/deliveries`; docs/api.md, ADR-0039, ADR-0045).
+ *
+ * Cada persona ve y cambia solo sus destinatarios y su historial (lo cuida la
+ * base); cuentas y reglas son del superusuario.
  *
  * Qué se manda, a quién y por qué canal: cuentas de envío (Outlook o Gmail
  * vía Composio; WhatsApp más adelante), destinatarios, cómo se manda cada
@@ -23,6 +26,10 @@ export interface DeliveryOverview {
   email_configured: boolean;
   whatsapp_available: boolean;
   sources: { id: string; label: string }[];
+  /** Desde qué correo se manda (lo elige el superusuario). */
+  sender_address?: string | null;
+  /** Cuántos correos puede tener la persona; `null` = sin tope. */
+  max_recipients?: number | null;
 }
 
 export interface DeliveryAccount {
@@ -39,10 +46,14 @@ export interface RecipientInput {
   email: string | null;
   phone: string | null;
   is_active: boolean;
+  /** Horas del horario a las que recibe («HH:MM»); vacío = a todas. */
+  hours?: string[];
 }
 
 export interface Recipient extends RecipientInput {
   id: number;
+  /** De quién es (usuario). */
+  owner?: string;
 }
 
 /**
@@ -93,6 +104,8 @@ export interface Delivery {
   next_attempt_at: string | null;
   /** Hora programada que lo mandó. */
   scheduled_for: string | null;
+  /** De quién es el envío (usuario). */
+  owner?: string;
   attempt_log: DeliveryAttempt[];
 }
 
@@ -205,11 +218,19 @@ export async function retryDelivery(id: string): Promise<Delivery> {
   return body as Delivery;
 }
 
-/** «Mandar prueba»: la última corrida a un destinatario, ya. */
-export async function sendTest(recipientId: number, accountId: number): Promise<Delivery> {
+/**
+ * «Mandar prueba»: la última corrida a un destinatario, ya.
+ *
+ * @param accountId Desde qué cuenta (solo superusuario). Sin ella sale del
+ *   correo que eligió el superusuario.
+ */
+export async function sendTest(recipientId: number, accountId?: number): Promise<Delivery> {
   const body = await requestJson(url('/test'), {
     method: 'POST',
-    body: { recipient_id: recipientId, account_id: accountId },
+    body:
+      accountId === undefined
+        ? { recipient_id: recipientId }
+        : { recipient_id: recipientId, account_id: accountId },
   });
   if (!isDelivery(body)) throw badFormat();
   return body as Delivery;

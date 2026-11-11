@@ -1,6 +1,6 @@
-"""Envíos contra la base de pruebas (migraciones 0035 a 0037, ADR-0039 y ADR-0040)."""
+"""Envíos contra la base de pruebas (migraciones 0035 a 0042, ADR-0039, ADR-0040 y ADR-0045)."""
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -9,13 +9,17 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.adapters.persistence.access_scope import as_user, create_api_engine
 from app.adapters.persistence.deliveries_repository import PostgresDeliveryStore
 from app.application.pagination import TimeCursor
 from app.application.ports.deliveries import AttemptRecord, NewDelivery, RuleDraft
 from app.core.config import Settings
+from app.domain.access import AuthUser, Role
 from app.domain.deliveries import (
+    DEFAULT_OWNER,
     SOURCE_FGR_RUN,
     AccountProvider,
     AccountStatus,
@@ -23,6 +27,7 @@ from app.domain.deliveries import (
     DeliveryStatus,
     RecipientDraft,
 )
+from app.domain.errors import DeliveryNotFoundError
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -98,7 +103,9 @@ async def test_cuentas_destinatarios_y_reglas(
         AccountProvider.OUTLOOK, "Ovitech 2", "ca_1", AccountStatus.PENDING
     )
     active = await store.update_account(account.id, AccountStatus.ACTIVE, "ovitech_22@hotmail.com")
-    recipient = await store.create_recipient(RecipientDraft("Benjamin", "benji@hotmail.com", None))
+    recipient = await store.create_recipient(
+        RecipientDraft("Benjamin", "benji@hotmail.com", None), "benji"
+    )
     edited = await store.update_recipient(
         recipient.id, RecipientDraft("Benjamin O.", "benji@hotmail.com", "525512345678")
     )
@@ -125,7 +132,9 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
     account = await store.save_account(
         AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE
     )
-    recipient = await store.create_recipient(RecipientDraft("Benjamin", "benji@hotmail.com", None))
+    recipient = await store.create_recipient(
+        RecipientDraft("Benjamin", "benji@hotmail.com", None), "benji"
+    )
     rule = await store.save_rule(rule_draft(account.id))
 
     first = await store.create_deliveries(
@@ -167,3 +176,94 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
     page = await store.history(None, 10)
     assert [d.id for d in page] == [due.id]
     assert await store.history(TimeCursor(page[0].created_at, str(page[0].id)), 10) == []
+
+
+# --- Envíos por usuario: dueño, horas y seguridad por filas (migración 0042, ADR-0045) ---
+
+ANA = AuthUser(911, "rls-envios-ana", "Ana", Role.USER)
+PEPE = AuthUser(912, "rls-envios-pepe", "Pepe", Role.USER)
+JEFA = AuthUser(913, "rls-envios-jefa", "Jefa", Role.SUPERUSER)
+
+
+@pytest.fixture
+async def api_engine(settings: Settings, sync_engine: Engine) -> AsyncIterator[AsyncEngine]:
+    engine = create_api_engine(settings.database_url(test=True))
+    yield engine
+    await engine.dispose()
+
+
+async def test_cada_persona_ve_y_cambia_solo_sus_correos(
+    sync_engine: Engine, test_engine: AsyncEngine, api_engine: AsyncEngine
+) -> None:
+    store = PostgresDeliveryStore(api_engine)
+    with as_user(ANA):
+        mine = await store.create_recipient(
+            RecipientDraft("Ana", "ana@x.mx", None, True, (420, 900)), ANA.username
+        )
+    with as_user(PEPE):
+        await store.create_recipient(RecipientDraft("Pepe", "pepe@x.mx", None), PEPE.username)
+        # Pepe no ve, no edita ni borra el de Ana.
+        assert [r.data.email for r in await store.list_recipients()] == ["pepe@x.mx"]
+        assert await store.get_recipient(mine.id) is None
+        with pytest.raises(DeliveryNotFoundError):
+            await store.update_recipient(mine.id, RecipientDraft("X", "x@x.mx", None))
+        assert not await store.delete_recipient(mine.id)
+        # Ni puede dar de alta uno a nombre de otra persona.
+        with pytest.raises(DBAPIError, match="row-level security"):
+            await store.create_recipient(RecipientDraft("Falso", "f@x.mx", None), ANA.username)
+    with as_user(ANA):
+        [own] = await store.list_recipients()
+    with as_user(JEFA):
+        everyone = {r.owner for r in await store.list_recipients()}
+    # Sin contexto (anónimo) no se ve nada.
+    assert await store.list_recipients() == []
+
+    assert (own.owner, own.data.hours) == (ANA.username, (420, 900))
+    assert everyone == {ANA.username, PEPE.username}
+    # El worker (sin contexto en su engine) ve a todos para mandar la corrida.
+    assert len(await PostgresDeliveryStore(test_engine).list_recipients()) == 2
+
+
+async def test_cada_envio_es_del_dueno_del_correo_y_solo_el_lo_ve(
+    sync_engine: Engine, test_engine: AsyncEngine, api_engine: AsyncEngine
+) -> None:
+    worker = PostgresDeliveryStore(test_engine)
+    account = await worker.save_account(
+        AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE
+    )
+    rule = await worker.save_rule(rule_draft(account.id))
+    ana = await worker.create_recipient(RecipientDraft("Ana", "ana@x.mx", None), ANA.username)
+    pepe = await worker.create_recipient(RecipientDraft("Pepe", "pepe@x.mx", None), PEPE.username)
+    # Como el worker: sin dueño explícito, la base toma el del destinatario.
+    await worker.create_deliveries(
+        [
+            new_delivery(account.id, ana.id, rule.id, "k-ana"),
+            new_delivery(account.id, pepe.id, rule.id, "k-pepe"),
+        ]
+    )
+
+    store = PostgresDeliveryStore(api_engine)
+    with as_user(ANA):
+        mine = await store.history(None, 10)
+    with as_user(PEPE):
+        theirs = await store.history(None, 10)
+        assert await store.get_delivery(mine[0].id) is None
+        assert not await store.claim(mine[0].id)
+    with as_user(JEFA):
+        everything = await store.history(None, 10)
+
+    assert [(d.recipient_name, d.owner) for d in mine] == [("Ana", ANA.username)]
+    assert [d.owner for d in theirs] == [PEPE.username]
+    assert len(everything) == 2
+
+
+async def test_lo_que_existia_queda_a_nombre_de_benji(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text("INSERT INTO delivery_recipients (name, email) VALUES ('Viejo', 'v@x.mx')")
+        )
+    [old] = await PostgresDeliveryStore(test_engine).list_recipients()
+
+    assert (old.owner, old.data.hours) == (DEFAULT_OWNER, ())
