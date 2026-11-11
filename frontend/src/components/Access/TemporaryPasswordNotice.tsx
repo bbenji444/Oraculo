@@ -10,6 +10,7 @@
  */
 import { useState } from 'react';
 
+import { copyText } from '../../ui/copyText';
 import { Modal } from '../Deliveries/Modal';
 import { HudButton } from '../ui/HudButton';
 
@@ -51,14 +52,9 @@ export function TemporaryPasswordNotice({
           variant="solid"
           size="sm"
           onClick={() => {
-            void navigator.clipboard.writeText(password).then(
-              () => {
-                setCopied('si');
-              },
-              () => {
-                setCopied('no');
-              },
-            );
+            void copyText(password).then((ok) => {
+              setCopied(ok ? 'si' : 'no');
+            });
           }}
         >
           Copiar contraseña

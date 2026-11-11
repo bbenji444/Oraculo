@@ -1294,10 +1294,13 @@ export function ExploreGlobe({
         aria-label="Globo interactivo"
       />
       {graphicsLost && <GlobeUnavailable />}
-      {tooltip?.label && (
+      {/* Con la ventana «notas en este lugar» abierta el letrero sobra (lista lo
+          mismo) y quedaba encimado debajo de ella (Benji, 10/11/2026). Cuando
+          sí se muestra, va encima de todo para no cortarse. */}
+      {tooltip?.label && !stack && (
         <div
           role="tooltip"
-          className="hud-panel pointer-events-none absolute z-10 max-w-xs -translate-x-1/2 -translate-y-[calc(100%+14px)] bg-[#050d12]/95 px-3 py-1.5 text-sm"
+          className="hud-panel pointer-events-none absolute z-40 max-w-xs -translate-x-1/2 -translate-y-[calc(100%+14px)] bg-[#050d12]/95 px-3 py-1.5 text-sm"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
           <span className="font-medium text-slate-100">{tooltip.label}</span>

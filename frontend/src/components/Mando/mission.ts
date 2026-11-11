@@ -370,8 +370,10 @@ export const STAGE_SHORT: Readonly<Record<string, string>> = {
   dedupe: 'Duplicados',
   extract: 'Lectura',
   enrich: 'IA',
-  geocode: 'Mapa',
-  filter: 'Región',
+  // «Mapa» y «Región» se confundían (Benji, 10/11/2026): una ubica cada nota
+  // y la otra decide si cae dentro de la zona buscada.
+  geocode: 'Ubicar',
+  filter: 'Zona',
   close: 'Cierre',
 };
 

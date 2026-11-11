@@ -11,6 +11,7 @@
 import { type CSSProperties, useState } from 'react';
 
 import { useQueryPreview } from '../../hooks/useConcepts';
+import { copyText } from '../../ui/copyText';
 import type { ConceptInput, PlannedQuery } from '../../services/concepts';
 import type { Region } from '../../services/regions';
 import { SearchBox } from '../GeoExplorer/SearchBox';
@@ -62,8 +63,8 @@ function QueryCard({ query }: { query: PlannedQuery }) {
           size="sm"
           className="shrink-0"
           onClick={() => {
-            void navigator.clipboard.writeText(query.text).then(() => {
-              setCopied(true);
+            void copyText(query.text).then((ok) => {
+              setCopied(ok);
               window.setTimeout(() => {
                 setCopied(false);
               }, 1500);
