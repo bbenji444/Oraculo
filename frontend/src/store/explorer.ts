@@ -358,14 +358,23 @@ export const useExplorerStore = create<ExplorerState>()(
     {
       name: 'monitor-noticias:explorar',
       storage: createJSONStorage(() => safeStorage),
-      // Solo preferencias de la persona; la búsqueda y la región no se recuerdan.
-      // El último caso usado sí: H9.1 agrega varias notas seguidas al mismo caso.
+      // Preferencias de la persona y la consulta abierta. El último caso usado
+      // también: H9.1 agrega varias notas seguidas al mismo caso.
       partialize: (state) => ({
         earth: state.earth,
         motion: state.motion,
         lastCaseId: state.lastCaseId,
         // Las fuentes que prefiere el analista se recuerdan entre visitas.
         sources: state.sources,
+        // La búsqueda abierta y su consulta también (Benji, 10/11/2026): si sale
+        // a otro módulo de Oráculo mientras corre, al volver la ve en la etapa
+        // en que va. La búsqueda sigue en el servidor aunque se cierre la página.
+        // Al entrar otra persona se borran (useAuth → switchPerson).
+        searchId: state.searchId,
+        regionId: state.regionId,
+        conceptIds: state.conceptIds,
+        subdivisionIds: state.subdivisionIds,
+        range: state.range,
       }),
     },
   ),

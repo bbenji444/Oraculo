@@ -116,17 +116,31 @@ describe('store de Explorar', () => {
     useExplorerStore.getState().setPanelOpen(false);
 
     expect(useExplorerStore.getState().panelOpen).toBe(false);
-    // Se recuerdan las preferencias, el último caso usado (9.3) y las fuentes
-    // elegidas (F12.2), nunca el panel.
-    expect(useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState())).toEqual(
-      {
-        earth: useExplorerStore.getState().earth,
-        motion: useExplorerStore.getState().motion,
-        lastCaseId: useExplorerStore.getState().lastCaseId,
-        sources: useExplorerStore.getState().sources,
-      },
-    );
+    // Se recuerdan las preferencias, el último caso usado (9.3), las fuentes
+    // elegidas (F12.2) y la búsqueda abierta con su consulta (para volver a
+    // ella tras ir a otro módulo, 10/11/2026); nunca el panel.
+    const state = useExplorerStore.getState();
+    expect(useExplorerStore.persist.getOptions().partialize?.(state)).toEqual({
+      earth: state.earth,
+      motion: state.motion,
+      lastCaseId: state.lastCaseId,
+      sources: state.sources,
+      searchId: state.searchId,
+      regionId: state.regionId,
+      conceptIds: state.conceptIds,
+      subdivisionIds: state.subdivisionIds,
+      range: state.range,
+    });
     useExplorerStore.getState().setPanelOpen(true);
+  });
+
+  it('recuerda la búsqueda abierta para volver a ella', () => {
+    useExplorerStore.getState().openSearch('b01afb0d-0000-4000-8000-000000000001');
+
+    const saved = useExplorerStore.persist.getOptions().partialize?.(useExplorerStore.getState());
+
+    expect(saved).toMatchObject({ searchId: 'b01afb0d-0000-4000-8000-000000000001' });
+    useExplorerStore.getState().openSearch(null);
   });
 
   it('recuerda el último caso al que se agregó una nota', () => {
