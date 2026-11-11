@@ -30,6 +30,11 @@ Medición con el caso real «Chuy» (3 notas, 36 entidades):
    - Cada nota de la evidencia dice si las dos participan (`same_event`), y el vínculo trae `same_event_count`, `strength`, `strength_label` y `reason` («participan en el mismo hecho en 2 notas (aparecen juntas en 3)»).
    - La lista ordena primero los fuertes. **No cambia** el tipo (`appears_with`), la confianza de la 9.5 (D6), lo ya guardado ni el muro.
 5. **D4 — Nada se esconde para siempre:** en la pantalla los débiles van en un grupo plegado; siguen ahí para quien los quiera revisar.
+6. **La pantalla del caso se divide** (`frontend/src/components/Cases/`):
+   - Pestañas **Panorama**, **Entidades**, **Vínculos** y **Noticias**, cada una con cuánto falta revisar. Abre en el Panorama.
+   - **Panorama:** lo confirmado por tipo; en cada entidad, sus vínculos confirmados y los sugeridos fuertes, con su porqué y «por revisar» en los sugeridos. Los débiles sin confirmar no entran.
+   - **Entidades:** grupos por tipo (personas, organizaciones, vehículos, cuentas, teléfonos, lugares); dentro, primero las que participan en el hecho y, en personas, por estatus legal (de «vinculado a proceso» a «mencionado»).
+   - **Selección:** casilla por elemento, por grupo y «todas», más atajos («las que participan en el hecho», «las que solo se nombran») y «Ver vínculos de…» una entidad. La barra confirma o descarta lo elegido; descartar pregunta antes en el mismo lugar.
 
 ## Alternativas consideradas
 

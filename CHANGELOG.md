@@ -8,6 +8,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Casos más claros y revisión en bloque (11/11/2026, ADR-0107).** Benji: «que haya cosas que te permitan seleccionar todo» y «que realmente haya alguna relación la cual nos pueda servir para algo».
+  - El caso se divide en pestañas: **Panorama**, Entidades, Vínculos y Noticias. Cada pestaña dice cuánto falta revisar.
+  - **Panorama:** quién está en el caso, por tipo, y con quién se relaciona cada uno y por qué («participan en el mismo hecho en 2 notas»).
+  - **Entidades por tipo:** Personas, Organizaciones, Vehículos y Lugares. Primero van las que participan en el hecho y después las que solo se nombran.
+  - **Vínculos fuertes y débiles:** un vínculo es fuerte si las dos entidades participan en el mismo hecho. Los débiles («solo se mencionan juntas») quedan plegados. Con el caso «Chuy» quedan 30 fuertes de 170.
+  - **Seleccionar todo:** casillas por elemento, por grupo y «todas», y confirmar o descartar lo elegido de una vez. Cada elemento queda firmado en la bitácora.
+  - Rutas nuevas: `POST /cases/{id}/entities/review` y `POST /cases/{id}/relationships/review`.
+
 - **Radar sobre la zona buscada (11/11/2026).** Mientras corre una búsqueda:
   - el radar se centra en la región y toma su tamaño;
   - marca la región con esquinas de «objetivo» y sus coordenadas;
