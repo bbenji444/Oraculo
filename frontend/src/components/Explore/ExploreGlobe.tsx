@@ -31,7 +31,6 @@ import {
   easeOutCubic,
   flyDurationMs,
   flyPitch,
-  idleResumeMs,
   INTRO_DURATION_MS,
   INTRO_FROM_ZOOM,
   INTRO_LNG_OFFSET_DEGREES,
@@ -224,8 +223,6 @@ const STACK_ROW_HEIGHT = 56;
 const STACK_MAX_HEIGHT = 380;
 // Alto supuesto de la ficha mientras se mide la real.
 const CALLOUT_INITIAL_HEIGHT = 280;
-// Revisión de inactividad para reanudar el giro.
-const IDLE_CHECK_MS = 1000;
 // El latido se redibuja a 30 cuadros por segundo: suficiente y barato.
 const PULSE_FRAME_MS = 1000 / 30;
 // Rampa mínima: con 0 el paso no se movería y la cadena de giro se cortaría.
@@ -390,7 +387,6 @@ export function ExploreGlobe({
   const spinning = useExplorerStore((s) => s.spinning);
   const earth = useExplorerStore((s) => s.earth);
   const motion = useExplorerStore((s) => s.motion);
-  const wallCaseId = useExplorerStore((s) => s.wallCaseId);
   const homeRequest = useExplorerStore((s) => s.homeRequest);
   const region = useRegionDetail(regionId).data;
   const selected = articles.find((a) => a.article_id === articleId) ?? null;
@@ -437,7 +433,6 @@ export function ExploreGlobe({
   // interrumpe, solo cambia el margen de la cámara.
   const flyingRef = useRef(false);
   const earthRef = useRef(earth);
-  const lastInteractionRef = useRef(0);
   const levelRef = useRef<RegionLevel | null>(null);
   const selectedRef = useRef<Article | null>(selected);
   // Notas por id para el tooltip (el evento del mapa lee la versión vigente).
@@ -457,7 +452,6 @@ export function ExploreGlobe({
     const container = containerRef.current;
     if (!container) return;
     setupMapLibre();
-    lastInteractionRef.current = performance.now();
     const intro = motionRef.current !== 'off';
     const map = new MapLibreMap({
       container,
@@ -548,7 +542,6 @@ export function ExploreGlobe({
     };
     for (const type of USER_EVENTS) {
       map.on(type, () => {
-        lastInteractionRef.current = performance.now();
         // Si toca el globo durante la entrada, la entrada se detiene ahí.
         finishIntro();
         useExplorerStore.getState().setSpinning(false);
@@ -962,36 +955,10 @@ export function ExploreGlobe({
     }
   }, [spinning, ready]);
 
-  // Elegir o soltar una nota, una región o el muro cuenta como uso: el giro
-  // no arranca en cuanto se cierra la ficha.
-  useEffect(() => {
-    lastInteractionRef.current = performance.now();
-  }, [regionId, articleId, wallCaseId]);
-
-  // Reanudar el giro tras un rato sin uso, si no se está viendo nada.
-  // En el Centro de mando la región de la consulta (casi siempre México) no
-  // cuenta: el globo gira con los resultados a la vista y se detiene al abrir
-  // una nota, el muro o la lista de un grupo (Benji, 30/10/2026: «que la
-  // tierra gire automáticamente cuando no estoy representando nada»).
-  const stackOpen = stack !== null;
-  useEffect(() => {
-    const idleMs = idleResumeMs({
-      mando: clearHeader,
-      regionId,
-      articleId,
-      wallCaseId,
-      stackOpen,
-    });
-    if (spinning || idleMs === null || motion === 'off') return;
-    const timer = window.setInterval(() => {
-      if (performance.now() - lastInteractionRef.current > idleMs) {
-        useExplorerStore.getState().setSpinning(true);
-      }
-    }, IDLE_CHECK_MS);
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [spinning, regionId, articleId, wallCaseId, stackOpen, motion, clearHeader]);
+  // El giro solo arranca solo tras 5 minutos sin tocar nada (useIdleSpin) o
+  // en una consulta nueva. Antes, en el Centro de mando volvía a los 10 s y
+  // en el diseño de columna a los 25 s (30/10/2026); Benji, 11/11/2026: «eso
+  // solo lo hicieras después de 5 minutos para cualquier cosa que pasara».
 
   // El muro y «Mis casos» dibujan sobre este mismo mapa (9.6).
   useEffect(() => {

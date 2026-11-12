@@ -179,43 +179,6 @@ export function introSpin(t: number, endSlope: number): number {
 
 // --- Rotación -----------------------------------------------------------------
 
-// Tras este tiempo sin tocar el mapa, el globo vuelve a girar solo.
-export const IDLE_RESUME_MS = 25_000;
-// En el Centro de mando, antes: Benji quiere más dinamismo mientras no se ve
-// nada en particular (30/10/2026).
-export const MANDO_IDLE_RESUME_MS = 10_000;
-
-/** Lo que se está viendo en el globo, para saber si puede volver a girar. */
-export interface GlobeFocus {
-  /** Si es el Centro de mando (ADR-0037). */
-  mando: boolean;
-  regionId: number | null;
-  articleId: number | null;
-  wallCaseId: string | null;
-  /** Si está abierta la lista de un grupo de notas. */
-  stackOpen: boolean;
-}
-
-/**
- * Cuánto esperar sin uso para que el globo vuelva a girar solo, o `null` si
- * se está viendo algo y no debe girar.
- *
- * En el Centro de mando la región de la consulta no cuenta (casi siempre es
- * México y estaba siempre puesta): solo detienen el giro una nota abierta, el
- * muro o la lista de un grupo (Benji, 30/10/2026). En el diseño de columna
- * la región elegida también lo detiene, como antes.
- *
- * @example idleResumeMs({ mando: true, regionId: 1, articleId: null, wallCaseId: null, stackOpen: false }) // 10000
- */
-export function idleResumeMs(focus: GlobeFocus): number | null {
-  const showing =
-    focus.articleId !== null ||
-    focus.wallCaseId !== null ||
-    focus.stackOpen ||
-    (!focus.mando && focus.regionId !== null);
-  if (showing) return null;
-  return focus.mando ? MANDO_IDLE_RESUME_MS : IDLE_RESUME_MS;
-}
 // La rotación arranca acelerando durante 2 s, sin saltos.
 export const SPIN_RAMP_MS = 2000;
 

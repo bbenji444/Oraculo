@@ -66,6 +66,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El globo ya no gira a los 10 segundos durante el barrido (11/11/2026).** Seguía viva una regla del 30/10: en el Centro de mando volvía a girar a los 10 s sin uso (25 s en el diseño de columna). Se quitó; ahora solo gira tras 5 minutos sin tocar nada o en una consulta nueva.
 - Las notas con muchos lugares (agendas) ya no se quedan sin resumen por una respuesta cortada de la IA (2 de 25 en la prueba).
 - «Copiar contraseña», «Copiar llave» y «Copiar consulta» funcionan también por `http://`.
 - El letrero de una nota ya no queda encimado con la ventana «N notas en este lugar».
