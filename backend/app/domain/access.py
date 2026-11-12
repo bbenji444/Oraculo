@@ -136,7 +136,8 @@ class UserAccount:
         is_active: Si puede entrar.
         created_at: Alta.
         last_seen_at: Última vez que entró.
-        active_keys: Llaves vigentes (sin revocar ni vencer).
+        active_keys: Llaves de sistema vigentes (sin revocar ni vencer); no
+            cuenta la llave de API.
         has_password: Si ya tiene contraseña (ADR-0043).
         must_change_password: Si su contraseña es temporal.
         totp_enrolled: Si ya dio de alta su Microsoft Authenticator.

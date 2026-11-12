@@ -395,6 +395,38 @@ def test_el_superusuario_prende_el_codigo_y_copia_llaves(
     assert created.json()["key"] not in pepe_row["api_key"]
 
 
+def test_las_llaves_de_sistema_no_cuentan_la_llave_de_api(
+    app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    """Benji, 12/11/2026: «¿por qué yo tengo dos llaves?» (una era la de API)."""
+    app.state.access_admin = AccessAdmin(
+        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
+    )
+    pepe = world.store.add_user("pepe")
+    _enter(client, world, "benji", secret)
+    client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+
+    def pepe_row() -> dict[str, object]:
+        return next(u for u in client.get(USERS).json()["items"] if u["username"] == "pepe")
+
+    only_api = pepe_row()
+    keys_only_api = client.get(f"{USERS}/{pepe}/keys").json()["items"]
+    client.post(
+        f"{USERS}/{pepe}/keys",
+        json={"label": "Servidor de reportes", "days": None},
+        headers=SAME_ORIGIN,
+    )
+    with_system = pepe_row()
+    keys_with_system = client.get(f"{USERS}/{pepe}/keys").json()["items"]
+
+    # La llave de API tiene su propio renglón: no es «llave de sistema».
+    assert only_api["active_keys"] == 0
+    assert str(only_api["api_key"]).endswith("…")
+    assert keys_only_api == []
+    assert with_system["active_keys"] == 1
+    assert [k["label"] for k in keys_with_system] == ["Servidor de reportes"]
+
+
 def test_la_bitacora_dice_quien_vio_la_llave(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:

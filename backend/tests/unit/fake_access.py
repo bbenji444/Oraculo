@@ -152,6 +152,7 @@ class FakeAccessStore:
             1
             for k in self.keys.values()
             if k.info.user_id == user_id
+            and k.sealed is None
             and k.info.revoked_at is None
             and (k.info.expires_at is None or k.info.expires_at > now)
         )

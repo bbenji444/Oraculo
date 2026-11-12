@@ -74,7 +74,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /access/users` | Personas: rol, si está activa, si su contraseña es temporal (`must_change_password`), si conectó su Authenticator (`totp_enrolled`), bloqueo y llaves vigentes |
+| `GET /access/users` | Personas: rol, si está activa, si su contraseña es temporal (`must_change_password`), si conectó su Authenticator (`totp_enrolled`), bloqueo y llaves de sistema vigentes (`active_keys`, sin contar la llave de API) |
 | `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
 | `GET /access/settings` · `PUT /access/settings` | `{"totp_required": true \| false}`: si al entrar se pide el código de 6 dígitos. Aplica desde el siguiente ingreso; queda en la bitácora (ADR-0047) |
@@ -83,7 +83,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `DELETE /access/users/{id}` | Borra a la persona (`204`, borrado lógico): sale de la lista, ya no entra, se revocan sus llaves, se apagan sus envíos programados (la bitácora dice cuáles en `envios_apagados`) y se cierran sus sesiones. Sus búsquedas y la bitácora se quedan y su usuario queda reservado. No te puedes borrar a ti mismo ni al último superusuario (`409`) |
 | `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
 | `POST /access/users/{id}/reset-totp` | Borra su Authenticator (`204`); escaneará un QR nuevo. Cierra sus sesiones |
-| `GET /access/users/{id}/keys` | Sus llaves de sistema, sin secretos (`masked`: `orc_live_a1b2c3d4…`) |
+| `GET /access/users/{id}/keys` | Sus llaves de sistema, sin secretos (`masked`: `orc_live_a1b2c3d4…`). No trae la llave de API, que tiene su propia ruta |
 | `POST /access/users/{id}/keys` | Crea una llave de sistema: `{"label", "days"}` → `{"key", "info"}` (**única vez que sale**) |
 | `DELETE /access/keys/{id}` | Revoca al instante y cierra las sesiones que entraron con ella |
 | `GET /access/audit` | La **bitácora**, de lo más nuevo a lo más viejo: `{"items": [{"id", "created_at", "actor", "actor_name", "action", "entity_type", "entity_id", "details", "ip"}], "next_before"}`. Filtros: `group` (`all`, `access`, `searches`, `reports`, `cases`, `concepts`), `actor` (usuario), `limit` (1 a 200, 50 por omisión) y `before` (el `next_before` de la página anterior; `null` = ya no hay más). Las llaves vienen enmascaradas. Respuesta `no-store` |

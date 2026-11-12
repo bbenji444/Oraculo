@@ -550,5 +550,7 @@ async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncE
     assert (box.open(sealed), info.revealable) == (key.full, True)
     assert key.full not in sealed
     assert listed is not None and listed.api_key_prefix == key.public_id
+    # La llave de API no cuenta como «llave de sistema» (12/11/2026).
+    assert listed.active_keys == 0
     assert (before, after) == (False, True)
     assert hidden is None

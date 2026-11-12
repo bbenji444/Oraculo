@@ -507,7 +507,10 @@ class AccessAdmin:
         await self._sessions.delete_for_user(user_id)
 
     async def user_keys(self, admin: AuthUser, user_id: int) -> list[KeyInfo]:
-        """Las llaves de una persona (sin secretos).
+        """Las llaves de sistema de una persona (sin secretos).
+
+        No trae su llave de API: esa tiene su propio renglón en «Accesos» y
+        contarla aquí hacía creer que la persona tenía una llave de más.
 
         Raises:
             ForbiddenError: Si quien pide no es superusuario.
@@ -516,7 +519,7 @@ class AccessAdmin:
         require_superuser(admin)
         if await self._store.get_user(user_id) is None:
             raise UserNotFoundError("No existe esa persona.", {"id": user_id})
-        return await self._store.user_keys(user_id)
+        return [key for key in await self._store.user_keys(user_id) if not key.revealable]
 
     async def issue_key(
         self,

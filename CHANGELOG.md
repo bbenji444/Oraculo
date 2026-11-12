@@ -67,6 +67,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **«Llaves de sistema» ya no cuenta la llave de API (12/11/2026).** Benji: «¿por qué yo tengo dos llaves?». El contador y la lista sumaban la llave de API, que ya tiene su propio renglón. A Benji le marcaba 2 en vez de 1 y a Admin 1 en vez de 0.
 - **Borrar a una persona apaga sus envíos programados (11/11/2026, migración 0045).** «pp» estaba borrada y su envío «Monitor FGR» seguía prendido. No mandaba nada porque no tenía correos, pero con uno habría seguido mandando. Ahora el borrado apaga sus envíos, la bitácora dice cuáles, y el reloj y la pantalla ya no ven envíos de personas borradas. La migración apagó el de «pp».
 - **El globo ya no gira a los 10 segundos durante el barrido (11/11/2026).** Seguía viva una regla del 30/10: en el Centro de mando volvía a girar a los 10 s sin uso (25 s en el diseño de columna). Se quitó; ahora solo gira tras 5 minutos sin tocar nada o en una consulta nueva.
 - Las notas con muchos lugares (agendas) ya no se quedan sin resumen por una respuesta cortada de la IA (2 de 25 en la prueba).

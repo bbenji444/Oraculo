@@ -37,6 +37,7 @@ _USER_COLUMNS = """
            u.must_change_password, u.totp_secret IS NOT NULL AS totp_enrolled,
            CASE WHEN u.locked_until > now() THEN u.locked_until END AS locked_until,
            (SELECT count(*) FROM access_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL
+              AND k.secret_sealed IS NULL
               AND (k.expires_at IS NULL OR k.expires_at > now())) AS active_keys,
            (SELECT k.key_prefix FROM access_keys k WHERE k.user_id = u.id
               AND k.revoked_at IS NULL AND k.secret_sealed IS NOT NULL
