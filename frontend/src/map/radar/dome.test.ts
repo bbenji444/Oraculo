@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { angularDistance, blipPoints, destination, domeMesh, domeShape } from './dome';
+import {
+  angularDistance,
+  contactBirths,
+  contactMesh,
+  contactPoints,
+  destination,
+  domeMesh,
+  domeShape,
+  MAX_CONTACTS,
+} from './dome';
+
+// Números por vértice: posición (2), alturas (2), u, t, tipo, nacimiento y semilla.
+const STRIDE = 9;
 
 const MEXICO: [number, number, number, number] = [-117.1, 14.5, -86.7, 32.7];
 const CHIAPAS: [number, number, number, number] = [-94.1, 14.5, -90.4, 17.99];
@@ -36,11 +48,11 @@ describe('cúpula 3D del radar (11/11/2026)', () => {
   it('la malla trae la cúpula y el piso, con su cima arriba', () => {
     const shape = domeShape(CHIAPAS);
     const { floats, indices } = domeMesh(shape, 4, 8);
-    // 2 mallas de (4 + 1) × (8 + 1) vértices, 7 números cada uno.
-    expect(floats.length).toBe(2 * 5 * 9 * 7);
+    // 2 mallas de (4 + 1) × (8 + 1) vértices.
+    expect(floats.length).toBe(2 * 5 * 9 * STRIDE);
     expect(indices.length).toBe(2 * 4 * 8 * 6);
     // El primer vértice de la cúpula (después del piso) es la cima: altura máxima.
-    const domeStart = 5 * 9 * 7;
+    const domeStart = 5 * 9 * STRIDE;
     expect(floats[domeStart + 2]).toBeCloseTo(shape.heightM, 0);
     expect(floats[domeStart + 6]).toBe(0);
     // El piso va pegado al terreno.
@@ -48,15 +60,47 @@ describe('cúpula 3D del radar (11/11/2026)', () => {
     expect(floats[6]).toBe(1);
   });
 
-  it('los ecos caen dentro de la cúpula y no cambian de lugar', () => {
+  it('los contactos caen dentro de la cúpula y no brincan al llegar más', () => {
     const shape = domeShape(CHIAPAS);
-    const points = blipPoints(shape, 10);
+    const points = contactPoints(shape, 10);
 
     expect(points).toHaveLength(10);
-    expect(blipPoints(shape, 10)).toEqual(points);
-    for (const [lng, lat] of points) {
-      expect(Math.abs(lng - shape.center[0])).toBeLessThan(3);
-      expect(Math.abs(lat - shape.center[1])).toBeLessThan(3);
+    // Los primeros 5 están donde estaban cuando había 5.
+    expect(points.slice(0, 5)).toEqual(contactPoints(shape, 5));
+    for (const point of points) {
+      expect(angularDistance(point, shape.center)).toBeLessThan(
+        ((shape.radiusM * 0.8) / 6_371_008.8) * (180 / Math.PI) + 1e-6,
+      );
     }
+  });
+
+  it('las columnas no atraviesan la cúpula y la onda va pegada al piso', () => {
+    const shape = domeShape(CHIAPAS);
+    const { floats, indices } = contactMesh(shape, [5, 6]);
+    let tallest = 0;
+    for (let v = 0; v < floats.length; v += STRIDE) {
+      const kind = floats[v + 6];
+      const meters = floats[v + 2] ?? 0;
+      if (kind === 2) tallest = Math.max(tallest, meters);
+      if (kind === 3) expect(meters).toBe(0);
+    }
+
+    expect(indices.length).toBeGreaterThan(0);
+    expect(tallest).toBeGreaterThan(0);
+    expect(tallest).toBeLessThan(shape.heightM);
+    // Cada vértice lleva el segundo en que se encendió su contacto.
+    expect(floats[7]).toBe(5);
+    expect(floats[floats.length - STRIDE + 7]).toBe(6);
+    expect(contactMesh(shape, []).indices).toHaveLength(0);
+  });
+
+  it('los contactos nuevos se encienden uno tras otro y los viejos no cambian', () => {
+    expect(contactBirths([], 2, 10)).toEqual([10, 10.18]);
+    const later = contactBirths([10, 10.18], 4, 20);
+    expect(later.slice(0, 2)).toEqual([10, 10.18]);
+    expect(later[2]).toBeCloseTo(20.18);
+    expect(later[3]).toBeCloseTo(20.36);
+    // Más notas que columnas: se queda en el tope.
+    expect(contactBirths([], 500, 0)).toHaveLength(MAX_CONTACTS);
   });
 });
