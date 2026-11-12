@@ -67,7 +67,7 @@ Las búsquedas de otra persona no existen para ti: la base de datos no las entre
 - **«Sin Authenticator»:** no ha conectado su celular (solo se ve con el código prendido).
 - **«Bloqueada hasta…»:** falló 5 veces seguidas. Se desbloquea sola a los 15 minutos.
 
-**«Llaves de sistema»** son para que otros programas consulten el monitor (como las llaves de la API de ChatGPT). Las personas no las usan para entrar.
+**«Llaves de sistema»** son para que otros programas consulten el monitor (como las llaves de la API de ChatGPT). Las personas no las usan para entrar. El número junto al botón no cuenta la llave de API, que tiene su propio renglón.
 
 **El sistema no deja:**
 - quitarte tu propio rol ni desactivarte;

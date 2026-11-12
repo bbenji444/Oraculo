@@ -53,7 +53,9 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     last_seen_at: datetime | None
-    active_keys: int = Field(description="Llaves vigentes (sin revocar ni vencer).")
+    active_keys: int = Field(
+        description="Llaves de sistema vigentes (sin revocar ni vencer); no cuenta la llave de API."
+    )
     has_password: bool = Field(description="Si ya tiene contraseña.")
     must_change_password: bool = Field(description="Si su contraseña es temporal.")
     totp_enrolled: bool = Field(description="Si ya dio de alta Microsoft Authenticator.")
