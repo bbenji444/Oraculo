@@ -120,3 +120,38 @@ def test_confirmar_y_descartar(client: TestClient, world: World) -> None:
     assert confirmed.json()["reviewed_by"] == "benji"
     assert discarded.json()["review_status"] == "discarded"
     assert client.post(f"{url}/9/discard", json={"case_id": str(case_id)}).status_code == 404
+
+
+def test_revisar_en_bloque(client: TestClient, world: World) -> None:
+    case_id = new_case(client, world)
+    for entity_id in (1, 2, 3):
+        world.entities.add_entity(case_id, person(entity_id))
+    url = f"/api/v1/cases/{case_id}/entities/review"
+
+    confirmed = client.post(
+        url,
+        json={
+            "action": "confirm",
+            "items": [
+                {"entity_id": 1, "legal_status": "alleged"},
+                {"entity_id": 2, "legal_status": "victim"},
+            ],
+        },
+    )
+    discarded = client.post(url, json={"action": "discard", "items": [{"entity_id": 3}]})
+    without_status = client.post(url, json={"action": "confirm", "items": [{"entity_id": 3}]})
+    empty = client.post(url, json={"action": "discard", "items": []})
+    missing = client.post(url, json={"action": "discard", "items": [{"entity_id": 9}]})
+
+    assert confirmed.json() == {"changed": 2, "unchanged": 0}
+    assert discarded.json() == {"changed": 1, "unchanged": 0}
+    assert without_status.json()["error"]["code"] == "invalid_entity_review"
+    assert empty.status_code == 422
+    assert empty.json()["error"]["code"] == "invalid_bulk_review"
+    assert missing.status_code == 404
+    counts = client.get(f"/api/v1/cases/{case_id}/entities").json()["counts"]
+    assert counts == {"suggested": 0, "confirmed": 2, "discarded": 1}
+    world.actor = Actor("lectora")
+    assert (
+        client.post(url, json={"action": "discard", "items": [{"entity_id": 1}]}).status_code == 403
+    )

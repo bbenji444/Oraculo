@@ -397,6 +397,8 @@ describe('caso de investigación (H9.1)', () => {
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
     fireEvent.click(await screen.findByRole('button', { name: /Homicidio estilista Polanco/ }));
+    // Desde F12 (ADR-0107) el caso se divide en pestañas; las noticias tienen la suya.
+    fireEvent.click(await screen.findByRole('tab', { name: 'Noticias (2)' }));
     expect(await screen.findByText('Noticias del caso (2)')).toBeTruthy();
     // Explorar sigue montada (oculta) con las mismas notas: se buscan en Casos.
     const visible = (title: string) =>

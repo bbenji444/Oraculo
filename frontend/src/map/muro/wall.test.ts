@@ -37,6 +37,10 @@ function edge(a: number, b: number, status: 'suggested' | 'confirmed'): Relation
     reviewed_at: null,
     notes: null,
     shared_articles: [],
+    same_event_count: 0,
+    strength: 'weak',
+    strength_label: 'solo se mencionan juntas',
+    reason: 'sin notas en común',
   };
 }
 

@@ -51,6 +51,7 @@ from app.application.ports.entities import (
     ArticleSource,
     CaseAnalysis,
     CaseEntity,
+    EntityReview,
     FailedExtraction,
     Materialized,
     MentionView,
@@ -125,6 +126,17 @@ _LIST_SQL = f"""
 """
 _ONE_SQL = f"""
     {_ENTITIES_OF_CASE} AND e.id = :entity
+"""
+# Varias de una vez, para la revisión en bloque (F12, ADR-0107).
+_MANY_SQL = f"""
+    {_ENTITIES_OF_CASE} AND e.id = ANY(:ids)
+"""
+# Confirmar o descartar con firma; solo si la entidad es del caso.
+_REVIEW_SQL = """
+    UPDATE entities SET review_status = :status, legal_status = :legal,
+        reviewed_by = :by, reviewed_at = now(), updated_at = now()
+    WHERE id = :entity AND id IN (SELECT entity_id FROM case_entities WHERE case_id = :case)
+    RETURNING id
 """
 _COUNTS_SQL = f"""
     {GROUPS_CTE}
@@ -676,35 +688,61 @@ class PostgresEntityRepository:
     ) -> CaseEntity:
         """Ver ``EntityRepositoryPort.review``."""
         async with self._engine.begin() as conn:
-            changed = (
-                await conn.execute(
-                    text(
-                        "UPDATE entities SET review_status = :status, legal_status = :legal, "
-                        "reviewed_by = :by, reviewed_at = now(), updated_at = now() "
-                        "WHERE id = :entity AND id IN "
-                        "(SELECT entity_id FROM case_entities WHERE case_id = :case) "
-                        "RETURNING id"
-                    ),
-                    {
-                        "status": status.value,
-                        "legal": legal_status.value if legal_status else None,
-                        "by": reviewer,
-                        "entity": entity_id,
-                        "case": case_id,
-                    },
-                )
-            ).first()
-            if changed is None:
-                raise EntityNotFoundError(
-                    "No existe esa entidad en el caso.",
-                    {"case_id": str(case_id), "entity_id": entity_id},
-                )
-            await write_audit(conn, case_id, audit)
+            await self._review_one(
+                conn,
+                case_id,
+                EntityReview(entity_id, status, legal_status, audit),
+                reviewer,
+            )
             await touch(conn, case_id)
             entity = await self._entity(conn, case_id, entity_id)
         if entity is None:
             raise EntityNotFoundError("No existe esa entidad en el caso.", {"entity_id": entity_id})
         return entity
+
+    async def get_entities(self, case_id: UUID, entity_ids: Sequence[int]) -> list[CaseEntity]:
+        """Ver ``EntityRepositoryPort.get_entities``."""
+        async with self._engine.connect() as conn:
+            rows = (
+                (await conn.execute(text(_MANY_SQL), {"case": case_id, "ids": list(entity_ids)}))
+                .mappings()
+                .all()
+            )
+            return await self._with_details(conn, case_id, rows)
+
+    async def review_many(
+        self, case_id: UUID, reviews: Sequence[EntityReview], *, reviewer: str
+    ) -> None:
+        """Ver ``EntityRepositoryPort.review_many``."""
+        # Una sola transacción: si una falla, ``begin`` deshace todas (ADR-0107).
+        async with self._engine.begin() as conn:
+            for review in reviews:
+                await self._review_one(conn, case_id, review, reviewer)
+            await touch(conn, case_id)
+
+    @staticmethod
+    async def _review_one(
+        conn: AsyncConnection, case_id: UUID, review: EntityReview, reviewer: str
+    ) -> None:
+        """Escribe una revisión firmada y su bitácora dentro de la transacción abierta."""
+        changed = (
+            await conn.execute(
+                text(_REVIEW_SQL),
+                {
+                    "status": review.status.value,
+                    "legal": review.legal_status.value if review.legal_status else None,
+                    "by": reviewer,
+                    "entity": review.entity_id,
+                    "case": case_id,
+                },
+            )
+        ).first()
+        if changed is None:
+            raise EntityNotFoundError(
+                "No existe esa entidad en el caso.",
+                {"case_id": str(case_id), "entity_id": review.entity_id},
+            )
+        await write_audit(conn, case_id, review.audit)
 
     async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
         """Ver ``EntityRepositoryPort.merge_suggestions``."""

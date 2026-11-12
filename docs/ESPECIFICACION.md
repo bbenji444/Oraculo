@@ -574,6 +574,13 @@ Solo entre entidades **confirmadas** del caso (cada una como la raíz de su grup
 - **Coocurrencia** (`domain/relationships.py`): dos entidades confirmadas que aparecen en la misma nota del caso forman «aparecen juntas», sugerido, con confianza 0.5 (una nota), 0.7 (dos) o 0.9 (tres o más). Se calcula al leer: confirmar, unir, separar o quitar una nota se refleja sin refrescar. Se guarda en `relationships` solo al confirmarlo o descartarlo; lo descartado no vuelve.
 - **Dibujado por el analista:** cualquier tipo (`family`, `associate`, `employer`, `located_in`, `owns`, `same_event`, `appears_with` o `custom` con su etiqueta de hasta 80 caracteres) y una nota opcional. Nace confirmado, con origen `human`, confianza 1 y la firma de quien lo dibuja. Los simétricos se guardan con el id menor primero; los dirigidos respetan el sentido. Si ya existía con las mismas entidades y tipo, se confirma ese.
 - **Evidencia:** cada vínculo muestra las notas del caso donde aparecen las dos entidades.
+- **Fuerza (F12, ADR-0107):** un vínculo es **fuerte** si las dos entidades participan en el hecho de al menos una nota del caso (rol `event` en las dos) o si lo dibujó una persona; si solo se nombran juntas, es **débil**. Se calcula al leer, ordena la lista (los fuertes primero) y viene con su frase («participan en el mismo hecho en 2 notas»). No cambia el tipo, la confianza ni lo guardado.
+- **Revisión en bloque (F12, ADR-0107):** entidades y vínculos se pueden confirmar o descartar varios a la vez (hasta 500), todos o ninguno, con una entrada de la bitácora por elemento marcada `bulk`. Las personas confirmadas en bloque llevan el estatus de su renglón; las fusiones siguen siendo par por par.
+- **Pantalla del caso (F12, ADR-0107):** pestañas Panorama, Entidades, Vínculos y Noticias, cada una con cuánto falta revisar.
+  - **Panorama** (abre ahí): lo confirmado por tipo y, en cada entidad, sus vínculos confirmados y sugeridos fuertes con su porqué.
+  - **Entidades:** filtro por estado y grupos plegables por tipo; dentro de cada grupo, primero las que participan en el hecho y, en personas, por estatus legal.
+  - **Vínculos:** los fuertes abiertos, los débiles plegados, y «Ver vínculos de…» una entidad.
+  - En Entidades y Vínculos hay casillas por elemento, por grupo y «todas», y una barra que confirma o descarta lo elegido. Descartar pregunta antes.
 - **Bitácora:** `relationship.created`, `relationship.confirmed` y `relationship.discarded`.
 
 ### 10.4 El muro de un caso sobre el globo (Fase 9.6, H9.3)

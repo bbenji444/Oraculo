@@ -69,3 +69,4 @@ $line
 | [0104](0104-confirmacion-humana-obligatoria.md) | Confirmación humana obligatoria: todo nace sugerido y nada se fusiona solo (Fase 9) | Aceptado |
 | [0105](0105-estatus-legal-y-procedencia.md) | Estatus legal y procedencia como campos de primera clase; "culpable" no existe (Fase 9) | Aceptado |
 | [0106](0106-vinculos-y-fusiones-calculados-al-leer.md) | Vínculos y sugerencias de fusión calculados al leer; unir solo escribe `merged_into` (Fase 9.5) | Aceptado |
+| [0107](0107-revision-en-bloque-y-fuerza-de-vinculos.md) | Revisión en bloque (todo o nada, bitácora por elemento) y fuerza de los vínculos: fuerte si participan en el mismo hecho o lo dibujó una persona (F12) | Aceptado |

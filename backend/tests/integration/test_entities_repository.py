@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.entities_repository import PostgresEntityRepository
 from app.application.audit import Actor, AuditEntry
-from app.application.ports.entities import FailedExtraction, StoredExtraction
+from app.application.ports.entities import EntityReview, FailedExtraction, StoredExtraction
 from app.core.config import Settings
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import (
@@ -29,6 +29,7 @@ from app.domain.entity_extraction import (
     TextSource,
     review_proposals,
 )
+from app.domain.errors import EntityNotFoundError
 from app.domain.investigation import InvestigationAction, LegalStatus, ReviewStatus
 from tests.integration.test_pipeline_tables import region_id
 
@@ -342,3 +343,49 @@ async def test_una_falla_se_cobra_y_se_puede_volver_a_pedir(
     )
     await repo.set_status(case_id, [article], CaseArticleEntitiesStatus.QUEUED)
     assert (await repo.analysis(case_id)).queued == 1
+
+
+async def test_revisar_en_bloque_es_una_transaccion(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    repo = PostgresEntityRepository(test_engine)
+    case_id = new_case(sync_engine)
+    article = new_article(sync_engine, case_id)
+    await repo.materialize(case_id, extraction(article, PERSON, PLACE), 0.0, audit())
+    suggested = await repo.list_entities(case_id, ReviewStatus.SUGGESTED)
+    by_type = {e.type.value: e.entity_id for e in suggested}
+    person_id, place_id = by_type["person"], by_type["place"]
+
+    def review(entity_id: int, legal: LegalStatus | None) -> EntityReview:
+        entry = AuditEntry(BENJI, InvestigationAction.ENTITY_CONFIRMED, {"bulk": True})
+        return EntityReview(entity_id, ReviewStatus.CONFIRMED, legal, entry)
+
+    found = await repo.get_entities(case_id, [person_id, place_id, 999_999])
+    # Si una no es del caso, ninguna cambia.
+    with pytest.raises(EntityNotFoundError):
+        await repo.review_many(
+            case_id,
+            [review(person_id, LegalStatus.ALLEGED), review(999_999, None)],
+            reviewer="benji",
+        )
+    unchanged = await repo.review_counts(case_id)
+    await repo.review_many(
+        case_id, [review(person_id, LegalStatus.ALLEGED), review(place_id, None)], reviewer="benji"
+    )
+
+    assert sorted(e.entity_id for e in found) == sorted([person_id, place_id])
+    assert unchanged[ReviewStatus.SUGGESTED] == 2
+    confirmed = await repo.list_entities(case_id, ReviewStatus.CONFIRMED)
+    assert {(e.entity_id, e.legal_status, e.reviewed_by) for e in confirmed} == {
+        (person_id, LegalStatus.ALLEGED, "benji"),
+        (place_id, None, "benji"),
+    }
+    with sync_engine.connect() as conn:
+        bulk = conn.execute(
+            text(
+                "SELECT count(*) FROM audit_log WHERE entity_id = :c "
+                "AND action = 'entity.confirmed' AND payload->>'bulk' = 'true'"
+            ),
+            {"c": str(case_id)},
+        ).scalar_one()
+    assert bulk == 2

@@ -4,14 +4,24 @@
  * «Aparecen juntas» lo sugiere el sistema cuando dos entidades confirmadas
  * comparten notas del caso; los demás los dibuja el analista y nacen
  * confirmados. Un sugerido todavía no tiene id: se revisa con su llave (las
- * dos entidades y el tipo).
+ * dos entidades y el tipo). Desde F12 (ADR-0107) cada uno trae su fuerza y se
+ * pueden revisar varios a la vez.
  *
  * No hace: no guarda estado (eso es TanStack Query en `hooks/useRelationships`).
  */
 import { apiUrl } from '../config/api';
-import type { LegalStatus, ReviewStatus } from './entities';
+import {
+  asBulkResult,
+  type BulkAction,
+  type BulkReviewResult,
+  type LegalStatus,
+  type ReviewStatus,
+} from './entities';
 import { badFormat, requestJson } from './http';
 import { isRecord } from './searches';
+
+/** Qué tan útil es un vínculo para investigar (F12, ADR-0107). */
+export type LinkStrength = 'strong' | 'weak';
 
 export type RelationshipType =
   | 'appears_with'
@@ -39,6 +49,8 @@ export interface SharedArticle {
   title: string;
   url: string;
   published_at: string | null;
+  /** Si en esta nota las dos participan en el hecho (no solo se nombran). */
+  same_event: boolean;
 }
 
 /** Un vínculo del caso con su origen, su confianza y su evidencia. */
@@ -60,6 +72,13 @@ export interface Relationship {
   reviewed_at: string | null;
   notes: string | null;
   shared_articles: SharedArticle[];
+  /** Notas donde las dos participan en el hecho (F12, ADR-0107). */
+  same_event_count: number;
+  /** Fuerte: participan en el mismo hecho o lo dibujó una persona. */
+  strength: LinkStrength;
+  strength_label: string;
+  /** Por qué se relacionan, en una frase. */
+  reason: string;
 }
 
 export interface CaseRelationships {
@@ -83,6 +102,7 @@ function isRelationship(value: unknown): value is Relationship {
     isRecord(value.entity_b) &&
     typeof value.type === 'string' &&
     typeof value.confidence === 'number' &&
+    typeof value.strength === 'string' &&
     Array.isArray(value.shared_articles)
   );
 }
@@ -152,6 +172,32 @@ export async function reviewRelationship(
         entity_b: relationship.entity_b.id,
         type: relationship.type,
       },
+    }),
+  );
+}
+
+/** La llave de un vínculo, como la pide la revisión en bloque. */
+export interface RelationshipKey {
+  entity_a: number;
+  entity_b: number;
+  type: RelationshipType;
+}
+
+/**
+ * Confirma o descarta varios vínculos a la vez: todos o ninguno.
+ *
+ * @throws {ApiError} `relationship_not_found` (alguno ya no existe),
+ *   `invalid_bulk_review`, `case_forbidden` o `case_closed`.
+ */
+export async function reviewRelationships(
+  caseId: string,
+  action: BulkAction,
+  items: RelationshipKey[],
+): Promise<BulkReviewResult> {
+  return asBulkResult(
+    await requestJson(apiUrl(`cases/${caseId}/relationships/review`), {
+      method: 'POST',
+      body: { action, items },
     }),
   );
 }

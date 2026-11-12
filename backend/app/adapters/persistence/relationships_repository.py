@@ -8,6 +8,9 @@ Junta dos fuentes de vínculos entre entidades **confirmadas** de un caso:
   quitar una nota, se refleja sin refrescar nada.
 - **Guardados (``relationships``):** los que alguien revisó o dibujó. Si un
   calculado ya se revisó, gana lo guardado; si se descartó, no vuelve.
+- **Mismo hecho (F12, ADR-0107):** cada nota de la evidencia dice si las dos
+  entidades participan en el hecho (alguna mención con rol ``event`` en las
+  dos) o solo se nombran; de ahí sale la fuerza del vínculo.
 
 Cada entidad se muestra como la raíz de su grupo de fusión: un vínculo
 guardado con una entidad que después se unió a otra se ve en la que quedó.
@@ -19,7 +22,8 @@ la tabla reservada de enlaces externos (ADR-0101).
 """
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -49,17 +53,39 @@ from app.domain.relationships import cooccurrence_confidence
 
 # Cada entidad del caso con la raíz de su grupo de fusión.
 _ROOTS_SQL = f"{GROUPS_CTE} SELECT grp.id, grp.root FROM grp"  # noqa: S608 — consulta fija
-# En qué notas que siguen en el caso aparece cada grupo.
+# En qué notas que siguen en el caso aparece cada grupo, y si en ellas
+# participa en el hecho (alguna mención con rol ``event``) o solo se nombra.
 _PRESENCE_SQL = f"""
     {GROUPS_CTE}
-    SELECT DISTINCT grp.root, m.article_id FROM grp
+    SELECT grp.root, m.article_id, bool_or(m.role = 'event') AS in_event FROM grp
     JOIN entity_mentions m ON m.entity_id = grp.id
     JOIN case_articles ca ON ca.case_id = :case AND ca.article_id = m.article_id
+    GROUP BY grp.root, m.article_id
 """  # noqa: S608 — consulta fija de este módulo; los datos van por parámetro
 _CONFIRMED_SQL = """
     SELECT e.id, e.type, e.canonical_label, e.legal_status FROM case_entities ce
     JOIN entities e ON e.id = ce.entity_id
     WHERE ce.case_id = :case AND e.merged_into IS NULL AND e.review_status = 'confirmed'
+"""
+# Revisar uno guardado, o guardar uno nuevo (un calculado que alguien revisó
+# o uno que dibujó una persona). La llave única es (entity_a, entity_b, type).
+_UPDATE_SQL = """
+    UPDATE relationships SET review_status = :status, reviewed_by = :by,
+        reviewed_at = now(), custom_label = :label, confidence = :confidence,
+        notes = COALESCE(:notes, notes), updated_at = now()
+    WHERE id = :id
+"""
+_INSERT_SQL = """
+    INSERT INTO relationships (entity_a, entity_b, type, custom_label, origin, confidence,
+        review_status, reviewed_by, reviewed_at, notes)
+    VALUES (:a, :b, :type, :label, :origin, :confidence, :status, :by, now(), :notes)
+    ON CONFLICT (entity_a, entity_b, type) DO UPDATE SET
+        review_status = EXCLUDED.review_status,
+        reviewed_by = EXCLUDED.reviewed_by, reviewed_at = now(),
+        custom_label = EXCLUDED.custom_label,
+        confidence = EXCLUDED.confidence,
+        notes = COALESCE(EXCLUDED.notes, relationships.notes),
+        updated_at = now()
 """
 # Las notas sin fecha van al final de la evidencia.
 _UNDATED = datetime.min.replace(tzinfo=UTC)
@@ -112,9 +138,12 @@ class PostgresRelationshipRepository:
                 for member, root in await conn.execute(text(_ROOTS_SQL), {"case": case_id})
             }
             articles_of: dict[int, set[int]] = defaultdict(set)
-            for root, article in await conn.execute(text(_PRESENCE_SQL), {"case": case_id}):
+            in_event: set[tuple[int, int]] = set()
+            for root, article, event in await conn.execute(text(_PRESENCE_SQL), {"case": case_id}):
                 if root in ends:
                     articles_of[int(root)].add(int(article))
+                    if event:
+                        in_event.add((int(root), int(article)))
             stored = await self._stored(conn, root_of, ends)
             shared = self._shared(articles_of)
             article_rows = await self._articles(conn, {a for ids in shared.values() for a in ids})
@@ -134,8 +163,9 @@ class PostgresRelationshipRepository:
                     ends=ends,
                     origin=origin,
                     confidence=confidence,
-                    evidence=evidence,
-                    articles=article_rows,
+                    evidence=self._evidence(
+                        evidence, article_rows, in_event, key.entity_a, key.entity_b
+                    ),
                 )
             )
         for (first, second), evidence in shared.items():
@@ -155,13 +185,29 @@ class PostgresRelationshipRepository:
                     reviewed_by=None,
                     reviewed_at=None,
                     notes=None,
-                    shared_articles=self._evidence(evidence, article_rows),
+                    shared_articles=self._evidence(evidence, article_rows, in_event, first, second),
                 )
             )
         return views
 
     async def save(self, case_id: UUID, write: RelationshipWrite, audit: AuditEntry) -> None:
         """Ver ``RelationshipRepositoryPort.save``."""
+        await self.save_many(case_id, [(write, audit)])
+
+    async def save_many(
+        self, case_id: UUID, items: Sequence[tuple[RelationshipWrite, AuditEntry]]
+    ) -> None:
+        """Ver ``RelationshipRepositoryPort.save_many``."""
+        # Una sola transacción: si una falla, ``begin`` deshace todas (ADR-0107).
+        async with self._engine.begin() as conn:
+            for write, audit in items:
+                await self._write(conn, write)
+                await write_audit(conn, case_id, audit)
+            await touch(conn, case_id)
+
+    @staticmethod
+    async def _write(conn: AsyncConnection, write: RelationshipWrite) -> None:
+        """Actualiza el vínculo guardado o guarda uno nuevo con su llave."""
         params: dict[str, Any] = {
             "id": write.relationship_id,
             "a": write.key.entity_a,
@@ -174,34 +220,10 @@ class PostgresRelationshipRepository:
             "by": write.reviewer,
             "notes": write.notes,
         }
-        async with self._engine.begin() as conn:
-            if write.relationship_id is not None:
-                await conn.execute(
-                    text(
-                        "UPDATE relationships SET review_status = :status, reviewed_by = :by, "
-                        "reviewed_at = now(), custom_label = :label, confidence = :confidence, "
-                        "notes = COALESCE(:notes, notes), updated_at = now() WHERE id = :id"
-                    ),
-                    params,
-                )
-            else:
-                await conn.execute(
-                    text(
-                        "INSERT INTO relationships (entity_a, entity_b, type, custom_label, "
-                        "origin, confidence, review_status, reviewed_by, reviewed_at, notes) "
-                        "VALUES (:a, :b, :type, :label, :origin, :confidence, :status, :by, "
-                        "now(), :notes) ON CONFLICT (entity_a, entity_b, type) DO UPDATE SET "
-                        "review_status = EXCLUDED.review_status, "
-                        "reviewed_by = EXCLUDED.reviewed_by, reviewed_at = now(), "
-                        "custom_label = EXCLUDED.custom_label, "
-                        "confidence = EXCLUDED.confidence, "
-                        "notes = COALESCE(EXCLUDED.notes, relationships.notes), "
-                        "updated_at = now()"
-                    ),
-                    params,
-                )
-            await write_audit(conn, case_id, audit)
-            await touch(conn, case_id)
+        if write.relationship_id is not None:
+            await conn.execute(text(_UPDATE_SQL), params)
+        else:
+            await conn.execute(text(_INSERT_SQL), params)
 
     async def _stored(
         self,
@@ -273,10 +295,21 @@ class PostgresRelationshipRepository:
 
     @staticmethod
     def _evidence(
-        ids: set[int], articles: Mapping[int, SharedArticle]
+        ids: set[int],
+        articles: Mapping[int, SharedArticle],
+        in_event: set[tuple[int, int]],
+        first: int,
+        second: int,
     ) -> tuple[SharedArticle, ...]:
-        """Las notas compartidas, de la más reciente a la más vieja."""
-        found = [articles[i] for i in ids if i in articles]
+        """Las notas compartidas, de la más reciente a la más vieja.
+
+        Cada una marca si las dos entidades participan en el hecho de esa nota.
+        """
+        found = [
+            replace(articles[i], same_event=(first, i) in in_event and (second, i) in in_event)
+            for i in ids
+            if i in articles
+        ]
         return tuple(
             sorted(found, key=lambda a: (a.published_at or _UNDATED, a.article_id), reverse=True)
         )
@@ -289,8 +322,7 @@ class PostgresRelationshipRepository:
         ends: Mapping[int, RelationshipEnd],
         origin: Origin,
         confidence: float,
-        evidence: set[int],
-        articles: Mapping[int, SharedArticle],
+        evidence: tuple[SharedArticle, ...],
     ) -> RelationshipView:
         return RelationshipView(
             relationship_id=row["id"],
@@ -304,5 +336,5 @@ class PostgresRelationshipRepository:
             reviewed_by=row["reviewed_by"],
             reviewed_at=row["reviewed_at"],
             notes=row["notes"],
-            shared_articles=self._evidence(evidence, articles),
+            shared_articles=evidence,
         )

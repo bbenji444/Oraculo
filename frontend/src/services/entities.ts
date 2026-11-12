@@ -3,7 +3,8 @@
  *
  * La IA propone personas, organizaciones, lugares y vehículos de cada nota
  * del caso; aquí se piden, se confirman (con estatus legal en personas) o se
- * descartan. Las llaves de la IA nunca llegan aquí: todo pasa por el backend.
+ * descartan, una por una o en bloque (F12, ADR-0107). Las llaves de la IA
+ * nunca llegan aquí: todo pasa por el backend.
  *
  * No hace: no guarda estado (eso es TanStack Query en `hooks/useEntities`).
  */
@@ -153,6 +154,50 @@ export async function discardEntity(caseId: string, entityId: number): Promise<E
     await requestJson(apiUrl(`entities/${String(entityId)}/discard`), {
       method: 'POST',
       body: { case_id: caseId },
+    }),
+  );
+}
+
+/** Confirmar o descartar en bloque (F12, ADR-0107). */
+export type BulkAction = 'confirm' | 'discard';
+
+/** Una entidad elegida para revisar en bloque. */
+export interface EntityDecision {
+  entity_id: number;
+  /** Solo al confirmar personas: el estatus que se ve en su renglón. */
+  legal_status: LegalStatus | null;
+}
+
+/** Cómo quedó una revisión en bloque. */
+export interface BulkReviewResult {
+  /** Cuántas cambiaron (cada una con su entrada en la bitácora). */
+  changed: number;
+  /** Cuántas ya estaban así. */
+  unchanged: number;
+}
+
+/** Valida la respuesta de una revisión en bloque (entidades o vínculos). */
+export function asBulkResult(value: unknown): BulkReviewResult {
+  if (!isRecord(value) || typeof value.changed !== 'number' || typeof value.unchanged !== 'number')
+    throw badFormat();
+  return { changed: value.changed, unchanged: value.unchanged };
+}
+
+/**
+ * Confirma o descarta varias entidades a la vez: todas o ninguna.
+ *
+ * @throws {ApiError} `entity_not_found` (alguna ya no está en el caso),
+ *   `invalid_entity_review`, `invalid_bulk_review`, `case_forbidden` o `case_closed`.
+ */
+export async function reviewEntities(
+  caseId: string,
+  action: BulkAction,
+  items: EntityDecision[],
+): Promise<BulkReviewResult> {
+  return asBulkResult(
+    await requestJson(apiUrl(`cases/${caseId}/entities/review`), {
+      method: 'POST',
+      body: { action, items },
     }),
   );
 }

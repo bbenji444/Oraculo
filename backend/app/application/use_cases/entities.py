@@ -11,6 +11,8 @@ descarta el ruido; solo lo confirmado llegará al muro (9.6).
   el texto (``review_proposals``) y lo convierte en sugerencias del caso.
 - ``ListCaseEntities``, ``ConfirmEntity`` y ``DiscardEntity`` son lo que hace el
   analista, con los permisos de la 9.3 (``case_for`` y ``require_edit``).
+- ``ReviewEntities`` confirma o descarta varias a la vez (F12, ADR-0107): todo
+  o nada, con una entrada de la bitácora por entidad.
 
 Reglas que se cumplen aquí:
 
@@ -36,6 +38,7 @@ from app.application.ports.entities import (
     CaseEntity,
     EntityQueuePort,
     EntityRepositoryPort,
+    EntityReview,
     FailedExtraction,
     Materialized,
     StoredExtraction,
@@ -47,6 +50,7 @@ from app.application.ports.llm import (
 )
 from app.application.use_cases.cases import case_for, require_edit
 from app.application.use_cases.reports import LLMPrices
+from app.domain.bulk_review import BulkReviewResult, check_bulk_review
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import (
     CASE_EXTRACTION_MAX_ARTICLES,
@@ -56,7 +60,7 @@ from app.domain.entity_extraction import (
     estimated_extraction_usage,
     review_proposals,
 )
-from app.domain.errors import EntityNotFoundError, ProviderError
+from app.domain.errors import EntityNotFoundError, EntityReviewError, ProviderError
 from app.domain.investigation import InvestigationAction, LegalStatus, ReviewStatus
 
 NO_USAGE = LLMUsage(0, 0)
@@ -508,6 +512,108 @@ class DiscardEntity:
         ), True
 
 
+@dataclass(frozen=True, slots=True)
+class EntityDecision:
+    """Una entidad elegida en una revisión en bloque.
+
+    Attributes:
+        entity_id: Entidad.
+        legal_status: Al confirmar a una persona, su estatus según la nota (el
+            que se ve en su renglón); vacío en lo demás y al descartar.
+    """
+
+    entity_id: int
+    legal_status: str | None = None
+
+
+class ReviewEntities:
+    """Confirma o descarta varias entidades a la vez (F12, ADR-0107)."""
+
+    def __init__(self, cases: CaseRepositoryPort, entities: EntityRepositoryPort) -> None:
+        """Recibe los repositorios.
+
+        Args:
+            cases: Casos (para los permisos).
+            entities: Entidades.
+        """
+        self._cases = cases
+        self._entities = entities
+
+    async def execute(
+        self,
+        case_id: UUID,
+        status: ReviewStatus,
+        decisions: Sequence[EntityDecision],
+        actor: Actor,
+    ) -> BulkReviewResult:
+        """Revisa todas o ninguna, con las mismas reglas que una por una.
+
+        Se valida todo antes de escribir: si una entidad no es del caso o a
+        una persona le falta su estatus legal, no cambia nada. Las que ya
+        estaban así no se tocan ni repiten la bitácora.
+
+        Args:
+            case_id: Caso.
+            status: Confirmar o descartar.
+            decisions: Las entidades elegidas (y el estatus de cada persona al
+                confirmar).
+            actor: Quién decide.
+
+        Returns:
+            Cuántas cambiaron y cuántas ya estaban así.
+
+        Raises:
+            BulkReviewError: Si viene vacía, con repetidas, con demasiadas o
+                pide regresar a «sugerido».
+            CaseNotFoundError: Si el caso no existe o la persona no es miembro.
+            CaseForbiddenError: Si su rol solo permite mirar.
+            CaseClosedError: Si el caso está cerrado o archivado.
+            EntityNotFoundError: Si alguna no es de ese caso.
+            EntityReviewError: Si a una persona le falta su estatus legal, otra
+                cosa trae uno, o se manda estatus al descartar.
+
+        Example:
+            >>> await ReviewEntities(cases, entities).execute(
+            ...     case_id, ReviewStatus.CONFIRMED,
+            ...     [EntityDecision(4, "alleged"), EntityDecision(9)], actor)
+            BulkReviewResult(changed=2, unchanged=0)
+        """
+        ids = [d.entity_id for d in decisions]
+        check_bulk_review(status, ids)
+        require_edit(await case_for(self._cases, case_id, actor))
+        found = {e.entity_id: e for e in await self._entities.get_entities(case_id, ids)}
+        missing = [entity_id for entity_id in ids if entity_id not in found]
+        if missing:
+            raise EntityNotFoundError(
+                "Alguna de las entidades elegidas ya no está en el caso; vuelve a cargar la lista.",
+                {"case_id": str(case_id), "entity_ids": missing},
+            )
+        reviews: list[EntityReview] = []
+        for decision in decisions:
+            entity = found[decision.entity_id]
+            legal = _bulk_legal_status(entity, status, decision.legal_status)
+            if entity.review_status is status and entity.legal_status == legal:
+                continue
+            audit = _review_audit(actor, entity, status, legal, bulk=True)
+            reviews.append(EntityReview(entity.entity_id, status, legal, audit))
+        if reviews:
+            await self._entities.review_many(case_id, reviews, reviewer=actor.user_id)
+        return BulkReviewResult(changed=len(reviews), unchanged=len(decisions) - len(reviews))
+
+
+def _bulk_legal_status(
+    entity: CaseEntity, status: ReviewStatus, chosen: str | None
+) -> LegalStatus | None:
+    """El estatus que queda: el elegido al confirmar; el que tenía al descartar."""
+    if status is ReviewStatus.CONFIRMED:
+        return confirmed_legal_status(entity.type, chosen)
+    if chosen is not None:
+        raise EntityReviewError(
+            "Al descartar no se elige estatus legal.", {"entity_id": entity.entity_id}
+        )
+    return entity.legal_status
+
+
 async def _entity_to_review(
     cases: CaseRepositoryPort,
     entities: EntityRepositoryPort,
@@ -533,33 +639,44 @@ async def _review(  # noqa: PLR0913 — la revisión firmada necesita todos sus 
     legal_status: LegalStatus | None,
     actor: Actor,
 ) -> CaseEntity:
-    action = (
-        InvestigationAction.ENTITY_CONFIRMED
-        if status is ReviewStatus.CONFIRMED
-        else InvestigationAction.ENTITY_DISCARDED
-    )
-    suggested = entity.suggested_legal_status
-    audit = AuditEntry(
-        actor,
-        action,
-        {
-            "entity_id": entity.entity_id,
-            "type": entity.type.value,
-            "label": entity.label,
-            "before": _snapshot(entity),
-            "after": {
-                "review_status": status.value,
-                "legal_status": legal_status.value if legal_status else None,
-            },
-            "suggested_legal_status": suggested.value if suggested else None,
-            "mentions": len(entity.mentions),
-        },
-    )
     return await entities.review(
         case_id,
         entity.entity_id,
         status=status,
         legal_status=legal_status,
         reviewer=actor.user_id,
-        audit=audit,
+        audit=_review_audit(actor, entity, status, legal_status),
     )
+
+
+def _review_audit(
+    actor: Actor,
+    entity: CaseEntity,
+    status: ReviewStatus,
+    legal_status: LegalStatus | None,
+    *,
+    bulk: bool = False,
+) -> AuditEntry:
+    """La entrada de la bitácora de una revisión: quién, qué había antes y qué quedó."""
+    action = (
+        InvestigationAction.ENTITY_CONFIRMED
+        if status is ReviewStatus.CONFIRMED
+        else InvestigationAction.ENTITY_DISCARDED
+    )
+    suggested = entity.suggested_legal_status
+    payload: dict[str, object] = {
+        "entity_id": entity.entity_id,
+        "type": entity.type.value,
+        "label": entity.label,
+        "before": _snapshot(entity),
+        "after": {
+            "review_status": status.value,
+            "legal_status": legal_status.value if legal_status else None,
+        },
+        "suggested_legal_status": suggested.value if suggested else None,
+        "mentions": len(entity.mentions),
+    }
+    if bulk:
+        # Para distinguir en la bitácora lo que se decidió en bloque (ADR-0107).
+        payload["bulk"] = True
+    return AuditEntry(actor, action, payload)

@@ -1,14 +1,18 @@
 /**
  * Una entidad propuesta por la IA en un caso (Fase 9.4, historia H9.2).
  *
- * Muestra tipo, nombre, estatus legal (siempre visible, §9.10) y cuántas
- * menciones tiene; al desplegarla, cada cita con la nota de donde salió. Quien
+ * Muestra nombre, si participa en el hecho de alguna nota (el tipo ya lo dice
+ * su grupo, F12), estatus legal (siempre visible, §9.10) y cuántas menciones
+ * tiene; al desplegarla, cada cita con la nota de donde salió. Quien
  * puede editar la confirma (en personas, eligiendo el estatus legal según la
  * nota; no existe "culpable") o la descarta.
  *
  * Desde la 9.5 (§9.8) también muestra qué entidades se le unieron (con
  * «Separar»), permite decir «Es la misma que…» otra entidad del caso y separar
  * menciones propias en una sugerencia nueva cuando juntó a dos homónimos.
+ *
+ * Desde F12 (ADR-0107) lleva una casilla para elegirla y revisarla en bloque,
+ * y el estatus legal del menú lo guarda `CaseEntities`.
  *
  * No hace: no pide datos (los recibe de `CaseEntities`).
  */
@@ -17,7 +21,9 @@ import { useState } from 'react';
 import type { ResolutionAction } from '../../hooks/useResolution';
 import type { Entity, LegalStatus } from '../../services/entities';
 import { formatDay } from '../Explore/format';
+import { participatesInEvent } from './grouping';
 import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
+import { SelectBox } from './SelectBox';
 import { ExternalLink } from '../ExternalLink';
 import { HudSelect } from '../ui/HudSelect';
 
@@ -25,11 +31,20 @@ interface EntityCardProps {
   entity: Entity;
   canEdit: boolean;
   busy: boolean;
+  /**
+   * Estatus legal que se ve en el menú (personas). Lo guarda `CaseEntities`
+   * para que «Confirmar» en bloque mande el mismo que se ve aquí (D1).
+   */
+  legal: LegalStatus;
+  onLegalChange: (legal: LegalStatus) => void;
   onConfirm: (legal: LegalStatus | undefined) => void;
   onDiscard: () => void;
   /** Otras entidades del caso del mismo tipo con las que se puede unir (9.5). */
   mergeTargets: Entity[];
   onResolve: (action: ResolutionAction) => void;
+  /** Si está elegida para revisar en bloque (F12). */
+  selected: boolean;
+  onSelect: (checked: boolean) => void;
 }
 
 // Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
@@ -39,10 +54,14 @@ export function EntityCard({
   entity,
   canEdit,
   busy,
+  legal,
+  onLegalChange,
   onConfirm,
   onDiscard,
   mergeTargets,
   onResolve,
+  selected,
+  onSelect,
 }: EntityCardProps) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState(0);
@@ -50,20 +69,35 @@ export function EntityCard({
   const own = entity.mentions.filter((m) => m.entity_id === entity.id);
   const canSplit = canEdit && own.length > 1;
   const isPerson = entity.type === 'person';
-  const [legal, setLegal] = useState<LegalStatus>(
-    entity.legal_status ?? entity.suggested_legal_status ?? 'mentioned',
-  );
+  const inEvent = participatesInEvent(entity);
   const status = entity.legal_status_label ?? entity.suggested_legal_status_label;
 
   return (
-    <li className="hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03]">
+    <li
+      className={`hud-reveal px-5 py-3.5 transition-colors duration-300 hover:bg-sky-400/[0.03] ${
+        selected ? 'bg-sky-400/[0.05]' : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start gap-3">
+        {canEdit && (
+          <span className="pt-0.5">
+            <SelectBox
+              state={selected ? 'all' : 'none'}
+              label={`Elegir ${entity.label}`}
+              disabled={busy}
+              onChange={onSelect}
+            />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-100">
-            <span className="mr-2 rounded-md border border-sky-400/20 bg-sky-400/5 px-1.5 py-0.5 text-[11px] text-slate-200">
-              {entity.type_label}
-            </span>
             {entity.label}
+            {/* El tipo ya lo dice el grupo (F12); aquí, si participa en el hecho. */}
+            {inEvent && (
+              <span className="ml-2 rounded-md border border-emerald-400/30 bg-emerald-400/5 px-1.5 py-0.5 text-[11px] text-emerald-100">
+                participa en el hecho
+              </span>
+            )}
           </p>
           <p className="mt-1 text-xs text-slate-400">
             {isPerson && (
@@ -156,7 +190,7 @@ export function EntityCard({
                 className="w-auto min-w-[9rem]"
                 value={legal}
                 options={LEGAL_STATUS_OPTIONS}
-                onChange={setLegal}
+                onChange={onLegalChange}
               />
             )}
             {(entity.review_status !== 'confirmed' || entity.legal_status !== legal) && (

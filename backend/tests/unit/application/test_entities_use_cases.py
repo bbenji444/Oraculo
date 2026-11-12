@@ -1,5 +1,6 @@
 """Casos de uso de las entidades de un caso con repositorios en memoria y una IA falsa (9.4)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -12,9 +13,11 @@ from app.application.use_cases.entities import (
     AnalyzePending,
     ConfirmEntity,
     DiscardEntity,
+    EntityDecision,
     ExtractCaseArticle,
     ListCaseEntities,
     QueueExtraction,
+    ReviewEntities,
 )
 from app.application.use_cases.reports import LLMPrices
 from app.domain.case import CaseChanges
@@ -25,6 +28,7 @@ from app.domain.entity_extraction import (
     TextSource,
 )
 from app.domain.errors import (
+    BulkReviewError,
     CaseClosedError,
     CaseForbiddenError,
     CaseNotFoundError,
@@ -375,3 +379,107 @@ async def test_en_un_caso_cerrado_no_se_revisa() -> None:
 
     with pytest.raises(CaseClosedError):
         await DiscardEntity(cases, repo).execute(case_id, 1, BENJI)
+
+
+# --- Revisar en bloque (F12, ADR-0107) ---------------------------------------------
+
+
+def org(entity_id: int) -> CaseEntity:
+    return replace(person(entity_id, mentions=1), type=EntityType.ORG, label=f"Org {entity_id}")
+
+
+async def test_confirmar_en_bloque_firma_cada_una_con_su_bitacora() -> None:
+    cases, repo = FakeCaseRepository(), FakeEntityRepository()
+    case_id = await new_case(cases)
+    repo.add_entity(case_id, person(1))
+    repo.add_entity(case_id, org(2))
+
+    result = await ReviewEntities(cases, repo).execute(
+        case_id,
+        ReviewStatus.CONFIRMED,
+        [EntityDecision(1, "detained"), EntityDecision(2)],
+        BENJI,
+    )
+
+    assert (result.changed, result.unchanged, repo.bulk_calls) == (2, 0, 1)
+    first, second = repo.entities[case_id][1], repo.entities[case_id][2]
+    assert (first.review_status, first.legal_status, first.reviewed_by) == (
+        ReviewStatus.CONFIRMED,
+        LegalStatus.DETAINED,
+        "benji",
+    )
+    assert (second.review_status, second.legal_status) == (ReviewStatus.CONFIRMED, None)
+    audits = [audit for _, audit in repo.reviews]
+    assert [a.payload["entity_id"] for a in audits] == [1, 2]
+    assert all(a.action == InvestigationAction.ENTITY_CONFIRMED for a in audits)
+    assert all(a.payload["bulk"] is True for a in audits)
+
+
+async def test_en_bloque_lo_que_ya_estaba_igual_no_se_toca() -> None:
+    cases, repo = FakeCaseRepository(), FakeEntityRepository()
+    case_id = await new_case(cases)
+    repo.add_entity(case_id, person(1))
+    repo.add_entity(case_id, person(2))
+    review = ReviewEntities(cases, repo)
+    await review.execute(case_id, ReviewStatus.DISCARDED, [EntityDecision(1)], BENJI)
+
+    result = await review.execute(
+        case_id, ReviewStatus.DISCARDED, [EntityDecision(1), EntityDecision(2)], BENJI
+    )
+    # Corregir el estatus de una persona ya confirmada sí cuenta como cambio.
+    await review.execute(case_id, ReviewStatus.CONFIRMED, [EntityDecision(2, "alleged")], BENJI)
+    fixed = await review.execute(
+        case_id, ReviewStatus.CONFIRMED, [EntityDecision(2, "victim")], BENJI
+    )
+
+    assert (result.changed, result.unchanged) == (1, 1)
+    assert (fixed.changed, repo.entities[case_id][2].legal_status) == (1, LegalStatus.VICTIM)
+    assert len(repo.reviews) == 4
+
+
+async def test_en_bloque_es_todo_o_nada() -> None:
+    cases, repo = FakeCaseRepository(), FakeEntityRepository()
+    case_id = await new_case(cases)
+    repo.add_entity(case_id, person(1))
+    repo.add_entity(case_id, org(2))
+    review = ReviewEntities(cases, repo)
+
+    with pytest.raises(EntityNotFoundError) as missing:
+        await review.execute(
+            case_id,
+            ReviewStatus.CONFIRMED,
+            [EntityDecision(1, "alleged"), EntityDecision(99)],
+            BENJI,
+        )
+    # Una persona sin estatus, otra cosa con estatus o estatus al descartar: nada cambia.
+    for status, decisions in [
+        (ReviewStatus.CONFIRMED, [EntityDecision(2), EntityDecision(1)]),
+        (ReviewStatus.CONFIRMED, [EntityDecision(1, "alleged"), EntityDecision(2, "alleged")]),
+        (ReviewStatus.DISCARDED, [EntityDecision(1, "alleged")]),
+    ]:
+        with pytest.raises(EntityReviewError):
+            await review.execute(case_id, status, decisions, BENJI)
+
+    assert missing.value.details["entity_ids"] == [99]
+    assert repo.reviews == []
+    assert repo.entities[case_id][1].review_status is ReviewStatus.SUGGESTED
+
+
+async def test_en_bloque_respeta_permisos_y_reglas_del_bloque() -> None:
+    cases, repo = FakeCaseRepository(), FakeEntityRepository()
+    case_id = await new_case(cases)
+    repo.add_entity(case_id, person(1))
+    review = ReviewEntities(cases, repo)
+
+    with pytest.raises(CaseForbiddenError):
+        await review.execute(case_id, ReviewStatus.DISCARDED, [EntityDecision(1)], LECTORA)
+    with pytest.raises(CaseNotFoundError):
+        await review.execute(case_id, ReviewStatus.DISCARDED, [EntityDecision(1)], Actor("ajena"))
+    with pytest.raises(BulkReviewError):
+        await review.execute(
+            case_id, ReviewStatus.DISCARDED, [EntityDecision(1), EntityDecision(1)], BENJI
+        )
+    await UpdateCase(cases).execute(case_id, CaseChanges(status=CaseStatus.CLOSED), BENJI)
+    with pytest.raises(CaseClosedError):
+        await review.execute(case_id, ReviewStatus.DISCARDED, [EntityDecision(1)], BENJI)
+    assert repo.reviews == []

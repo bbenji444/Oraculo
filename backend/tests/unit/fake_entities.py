@@ -19,6 +19,7 @@ from app.application.ports.entities import (
     ArticleSource,
     CaseAnalysis,
     CaseEntity,
+    EntityReview,
     FailedExtraction,
     Materialized,
     MergedEntity,
@@ -33,6 +34,7 @@ from app.application.ports.llm import (
 from app.domain.enrichment import LLMUsage
 from app.domain.entity_extraction import CaseArticleEntitiesStatus, RawProposal
 from app.domain.entity_resolution import MergeCandidate
+from app.domain.errors import EntityNotFoundError
 from app.domain.investigation import LegalStatus, ReviewStatus
 
 REVIEWED_AT = datetime(2026, 10, 21, 19, tzinfo=UTC)
@@ -66,6 +68,8 @@ class FakeEntityRepository:
     dismissed: set[tuple[UUID, int, int]] = field(default_factory=set)
     resolution_audits: list[AuditEntry] = field(default_factory=list)
     next_id: int = 1000
+    # F12 (ADR-0107): cuántas revisiones en bloque llegaron al repositorio.
+    bulk_calls: int = 0
 
     def add_article(
         self,
@@ -201,6 +205,28 @@ class FakeEntityRepository:
         self.entities[case_id][entity_id] = reviewed
         self.reviews.append((case_id, audit))
         return reviewed
+
+    async def get_entities(self, case_id: UUID, entity_ids: Sequence[int]) -> list[CaseEntity]:
+        found = [await self.get_entity(case_id, entity_id) for entity_id in entity_ids]
+        return [entity for entity in found if entity is not None]
+
+    async def review_many(
+        self, case_id: UUID, reviews: Sequence[EntityReview], *, reviewer: str
+    ) -> None:
+        # Todo o nada, como la transacción de PostgreSQL.
+        found = await self.get_entities(case_id, [r.entity_id for r in reviews])
+        if len(found) != len(reviews):
+            raise EntityNotFoundError("No existe esa entidad en el caso.", {})
+        for r in reviews:
+            await self.review(
+                case_id,
+                r.entity_id,
+                status=r.status,
+                legal_status=r.legal_status,
+                reviewer=reviewer,
+                audit=r.audit,
+            )
+        self.bulk_calls += 1
 
     async def merge_suggestions(self, case_id: UUID) -> list[MergeSuggestion]:
         return [

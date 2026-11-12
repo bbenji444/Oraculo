@@ -617,6 +617,7 @@ La IA propone las entidades de cada nota que entra a un caso (ADR-0103). Todo na
 | POST | `/cases/{id}/extract` | «Analizar con IA»: encola las notas pendientes o fallidas. Responde `{queued, estimated_cost_usd}`. Gasta tokens. Editor o dueño, caso abierto. |
 | POST | `/entities/{id}/confirm` | Cuerpo `{case_id, legal_status}`. En personas, `legal_status` es obligatorio: `mentioned`, `alleged`, `detained`, `charged`, `victim`, `witness` u `official`; nunca "culpable" (422 `invalid_entity_review`). Firma quién y cuándo y va a la bitácora (`entity.confirmed`). |
 | POST | `/entities/{id}/discard` | Cuerpo `{case_id}`. Deja de proponerse sin borrarse (`entity.discarded`). |
+| POST | `/cases/{id}/entities/review` | Revisar en bloque (F12, ADR-0107). Cuerpo `{action: "confirm" \| "discard", items: [{entity_id, legal_status?}]}`; al confirmar, cada persona lleva su `legal_status` (las mismas reglas que una por una) y lo demás va sin él; al descartar nadie lo lleva. Todas o ninguna: 404 `entity_not_found` si alguna ya no está en el caso, 422 `invalid_entity_review` si a una persona le falta su estatus y 422 `invalid_bulk_review` si viene vacía, con repetidas o con más de 500. Responde `{changed, unchanged}`; las que ya estaban así no se tocan. Cada una deja su `entity.confirmed` o `entity.discarded` con `"bulk": true`. |
 
 Agregar una nota con `POST /cases/{id}/articles` la encola sola. Cada lectura queda en la bitácora como `case.entities_extracted`, con modelo, tokens y costo.
 
@@ -649,9 +650,10 @@ Solo entre entidades **confirmadas** del caso. «Aparecen juntas» se calcula de
 
 | Método | Ruta | Qué hace |
 |---|---|---|
-| GET | `/cases/{id}/relationships?status=suggested` | Vínculos en ese estado, los de más confianza primero, con `counts`. Cada uno trae sus dos entidades (con estatus legal), `type` y `type_label`, `symmetric`, `origin` y `origin_label`, `confidence` y `shared_articles` (la evidencia). Un sugerido por coocurrencia tiene `id` nulo. Cualquier miembro. |
+| GET | `/cases/{id}/relationships?status=suggested` | Vínculos en ese estado con `counts`: primero los fuertes, luego los de más notas en el mismo hecho y más confianza (ADR-0107). Cada uno trae sus dos entidades (con estatus legal), `type` y `type_label`, `symmetric`, `origin` y `origin_label`, `confidence`, `shared_articles` (la evidencia; cada nota con `same_event`: si las dos participan en el hecho), `same_event_count`, `strength` (`strong` o `weak`) con `strength_label`, y `reason` («participan en el mismo hecho en 2 notas»). Un sugerido por coocurrencia tiene `id` nulo. Cualquier miembro. |
 | POST | `/relationships` | Cuerpo `{case_id, entity_a, entity_b, type, custom_label?, notes?}`. `type`: `appears_with`, `same_event`, `family`, `associate`, `employer`, `located_in`, `owns` o `custom` (este con `custom_label`, hasta 80 caracteres). Nace confirmado, origen `human`, confianza 1. En los dirigidos (`employer`, `located_in`, `owns`) `entity_a` es quien «es dueño de»… Si ya existía, se confirma ese. 422 `invalid_relationship` si alguna entidad no está confirmada. Bitácora `relationship.created`. |
 | POST | `/relationships/confirm` · `/discard` | Cuerpo `{case_id, entity_a, entity_b, type}` (la llave que trae la lista). 404 `relationship_not_found` si no existe. Bitácora `relationship.confirmed` o `relationship.discarded`. |
+| POST | `/cases/{id}/relationships/review` | Revisar en bloque (F12, ADR-0107). Cuerpo `{action: "confirm" \| "discard", items: [{entity_a, entity_b, type}]}` con las llaves que trae la lista (en los simétricos da igual el orden). Todos o ninguno: 404 `relationship_not_found` si alguno ya no existe entre confirmadas del caso, 422 `invalid_bulk_review` si viene vacía, con repetidos o con más de 500. Responde `{changed, unchanged}`. Cada uno deja su `relationship.confirmed` o `relationship.discarded` con `"bulk": true`. |
 
 Las escrituras piden editor o dueño con el caso abierto.
 

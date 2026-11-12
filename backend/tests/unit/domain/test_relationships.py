@@ -3,13 +3,16 @@
 import pytest
 
 from app.domain.errors import RelationshipValidationError
-from app.domain.investigation import RelationshipType
+from app.domain.investigation import Origin, RelationshipType
 from app.domain.relationships import (
     COOCCURRENCE_CONFIDENCE_MAX,
     CUSTOM_LABEL_MAX_CHARS,
     HUMAN_RELATIONSHIP_CONFIDENCE,
     RELATIONSHIP_NOTES_MAX_CHARS,
+    LinkStrength,
     cooccurrence_confidence,
+    link_reason,
+    link_strength,
     manual_relationship,
 )
 
@@ -52,3 +55,43 @@ def test_lo_que_no_es_un_vinculo_valido(
 ) -> None:
     with pytest.raises(RelationshipValidationError, match=message):
         manual_relationship(kind, label, notes)
+
+
+# --- Fuerza de un vínculo (F12, ADR-0107) ------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("origin", "same_event", "expected"),
+    [
+        (Origin.COOCCURRENCE, 0, LinkStrength.WEAK),
+        (Origin.COOCCURRENCE, 1, LinkStrength.STRONG),
+        (Origin.HUMAN, 0, LinkStrength.STRONG),
+        (Origin.LLM, 0, LinkStrength.WEAK),
+    ],
+)
+def test_es_fuerte_si_participan_en_el_mismo_hecho_o_lo_dibujo_una_persona(
+    origin: Origin, same_event: int, expected: LinkStrength
+) -> None:
+    assert link_strength(origin, same_event) is expected
+
+
+@pytest.mark.parametrize(
+    ("origin", "same_event", "shared", "expected"),
+    [
+        (Origin.COOCCURRENCE, 1, 1, "participan en el mismo hecho en 1 nota"),
+        (
+            Origin.COOCCURRENCE,
+            2,
+            3,
+            "participan en el mismo hecho en 2 notas (aparecen juntas en 3)",
+        ),
+        (Origin.COOCCURRENCE, 0, 2, "solo se mencionan juntas en 2 notas"),
+        (Origin.HUMAN, 0, 0, "lo afirmó una persona"),
+        (Origin.HUMAN, 1, 1, "participan en el mismo hecho en 1 nota"),
+        (Origin.COOCCURRENCE, 0, 0, "sin notas en común"),
+    ],
+)
+def test_la_razon_se_lee_en_una_frase(
+    origin: Origin, same_event: int, shared: int, expected: str
+) -> None:
+    assert link_reason(origin, same_event, shared) == expected
