@@ -9,18 +9,21 @@
  * - con el mapa y la región, una **cúpula 3D** sobre la zona buscada (todo
  *   México, Chiapas, un municipio), dibujada en el propio globo
  *   (map/radar/dome.ts): vidrio con rejilla, haz que gira, onda en el piso y
- *   un eco que late por cada nota encontrada;
+ *   una columna de luz por cada nota encontrada. La cámara vuela a la zona,
+ *   la encuadra y se inclina 60° para que se vea el volumen; al terminar se
+ *   endereza;
  * - encima, el letrero con la región y sus coordenadas; abajo, la etapa en
  *   curso («Consultando proveedores», «Ubicando en el mapa»…) y las notas
  *   detectadas. Siguen a la cúpula si el mapa se mueve.
  * Sin mapa o sin región todavía, un radar plano en la parte libre de la pantalla.
  *
- * No hace: no recibe clics (todo es `pointer-events: none`) ni mueve el mapa.
+ * No hace: no recibe clics (todo es `pointer-events: none`); fuera de ese
+ * vuelo de la cámara, no mueve el mapa.
  */
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
-import { addDomeRadar, angularDistance, type DomeRadar } from '../../map/radar/dome';
+import { addDomeRadar, type DomeRadar } from '../../map/radar/dome';
 import { isFinished, type Search } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { type FinishNotice, STAGE_LABEL } from '../Explore/format';
@@ -31,13 +34,14 @@ import { type Bbox, blips, coordinatesLabel, type RadarGeometry, radarGeometry }
 const RING_DELAYS_S = [0, 1.1, 2.2];
 // Tamaño del radar sin región: más o menos el del globo en la vista de México.
 const SCAN_SIZE = 'min(66vh, 46vw)';
-// Ecos a la vista como máximo: más ya no se distinguen.
+// Ecos del radar plano a la vista como máximo: más ya no se distinguen.
 const MAX_BLIPS = 18;
-// Inclinación de la cámara durante el barrido (grados): deja ver la cúpula.
-const DOME_PITCH = 40;
+// Inclinación de la cámara durante el barrido (grados): deja ver el volumen
+// de la cúpula. 60 es lo más que MapLibre deja por omisión (maxPitch); Benji,
+// 11/11/2026: «que el mundo se inclinara un poco para que se pudiera ver el
+// efecto 3D de la zona» (con 40 se veía casi plana).
+const DOME_PITCH = 60;
 const TILT_MS = 1400;
-// Si la zona está a más de esto (grados) del centro de la vista, la cámara vuela.
-const FAR_DEGREES = 25;
 // Vuelo a la zona: aire para el encabezado y la consola, sin acercarse de más.
 const AIM_PADDING = { top: 140, bottom: 300, left: 60, right: 60 };
 const AIM_MAX_ZOOM = 7;
@@ -122,25 +126,19 @@ function useDomeRadar(
   }, [found]);
   useEffect(() => {
     if (!map || !bbox) return;
-    // La cámara mira la zona: si está lejos (o del otro lado del globo) vuela a
-    // ella; si ya se ve, solo se inclina. Vista desde arriba la cúpula parece
-    // un disco: inclinada se nota su volumen.
+    // La cámara vuela a la zona, la encuadra y se inclina: vista desde arriba
+    // la cúpula parece un disco; inclinada se nota su volumen. Aunque la zona
+    // ya se vea, se encuadra: una zona chica (un estado) se veía diminuta.
     const [west, south, east, north] = bbox;
     const aim = () => {
       const center: [number, number] = [(west + east) / 2, (south + north) / 2];
-      const here = map.getCenter();
-      const duration = animate ? AIM_MS : 0;
-      if (angularDistance([here.lng, here.lat], center) > FAR_DEGREES) {
-        const fit = map.cameraForBounds([west, south, east, north], { padding: AIM_PADDING });
-        map.flyTo({
-          center,
-          zoom: Math.min(fit?.zoom ?? map.getZoom(), AIM_MAX_ZOOM),
-          pitch: DOME_PITCH,
-          duration,
-        });
-      } else if (map.getPitch() < DOME_PITCH) {
-        map.easeTo({ pitch: DOME_PITCH, duration });
-      }
+      const fit = map.cameraForBounds([west, south, east, north], { padding: AIM_PADDING });
+      map.flyTo({
+        center,
+        zoom: Math.min(fit?.zoom ?? map.getZoom(), AIM_MAX_ZOOM),
+        pitch: DOME_PITCH,
+        duration: animate ? AIM_MS : 0,
+      });
     };
     let aimTimer = 0;
     // Se espera a que el globo termine su propio acomodo: si no, lo cancelaba.

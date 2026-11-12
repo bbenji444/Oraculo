@@ -49,8 +49,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
-  - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira, onda en el piso y un eco por nota encontrada;
-  - la cámara vuela a la zona y se inclina para que se vea el volumen;
+  - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;
+  - por cada nota encontrada se levanta una columna de luz desde el piso, con un destello y una onda en su base (hasta 24 columnas). Antes eran puntos;
+  - la cámara vuela a la zona, la encuadra y se inclina 60° para que se vea el volumen (antes 40°, y solo volaba si la zona estaba lejos);
   - al terminar, la cámara se endereza.
 - **Fechas y zonas estrictas (11/11/2026, ADR-0048).** Benji: «si le doy buscar hoy, solo hoy».
   - Una búsqueda manual solo guarda lo publicado en los días pedidos, de 00:00 a 23:59 de la Ciudad de México.
@@ -66,6 +67,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **El globo ya no gira a los 10 segundos durante el barrido (11/11/2026).** Seguía viva una regla del 30/10: en el Centro de mando volvía a girar a los 10 s sin uso (25 s en el diseño de columna). Se quitó; ahora solo gira tras 5 minutos sin tocar nada o en una consulta nueva.
 - Las notas con muchos lugares (agendas) ya no se quedan sin resumen por una respuesta cortada de la IA (2 de 25 en la prueba).
 - «Copiar contraseña», «Copiar llave» y «Copiar consulta» funcionan también por `http://`.
 - El letrero de una nota ya no queda encimado con la ventana «N notas en este lugar».
