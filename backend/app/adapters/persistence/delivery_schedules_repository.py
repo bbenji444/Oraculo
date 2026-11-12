@@ -25,7 +25,15 @@ _SELECT = """
                           WHERE r.schedule_id = s.id ORDER BY r.recipient_id), '{}') AS recipients
     FROM delivery_schedules s
 """
-_LIST = text(_SELECT + " ORDER BY s.owner, s.name, s.id")
+# Los envíos de personas borradas no existen para nadie: ni la pantalla los
+# lista ni el reloj los corre, aunque alguien los prendiera a mano. Quien no
+# está en ``users`` (dueños de antes de las cuentas) sí se lista.
+_LIST = text(
+    _SELECT  # noqa: S608 — solo texto fijo de este archivo; los valores van como parámetros
+    + " WHERE NOT EXISTS (SELECT 1 FROM users u "
+    "WHERE u.username = s.owner AND u.deleted_at IS NOT NULL) "
+    "ORDER BY s.owner, s.name, s.id"
+)
 _GET = text(_SELECT + " WHERE s.id = :id")
 _INSERT = text(
     "INSERT INTO delivery_schedules (owner, name, concept_ids, region_id, times, days, "

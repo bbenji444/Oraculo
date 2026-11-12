@@ -29,6 +29,9 @@ from app.adapters.cache.redis_sessions import (
 )
 from app.adapters.persistence.access_repository import PostgresAccessStore
 from app.adapters.persistence.access_scope import as_system, as_user, create_api_engine
+from app.adapters.persistence.delivery_schedules_repository import (
+    PostgresDeliveryScheduleStore,
+)
 from app.adapters.persistence.search_repository import PostgresSearchStore
 from app.adapters.security.secret_box import AesGcmSecretBox
 from app.application.audit import Actor, AuditEntry
@@ -44,8 +47,10 @@ from app.application.ports.search_store import NewSearch
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role, key_digest, new_key
 from app.domain.credentials import hash_password, verify_password
+from app.domain.delivery_schedules import ScheduleDraft
 from app.domain.errors import UsernameTakenError
 from app.domain.queries import Provider
+from app.domain.schedule import RunSchedule
 from tests.integration.geo_fixture import load_fixture_catalog
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
@@ -61,6 +66,7 @@ AUDIT = AuditEntry(Actor("rls-prueba"), "prueba", {})
 def _clean(engine: Engine) -> None:
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM searches WHERE user_id LIKE 'rls-%'"))
+        conn.execute(text("DELETE FROM delivery_schedules WHERE owner LIKE 'rls-%'"))
         conn.execute(text("DELETE FROM users WHERE username LIKE 'rls-%'"))
         conn.execute(text("DELETE FROM audit_log WHERE user_id LIKE 'rls-%'"))
 
@@ -430,6 +436,85 @@ async def test_borrar_a_una_persona_en_la_base(api_engine: AsyncEngine) -> None:
     assert creds is None
     assert found_key is not None and found_key.revoked_at is not None
     assert not found_key.user_active
+
+
+async def test_borrar_a_una_persona_apaga_sus_envios(
+    api_engine: AsyncEngine, test_engine: AsyncEngine
+) -> None:
+    """Benji, 11/11/2026: «pp» estaba borrada y su envío seguía prendido."""
+    store = PostgresAccessStore(api_engine)
+    schedules = PostgresDeliveryScheduleStore(api_engine)
+    async with test_engine.connect() as conn:
+        region = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    draft = ScheduleDraft("Monitor FGR", (1,), region, RunSchedule((420, 900)))
+    with as_user(JEFA):
+        ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
+    with as_user(ANA):
+        mine = await schedules.create_schedule(draft, ANA.username)
+    with as_user(PEPE):
+        other = await schedules.create_schedule(draft, PEPE.username)
+
+    with as_user(JEFA):
+        await store.delete_user(ana.user_id, AUDIT)
+        listed = [s.id for s in await schedules.list_schedules()]
+    async with test_engine.connect() as conn:
+        active: dict[object, bool] = dict(
+            (
+                await conn.execute(
+                    text("SELECT id, is_active FROM delivery_schedules WHERE id IN (:a, :b)"),
+                    {"a": mine.id, "b": other.id},
+                )
+            ).all()
+        )
+        logged = (
+            await conn.execute(
+                text(
+                    "SELECT payload->'envios_apagados' FROM audit_log "
+                    "WHERE action = 'prueba' AND entity_type = 'user' AND entity_id = :id "
+                    "AND payload ? 'envios_apagados'"
+                ),
+                {"id": str(ana.user_id)},
+            )
+        ).scalar_one()
+
+    assert active == {mine.id: False, other.id: True}
+    # El reloj y la pantalla ya no ven los envíos de quien se borró.
+    assert mine.id not in listed
+    assert other.id in listed
+    assert logged == [mine.id]
+
+
+def test_la_migracion_0045_apaga_los_envios_de_los_ya_borrados(clean: Engine) -> None:
+    with clean.begin() as conn:
+        region = conn.execute(text("SELECT id FROM regions WHERE code = '09'")).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO users (username, display_name, created_by, deleted_at) "
+                "VALUES ('rls-borrada', 'Borrada', 'prueba', now()), "
+                "('rls-viva', 'Viva', 'prueba', NULL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO delivery_schedules (owner, name, concept_ids, region_id, times) "
+                "VALUES ('rls-borrada', 'Monitor FGR', '{1}', :r, '{420}'), "
+                "('rls-viva', 'Monitor FGR', '{1}', :r, '{420}')"
+            ),
+            {"r": region},
+        )
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("ALEMBIC_TARGET", "test")
+        config = Config(str(BACKEND_DIR / "alembic.ini"))
+        command.downgrade(config, "0044")
+        command.upgrade(config, "head")
+    with clean.connect() as conn:
+        active: dict[object, bool] = dict(
+            conn.execute(
+                text("SELECT owner, is_active FROM delivery_schedules WHERE owner LIKE 'rls-%'")
+            ).all()
+        )
+
+    assert active == {"rls-borrada": False, "rls-viva": True}
 
 
 async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncEngine) -> None:

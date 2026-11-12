@@ -59,7 +59,7 @@ Las búsquedas de otra persona no existen para ti: la base de datos no las entre
 - **Olvidó su contraseña:** «Editar» → **Restablecer contraseña**. Le sale una temporal nueva y sus sesiones se cierran.
 - **Cambió o perdió el celular:** «Editar» → **Reiniciar autenticador**. Al entrar escanea un QR nuevo.
 - **Quitarle el acceso un tiempo:** «Editar» → apaga «Puede entrar».
-- **Borrarla:** «Editar» → **Borrar persona**. Desaparece de la lista y ya no puede entrar. Sus búsquedas y la bitácora se quedan, y su usuario no se puede volver a usar (así nadie nuevo ve lo suyo).
+- **Borrarla:** «Editar» → **Borrar persona**. Desaparece de la lista y ya no puede entrar. Sus envíos programados se apagan (ya no le llega nada a nadie por ella). Sus búsquedas y la bitácora se quedan, y su usuario no se puede volver a usar (así nadie nuevo ve lo suyo).
 - **Cambiar su rol:** «Editar» → Rol.
 
 **Etiquetas junto a cada persona:**
