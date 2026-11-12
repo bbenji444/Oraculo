@@ -36,7 +36,10 @@ class DeliveryScheduleStorePort(Protocol):
     """Dónde se guardan los envíos programados y las corridas apartadas."""
 
     async def list_schedules(self) -> list[DeliverySchedule]:
-        """Los envíos que ve quien pregunta (todos, para el worker), por dueño y nombre."""
+        """Los envíos que ve quien pregunta (todos, para el worker), por dueño y nombre.
+
+        Nunca trae los de personas borradas.
+        """
         ...
 
     async def get_schedule(self, schedule_id: int) -> DeliverySchedule | None:

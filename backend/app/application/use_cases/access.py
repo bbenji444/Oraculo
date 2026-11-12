@@ -477,7 +477,8 @@ class AccessAdmin:
         """Borra a una persona (borrado lógico) y cierra sus sesiones.
 
         Desaparece de «Accesos» y ya no puede entrar: se le quitan contraseña,
-        código y llaves. Sus búsquedas y casos se quedan (los ven los
+        código y llaves, y se apagan sus envíos programados (no se borran).
+        Sus búsquedas y casos se quedan (los ven los
         superusuarios) y su usuario queda reservado para que nadie nuevo los
         herede. La bitácora conserva todo.
 

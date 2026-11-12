@@ -80,7 +80,13 @@ _USE_COUNTER = text(
 _DELETE_USER = text(
     "UPDATE users SET deleted_at = now(), is_active = false, password_hash = NULL, "
     "totp_secret = NULL, totp_last_counter = NULL, must_change_password = true "
-    "WHERE id = :id AND deleted_at IS NULL RETURNING id"
+    "WHERE id = :id AND deleted_at IS NULL RETURNING username"
+)
+# Sus envíos programados se apagan (no se borran): una persona borrada no
+# debe seguir mandando reportes. Benji, 11/11/2026: «pp» seguía prendido.
+_PAUSE_USER_SCHEDULES = text(
+    "UPDATE delivery_schedules SET is_active = false, updated_at = now() "
+    "WHERE owner = :owner AND is_active RETURNING id"
 )
 _REVOKE_USER_KEYS = text(
     "UPDATE access_keys SET revoked_at = now() WHERE user_id = :id AND revoked_at IS NULL"
@@ -265,11 +271,14 @@ class PostgresAccessStore:
     async def delete_user(self, user_id: int, audit: AuditEntry) -> bool:
         """Ver ``AccessStorePort.delete_user``."""
         async with self._engine.begin() as conn:
-            found = await conn.scalar(_DELETE_USER, {"id": user_id})
-            if found is None:
+            username = await conn.scalar(_DELETE_USER, {"id": user_id})
+            if username is None:
                 return False
             await conn.execute(_REVOKE_USER_KEYS, {"id": user_id})
-            await _audit(conn, audit, "user", str(user_id))
+            paused = (await conn.execute(_PAUSE_USER_SCHEDULES, {"owner": username})).scalars()
+            # La bitácora dice qué envíos se apagaron con el borrado.
+            payload = {**audit.payload, "envios_apagados": sorted(paused)}
+            await _audit(conn, AuditEntry(audit.actor, audit.action, payload), "user", str(user_id))
         return True
 
     async def find_key(self, public_id: str) -> KeyRecord | None:

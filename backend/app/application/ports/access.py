@@ -179,7 +179,10 @@ class AccessStorePort(Protocol):
         ...
 
     async def delete_user(self, user_id: int, audit: AuditEntry) -> bool:
-        """Borrado lógico: la quita de la lista, le borra credenciales y revoca sus llaves.
+        """Borrado lógico de una persona.
+
+        La quita de la lista, le borra credenciales, revoca sus llaves y apaga
+        sus envíos programados (la bitácora dice cuáles: ``envios_apagados``).
 
         Returns:
             ``False`` si no existe o ya estaba borrada.
