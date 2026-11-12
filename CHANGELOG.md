@@ -51,7 +51,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;
   - por cada nota encontrada se levanta una columna de luz desde el piso, con un destello y una onda en su base (hasta 24 columnas). Antes eran puntos;
-  - la cámara vuela a la zona y se inclina para que se vea el volumen;
+  - la cámara vuela a la zona, la encuadra y se inclina 60° para que se vea el volumen (antes 40°, y solo volaba si la zona estaba lejos);
   - al terminar, la cámara se endereza.
 - **Fechas y zonas estrictas (11/11/2026, ADR-0048).** Benji: «si le doy buscar hoy, solo hoy».
   - Una búsqueda manual solo guarda lo publicado en los días pedidos, de 00:00 a 23:59 de la Ciudad de México.
