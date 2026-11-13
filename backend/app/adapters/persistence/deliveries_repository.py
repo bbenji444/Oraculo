@@ -383,6 +383,18 @@ class PostgresDeliveryStore:
             )
             return [_delivery(r) for r in rows]
 
+    async def stuck_deliveries(self, claimed_before: datetime) -> list[Delivery]:
+        """Ver ``DeliveryStorePort.stuck_deliveries``."""
+        async with self._engine.connect() as conn:
+            rows = await conn.execute(
+                text(
+                    _DELIVERY_SELECT + " WHERE d.status = 'sending' AND d.updated_at < :before "
+                    "ORDER BY d.updated_at, d.id"
+                ),
+                {"before": claimed_before},
+            )
+            return [_delivery(r) for r in rows]
+
     async def claim(self, delivery_id: UUID) -> bool:
         """Ver ``DeliveryStorePort.claim``."""
         async with self._engine.begin() as conn:

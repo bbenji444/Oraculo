@@ -41,6 +41,8 @@ class FakeDeliveryStore:
         self.deliveries: dict[UUID, Delivery] = {}
         self.keys: set[str] = set()
         self.attempts: list[AttemptRecord] = []
+        # Cuándo se tomó cada guía «enviando» (las pruebas lo fijan a mano).
+        self.claimed_at: dict[UUID, datetime] = {}
 
     async def list_accounts(self) -> list[DeliveryAccount]:
         return list(self.accounts.values())
@@ -149,6 +151,15 @@ class FakeDeliveryStore:
             if d.status is DeliveryStatus.PENDING and d.next_attempt_at and d.next_attempt_at <= now
         ]
         return due[:limit]
+
+    async def stuck_deliveries(self, claimed_before: datetime) -> list[Delivery]:
+        return [
+            d
+            for d in self.deliveries.values()
+            if d.status is DeliveryStatus.SENDING
+            and self.claimed_at.get(d.id, datetime.max.replace(tzinfo=claimed_before.tzinfo))
+            < claimed_before
+        ]
 
     async def claim(self, delivery_id: UUID) -> bool:
         d = self.deliveries[delivery_id]

@@ -187,6 +187,38 @@ async def test_guias_idempotentes_intentos_reintento_e_historial(
     assert await store.history(TimeCursor(page[0].created_at, str(page[0].id)), 10) == []
 
 
+async def test_solo_las_que_llevan_rato_enviando_estan_atoradas(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    """12/11/2026: un reinicio de la VM dejó una guía «enviando» para siempre."""
+    store = PostgresDeliveryStore(test_engine)
+    account = await store.save_account(
+        AccountProvider.OUTLOOK, "Ovitech", "ca_1", AccountStatus.ACTIVE
+    )
+    recipient = await store.create_recipient(
+        RecipientDraft("Geovanni", "geo@example.com", None), "benji"
+    )
+    rule = await store.save_rule(rule_draft(account.id))
+    old, fresh = await store.create_deliveries(
+        [
+            new_delivery(account.id, recipient.id, rule.id, "atorada", NOW),
+            new_delivery(account.id, recipient.id, rule.id, "saliendo", NOW),
+        ]
+    )
+    assert await store.claim(old)
+    assert await store.claim(fresh)
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text("UPDATE deliveries SET updated_at = now() - interval '20 minutes' WHERE id = :id"),
+            {"id": old},
+        )
+
+    stuck = await store.stuck_deliveries(datetime.now(UTC) - timedelta(minutes=15))
+
+    assert [d.id for d in stuck] == [old]
+    assert stuck[0].status is DeliveryStatus.SENDING
+
+
 # --- Envíos por usuario: dueño, horas y seguridad por filas (migración 0042, ADR-0045) ---
 
 ANA = AuthUser(911, "rls-envios-ana", "Ana", Role.USER)
