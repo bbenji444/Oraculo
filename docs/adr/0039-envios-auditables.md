@@ -36,6 +36,7 @@ El 06/11/2026 se probó Composio a mano: un script mandó el PDF desde la cuenta
    - un error pasajero (red, límite) se reintenta a los 1, 5 y 30 minutos;
    - un error permanente (permiso, destino inválido) o el cuarto fallo dejan la guía en «falló»;
    - el botón **Reintentar** crea un intento nuevo sin borrar los anteriores;
+   - una guía que se queda «enviando» más de 15 minutos se cortó a medias (el servidor se reinició mientras salía). Cuenta como un intento fallido y vuelve a la fila en la siguiente pasada. Si el correo sí alcanzó a salir, llega dos veces; es preferible a que no llegue (añadido el 12/11/2026, cuando un reinicio de la VM dejó atorado el correo de Geovanni de las 07:00);
    - el reloj de Celery revisa lo pendiente cada minuto.
 5. **Interruptor general apagado por defecto** (`DELIVERIES_ENABLED=false`). Las corridas no mandan nada hasta encenderlo. «Mandar prueba» sí funciona: manda ya la última corrida a una persona.
 6. **WhatsApp:** el botón aparece como «Próximamente». El canal existe en el modelo y su emisor responde «todavía no». Llega con la API oficial de Meta y una plantilla aprobada (`docs/PLAN_AUTOMATIZACION.md` §4.4).

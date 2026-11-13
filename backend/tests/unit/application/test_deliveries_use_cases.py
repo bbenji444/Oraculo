@@ -1,6 +1,7 @@
 """Casos de uso de los envíos (ADR-0039, ADR-0045), con piezas en memoria."""
 
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -18,8 +19,10 @@ from app.application.use_cases.deliveries import (
     sender_account_id,
 )
 from app.domain.deliveries import (
+    MAX_ATTEMPTS,
     MAX_RECIPIENTS_PER_USER,
     SOURCE_FGR_RUN,
+    STUCK_SENDING_MINUTES,
     AccountProvider,
     AccountStatus,
     DeliveryChannel,
@@ -364,3 +367,57 @@ async def test_sin_cuenta_elegida_la_prueba_lo_dice() -> None:
     assert await sender_account_id(store, SOURCE_FGR_RUN) is None
     with pytest.raises(DeliveryNotFoundError, match="administrador"):
         await SendTest(store, FakeReports(), use).execute(SOURCE_FGR_RUN, 1)
+
+
+async def _stuck(store: FakeDeliveryStore, minutes_ago: int, attempts: int = 0) -> None:
+    """Deja la guía «enviando» como si el servidor se hubiera reiniciado a media entrega."""
+    await PlanDeliveries(store, FakeReports()).for_run(
+        SOURCE_FGR_RUN, "corrida-1", AT_0700, await store.list_recipients()
+    )
+    [delivery] = store.deliveries.values()
+    store.deliveries[delivery.id] = replace(
+        delivery, status=DeliveryStatus.SENDING, attempts=attempts
+    )
+    store.claimed_at[delivery.id] = NOW - timedelta(minutes=minutes_ago)
+
+
+async def test_un_envio_cortado_a_medias_se_reintenta_solo() -> None:
+    """12/11/2026: la VM se reinició a las 07:04 y el correo de Geovanni quedó «enviando»."""
+    store = await store_with_rule()
+    await _stuck(store, minutes_ago=STUCK_SENDING_MINUTES + 5)
+    use, fake = sender_for(store, SendResult(True, "202", "msg-1"))
+
+    report = await use.send_due()
+
+    [delivery] = store.deliveries.values()
+    assert (delivery.status, delivery.attempts) == (DeliveryStatus.SENT, 2)
+    assert len(fake.sent) == 1
+    assert report.sent == 1
+    # Queda el intento cortado en el historial, con su razón.
+    interrupted = store.attempts[0]
+    assert (interrupted.attempt, interrupted.ok) == (1, False)
+    assert "cortó" in (interrupted.error or "")
+
+
+async def test_uno_que_se_esta_mandando_ahorita_no_se_toca() -> None:
+    store = await store_with_rule()
+    await _stuck(store, minutes_ago=2)
+    use, fake = sender_for(store, SendResult(True, "202", "msg-1"))
+
+    await use.send_due()
+
+    [delivery] = store.deliveries.values()
+    assert delivery.status is DeliveryStatus.SENDING
+    assert (fake.sent, store.attempts) == ([], [])
+
+
+async def test_uno_que_siempre_se_corta_no_se_reintenta_para_siempre() -> None:
+    store = await store_with_rule()
+    await _stuck(store, minutes_ago=STUCK_SENDING_MINUTES + 5, attempts=MAX_ATTEMPTS - 1)
+    use, fake = sender_for(store, SendResult(True, "202", "msg-1"))
+
+    await use.send_due()
+
+    [delivery] = store.deliveries.values()
+    assert (delivery.status, delivery.attempts) == (DeliveryStatus.FAILED, MAX_ATTEMPTS)
+    assert fake.sent == []

@@ -76,6 +76,12 @@ SOURCES: dict[str, str] = {SOURCE_FGR_RUN: "Monitor de noticias · reporte de co
 # (plan de automatización §4.1). Con 3 esperas hay 4 intentos en total.
 RETRY_DELAYS_MINUTES = (1, 5, 30)
 MAX_ATTEMPTS = len(RETRY_DELAYS_MINUTES) + 1
+# Una guía «enviando» por más de esto se cortó a medias: el servidor se
+# reinició mientras salía. Un correo con el PDF tarda unos 2 s en salir
+# (medido en la VM el 12/11/2026), así que 15 minutos sobran.
+STUCK_SENDING_MINUTES = 15
+# Lo que queda en el historial del intento cortado.
+INTERRUPTED_ERROR = "El envío se cortó a medias (el servidor se reinició); se reintenta."
 
 # Correo: algo@algo.dominio, sin espacios. La validación fina la hace el proveedor.
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")

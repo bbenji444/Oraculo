@@ -281,6 +281,14 @@ class DeliveryStorePort(Protocol):
         """Guías pendientes cuyo intento ya toca, las más viejas primero."""
         ...
 
+    async def stuck_deliveries(self, claimed_before: datetime) -> list[Delivery]:
+        """Guías que siguen «enviando» desde antes de ``claimed_before``.
+
+        Pasa cuando el servidor se reinicia mientras un correo sale: nadie
+        termina ese envío y la guía se queda así para siempre.
+        """
+        ...
+
     async def claim(self, delivery_id: UUID) -> bool:
         """Marca una guía como «enviando» si seguía pendiente (evita mandarla dos veces)."""
         ...

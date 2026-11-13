@@ -14,9 +14,10 @@
 No hace: no sabe de Composio, Outlook ni del monitor; usa los puertos.
 """
 
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from app.application.ports.deliveries import (
@@ -35,7 +36,9 @@ from app.application.ports.deliveries import (
     RuleDraft,
 )
 from app.domain.deliveries import (
+    INTERRUPTED_ERROR,
     SOURCES,
+    STUCK_SENDING_MINUTES,
     AccountProvider,
     AccountStatus,
     DeliveryChannel,
@@ -49,6 +52,8 @@ from app.domain.errors import (
     DeliveryNotFoundError,
     DeliveryValidationError,
 )
+
+logger = logging.getLogger(__name__)
 
 # Guías que se mandan por pasada: una corrida con muchos destinatarios se
 # reparte en varias pasadas del reloj (cada minuto).
@@ -316,14 +321,54 @@ class SendDeliveries:
         self._now = now
 
     async def send_due(self, limit: int = SEND_BATCH) -> SendReport:
-        """Manda las guías cuyo turno ya llegó."""
+        """Manda las guías cuyo turno ya llegó.
+
+        Antes, regresa a la fila las que se quedaron «enviando» porque el
+        servidor se reinició a media entrega (``release_stuck``).
+        """
         sent = failed = 0
+        await self.release_stuck()
         due = await self._store.due_deliveries(self._now(), limit)
         for delivery in due:
             status = await self.send_one(delivery)
             sent += status is DeliveryStatus.SENT
             failed += status in (DeliveryStatus.FAILED, DeliveryStatus.SKIPPED)
         return SendReport(len(due), sent, failed)
+
+    async def release_stuck(self) -> int:
+        """Reintenta las guías que se cortaron a medias.
+
+        Una guía «enviando» por más de ``STUCK_SENDING_MINUTES`` se cortó (el
+        12/11/2026 la VM se reinició a las 07:04 y el correo de Geovanni se
+        quedó así). Cuenta como un intento fallido, con su razón en el
+        historial, y vuelve a la fila para salir en esta misma pasada. Si ya
+        no le quedan intentos, se da por fallida: una guía que siempre tumba
+        el envío no se reintenta para siempre.
+
+        Si el correo sí alcanzó a salir antes del corte, llegará dos veces:
+        es preferible a que no llegue.
+
+        Returns:
+            Cuántas guías se liberaron.
+        """
+        now = self._now()
+        stuck = await self._store.stuck_deliveries(now - timedelta(minutes=STUCK_SENDING_MINUTES))
+        for delivery in stuck:
+            attempt = delivery.attempts + 1
+            # El corte no fue culpa del proveedor: no hay que esperar, solo
+            # saber si quedan intentos.
+            retry = next_attempt_at(attempt, now) is not None
+            await self._store.record_attempt(
+                AttemptRecord(delivery.id, attempt, False, None, INTERRUPTED_ERROR, now, now),
+                DeliveryStatus.PENDING if retry else DeliveryStatus.FAILED,
+                now if retry else None,
+                None,
+            )
+            logger.warning(
+                "Envío cortado a medias: vuelve a la fila",
+                extra={"delivery_id": str(delivery.id), "attempt": attempt, "retry": retry},
+            )
+        return len(stuck)
 
     async def send_one(self, delivery: Delivery) -> DeliveryStatus:
         """Intenta mandar una guía y deja el intento registrado.
