@@ -111,6 +111,32 @@ async def test_errores_pasajeros_y_permanentes() -> None:
     assert not ComposioEmailSender(None, "u").is_configured()
 
 
+# Errores reales del 12/11/2026, cuando Outlook (vía Composio) falló toda la tarde.
+CLOUDFLARE_502 = (
+    "502 {'type': 'https://developers.cloudflare.com/support/troubleshooting/http-status-codes/"
+    "cloudflare-5xx-errors/error-502/', 'title': 'Error 502: Bad gateway', 'status': 502, "
+    "'detail': 'The origin web server returned an invalid or incomplete response to Cloudflare.'}"
+)
+GRAPH_500 = (
+    "Failed to send email (Subject: 'Reporte FGR · México', Recipients: To: m***@gmail.com): "
+    "HTTP 500 Internal Server Error"
+)
+
+
+@pytest.mark.parametrize("error", [CLOUDFLARE_502, GRAPH_500, "503 Service Unavailable"])
+async def test_las_caidas_del_proveedor_se_reintentan(error: str) -> None:
+    """El 502 traía «invalid» en su texto y se tomaba como error permanente."""
+    raised = await ComposioEmailSender(lambda: client(FakeTools(RuntimeError(error))), "u").send(
+        OVITECH, MESSAGE
+    )
+    answered = await ComposioEmailSender(
+        lambda: client(FakeTools({"successful": False, "data": {}, "error": error})), "u"
+    ).send(OVITECH, MESSAGE)
+
+    assert (raised.ok, raised.retryable) == (False, True)
+    assert (answered.ok, answered.retryable) == (False, True)
+
+
 async def test_conectar_crea_la_configuracion_si_falta_y_da_el_link() -> None:
     configs = FakeConfigs([])
     fake = client(FakeTools({}), configs)

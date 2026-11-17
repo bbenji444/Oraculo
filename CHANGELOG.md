@@ -67,6 +67,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Los correos se reintentan hasta por 8 horas (13/11/2026).** El 12/11 Outlook (vía Composio) falló toda la tarde: a las 15:00 no llegó ningún correo y a las 23:00 faltaron 2. Antes los reintentos duraban 36 minutos (1, 5 y 30). Ahora hay 8 intentos a los 1, 5, 15, 30, 60, 120 y 240 minutos. Además, un 502 de Cloudflare se daba por perdido porque su texto decía «invalid»; las caídas del proveedor (500, 502, 503, 504) ahora siempre se reintentan.
 - **Un correo cortado a medias se reintenta solo (12/11/2026).** La VM se reinició a las 07:04 mientras mandaba la corrida de las 07:00, y el correo de Geovanni se quedó «enviando» para siempre. Ahora, una guía que lleva más de 15 minutos «enviando» cuenta como intento fallido y vuelve a la fila; si ya no le quedan intentos, queda «falló».
 - **«Llaves de sistema» ya no cuenta la llave de API (12/11/2026).** Benji: «¿por qué yo tengo dos llaves?». El contador y la lista sumaban la llave de API, que ya tiene su propio renglón. A Benji le marcaba 2 en vez de 1 y a Admin 1 en vez de 0.
 - **Borrar a una persona apaga sus envíos programados (11/11/2026, migración 0045).** «pp» estaba borrada y su envío «Monitor FGR» seguía prendido. No mandaba nada porque no tenía correos, pero con uno habría seguido mandando. Ahora el borrado apaga sus envíos, la bitácora dice cuáles, y el reloj y la pantalla ya no ven envíos de personas borradas. La migración apagó el de «pp».

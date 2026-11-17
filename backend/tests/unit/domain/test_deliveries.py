@@ -19,10 +19,18 @@ from app.domain.errors import DeliveryValidationError
 NOW = datetime(2026, 11, 7, 13, 5, tzinfo=UTC)
 
 
-def test_reintentos_a_1_5_y_30_minutos_y_luego_ya_no() -> None:
+def test_los_reintentos_aguantan_unas_8_horas_y_luego_ya_no() -> None:
+    """12/11/2026: Outlook falló de 15:00 a casi medianoche; 36 minutos no alcanzaban."""
     assert next_attempt_at(1, NOW) == NOW + timedelta(minutes=1)
     assert next_attempt_at(2, NOW) == NOW + timedelta(minutes=5)
-    assert next_attempt_at(3, NOW) == NOW + timedelta(minutes=30)
+    total = timedelta()
+    for attempt in range(1, MAX_ATTEMPTS):
+        retry = next_attempt_at(attempt, NOW)
+        assert retry is not None
+        total += retry - NOW
+    # De la primera falla al último intento: cerca de 8 horas, lo que hay entre
+    # una corrida y la siguiente.
+    assert timedelta(hours=7) <= total <= timedelta(hours=8)
     assert next_attempt_at(MAX_ATTEMPTS, NOW) is None
     assert next_attempt_at(0, NOW) is None
 

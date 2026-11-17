@@ -73,8 +73,11 @@ SOURCE_FGR_RUN = "monitor.corrida_fgr"
 SOURCES: dict[str, str] = {SOURCE_FGR_RUN: "Monitor de noticias · reporte de corrida automática"}
 
 # Esperas entre intentos (minutos): reintentar enseguida casi nunca sirve
-# (plan de automatización §4.1). Con 3 esperas hay 4 intentos en total.
-RETRY_DELAYS_MINUTES = (1, 5, 30)
+# (plan de automatización §4.1). Suman casi 8 horas, lo que hay de una corrida
+# a la siguiente: el 12/11/2026 Outlook (vía Composio) falló de las 15:00 a
+# casi medianoche y, con solo 36 minutos de reintentos, se perdieron 6 correos.
+# Con 7 esperas hay 8 intentos en total.
+RETRY_DELAYS_MINUTES = (1, 5, 15, 30, 60, 120, 240)
 MAX_ATTEMPTS = len(RETRY_DELAYS_MINUTES) + 1
 # Una guía «enviando» por más de esto se cortó a medias: el servidor se
 # reinició mientras salía. Un correo con el PDF tarda unos 2 s en salir

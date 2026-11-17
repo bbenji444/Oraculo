@@ -23,6 +23,7 @@ No hace: no decide reintentos ni guarda nada (eso es del caso de uso).
 
 import asyncio
 import logging
+import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, Protocol
@@ -62,6 +63,14 @@ _ACCOUNT_STATUS: Mapping[str, AccountStatus] = {
 }
 # Palabras de un error que no se arregla reintentando (permiso, destino inválido).
 _PERMANENT_HINTS = ("401", "403", "invalid", "not found", "permission", "unauthorized")
+# Caídas del proveedor: siempre se reintentan, aunque su texto traiga una
+# palabra de error permanente. El 502 de Cloudflare del 12/11/2026 decía
+# «returned an invalid or incomplete response» y se daba por perdido.
+_TRANSIENT = re.compile(
+    r"\b(?:500|502|503|504)\b|bad gateway|internal server error|service unavailable"
+    r"|gateway timeout|timed? ?out",
+    re.IGNORECASE,
+)
 
 
 class ComposioClient(Protocol):
@@ -110,6 +119,8 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 def _retryable(error: str) -> bool:
+    if _TRANSIENT.search(error):
+        return True
     lowered = error.lower()
     return not any(hint in lowered for hint in _PERMANENT_HINTS)
 
