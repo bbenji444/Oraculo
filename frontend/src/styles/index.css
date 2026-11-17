@@ -6,9 +6,15 @@
  * cian #00d2ff, texto #e0f7fa, títulos en Orbitron y texto en Roboto. Las
  * fuentes van autoalojadas (src/assets/fonts): nada se descarga de internet.
  *
- * Desde el 30/10/2026 (Benji: «algo que se vea más moderno pero tampoco tan
- * exagerado»): títulos, botones y etiquetas en Exo 2 y el texto en Inter.
- * Orbitron queda solo en el logo, como marca de Oráculo.
+ * Del 30/10/2026 (Benji: «algo que se vea más moderno pero tampoco tan
+ * exagerado») al 17/11/2026: títulos, botones y etiquetas en Exo 2 y el
+ * texto en Inter. Orbitron quedaba solo en el logo.
+ *
+ * Desde el 17/11/2026 se homologa con Oráculo core (servidor OraculoApp,
+ * docs/design_system.md, «consola HUD»): Orbitron en títulos, botones,
+ * etiquetas y cifras, y Roboto en el texto, como en Oráculo. Benji lo pidió
+ * «para que veamos», con un commit propio para regresar si no le gusta;
+ * por eso Exo 2 e Inter siguen cargadas abajo (ver ADR-0037).
  *
  * En lugar de tocar cada componente, se redefinen las escalas `slate` (fondos
  * y textos) y `sky` (acento) de Tailwind con los tonos de Oráculo: toda la
@@ -42,7 +48,9 @@
   src: url('../assets/fonts/orbitron-700.woff2') format('woff2');
 }
 /* Exo 2 e Inter: subconjunto latino de @fontsource 5.3.0 (OFL), con su
-   SHA-256 en src/assets/fonts/README.md. */
+   SHA-256 en src/assets/fonts/README.md. Desde el 17/11/2026 no las usa
+   ningún token y el navegador no descarga una letra que no se usa: se
+   quedan mientras Benji decide entre ellas y la letra de Oráculo. */
 @font-face {
   font-family: 'Exo 2';
   font-style: normal;
@@ -115,11 +123,13 @@
 }
 
 @theme {
-  --font-sans: 'Inter', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  /* Títulos, botones, etiquetas y cifras: técnica pero sobria. */
-  --font-display: 'Exo 2', 'Inter', sans-serif;
-  /* La marca de Oráculo (el logo): la única que sigue en Orbitron. */
-  --font-brand: 'Orbitron', 'Exo 2', sans-serif;
+  /* Texto que se lee o se escribe: Roboto, el --font-body de Oráculo. */
+  --font-sans: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Títulos, botones, etiquetas y cifras: Orbitron, el --font-head de
+     Oráculo. Solo hay pesos 400 y 700; el 500 y el 600 toman el más cercano. */
+  --font-display: 'Orbitron', 'Roboto', sans-serif;
+  /* La marca de Oráculo (el logo). */
+  --font-brand: 'Orbitron', 'Roboto', sans-serif;
 
   /* Fondos y textos de Oráculo (--fondo, --papel-solido, --texto, --texto-2,
      --texto-3), con los pasos intermedios interpolados. */

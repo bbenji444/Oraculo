@@ -47,6 +47,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Letras de Oráculo, a prueba (17/11/2026, ADR-0037).** Benji: «regresar a Orbitron… simplemente para que veamos». Primer paso para que el monitor se vea como Oráculo core, que lo abre desde su Hub como «Noticias Intelligence».
+  - Títulos, botones, etiquetas y cifras en **Orbitron**, y el texto en **Roboto**, como en Oráculo. Antes eran Exo 2 e Inter.
+  - Va en un commit propio para regresar con `git revert` si no gusta.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;
