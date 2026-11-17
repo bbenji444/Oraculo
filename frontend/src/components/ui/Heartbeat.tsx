@@ -10,6 +10,10 @@
 const BEAT = 'M0 14h48l6-9 8 18 7-14 5 5h86';
 // Sin latido: una línea plana.
 const FLAT = 'M0 14h160';
+// Verde «funciona» y rojo «falla» de Oráculo core (--hud-green y --hud-rose de
+// hud.css; un atributo de SVG no lee variables CSS).
+const OK_COLOR = '#00ff9d';
+const FAIL_COLOR = '#ff3333';
 
 interface HeartbeatProps {
   ok: boolean;
@@ -19,7 +23,7 @@ interface HeartbeatProps {
 }
 
 export function Heartbeat({ ok, delaySeconds = 0, className = '' }: HeartbeatProps) {
-  const color = ok ? '#2cf5a0' : '#ff4d6d';
+  const color = ok ? OK_COLOR : FAIL_COLOR;
   const path = ok ? BEAT : FLAT;
   return (
     <svg

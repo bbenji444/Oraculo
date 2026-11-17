@@ -158,6 +158,56 @@
   --color-sky-900: #004660;
   --color-sky-950: #002a3a;
 
+  /* Colores de estado de Oráculo core (--jarvis-success, --jarvis-warning y
+     --jarvis-danger de su global.css, 17/11/2026): el tono 400 es el suyo y
+     los demás pasos se mezclan con blanco (50-300) o con negro (500-950).
+     Así los ~200 usos de emerald, amber y rose en los .tsx (con datos, aviso
+     y error) dicen lo mismo que en Oráculo sin tocar cada componente. */
+  --color-emerald-50: #e6fff5;
+  --color-emerald-100: #c7ffe9;
+  --color-emerald-200: #99ffd8;
+  --color-emerald-300: #66ffc4;
+  --color-emerald-400: #00ff9d;
+  --color-emerald-500: #00e08a;
+  --color-emerald-600: #00b26e;
+  --color-emerald-700: #008c56;
+  --color-emerald-800: #007347;
+  --color-emerald-900: #005434;
+  --color-emerald-950: #00331f;
+
+  --color-amber-50: #fff7e9;
+  --color-amber-100: #ffeece;
+  --color-amber-200: #ffdfa6;
+  --color-amber-300: #ffd079;
+  --color-amber-400: #ffb020;
+  --color-amber-500: #e09b1c;
+  --color-amber-600: #b27b16;
+  --color-amber-700: #8c6112;
+  --color-amber-800: #734f0e;
+  --color-amber-900: #543a0b;
+  --color-amber-950: #332306;
+
+  --color-rose-50: #ffebeb;
+  --color-rose-100: #ffd2d2;
+  --color-rose-200: #ffadad;
+  --color-rose-300: #ff8585;
+  --color-rose-400: #ff3333;
+  --color-rose-500: #e02d2d;
+  --color-rose-600: #b22424;
+  --color-rose-700: #8c1c1c;
+  --color-rose-800: #731717;
+  --color-rose-900: #541111;
+  --color-rose-950: #330a0a;
+
+  /* Esquinas casi rectas, como las tarjetas y botones de Oráculo (4px). Los
+     `rounded-md` a `rounded-3xl` sueltos en los .tsx quedan iguales de una
+     vez; `rounded-full` (círculos y píldoras) no cambia. */
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+
   /* Brillos de OSINT (--brillo, --brillo-titulo). */
   --shadow-glow: 0 0 0 1px rgb(0 210 255 / 0.45), 0 0 18px rgb(0 210 255 / 0.35);
 }

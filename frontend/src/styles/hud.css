@@ -23,9 +23,10 @@
   --hud-cyan-line: rgb(0 210 255 / 0.2);
   --hud-ink: #e6fbff;
   --hud-muted: #809699;
-  --hud-green: #2cf5a0;
-  --hud-amber: #ffb547;
-  --hud-rose: #ff4d6d;
+  /* Estados de Oráculo core: con datos, aviso y error (ADR-0108). */
+  --hud-green: #00ff9d;
+  --hud-amber: #ffb020;
+  --hud-rose: #ff3333;
   --hud-violet: #9b8cff;
   --hud-panel: linear-gradient(180deg, rgb(10 24 32 / 0.86), rgb(4 10 14 / 0.92));
   --hud-ease: cubic-bezier(0.22, 1, 0.36, 1);
