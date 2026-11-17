@@ -33,8 +33,8 @@ El 06/11/2026 se probó Composio a mano: un script mandó el PDF desde la cuenta
    - la librería **solo puede subir archivos de `REPORTS_DIR`**, para que nunca adjunte por error el `.env` u otro archivo.
 4. **Reintentos y registro:**
    - cada intento queda en `delivery_attempts`;
-   - un error pasajero (red, límite) se reintenta a los 1, 5 y 30 minutos;
-   - un error permanente (permiso, destino inválido) o el cuarto fallo dejan la guía en «falló»;
+   - un error pasajero (red, límite o caída del proveedor: 500, 502, 503, 504) se reintenta a los 1, 5, 15, 30, 60, 120 y 240 minutos, casi 8 horas, lo que hay de una corrida a la siguiente. Antes eran 1, 5 y 30 minutos; el 12/11/2026 Outlook falló toda la tarde y se perdieron 6 correos;
+   - un error permanente (permiso, destino inválido) o el octavo fallo dejan la guía en «falló». Una caída del proveedor siempre cuenta como pasajera, aunque su texto diga «invalid» (como el 502 de Cloudflare de ese día);
    - el botón **Reintentar** crea un intento nuevo sin borrar los anteriores;
    - una guía que se queda «enviando» más de 15 minutos se cortó a medias (el servidor se reinició mientras salía). Cuenta como un intento fallido y vuelve a la fila en la siguiente pasada. Si el correo sí alcanzó a salir, llega dos veces; es preferible a que no llegue (añadido el 12/11/2026, cuando un reinicio de la VM dejó atorado el correo de Geovanni de las 07:00);
    - el reloj de Celery revisa lo pendiente cada minuto.
