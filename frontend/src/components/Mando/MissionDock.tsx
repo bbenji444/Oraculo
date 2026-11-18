@@ -117,7 +117,7 @@ function MissionClock() {
     <div className="flex items-center gap-3 text-[11px] text-slate-400">
       {upcoming.length > 0 && (
         <span className="mando-next-run">
-          Próxima corrida automática <span className="text-slate-200">{next.time}</span> · en{' '}
+          Próxima corrida <span className="text-slate-200">{next.time}</span> · en{' '}
           {countdownLabel(next.seconds)}
         </span>
       )}
@@ -403,7 +403,7 @@ function RecentMissions() {
         className="hud-kpi-label shrink-0"
         title="Abre los resultados guardados de una corrida o de una búsqueda anterior, sin volver a buscar ni gastar"
       >
-        Abrir resultados anteriores
+        Anteriores
       </span>
       <div className="mando-recents">
         {run && (
@@ -619,9 +619,10 @@ export function MissionDock({ active }: MissionDockProps) {
         <header className="mando-console-head">
           <span aria-hidden="true" className="hud-dot hud-dot--live" />
           <span className="mando-kicker whitespace-nowrap">
-            Centro de mando · {editing ? 'Ajustar consulta' : 'Nueva consulta'}
+            <span className="mando-console-brand">Centro de mando · </span>
+            {editing ? 'Ajustar consulta' : 'Nueva consulta'}
           </span>
-          <span className="ml-auto">
+          <span className="mando-console-clock ml-auto">
             <MissionClock />
           </span>
           {editing && (

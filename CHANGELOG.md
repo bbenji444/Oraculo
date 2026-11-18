@@ -64,6 +64,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Centro de mando más chaparrito otra vez (18/11/2026).** Con la búsqueda rápida la consola había crecido a 326 px de alto; ahora mide 207 px en una pantalla de 1500 px.
+  - Menos relleno y renglones más juntos; radar más chico.
+  - La explicación de la búsqueda rápida sale solo mientras se escribe en ella.
+  - «Abrir resultados anteriores» ahora dice «Anteriores» y «Próxima corrida automática» dice «Próxima corrida». La explicación completa sigue al pasar el mouse.
+  - En el celular el encabezado cabía en dos renglones y se cortaba («AJUSTAR CONSUL…»). Ahora va en uno: sin «Centro de mando ·» ni el reloj, que el teléfono ya muestra.
+
 - **Dos topes de consultas por búsqueda (17/11/2026, ADR-0109).** Para que quepan los conceptos «como en Google», que mandan una consulta por frase.
   - `MAX_QUERIES_PER_SEARCH` (10) ahora cuenta solo las consultas de pago (SearchApi).
   - Nuevo `MAX_FREE_QUERIES_PER_SEARCH` (24): cuenta las gratuitas a buscadores de afuera (Google News RSS, GDELT, BrowserWork). Alcanza para dos conceptos «como en Google».

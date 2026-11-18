@@ -91,7 +91,7 @@ export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
           {start.error.message}
         </p>
       ) : (
-        <p className="mt-1 text-[11px] text-slate-500">
+        <p className="quick-help mt-1 text-[11px] text-slate-500">
           Sin guardar un concepto: la IA arma las búsquedas y descarta las notas que no tratan de lo
           que escribiste. Si escribes un lugar («en Jalisco») se busca ahí; si no, en el de abajo
           {regionId === null ? ' (México)' : ''}. Las fechas son las de abajo.
