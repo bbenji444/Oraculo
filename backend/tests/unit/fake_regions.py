@@ -124,7 +124,10 @@ class FakeRegionRepository:
             state_code=region.code
             if region.level is RegionLevel.STATE
             else (state.code if state else None),
-            country=MEXICO_FILTER,
+            # Como el repositorio real: «Mundo» no filtra por país (ADR-0112).
+            country=CountryFilter.world(region.name)
+            if region.level is RegionLevel.WORLD
+            else MEXICO_FILTER,
         )
 
     async def find_at_point(self, point: GeoPoint, level: RegionLevel | None) -> Region | None:

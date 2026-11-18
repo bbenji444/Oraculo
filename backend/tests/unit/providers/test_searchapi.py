@@ -116,6 +116,15 @@ def test_parametros_sin_llave() -> None:
     assert not any("key" in name for name in params)
 
 
+def test_en_el_mundo_no_manda_pais() -> None:
+    # «Mundo» (ADR-0112): sin `gl`; SearchApi usa entonces su país por omisión.
+    world = query(DateWindow.last_days(7, TODAY), CountryFilter.world("Mundo"))
+    params = SearchApiProvider(None).request_params(world)
+
+    assert "gl" not in params
+    assert params["hl"] == "es"
+
+
 @pytest.mark.anyio
 async def test_sin_llave_no_esta_configurado_ni_envia() -> None:
     provider = SearchApiProvider(None)

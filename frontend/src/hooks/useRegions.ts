@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 
-import type { RegionLevel } from '../map/style';
+import type { CatalogLevel } from '../services/regions';
 import {
   getRegion,
   listChildRegions,
@@ -48,7 +48,7 @@ export function useRegionDetail(id: number | null) {
 }
 
 /** Todas las regiones de un nivel (para el primer filtro: los estados). */
-export function useRegionsByLevel(level: RegionLevel) {
+export function useRegionsByLevel(level: CatalogLevel) {
   return useQuery({
     queryKey: ['regions', 'level', level],
     queryFn: ({ signal }) => listRegionsByLevel(level, signal),

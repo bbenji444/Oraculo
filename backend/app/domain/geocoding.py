@@ -228,10 +228,12 @@ class Place:
         Returns:
             ``True`` si es una región distinta y queda dentro: un país contiene
             todo lo de su país; en México, el prefijo de la clave INEGI dice la
-            jerarquía (``09`` contiene a ``09007``).
+            jerarquía (``09`` contiene a ``09007``). «Mundo» contiene todo.
         """
         if other.region_id == self.region_id:
             return False
+        if self.level is RegionLevel.WORLD:
+            return True
         if self.level is RegionLevel.COUNTRY:
             return other.country_code == self.code
         return len(other.code) > len(self.code) and other.code.startswith(self.code)

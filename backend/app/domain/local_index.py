@@ -113,7 +113,13 @@ def criteria_for(query: PlannedQuery, tz: tzinfo) -> LocalIndexCriteria:
         raise InvalidRequestError("La consulta no tiene palabras clave.")
     place = query.place or QueryPlace((), (), query.country)
     place_terms = _normalized(place.terms)
-    if not place_terms and place.country.iso_a2 != INDEX_COUNTRY_ISO:
+    # En «Mundo» todo cuenta; el índice solo tiene notas de México, que también
+    # son del mundo.
+    if (
+        not place_terms
+        and not place.country.worldwide
+        and place.country.iso_a2 != INDEX_COUNTRY_ISO
+    ):
         place_terms = _normalized((place.country.name,))
     window = query.window
     start = datetime.combine(window.date_from, time.min, tzinfo=tz)

@@ -37,6 +37,14 @@ def test_otro_pais_se_cuenta_a_si_mismo() -> None:
     assert not is_inside(note("MEX", "MEX"), "COL", RegionLevel.COUNTRY)
 
 
+def test_el_mundo_se_cuenta_por_paises_y_toda_nota_ubicada_esta_dentro() -> None:
+    # «Mundo» (ADR-0112).
+    assert subregion_level(RegionLevel.WORLD, "WLD") is AggregateLevel.COUNTRY
+    assert is_inside(note("COL", "COL"), "WLD", RegionLevel.WORLD)
+    assert is_inside(note("14039"), "WLD", RegionLevel.WORLD)
+    assert not is_inside(NoteLocation(None, None, Precision.UNKNOWN), "WLD", RegionLevel.WORLD)
+
+
 def test_dentro_de_un_estado_por_el_prefijo_de_la_clave() -> None:
     assert is_inside(note("14039"), "14", RegionLevel.STATE)  # Guadalajara en Jalisco
     assert is_inside(note("14"), "14", RegionLevel.STATE)  # solo "Jalisco"

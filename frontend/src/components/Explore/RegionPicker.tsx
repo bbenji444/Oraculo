@@ -12,6 +12,9 @@
  * solo lo mostraba como texto de ayuda: parecía elegido, la consulta no
  * dejaba barrer y volver a elegirlo no hacía nada porque el menú ya lo
  * mostraba (Benji, 09/11/2026).
+ *
+ * Arriba, «México · Todo el mundo» (ADR-0112): con «Todo el mundo» se busca
+ * en español sin país y no hay estados ni municipios que elegir.
  */
 import { useEffect, useId, useState } from 'react';
 
@@ -20,6 +23,7 @@ import { MAX_FILTER_OPTIONS } from '../../services/regions';
 import { useExplorerStore } from '../../store/explorer';
 import { SearchBox } from '../GeoExplorer/SearchBox';
 import { chainOf } from './regionChain';
+import { HudSegmented } from '../ui/HudSegmented';
 import { HudSelect } from '../ui/HudSelect';
 import { Icon } from '../ui/Icon';
 
@@ -66,6 +70,10 @@ export function RegionPicker() {
   const states = useRegionsByLevel('state').data;
   // México es el país de los estados (todos traen su id en parent_id).
   const mexicoId = states?.[0]?.parent_id ?? null;
+  const worldId = useRegionsByLevel('world').data?.[0]?.id ?? null;
+  const isWorld = detail?.level === 'world';
+  // El primer botón lleva el país elegido («Colombia» si se buscó Colombia).
+  const countryName = detail && !isWorld ? (detail.ancestors[0]?.name ?? detail.name) : 'México';
   const municipalities = useChildRegions(stateId).data;
   const localities = useChildRegions(municipalityId).data;
   // Filtro de texto para las localidades: un municipio puede tener cientos.
@@ -80,6 +88,20 @@ export function RegionPicker() {
 
   return (
     <div className="space-y-3">
+      {worldId !== null && (
+        <HudSegmented
+          label="Alcance de la búsqueda"
+          value={isWorld ? 'world' : 'country'}
+          options={[
+            { value: 'country', label: countryName },
+            { value: 'world', label: 'Todo el mundo' },
+          ]}
+          onChange={(scope) => {
+            if (scope === 'world') selectRegion(worldId);
+            else if (isWorld) selectRegion(mexicoId);
+          }}
+        />
+      )}
       <SearchBox
         onSelect={(region) => {
           selectRegion(region.id);
@@ -104,28 +126,35 @@ export function RegionPicker() {
           <span className="font-medium text-slate-100">{detail.display_name}</span>
         </nav>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <LevelSelect
-          label="Estado"
-          value={stateId}
-          options={states}
-          disabled={!states}
-          placeholder="Todo México"
-          onChange={(id) => {
-            selectRegion(id ?? mexicoId);
-          }}
-        />
-        <LevelSelect
-          label="Municipio"
-          value={municipalityId}
-          options={municipalities}
-          disabled={stateId === null}
-          placeholder="Todo el estado"
-          onChange={(id) => {
-            selectRegion(id ?? stateId);
-          }}
-        />
-      </div>
+      {isWorld && (
+        <p className="text-xs text-slate-400">
+          Noticias en español de cualquier país. Para acotar a uno, búscalo arriba.
+        </p>
+      )}
+      {!isWorld && (
+        <div className="grid grid-cols-2 gap-2">
+          <LevelSelect
+            label="Estado"
+            value={stateId}
+            options={states}
+            disabled={!states}
+            placeholder="Todo México"
+            onChange={(id) => {
+              selectRegion(id ?? mexicoId);
+            }}
+          />
+          <LevelSelect
+            label="Municipio"
+            value={municipalityId}
+            options={municipalities}
+            disabled={stateId === null}
+            placeholder="Todo el estado"
+            onChange={(id) => {
+              selectRegion(id ?? stateId);
+            }}
+          />
+        </div>
+      )}
       {municipalityId !== null && (
         <div className="space-y-1.5">
           <input

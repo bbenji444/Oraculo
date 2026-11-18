@@ -1,4 +1,4 @@
-"""Región geográfica: país, estado, municipio/alcaldía o localidad.
+"""Región geográfica: el mundo, un país, estado, municipio/alcaldía o localidad.
 
 Es la entidad del catálogo ``regions`` (ADR-0002) vista por el resto del
 sistema. Las geometrías completas no viajan aquí: solo el punto
@@ -11,10 +11,18 @@ No hace: no sabe de SQL ni de JSON.
 from dataclasses import dataclass
 from enum import StrEnum
 
+# Clave de la región «Mundo» (ADR-0112): el código de «World» del Banco
+# Mundial y la ONU. La crea la migración 0048.
+WORLD_CODE = "WLD"
+
 
 class RegionLevel(StrEnum):
-    """Nivel de una región, de lo más general a lo más específico."""
+    """Nivel de una región, de lo más general a lo más específico.
 
+    ``WORLD`` es una sola región, «Mundo» (ADR-0112): buscar sin país.
+    """
+
+    WORLD = "world"
     COUNTRY = "country"
     STATE = "state"
     MUNICIPALITY = "municipality"
@@ -22,7 +30,7 @@ class RegionLevel(StrEnum):
 
     @property
     def depth(self) -> int:
-        """Profundidad en la jerarquía: 0 para país, 3 para localidad."""
+        """Profundidad en la jerarquía: 0 para el mundo, 4 para localidad."""
         return list(RegionLevel).index(self)
 
 

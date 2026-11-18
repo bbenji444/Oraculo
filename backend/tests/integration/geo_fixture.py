@@ -52,8 +52,27 @@ def fixture_target(settings: Settings) -> PostgresTarget:
     )
 
 
+# La fila «Mundo» que agrega la migración 0048 (ADR-0112). Al vaciar
+# ``regions`` se pierde y la migración ya no vuelve a correr; en producción el
+# cargador no la borra (hace upsert por clave).
+WORLD_ROW = """
+    INSERT INTO regions (level, code, parent_id, country_code, name, name_norm, aliases,
+                         aliases_norm, display_prefix, geom, centroid, bbox, focus_bbox, source)
+    VALUES ('world', 'WLD', NULL, 'WLD', 'Mundo', 'MUNDO',
+            ARRAY['Todo el mundo', 'Global'], ARRAY['TODO EL MUNDO', 'GLOBAL'], '',
+            ST_Multi(ST_MakeEnvelope(-180, -90, 180, 90, 4326)),
+            ST_SetSRID(ST_MakePoint(0, 20), 4326),
+            ARRAY[-180, -90, 180, 90]::double precision[],
+            ARRAY[-180, -58, 180, 75]::double precision[], 'Monitor de Noticias (ADR-0112)')
+    ON CONFLICT (code) DO NOTHING
+"""
+
+
 def load_fixture_catalog(engine: Engine, settings: Settings, work_dir: Path) -> LoadSummary:
-    """Vacía ``regions`` en la base de pruebas y carga el mini-catálogo."""
+    """Vacía ``regions`` en la base de pruebas y carga el mini-catálogo, con «Mundo»."""
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM regions"))
-    return run_load(engine, fixture_target(settings), fixture_inputs(), work_dir)
+    summary = run_load(engine, fixture_target(settings), fixture_inputs(), work_dir)
+    with engine.begin() as conn:
+        conn.execute(text(WORLD_ROW))
+    return summary

@@ -1,7 +1,7 @@
 """Reglas puras de los reportes (especificación §15, ADR-0018).
 
 - **Subregiones:** la tabla y el mapa del reporte cuentan las notas un nivel
-  abajo de la región buscada: país → estados, estado → municipios,
+  abajo de la región buscada: mundo → países, país → estados, estado → municipios,
   municipio → localidades. Una localidad se cuenta a sí misma.
 - **Dentro de la región:** solo las notas ubicadas en la región buscada entran
   en la tabla; las notas de fuera se cuentan aparte (§9 paso 7: no se borran).
@@ -14,6 +14,7 @@ from app.domain.geocoding import MEXICO_ISO3
 from app.domain.region import RegionLevel
 
 _SUBREGION = {
+    RegionLevel.WORLD: AggregateLevel.COUNTRY,
     RegionLevel.COUNTRY: AggregateLevel.STATE,
     RegionLevel.STATE: AggregateLevel.MUNICIPALITY,
     RegionLevel.MUNICIPALITY: AggregateLevel.LOCALITY,
@@ -31,6 +32,7 @@ def subregion_level(level: RegionLevel, code: str) -> AggregateLevel:
     Returns:
         El nivel de abajo (una localidad se queda en localidad). Otro país
         se cuenta a sí mismo: el catálogo solo tiene estados de México.
+        «Mundo» se cuenta por países (ADR-0112).
 
     Example:
         >>> subregion_level(RegionLevel.STATE, "14")
@@ -55,9 +57,12 @@ def is_inside(note: NoteLocation, region_code: str, region_level: RegionLevel) -
     Returns:
         En un país, si la nota es de ese país. Dentro de México, si su clave
         empieza con la de la región (``14`` contiene a ``14`` y a ``14039``, §6).
+        En «Mundo» (ADR-0112), toda nota ubicada.
     """
     if note.code is None:
         return False
+    if region_level is RegionLevel.WORLD:
+        return True
     if region_level is RegionLevel.COUNTRY:
         return note.country_code == region_code
     return note.country_code == MEXICO_ISO3 and note.code.startswith(region_code)

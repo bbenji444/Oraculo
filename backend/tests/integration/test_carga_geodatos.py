@@ -166,8 +166,9 @@ def test_zocalo_cae_en_cuauhtemoc_cdmx_y_mexico(engine: Engine) -> None:
     with engine.connect() as conn:
         codes = conn.execute(
             text(
-                "SELECT code FROM regions "
-                "WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)) "
+                # «Mundo» (ADR-0112) contiene cualquier punto: no dice dónde cae.
+                "SELECT code FROM regions WHERE level <> 'world' "
+                "AND ST_Contains(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)) "
                 "ORDER BY code"
             ),
             {"lon": ZOCALO[0], "lat": ZOCALO[1]},
@@ -205,7 +206,14 @@ def test_volver_a_cargar_no_duplica_ni_cambia_ids(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'staging_geo'"
             )
         ).scalar_one()
-    assert again.counts == {"country": 3, "state": 4, "municipality": 6, "locality": 4}
+    # «Mundo» lo agrega la migración 0048 (y el mini-catálogo); el cargador lo respeta.
+    assert again.counts == {
+        "world": 1,
+        "country": 3,
+        "state": 4,
+        "municipality": 6,
+        "locality": 4,
+    }
     assert ids() == before
     assert staging == 0
 

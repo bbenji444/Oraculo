@@ -30,9 +30,10 @@ _COLUMNS = """
     r.country_code, r.parent_id, ST_X(r.centroid) AS lon, ST_Y(r.centroid) AS lat,
     r.bbox, r.focus_bbox, r.geom IS NOT NULL AS has_polygon, r.aliases, r.population
 """
-# Profundidad del nivel (país 1 … localidad 4) para ordenar en SQL.
+# Profundidad del nivel (mundo 1, país 2 … localidad 5) para ordenar en SQL.
 _LEVEL_DEPTH = (
-    "array_position(ARRAY['country', 'state', 'municipality', 'locality']::region_level[], r.level)"
+    "array_position(ARRAY['world', 'country', 'state', 'municipality', 'locality']"
+    "::region_level[], r.level)"
 )
 _AFTER = "AND (CAST(:after_name AS text) IS NULL OR (r.name_norm, r.id) > (:after_name, :after_id))"
 # Relevancia del buscador cuando el nombre solo se parece (error de dedo): ahí
@@ -212,27 +213,35 @@ class PostgresRegionRepository:
                    ON r.level IN ('municipality', 'locality') AND s.level = 'state'
                   AND s.code = left(r.code, {_STATE_CODE_LENGTH})
                   AND s.country_code = r.country_code
-            JOIN regions c ON c.level = 'country' AND c.code = r.country_code
+            -- «Mundo» no tiene país (ADR-0112): LEFT JOIN y se decide abajo.
+            LEFT JOIN regions c ON c.level = 'country' AND c.code = r.country_code
             WHERE r.id = :id
         """  # noqa: S608 — fragmentos SQL constantes del módulo
         async with self._engine.connect() as conn:
             row = (await conn.execute(text(sql), {"id": region_id})).mappings().one_or_none()
         if row is None:
             return None
+        level = RegionLevel(row["level"])
+        if level is RegionLevel.WORLD:
+            country = CountryFilter.world(row["name"])
+        elif row["country_name"] is None:
+            return None
+        else:
+            country = CountryFilter(
+                name=row["country_name"],
+                iso_a2=row["iso_a2"],
+                fips_code=row["fips_code"],
+                name_en=row["country_name_en"],
+            )
         return PlaceFacts(
-            level=RegionLevel(row["level"]),
+            level=level,
             name=row["name"],
             search_terms=tuple(row["search_terms"]),
             name_is_repeated=row["repeated"],
             state_name=row["state_name"],
             state_search_terms=tuple(row["state_terms"] or ()),
             state_code=row["state_code"],
-            country=CountryFilter(
-                name=row["country_name"],
-                iso_a2=row["iso_a2"],
-                fips_code=row["fips_code"],
-                name_en=row["country_name_en"],
-            ),
+            country=country,
         )
 
     async def state_terms(self) -> list[str]:
@@ -260,7 +269,8 @@ class PostgresRegionRepository:
         rows = await self._fetch(
             f"""
             SELECT {_COLUMNS} FROM regions r
-            WHERE r.geom IS NOT NULL
+            -- «Mundo» contiene cualquier punto; un clic en el mar no es «Mundo».
+            WHERE r.geom IS NOT NULL AND r.level <> 'world'
               AND ST_Contains(r.geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326))
               AND (CAST(:level AS region_level) IS NULL OR r.level = CAST(:level AS region_level))
             ORDER BY {_LEVEL_DEPTH} DESC

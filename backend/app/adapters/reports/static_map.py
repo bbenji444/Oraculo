@@ -63,7 +63,7 @@ MIN_SIZE_DEGREES = 0.01
 # Ancho de referencia del SVG; el PDF lo escala al ancho de la página.
 SVG_WIDTH = 1000
 
-# Las tres consultas convierten igual cada polígono a trazos SVG: lo
+# Las consultas convierten igual cada polígono a trazos SVG: lo
 # simplifican (:tol), corrigen la longitud por la latitud media (:kx) y
 # redondean a :digits decimales.
 _SUBREGIONS = text(
@@ -76,6 +76,19 @@ _SUBREGIONS = text(
     WHERE r.geom IS NOT NULL AND (
         (:itself AND r.id = :region_id) OR (NOT :itself AND r.parent_id = :region_id)
     )
+    ORDER BY r.code
+    """
+)
+# «Mundo» (ADR-0112): los países son sus subregiones, aunque no son sus
+# hijas en el catálogo (un país no tiene padre).
+_COUNTRIES = text(
+    """
+    SELECT r.code, r.name,
+           ST_AsSVG(ST_Scale(ST_SimplifyPreserveTopology(r.geom, :tol), :kx, 1), 0, :digits)
+               AS path,
+           ST_X(r.centroid) AS lon, ST_Y(r.centroid) AS lat
+    FROM regions r
+    WHERE r.level = 'country' AND r.geom IS NOT NULL
     ORDER BY r.code
     """
 )
@@ -238,6 +251,10 @@ class PostgisStaticMap:
         # dibujan a sí mismos.
         itself = level is AggregateLevel.COUNTRY or region.level is RegionLevel.LOCALITY
         async with self._engine.connect() as conn:
+            if region.level is RegionLevel.WORLD:
+                # El mundo no tiene contorno (sería un rectángulo) ni vecinas.
+                world = list((await conn.execute(_COUNTRIES, geometry)).mappings())
+                return _svg(frame, region, _Layers(world, None, []), counts, points)
             shapes = list(
                 (
                     await conn.execute(

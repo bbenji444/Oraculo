@@ -12,6 +12,7 @@ from app.application.use_cases.quick_search import (
     KeepQuickConcept,
     QuickSearchRequest,
     StartQuickSearch,
+    names_whole_world,
     quick_name,
     resolve_place,
 )
@@ -47,7 +48,9 @@ CHIHUAHUA = make_region(
     10, "Chihuahua", RegionLevel.STATE, parent_id=1, code="08", prefix="Entidad federativa"
 )
 CUAUHTEMOC_CHIH = make_region(11, "Cuauhtémoc", parent_id=10, code="08017")
-REGIONS = (*ALL, CHIHUAHUA, CUAUHTEMOC_CHIH)
+# «Mundo» (ADR-0112), para las búsquedas en todo el mundo.
+WORLD = make_region(12, "Mundo", RegionLevel.WORLD, code="WLD", prefix="")
+REGIONS = (*ALL, CHIHUAHUA, CUAUHTEMOC_CHIH, WORLD)
 
 
 def quick(
@@ -212,3 +215,47 @@ async def test_un_parecido_no_cuenta_como_lugar() -> None:
     assert await resolve_place(regions, "Iztapa", None) is None
     assert await resolve_place(regions, None, "Jalisco") is None
     assert await resolve_place(regions, "", None) is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "bases de datos hackeadas en todo el mundo",
+        "Ataques de ransomware a nivel mundial",
+        "fraudes con criptomonedas a nivel global",
+        "filtraciones de datos en el mundo",
+        "secuestros en todos los países",
+    ],
+)
+def test_reconoce_cuando_se_pide_todo_el_mundo(text: str) -> None:
+    assert names_whole_world(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [TEXT, "boletos para el Mundial", "Mundial de futbol 2026 en Guadalajara", "mundialista"],
+)
+def test_no_confunde_el_mundial_ni_un_texto_sin_mundo(text: str) -> None:
+    assert not names_whole_world(text)
+
+
+async def test_en_todo_el_mundo_busca_en_mundo() -> None:
+    use, store, _ = quick(FakeConceptRepository())
+    text = "bases de datos hackeadas en todo el mundo"
+
+    started = await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert started.place_region == WORLD
+    [created] = store.created
+    assert created.region_id == WORLD.id
+
+
+async def test_un_lugar_del_catalogo_gana_sobre_en_el_mundo() -> None:
+    use, store, _ = quick(FakeConceptRepository(), place="Ciudad de México")
+    text = "robo de autos en la Ciudad de México, de los más altos en el mundo"
+
+    started = await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert started.place_region == CDMX
+    [created] = store.created
+    assert created.region_id == CDMX.id

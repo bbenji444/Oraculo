@@ -94,6 +94,9 @@ def test_quita_el_medio_del_titulo_solo_si_coincide() -> None:
             CountryFilter("Somalilandia", None, None, "Somaliland"),
             {"hl": "es-419", "gl": "MX", "ceid": "MX:es-419"},
         ),
+        # «Mundo» (ADR-0112): no hay edición mundial; la de Estados Unidos en
+        # español es la menos cargada a un país.
+        (CountryFilter.world("Mundo"), {"hl": "es-419", "gl": "US", "ceid": "US:es-419"}),
     ],
 )
 def test_edicion_por_pais(country: CountryFilter, expected: dict[str, str]) -> None:

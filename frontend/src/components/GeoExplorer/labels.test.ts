@@ -4,7 +4,14 @@ import { LEVEL_LABEL, stateOf } from './labels';
 
 describe('labels', () => {
   it('niveles en español', () => {
-    expect(Object.values(LEVEL_LABEL)).toEqual(['País', 'Estado', 'Municipio', 'Localidad']);
+    // «Todo el mundo» (ADR-0112) va primero: es el nivel más general.
+    expect(Object.values(LEVEL_LABEL)).toEqual([
+      'Todo el mundo',
+      'País',
+      'Estado',
+      'Municipio',
+      'Localidad',
+    ]);
   });
 });
 

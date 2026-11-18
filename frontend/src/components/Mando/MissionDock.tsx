@@ -183,7 +183,13 @@ function MissionSentence({ launcher }: { launcher: Launcher }) {
     subdivisionNames,
   );
   const connector = rangeConnector(range);
-  const regionName = regionId === null ? 'elige una región' : (region?.display_name ?? '…');
+  // «Rastrear robos en todo el mundo» se lee mejor que «en Mundo» (ADR-0112).
+  const regionName =
+    regionId === null
+      ? 'elige una región'
+      : region?.level === 'world'
+        ? 'todo el mundo'
+        : (region?.display_name ?? '…');
   return (
     <p className="mando-sentence">
       Rastrear{' '}

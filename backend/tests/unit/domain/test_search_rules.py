@@ -93,3 +93,14 @@ def test_en_un_estado_o_municipio_una_nota_sin_lugar_no_cuenta() -> None:
     assert in_region(None, cat.IZTAPALAPA) is False
     # En todo el país, una nota de un medio mexicano sin lugar sigue contando.
     assert in_region(None, cat.MEXICO, "eluniversal.com.mx") is None
+
+
+def test_en_el_mundo_toda_nota_ubicada_esta_dentro() -> None:
+    # «Mundo» (ADR-0112): cualquier país cuenta; sin lugar queda «Sin ubicación».
+    world = cat.place(99, "WLD", RegionLevel.WORLD, "Mundo", country="WLD")
+
+    assert in_region(cat.IZTAPALAPA, world) is True
+    assert in_region(cat.SPAIN, world) is True
+    assert in_region(None, world, "chilevision.cl") is None
+    assert world.contains(cat.SPAIN)
+    assert not world.contains(world)

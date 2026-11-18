@@ -5,7 +5,7 @@ obtenido y si pasó. Los valores esperados vienen en ``Expectations`` para
 poder probar las mismas revisiones con el mini-catálogo de pruebas.
 
 Criterios de §12, más revisiones extra que protegen la geolocalización:
-regiones sin padre, puntos representativos fuera de su polígono, nombres
+regiones sin padre (salvo países y «Mundo»), puntos representativos fuera de su polígono, nombres
 normalizados vacíos y conteo de localidades contra la fuente.
 
 No hace: no corrige nada; solo informa.
@@ -170,9 +170,11 @@ def check_zocalo(conn: Connection, exp: Expectations) -> CheckResult:
 
 
 def check_orphans(conn: Connection, exp: Expectations) -> CheckResult:
-    """Extra: toda región que no es país tiene padre."""
+    """Extra: toda región que no es país ni «Mundo» (ADR-0112) tiene padre."""
     count = _scalar(
-        conn, "SELECT count(*) FROM regions WHERE level <> 'country' AND parent_id IS NULL"
+        conn,
+        "SELECT count(*) FROM regions WHERE level NOT IN ('world', 'country') "
+        "AND parent_id IS NULL",
     )
     return CheckResult("Regiones sin padre", count == 0, "0", f"{count:,}")
 

@@ -166,8 +166,11 @@ def in_region(
         ubicación: ``False`` si se buscó un estado, municipio o localidad
         (no se puede asegurar que pasó ahí; Benji, 11/11/2026: «súper estricto
         de las zonas»), y ``None`` («Sin ubicación») si se buscó un país,
-        salvo que el medio sea de otro país.
+        salvo que el medio sea de otro país. En «Mundo» (ADR-0112) toda
+        nota ubicada está dentro y la que no tiene lugar queda sin ubicación.
     """
+    if searched.level is RegionLevel.WORLD:
+        return None if primary is None else True
     if primary is None:
         if searched.level is not RegionLevel.COUNTRY:
             return False

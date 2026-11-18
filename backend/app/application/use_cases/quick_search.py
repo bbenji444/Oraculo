@@ -8,8 +8,9 @@ búsqueda rápida y lo pongas así como en el buscador de Google».
 1. le pide a la IA las frases de lo que escribió el analista y el lugar que
    nombra («en Jalisco»), si nombra uno (``SuggestConceptTerms``, que valida
    el texto y deja la propuesta en la bitácora);
-2. si nombra un lugar que está en el catálogo, se busca ahí; si no, en la
-   región que eligió en la consulta;
+2. si nombra un lugar que está en el catálogo, se busca ahí; si dice «en
+   todo el mundo» o algo así, en «Mundo» (ADR-0112); si no, en la región que
+   eligió en la consulta;
 3. crea un concepto **oculto** «como en Google» con ese texto como lo que se
    juzga y las frases de la IA. No sale en la lista de conceptos ni ocupa su
    nombre;
@@ -26,6 +27,7 @@ Lo usan ``POST /api/v1/searches/quick`` y ``POST /api/v1/concepts/{id}/keep``.
 No hace: no corre la búsqueda (eso lo hace el worker) ni sabe de HTTP.
 """
 
+import re
 from dataclasses import dataclass
 
 from app.application.audit import (
@@ -44,7 +46,7 @@ from app.domain.concept import NAME_MAX_LENGTH, Concept, ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
 from app.domain.names import normalize_name
 from app.domain.queries import DateWindow, Provider
-from app.domain.region import Region, RegionLevel
+from app.domain.region import WORLD_CODE, Region, RegionLevel
 
 # Color de las búsquedas rápidas en el mapa: el cian de la consola de Oráculo
 # (ADR-0108), para que no se confunda con los conceptos guardados.
@@ -54,6 +56,36 @@ QUICK_COLOR = "#00D2FF"
 # nombres repetidos en varios estados ("San Pedro"), y con 10 caben el
 # municipio y las localidades homónimas más comunes.
 PLACE_CANDIDATES = 10
+
+# Frases que piden buscar en todo el mundo (ADR-0112), sobre el texto ya
+# normalizado (mayúsculas, sin acentos). No incluye «mundial» suelto: «el
+# Mundial» es el de futbol.
+_WHOLE_WORLD = re.compile(
+    r"\b(?:TODO EL MUNDO|EN EL MUNDO|A NIVEL (?:MUNDIAL|GLOBAL|INTERNACIONAL)"
+    r"|EN TODO EL PLANETA|EN TODOS LOS PAISES|MUNDIALMENTE|GLOBALMENTE)\b"
+)
+
+
+def names_whole_world(text: str) -> bool:
+    """Dice si el analista pidió buscar en todo el mundo.
+
+    La IA solo devuelve lugares del catálogo («en Jalisco»); «en todo el
+    mundo» no es un lugar para ella, así que se reconoce aquí, sin pagar.
+
+    Args:
+        text: Lo que escribió el analista.
+
+    Returns:
+        ``True`` si dice «en todo el mundo», «a nivel mundial», «a nivel
+        global» o algo así.
+
+    Example:
+        >>> names_whole_world("bases de datos hackeadas en todo el mundo")
+        True
+        >>> names_whole_world("boletos para el Mundial")
+        False
+    """
+    return _WHOLE_WORLD.search(normalize_name(text)) is not None
 
 
 def quick_name(proposed: str, text: str) -> str:
@@ -220,6 +252,10 @@ class StartQuickSearch:
         )
         concept = await self._concepts.create(draft, actor.user_id, audit, quick=True)
         place = await resolve_place(self._regions, proposal.place, proposal.place_state)
+        # Un lugar del catálogo gana: «robo de autos en Jalisco, de los más
+        # altos en el mundo» es de Jalisco.
+        if place is None and names_whole_world(request.text):
+            place = await self._regions.get_by_code(WORLD_CODE)
         search = await self._starter.execute(
             SearchRequest(
                 request.user_id,

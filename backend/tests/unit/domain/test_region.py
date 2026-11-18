@@ -18,7 +18,9 @@ def test_paises_y_estados_se_muestran_solo_con_su_nombre() -> None:
 
 
 def test_profundidad_de_cada_nivel() -> None:
-    assert [level.depth for level in RegionLevel] == [0, 1, 2, 3]
+    # «Mundo» (ADR-0112) va arriba de los países.
+    assert [level.depth for level in RegionLevel] == [0, 1, 2, 3, 4]
+    assert RegionLevel.WORLD.depth < RegionLevel.COUNTRY.depth
 
 
 def test_migas_de_pan_del_mas_general_al_mas_cercano() -> None:

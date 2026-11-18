@@ -3,10 +3,10 @@
  * el buscador sin conocer los nombres técnicos de la API, y el estado de cada
  * resultado para distinguir homónimos ("San Pedro" de Coahuila o de Nuevo León).
  */
-import type { RegionLevel } from '../../map/style';
-import type { Region } from '../../services/regions';
+import type { CatalogLevel, Region } from '../../services/regions';
 
-export const LEVEL_LABEL: Record<RegionLevel, string> = {
+export const LEVEL_LABEL: Record<CatalogLevel, string> = {
+  world: 'Todo el mundo',
   country: 'País',
   state: 'Estado',
   municipality: 'Municipio',

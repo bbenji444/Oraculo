@@ -47,6 +47,12 @@ LANGUAGE = "es-419"
 # Si un país no tiene código ISO-2 (territorios en disputa), se usa la
 # edición de México: el sistema está enfocado en México.
 FALLBACK_COUNTRY = "MX"
+# «Mundo» (ADR-0112): Google News no tiene edición mundial en español; hay
+# que elegir un país. Medido el 18/11/2026 con «robo de vehículos», tres
+# días: la de Estados Unidos en español trajo 9 medios .mx, 5 .cl y 1 .es; la
+# de México, 11 .mx. Es la menos cargada a un solo país.
+# VERIFICAR: no hay documentación oficial de las ediciones del RSS.
+WORLD_EDITION_COUNTRY = "US"
 _TITLE_SEPARATOR = " - "
 
 
@@ -59,7 +65,7 @@ def edition_params(country: CountryFilter) -> dict[str, str]:
     Returns:
         ``hl``, ``gl`` y ``ceid``, por ejemplo ``ceid=MX:es-419``.
     """
-    code = country.iso_a2 or FALLBACK_COUNTRY
+    code = WORLD_EDITION_COUNTRY if country.worldwide else country.iso_a2 or FALLBACK_COUNTRY
     return {"hl": LANGUAGE, "gl": code, "ceid": f"{code}:{LANGUAGE}"}
 
 
