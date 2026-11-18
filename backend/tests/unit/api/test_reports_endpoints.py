@@ -1,5 +1,6 @@
 """Endpoints de reporte y exportación con puertos en memoria (§13, §15, ADR-0018)."""
 
+import re
 from collections.abc import Iterator
 from dataclasses import replace
 from uuid import uuid4
@@ -122,3 +123,32 @@ def test_el_nombre_del_archivo_quita_acentos_y_enie() -> None:
     )
 
     assert file_name(row, "pdf") == "reporte-desaparicion-de-personas-penon-blanco-2026-10-17.pdf"
+
+
+def test_la_vista_en_pantalla_solo_se_incrusta_en_el_monitor(client: TestClient) -> None:
+    response = client.get(url("report/view"))
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["x-frame-options"] == "SAMEORIGIN"
+    assert response.headers["cache-control"] == "no-store"
+    policy = response.headers["content-security-policy"]
+    assert "frame-ancestors 'self'" in policy
+    assert "default-src 'none'" in policy
+    # El script de la página lleva el mismo nonce que la política.
+    nonce = re.search(r"script-src 'nonce-([\w-]+)'", policy)
+    assert nonce is not None
+    assert f'<script nonce="{nonce.group(1)}">' in response.text
+
+
+def test_cada_vista_lleva_un_nonce_distinto(client: TestClient) -> None:
+    first = client.get(url("report/view")).headers["content-security-policy"]
+    second = client.get(url("report/view")).headers["content-security-policy"]
+
+    assert first != second
+
+
+def test_la_vista_de_una_busqueda_que_corre_responde_409() -> None:
+    response = make_client(RUNNING).get(url("report/view", RUNNING))
+
+    assert response.status_code == 409

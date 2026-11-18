@@ -53,6 +53,19 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # La vista del reporte en pantalla se incrusta en el monitor: su política
+    # de contenido y X-Frame-Options los pone la API (ADR-0111).
+    location ~ ^/api/v1/searches/[^/]+/report/view$ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # La primera vez se escribe el resumen ejecutivo con la IA.
+        proxy_read_timeout 60s;
+        include __PROJECT_ROOT__/nginx/encabezados-reporte.conf;
+    }
+
     location /tiles/ {
         alias __PROJECT_ROOT__/geodata/output/;
         # nginx atiende Range en archivos estáticos por sí solo; PMTiles lo

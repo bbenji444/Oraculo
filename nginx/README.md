@@ -12,5 +12,6 @@ Configuración de nginx, el servidor web que une todo en un solo punto de entrad
 |---|---|
 | `monitor-noticias.conf.template` | El sitio. `make up` reemplaza `__PROJECT_ROOT__` por la ruta real y lo instala en `/etc/nginx/sites-available/`. |
 | `encabezados-seguridad.conf` | Encabezados de seguridad, incluidos en cada bloque que los necesita. |
+| `encabezados-reporte.conf` | Los de la vista del reporte en pantalla (`/api/v1/searches/{id}/report/view`): sin la política de contenido ni `X-Frame-Options`, que pone la API para dejarla incrustar solo en el monitor ([ADR-0111](../docs/adr/0111-reporte-en-pantalla.md)). |
 
 Para revisar la configuración instalada: `wsl sudo nginx -t`.

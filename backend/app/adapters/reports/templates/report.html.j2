@@ -23,6 +23,11 @@
 
   Todo el texto se escapa; solo los SVG (mapa y red) van tal cual. Nunca
   lleva el texto completo de una nota (§8).
+
+  Vista en pantalla (ADR-0111): con ``script`` la página lleva la clase
+  ``web`` y, al final, el script que arma el índice, los pliegues, el filtro
+  de noticias y las ayudas. Las ayudas leen los ``title`` de barras y
+  gráficas, que WeasyPrint ignora en el PDF.
 #}
 {% set o = view.oraculo %}
 {# Numeración de las preguntas: corre sola, así una que no aplica (como «¿Qué
@@ -38,7 +43,7 @@
   <meta name="description" content="Reporte de noticias: {{ view.title }} en {{ data.breadcrumb }}, del {{ data.search.date_from | mx_date }} al {{ data.search.date_to | mx_date }}.">
   {% if css %}<style>{{ css }}</style>{% endif %}
 </head>
-<body>
+<body{% if script %} class="web"{% endif %}>
 
 {# ------------------------------------------------------------------ Portada #}
 <section class="cover">
@@ -156,7 +161,7 @@
     <div class="breakdown">
       {# Dona: los trazos son solo números calculados en oraculo.donut. #}
       <svg class="donut" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" font-family="Barlow Reporte, Noto Sans Reporte, sans-serif">
-        {% for slice in o.donut %}<path d="{{ slice.path }}" fill="{{ slice.color }}" stroke="#ffffff" stroke-width="0.8"/>{% endfor %}
+        {% for slice in o.donut %}<path d="{{ slice.path }}" fill="{{ slice.color }}" stroke="#ffffff" stroke-width="0.8"><title>{{ slice.name }}: {{ slice.count }} {{ "nota" if slice.count == 1 else "notas" }} · {{ slice.percent }} %</title></path>{% endfor %}
         <text x="60" y="62" text-anchor="middle" font-size="18" font-weight="700" fill="#0f172a">{{ view.total }}</text>
         <text x="60" y="74" text-anchor="middle" font-size="6" letter-spacing="0.8" fill="#64748b">NOTAS</text>
       </svg>
@@ -165,7 +170,7 @@
           {% for card in o.cards %}
             <tr>
               <td class="cat-name"><i style="background: {{ card.color }}"></i>{{ card.name }}</td>
-              <td class="cat-bar"><span style="width: {{ card.percent }}%; background: {{ card.color }}"></span></td>
+              <td class="cat-bar"><span title="{{ card.name }}: {{ card.count }} · {{ card.percent }} %" style="width: {{ card.percent }}%; background: {{ card.color }}"></span></td>
               <td class="num">{{ card.count }} <small class="pct">{{ card.percent }} %</small></td>
               <td class="cat-note">{% if card.top_state %}Más en {{ card.top_state }}{% endif %}</td>
             </tr>
@@ -247,7 +252,7 @@
           {% for bar in view.subregions %}
             <tr>
               <td class="name">{{ bar.label }}</td>
-              <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
+              <td class="bar"><span title="{{ bar.label }}: {{ bar.count }} · {{ bar.percent }} %" style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
               <td class="num">{{ bar.count }} <small class="pct">{{ bar.percent }} %</small></td>
             </tr>
           {% else %}
@@ -272,7 +277,7 @@
       {% for card in q.states %}
         <div class="state-card">
           <p class="sc-head"><b>{{ card.name }}</b><span>{{ card.count }} · {{ card.percent }} %</span></p>
-          <p class="sc-bar">{% for segment in card.segments %}<span style="width: {{ (segment.share * 100) | round(2) }}%; background: {{ segment.color }}"></span>{% endfor %}</p>
+          <p class="sc-bar">{% for segment in card.segments %}<span title="{{ segment.category }}: {{ segment.count }}" style="width: {{ (segment.share * 100) | round(2) }}%; background: {{ segment.color }}"></span>{% endfor %}</p>
           <p class="sc-line"><span>Delito</span>{{ card.main_category }}</p>
           <p class="sc-line"><span>Actuación</span>{{ card.main_action }}</p>
           <p class="sc-headline">«{{ card.headline }}»</p>
@@ -302,7 +307,7 @@
           {% set ns = namespace(top=120) %}
           {% for segment in bar.segments %}
             {% set sh = 100 * segment.share %}
-            <rect x="{{ '%.2f' | format(x + slot * 0.14) }}" y="{{ '%.2f' | format(ns.top - sh) }}" width="{{ '%.2f' | format(slot * 0.72) }}" height="{{ '%.2f' | format(sh) }}" fill="{{ segment.color }}"/>
+            <rect x="{{ '%.2f' | format(x + slot * 0.14) }}" y="{{ '%.2f' | format(ns.top - sh) }}" width="{{ '%.2f' | format(slot * 0.72) }}" height="{{ '%.2f' | format(sh) }}" fill="{{ segment.color }}"><title>{{ bar.start | mx_datetime }} · {{ segment.category }}: {{ segment.count }} de {{ bar.count }}</title></rect>
             {% set ns.top = ns.top - sh %}
           {% endfor %}
           <text x="{{ '%.2f' | format(x + slot / 2) }}" y="{{ '%.2f' | format(116 - h) }}" text-anchor="middle" font-size="{{ 8 if bar.peak else 6.5 }}" font-weight="700" fill="{{ '#005f7f' if bar.peak else '#64748b' }}">{{ bar.count }}</text>
@@ -364,12 +369,12 @@
   <div class="trust-grid">
     <div>
       <h3 class="sub">Confianza de la IA en la relevancia</h3>
-      <p class="stackbar">{% for bar in q.trust.confidence %}{% if bar.count %}<span style="width: {{ (bar.share * 100) | round(2) }}%; background: {{ bar.color }}">{{ bar.count }}</span>{% endif %}{% endfor %}</p>
+      <p class="stackbar">{% for bar in q.trust.confidence %}{% if bar.count %}<span title="{{ bar.name | capitalize }}: {{ bar.count }} · {{ bar.percent }} %" style="width: {{ (bar.share * 100) | round(2) }}%; background: {{ bar.color }}">{{ bar.count }}</span>{% endif %}{% endfor %}</p>
       <p class="stack-legend">{% for bar in q.trust.confidence %}<span class="legend-item"><i style="background: {{ bar.color }}"></i>{{ bar.name | capitalize }} · {{ bar.percent }} %</span>{% endfor %}</p>
     </div>
     <div>
       <h3 class="sub">Precisión del lugar</h3>
-      <p class="stackbar">{% for bar in q.trust.precision %}{% if bar.count %}<span style="width: {{ (bar.share * 100) | round(2) }}%; background: {{ bar.color }}">{{ bar.count }}</span>{% endif %}{% endfor %}</p>
+      <p class="stackbar">{% for bar in q.trust.precision %}{% if bar.count %}<span title="{{ bar.name | capitalize }}: {{ bar.count }} · {{ bar.percent }} %" style="width: {{ (bar.share * 100) | round(2) }}%; background: {{ bar.color }}">{{ bar.count }}</span>{% endif %}{% endfor %}</p>
       <p class="stack-legend">{% for bar in q.trust.precision %}<span class="legend-item"><i style="background: {{ bar.color }}"></i>{{ bar.name }} · {{ bar.percent }} %</span>{% endfor %}</p>
     </div>
   </div>
@@ -380,7 +385,7 @@
       {% for bar in view.sources %}
         <tr>
           <td class="name">{{ bar.label }}</td>
-          <td class="bar"><span style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
+          <td class="bar"><span title="{{ bar.label }}: {{ bar.count }}" style="width: {{ (bar.share * 100) | round(1) }}%"></span></td>
           <td class="num">{{ bar.count }}</td>
         </tr>
       {% endfor %}
@@ -391,11 +396,11 @@
 {# ----------------------------------------------------------------- Noticias #}
 <section class="news">
   <h2 class="section">Noticias por estado</h2>
-  <p class="muted small">Índice de los hechos{% if o.novelty %} nuevos{% endif %}: un renglón por hecho, con su hora, título (link a la fuente), medio y cuántos medios más lo publicaron. En el panel de marcadores del lector de PDF cada estado y categoría se despliega o se contrae.</p>
+  <p class="muted small">Índice de los hechos{% if o.novelty %} nuevos{% endif %}: un renglón por hecho, con su hora, título (link a la fuente), medio y cuántos medios más lo publicaron.{% if script %} Busque por título o medio, o elija un estado.{% else %} En el panel de marcadores del lector de PDF cada estado y categoría se despliega o se contrae.{% endif %}</p>
   {% for state in o.groups %}
     <div class="state">
       <h3 class="state-title">{{ state.name }} <span>{{ state.facts }} {{ "hecho" if state.facts == 1 else "hechos" }} · {{ state.count }} {{ "nota" if state.count == 1 else "notas" }} · {{ state.percent }} %</span></h3>
-      <p class="state-strip">{% for category in state.categories %}<span style="width: {{ (100 * (category.notes | length) / state.facts) | round(2) }}%; background: {{ category.color }}"></span>{% endfor %}</p>
+      <p class="state-strip">{% for category in state.categories %}<span title="{{ category.name }}: {{ category.notes | length }}" style="width: {{ (100 * (category.notes | length) / state.facts) | round(2) }}%; background: {{ category.color }}"></span>{% endfor %}</p>
       {% for category in state.categories %}
         <h4 class="category-title"><i style="background: {{ category.color }}"></i>› {{ category.name }} <span>{{ category.notes | length }}</span></h4>
         <table class="index">
@@ -462,5 +467,6 @@
   <p class="small muted">Los resúmenes, las categorías, quién actúa y las ubicaciones se generan automáticamente y pueden contener errores. Este reporte no reproduce el texto de las notas: consulte cada fuente en su link. Documento de uso interno · {{ o.code }}.</p>
 </section>
 
+{% if script %}<script nonce="{{ nonce }}">{{ script }}</script>{% endif %}
 </body>
 </html>

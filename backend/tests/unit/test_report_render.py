@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 from dataclasses import replace
 from typing import cast
 from uuid import uuid4
@@ -12,7 +13,7 @@ from pypdf import PdfReader
 from pypdf.generic import DictionaryObject
 
 from app.adapters.reports.exports import CSV_COLUMNS, to_csv, to_geojson
-from app.adapters.reports.render import ReportRenderer, paragraphs
+from app.adapters.reports.render import ReportRenderer, paragraphs, web_css
 from app.application.ports.reports import ProviderUsage
 from app.application.ports.search_reads import JudgementView, PreviousRun
 from app.application.use_cases.reports import ExportData, ReportData, ReportFormat
@@ -227,3 +228,50 @@ async def test_la_corrida_compara_con_la_anterior(report: ReportData) -> None:
     assert "¿Qué cambió desde la corrida anterior?</h2>" not in plain
     assert '<span class="q-num">08</span>' in plain
     assert '<span class="q-num">09</span>' not in plain
+
+
+async def test_la_vista_en_pantalla_lleva_su_script_con_nonce_y_fuentes_incrustadas(
+    report: ReportData,
+) -> None:
+    page = ReportRenderer().html_view(report, "abc123")
+
+    # El mismo reporte que el PDF, con la clase y el script de la vista (ADR-0111).
+    assert "Noticias por estado" in page
+    assert '<body class="web">' in page
+    assert '<script nonce="abc123">' in page
+    assert page.count("<script") == 1
+    # Lo de la web sigue escapado: el único script es el propio.
+    assert "&lt;script&gt;" in page
+    # Fuentes WOFF2 dentro de la página; las TTF no (pesan 1.2 MB).
+    assert "data:font/woff2;base64," in page
+    assert 'url("orbitron-400.woff2")' not in page
+    assert ".ttf" not in page
+    assert "web-toc" in page
+
+
+async def test_las_graficas_traen_su_cifra_para_la_ayuda(report: ReportData) -> None:
+    page = ReportRenderer().html_view(report, "n")
+
+    # La dona: categoría, notas y porcentaje en el title de cada tramo.
+    assert re.search(r"<path [^>]+><title>[^<]+: \d+ notas? · \d+ %</title></path>", page)
+
+
+async def test_el_html_para_descargar_no_lleva_script(report: ReportData) -> None:
+    page = ReportRenderer().html(report)
+
+    assert "<script" not in page
+    assert 'class="web"' not in page
+
+
+def test_web_css_incrusta_las_woff2_y_quita_las_ttf() -> None:
+    css = (
+        '@font-face { font-family: "A"; src: url("orbitron-700.woff2") format("woff2"); }\n'
+        '@font-face { font-family: "B"; src: url("NotoSans-Bold.ttf"); font-weight: 700; }\n'
+        "p { color: red; }"
+    )
+
+    result = web_css(css)
+
+    assert 'url("data:font/woff2;base64,' in result
+    assert "NotoSans" not in result
+    assert "p { color: red; }" in result

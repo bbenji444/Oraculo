@@ -4,6 +4,11 @@
   descarga; el HTML es la vista previa y lo que se imprime desde el
   navegador. La primera vez puede pedirle el resumen ejecutivo a la IA
   (~0.001 USD); las siguientes lo reutilizan.
+- ``GET /searches/{id}/report/view``: el reporte para verlo dentro del
+  monitor (ventana «Ver reporte», ADR-0111), con índice, pliegues, filtro de
+  noticias y ayudas. Es ``GET`` porque lo abre un iframe. Igual que el
+  ``POST``, la primera vez puede pedir el resumen a la IA; otro sitio no
+  puede provocarlo porque la cookie de sesión es ``SameSite=Strict``.
 - ``GET /searches/{id}/export?format=csv|geojson``: las notas como datos.
 
 Routers delgados: toman las piezas que armó la aplicación al arrancar
@@ -14,6 +19,7 @@ No hace: no decide qué va en el reporte ni cómo se dibuja.
 """
 
 import re
+import secrets
 import unicodedata
 from typing import Annotated, Literal
 
@@ -38,6 +44,35 @@ CSV_MEDIA = "text/csv; charset=utf-8"
 GEOJSON_MEDIA = "application/geo+json"
 # Nombre de archivo corto y seguro para cualquier sistema operativo.
 MAX_SLUG_CHARS = 60
+# 128 bits: lo que la especificación de CSP pide como mínimo para un nonce.
+NONCE_BYTES = 16
+
+
+def view_policy(nonce: str) -> str:
+    """Política de contenido de la vista del reporte en pantalla (ADR-0111).
+
+    El reporte trae títulos y resúmenes de la web, ya escapados. Aun así, solo
+    corre el script que lleva este nonce, no se carga nada de fuera (fuentes e
+    imágenes van incrustadas) y solo el propio monitor puede mostrarla en un
+    iframe. El estilo en línea se permite: la plantilla lo usa para anchos y
+    colores de las barras.
+
+    Args:
+        nonce: Valor único de esta respuesta.
+
+    Returns:
+        El valor del encabezado ``Content-Security-Policy``.
+    """
+    return (
+        "default-src 'none'; "
+        f"script-src 'nonce-{nonce}'; "
+        "style-src 'unsafe-inline'; "
+        "img-src data:; "
+        "font-src data:; "
+        "base-uri 'none'; "
+        "form-action 'none'; "
+        "frame-ancestors 'self'"
+    )
 
 
 def get_report_builder(request: Request) -> BuildReport:
@@ -142,6 +177,36 @@ async def search_report(
         return HTMLResponse(documents.html(data))
     pdf = await run_in_threadpool(documents.pdf, data)
     return _download(pdf, PDF_MEDIA, file_name(data.search, "pdf"))
+
+
+@router.get(
+    "/{search_id}/report/view",
+    response_class=HTMLResponse,
+    summary="Reporte de una búsqueda para verlo en el monitor",
+    responses=error_responses(404, 409),
+)
+async def search_report_view(
+    builder: Builder,
+    documents: Documents,
+    actor: CurrentActor,
+    search_id: SearchId,
+) -> HTMLResponse:
+    """El mismo reporte que el PDF, con índice, pliegues, filtro y ayudas (ADR-0111).
+
+    Responde ``409`` si la búsqueda todavía corre. La primera vez le pide el
+    resumen ejecutivo a la IA; las siguientes, y el PDF, lo reutilizan.
+    """
+    data = await builder.execute(search_id, ReportFormat.HTML, actor)
+    nonce = secrets.token_urlsafe(NONCE_BYTES)
+    return HTMLResponse(
+        documents.html_view(data, nonce),
+        headers={
+            "Content-Security-Policy": view_policy(nonce),
+            "X-Frame-Options": "SAMEORIGIN",
+            # Es información de uso interno: que no quede guardada en el navegador.
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get(
