@@ -1062,12 +1062,13 @@
 }
 
 /* Los controles del mapa (acercar, alejar, brújula) se recorren junto con el
-   expediente para no quedar encima de su esquina. */
+   expediente para no quedar encima de su esquina. Los 12px extra los separan
+   de su borde: sin ellos quedaban pegados (medido a 1024 px, 17/11/2026). */
 .maplibregl-ctrl-top-right {
   transition: translate 0.7s var(--hud-ease);
 }
 [data-dossier='open'] .maplibregl-ctrl-top-right {
-  translate: calc(-30rem - 1rem) 0;
+  translate: calc(-30rem - 1rem - 12px) 0;
 }
 
 /* --- Movimientos --------------------------------------------------------------- */
