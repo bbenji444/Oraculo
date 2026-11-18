@@ -220,6 +220,10 @@ def test_un_concepto_abierto_se_juzga_contra_lo_que_escribio_el_analista() -> No
     ) in prompt
     # La regla que le dice a la IA qué hacer con ese texto.
     assert "Las frases de búsqueda solo son pista" in prompt
+    # Medido el 17/11/2026: con solo el título y la regla del hecho concreto,
+    # descartaba notas del tema («Ciberataques bancarios aumentan 70% en México»).
+    assert "no exijas un hecho concreto" in prompt
+    assert "Tener poco texto no es motivo para descartar" in prompt
 
 
 def test_un_concepto_abierto_sin_descripcion_se_presenta_como_exacto() -> None:

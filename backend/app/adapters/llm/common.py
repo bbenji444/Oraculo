@@ -44,6 +44,9 @@ from app.domain.region import RegionLevel
 # v4: relevante solo si el concepto es el asunto principal de la nota (ADR-0044).
 # v5 (17/11/2026): en los conceptos «como en Google» la relevancia se juzga
 # contra lo que escribió el analista; las frases son solo pista (ADR-0109).
+# Antes de publicarse se le quitó, solo a esos conceptos, la exigencia de un
+# hecho concreto y el descarte por tener solo el título: en la primera
+# búsqueda real dejaba 5 relevantes de 150 (ADR-0109, «Primera búsqueda real»).
 PROMPT_VERSION = "enrich_v5"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 # Respuestas consistentes: se extraen datos, no se escribe creativo.

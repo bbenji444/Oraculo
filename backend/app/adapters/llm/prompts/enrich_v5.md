@@ -6,7 +6,13 @@ Reglas:
 2. Resumen: 2 o 3 oraciones, neutral, en español, con tus propias palabras. No copies frases largas de la nota.
 3. Relevancia MUY estricta para cada concepto. Mencionar un tema no es tratar de él.
    - Es relevante solo si el concepto es el ASUNTO PRINCIPAL de la nota: la nota informa un hecho concreto de ese tema (por ejemplo un homicidio, una desaparición, una detención, un cateo, una investigación, un juicio o una sentencia) o trata ese tema a fondo.
-   - Si el concepto trae «Lo que busca el analista», juzga contra ese texto: la nota es relevante si su asunto principal es lo que el analista describe, con las condiciones que ponga (de qué país, qué tipo de víctima, quién actúa). Las frases de búsqueda solo son pista: que la nota tenga una de ellas no la hace relevante ("descartan ciberataque en Estados Unidos" no sirve para "hackeos al gobierno mexicano"), y una nota sin ninguna de ellas sí puede serlo.
+   - Si el concepto trae «Lo que busca el analista», juzga contra ese texto y no exijas un hecho concreto:
+     - Es relevante si el asunto principal de la nota es lo que el analista describe, con las condiciones que ponga (de qué país, qué tipo de víctima, quién actúa).
+     - También cuenta lo que se informa de ese tema sin ser un hecho concreto: cifras, aumentos, alertas o advertencias de autoridades o especialistas, investigaciones y denuncias ("Ciberataques bancarios aumentan 70% en México" sí sirve para "hackeos a bancos en México").
+     - Si el analista pide un país o un lugar, cuenta si el hecho ocurre ahí o si la nota dice que lo afecta directamente: un ataque mundial que alcanzó a empresas de México, sí; uno que no nombra a México, no.
+     - Si solo tienes el título y un fragmento, juzga con lo que dicen: un título que deja claro el asunto basta. Tener poco texto no es motivo para descartar.
+     - No cuentan las guías o consejos ("cómo protegerte", "qué hacer si te hackean"), la publicidad ni las notas de otro tema que lo nombran de pasada.
+     - Las frases de búsqueda solo son pista: que la nota tenga una de ellas no la hace relevante ("descartan ciberataque en Estados Unidos" no sirve para "hackeos al gobierno mexicano"), y una nota sin ninguna de ellas sí puede serlo.
    - Prueba rápida: si le quitas a la nota la parte del concepto, ¿la nota sigue siendo casi la misma? Entonces NO es relevante.
    - NO son relevantes las notas que reúnen muchos temas distintos, aunque uno sea el concepto: agendas o listas de marchas, bloqueos y manifestaciones del día; "lo que pasó hoy"; resúmenes o columnas de varias noticias; guías de tránsito; clima; efemérides; horóscopos.
    - Una marcha, protesta o caravana cuenta solo si toda la nota trata de ella y es por ese tema (una marcha para buscar a una persona desaparecida sí es desaparición). En una lista de varias marchas, no.

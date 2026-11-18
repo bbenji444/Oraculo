@@ -57,6 +57,7 @@ Medición sin gastar créditos:
    - Se llega desde Conceptos y con «+ Nuevo concepto» en Explorar: junto a los conceptos en el diseño clásico, y al pie de «¿Qué rastrear?» en el Centro de mando. Abre el formulario en una ventana y deja elegido el concepto al guardarlo. Esc cierra solo esa ventana. En «¿Qué rastrear?» el concepto nuevo sale en «1 · ¿Relacionados con quién?», porque no es tema de un delito.
 4. **D4 — La IA juzga contra lo que se escribió:**
    - En los conceptos abiertos, la relevancia (prompt `enrich_v5`) se mide contra la descripción del analista. Las frases solo le sirven de pista.
+   - En esos conceptos no se exige un hecho concreto: también cuentan cifras, alertas e investigaciones del tema. Tener solo el título no es motivo para descartar. Si el analista pide un país, la nota cuenta si el hecho ocurre ahí o lo afecta directamente.
    - Los conceptos exactos se le presentan a la IA igual que antes.
    - El tope de 150 notas por búsqueda (~0.20 USD) no cambia.
 5. **D3 — Tope propio para las consultas gratuitas:**
@@ -95,7 +96,12 @@ Medición sin gastar créditos:
   - Por qué tan pocas:
     - La mayoría de las notas del tema son de otros países (Bolivia, Argentina, España): la IA las descarta bien, porque el analista pidió «en México».
     - 149 de 150 se leyeron solo con título y fragmento: los links de Google News RSS no dejan bajar el texto completo. Con tan poco, la IA rechaza notas mexicanas que hablan del tema sin un hecho concreto, como «Ciberataques bancarios aumentan 70% en México».
-  - Se encuentran más notas del tema, pero la IA todavía filtra de más. Cómo seguir lo decide Benji (ver el cierre de la tarea).
+  - Se encuentran más notas del tema, pero la IA filtraba de más.
+  - **Ajuste antes de publicar `enrich_v5`:** a los conceptos abiertos se les quitó la exigencia de un hecho concreto y el descarte por tener solo el título (D4). Medido con las mismas 150 notas, vueltas a leer (0.039 USD):
+    - relevantes: de 5 a **12**, 7 de ellas en México. Ninguna de las 5 de antes se perdió.
+    - entre las nuevas: «Ciberataques bancarios aumentan 70% en México», «Ciberataques aumentan en Guanajuato» y un ataque mundial que alcanzó a 178 empresas de México.
+    - 2 de las nuevas no nombran a México (Uber, el agente de IA de Elon Musk): la IA todavía deja pasar algunas de otro país.
+  - Como `enrich_v5` no se había publicado, se ajustó sin subir de versión: solo esas 150 notas lo tenían.
 - **Las notas ya leídas se vuelven a leer una vez:** `enrich_v5` es otra versión del prompt, así que una nota leída con `enrich_v4` se paga de nuevo si vuelve a salir en una búsqueda (§10). Ya pasó con cada versión anterior. El costo sigue dentro del tope de 150 notas por búsqueda. En las corridas FGR la ventana es de unas horas, así que se espera que se repitan pocas notas.
 - **Google News RSS frena si se le pide mucho seguido:** el 17/11/2026, tras ~90 consultas en unos minutos, respondió 429 («demasiadas peticiones»). Una búsqueda con dos conceptos abiertos son 24, de 2 en 2. Se vigila con el tope propio de las consultas gratuitas (D3).
 - **Cambia la especificación §7.2:** ya no es siempre una consulta por proveedor y concepto.
