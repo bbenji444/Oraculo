@@ -65,6 +65,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - La sesión es una píldora como la de Oráculo, con el botón rojo de «Salir». En pantallas medianas se ocultan «ORÁCULO» y el nombre de la persona para que quepan todas las pestañas.
     - Abajo al centro, fuera de Explorar, el chip «Estado del sistema» con un piloto verde, ámbar o rojo según `/health`. Lleva a la pestaña Estado del sistema.
     - Fuera de Explorar el fondo es la cuadrícula y la constelación de Oráculo en lugar de las estrellas. Con «reducir animaciones» queda quieta, y se detiene si la pestaña del navegador está oculta. Explorar conserva el globo y su universo, que ya no se carga en las demás pestañas.
+  - **Menú a la izquierda, como en Oráculo (17/11/2026):** las 7 secciones dejan el encabezado y pasan a una barra vertical compacta a la izquierda, con el icono de cada una y su nombre chiquito debajo, como el dock del Hub de Oráculo (lo pidió el jefe de Benji). Arriba quedan solo la marca y la sesión, que ya se ven completas en cualquier pantalla. En Explorar el globo sigue de fondo y los paneles se recorren a la derecha de la barra. En celular el menú se queda en el encabezado como fila que se desliza, para no chocar con la consola de Explorar.
   - **Iconos de Oráculo (Material Icons):** cerrar, flechas, desplegar, palomitas, «abre en otra pestaña», filtro, calendario, búsqueda y la sesión usan los mismos iconos que Oráculo, en lugar de caracteres (× › ▾ ✓ ↗) y dibujos sueltos. La letra va dentro del monitor, no se descarga de internet.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
@@ -184,6 +185,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - un índice compacto, un renglón por hecho y hasta 40 hechos; lo demás se consulta en el monitor o en el CSV.
 
   La portada, el panorama, el mapa y el anexo siguen igual.
+
 - **Calendario con el estilo del sistema (28/10/2026, `HudDatePicker`).** «Desde» y «Hasta» ya no abren el calendario gris del navegador. Ahora el calendario es propio:
   - vidrio oscuro y días que se iluminan al pasar el mouse;
   - hoy con un punto, el día elegido brillando y una banda entre las dos fechas;
@@ -191,6 +193,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - no deja elegir días después de hoy, ni un «hasta» antes del «desde».
 
   Se usa con el mouse o con el teclado.
+
 - **Consola del Centro de mando en tres zonas, sin textos cortados (28/10/2026).** Antes, «Abrir resultados anteriores» se encimaba con el costo, y había textos a medias: «CENTRO DE MAND…», «CONSU…», «Tu búsqueda del 27…». Ahora:
   - arriba, a todo el ancho, el título completo, la próxima corrida y el reloj;
   - en medio:
@@ -208,6 +211,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - no relevantes.
 
   El botón dice cuántos filtros hay puestos, y lo elegido vale para la cronología, la lista y el globo. Las pestañas de ubicación de la lista y la línea del tiempo de arriba se quitaron para dejarle el espacio a las noticias.
+
 - **Cada tipo de noticia tiene su color (28/10/2026, migración 0032).** Las 15 categorías tienen un color propio, el mismo en la barra del expediente, las etiquetas de la lista y de la cronología, los nodos de la cronología y los puntos del globo. Ejemplos: Homicidio en rojo, Huachicol en verde lima, Secuestro en rosa y Otros en gris. Solo se llenan los colores vacíos; si alguien elige uno, se respeta.
 - **Diseño 3, «Centro de mando», para comparar (27/10/2026, ADR-0037).** Se abre con `?mando#/explorar`; sin `?mando` sigue el diseño 2, igual que antes. Usa el mismo globo, los mismos estilos y los mismos botones, con otro acomodo de la búsqueda:
   - **la búsqueda se lee como una orden:** «Rastrear [FGR] en [Jalisco] durante [los últimos 7 días] vía [2 fuentes gratis]». Cada parte se toca para cambiarla y las que faltan brillan en ámbar;
@@ -230,6 +234,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - aviso «Deshacer»: barra de tiempo.
 
   La muestra de todas las piezas sigue en `?diseno#/diseno`.
+
 - **Menús desplegables con el estilo del sistema (27/10/2026).** Los 9 menús (estado, municipio, localidad, filtros de la cronología, animación del globo, sensibilidad del caso, estatus legal, unir entidades y tipo de vínculo) ya no usan la lista del navegador. Ahora:
   - se despliegan con animación;
   - la opción bajo el mouse o el teclado se ilumina con una barra de luz, y la elegida lleva palomita;
@@ -240,6 +245,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - el panorama, las gráficas y el mapa siguen cubriendo toda la ventana.
 
   En la corrida de las 23:00 del 26/10 fueron 33 hechos nuevos y 65 que no se repiten. El PDF bajó de 26 a 14 páginas. La auditoría completa está en `docs/analisis-2026-10-27.md`.
+
 - **Eliminar casos y búsquedas del historial (27/10/2026).** Se borran de forma reversible:
   - el primer clic pide confirmar («¿Eliminar? · Sí, eliminar · Cancelar») y luego aparece un aviso con «Deshacer» durante 8 segundos;
   - un caso solo lo elimina su dueño; del historial se pueden quitar las búsquedas propias y las corridas automáticas;
@@ -252,6 +258,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - duplicados en tres niveles y tema visual homologado con OSINT Oráculo.
 
   El reloj de Celery que ya existe dispara las corridas (ADR-0022). Los perfiles de fuentes y la conexión con BrowserWork quedan en el ADR-0023.
+
 - **`make reparar-texto`** (F12.1, ADR-0024): repara el Mojibake de las notas ya guardadas en el índice local, en las notas y en sus textos, y recalcula sus columnas de búsqueda. Sin opciones solo muestra cuántas cambiarían y 5 ejemplos reales; con `ARGS=--aplicar` pide «si» y guarda por lotes.
 - **Switches de fuentes** (F12.2, ADR-0027): en la búsqueda manual el analista enciende o apaga Google News RSS, el índice local y SearchApi; cada switch dice si es gratis o gasta créditos, y la estimación se recalcula (con SearchApi apagado, 0 créditos). La búsqueda guarda sus fuentes (migración 0025, `searches.providers`), el worker corre solo con ellas, la bitácora las registra y el historial las muestra. Cada fila de la lista dice de qué fuente vino la nota. Nuevo `GET /sources`; `MANUAL_DEFAULT_SOURCES` fija las encendidas por defecto.
 - **BrowserWork como fuente, listo pero oculto** (F12.3, ADR-0028): adaptador para Bing y Google 2 por la API de BrowserWork, sin llave ni credenciales. Si pide captcha, falla o no termina en 240 s, esa fuente se omite y la búsqueda queda parcial. Se configura con `BROWSERWORK_BASE_URL`. En la prueba real del 25/10/2026, Bing trajo solo sitios oficiales y Google 2 links rotos por un error de BrowserWork, así que sus switches quedan ocultos hasta que se corrija.
@@ -315,6 +322,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - IBM Plex Mono en horas y número de expediente.
 
   Reemplaza a Noto Serif.
+
 - **PDF con tipografía formal y texto justificado (30/10/2026).** Se cambió la tipografía:
   - el texto de lectura (resumen ejecutivo, resúmenes de los hechos, metodología) va en Noto Serif, justificado y con división de palabras en español;
   - los titulares de las notas y el título de la portada, en Noto Serif negrita;
@@ -322,6 +330,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - las conclusiones de cada pregunta, en cursiva.
 
   Las fuentes van incluidas en el repositorio con su manifiesto y su SHA-256.
+
 - **Las corridas dejan fuera los hechos de otros días, no las sentencias de hoy (28/10/2026, `enrich_v3`, ADR-0031).** La IA ahora da la fecha y el tipo de lo que la nota informa (la detención, la sentencia, el cateo) en lugar de la fecha del delito original. Con esa fecha, cada corrida quita las notas cuyo hecho es de antes de su periodo: el cateo de ayer publicado hoy sale; la sentencia de hoy por un delito de 2019 se queda. La cronología también acomoda cada nota en la fecha de lo que informa.
 - **«Nueva consulta» y «Ajustar consulta» regresan el globo al Atlántico y lo ponen a girar (28/10/2026).** Al tocar cualquiera de los dos botones, el globo vuela a la vista del Atlántico, la misma con la que abre el sistema, y al llegar empieza a girar solo. «Limpiar globo», en el diseño de columna, sigue volviendo a México.
 - **La espera del barrido, más viva y más clara (28/10/2026).** Mientras se busca:
@@ -332,6 +341,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - la bitácora escribe con cursor y una franja de escaneo recorre la consola.
 
   La bitácora ya no dice «Fuentes consultadas: 512 notas», que parecía 512 resultados. Dice «Notas encontradas: 512 (la IA decide cuáles sirven)» e «IA leyendo: 110 de 295 nuevas · 217 ya leídas antes».
+
 - **El PDF responde las preguntas del analista (28/10/2026, ADR-0033).** Cada bloque abre con una pregunta numerada, su gráfica y una línea de conclusión:
   - ¿Qué pasó?
   - ¿Qué es lo más importante?
@@ -348,6 +358,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - fichas por estado;
   - un índice por estado con franjas de color;
   - tipografía formal: Noto Sans en lugar de Orbitron, que solo queda en la marca de la portada.
+
 - **Consola más chaparrita y ubicación sin ambigüedad (28/10/2026).**
   - La consola del Centro de mando baja de 240 a 179 px de alto con las mismas piezas: el radar, la frase y los márgenes son más chicos, y el costo va en un solo renglón de tres cifras con su nombre completo.
   - En el filtro de ubicación, «Dentro» y «Fuera» ahora dicen «Dentro de zona» y «Fuera de zona», también en el diseño de columna.
@@ -403,6 +414,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - la de las 23:00, de 15:00 a 23:00.
 
   Se quitó `AUTOMATIC_WINDOW_DAYS`.
+
 - **Al elegir un país, el globo se acerca a él (28/10/2026).** En el Centro de mando, el vuelo seguía apartando la columna de búsqueda del diseño 2, que ahí no existe. Por eso Estados Unidos o Argentina quedaban corridos al oeste y más lejos que antes. Ahora el país queda al centro del espacio libre y lo llena, con poco margen.
 - **La entrada del globo llega directo a su lugar (28/10/2026).** Al abrir el sistema la Tierra giraba, se detenía y luego se recorría hacia arriba y cambiaba de tamaño, porque terminaba en un zoom fijo y después se reacomodaba al espacio libre. Ahora la entrada calcula desde el principio el zoom y el margen finales y llega ahí sin segundo ajuste.
 - **Elegir un país o una región en el Centro de mando ya hace zoom directo a él (27/10/2026).** Antes, al llegar a un país (zoom menor a 3), cualquier cambio de alto de la consola volvía a ajustar el globo entero y lo alejaba. Ahora ese ajuste solo aplica en la vista general, sin región ni nota elegida.
@@ -422,6 +434,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - **acentos:** «Fiscalia General de la Republica», sin acentos y entre comillas, traía 4 notas en dos días. El concepto ahora busca «Fiscalía General de la República» (migración 0031).
 
   En la sonda del mismo día, la ventana de dos días juntó 281 notas distintas en lugar de 102. Cuesta unos 0.02 USD más por corrida.
+
 - **El índice local ya no corta en 250 notas** (27/10/2026): la corrida de las 23:00 llegó justo a ese tope. Ahora son 500.
 - **La misma nota ya no se guarda dos veces cuando Google News la vuelve a fechar** (27/10/2026): el mismo medio con el mismo título exacto, a menos de una semana, es la misma nota. La regla pide al menos 6 palabras en el título, porque las columnas repiten su nombre.
 - **El mismo medio ya no cuenta doble con su versión AMP** (27/10/2026): `amp.milenio.com` es `milenio.com`.

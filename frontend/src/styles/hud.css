@@ -1018,6 +1018,102 @@
   text-shadow: 0 0 5px rgb(0 210 255 / 0.7);
 }
 
+/* --- Menú de secciones (dock de Oráculo) ----------------------------------------- */
+
+/* HudDock (ADR-0108). En celular, una fila que se desliza dentro del
+   encabezado: icono y nombre lado a lado, con la altura de las pestañas de
+   antes. Desde 640px, la barra vertical de Oráculo a la izquierda (abajo). */
+.hud-dock {
+  display: flex;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.hud-dock-link {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 4px 10px 4px 4px;
+  color: var(--hud-muted);
+  transition: color 0.2s;
+}
+.hud-dock-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 15px;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+.hud-dock-label {
+  font: 400 10px/1 var(--font-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hud-dock-link:hover {
+  color: var(--hud-ink);
+}
+.hud-dock-link:hover .hud-dock-icon {
+  background: rgb(0 210 255 / 0.08);
+}
+/* La sección elegida: el círculo con anillo y brillo cian, como el primer
+   botón del dock del Hub de Oráculo. */
+.hud-dock-link[aria-current='page'] {
+  color: var(--hud-cyan);
+}
+.hud-dock-link[aria-current='page'] .hud-dock-icon {
+  background: rgb(0 210 255 / 0.12);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 210 255 / 0.6),
+    0 0 14px rgb(0 210 255 / 0.35);
+}
+
+@media (min-width: 640px) {
+  /* Barra vertical centrada en lo que queda bajo el encabezado. Mide 72px de
+     ancho; --dock-w (index.css) reserva ese espacio más el margen. Si la
+     ventana es muy baja, se desplaza en lugar de salirse. */
+  .hud-dock {
+    position: fixed;
+    top: calc(var(--header-h) + (100dvh - var(--header-h)) / 2);
+    left: 14px;
+    z-index: 30;
+    flex-direction: column;
+    gap: 4px;
+    width: 72px;
+    max-height: calc(100dvh - var(--header-h) - 24px);
+    overflow: hidden auto;
+    translate: 0 -50%;
+    border-radius: 36px;
+    padding: 12px 0;
+    background: var(--hud-panel);
+    box-shadow:
+      0 0 0 1px rgb(0 210 255 / 0.16),
+      0 8px 32px rgb(0 0 0 / 0.45);
+  }
+  .hud-dock-link {
+    flex-direction: column;
+    gap: 5px;
+    border-radius: 12px;
+    padding: 4px 2px;
+  }
+  .hud-dock-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 17px;
+  }
+  .hud-dock-label {
+    font-size: 8px;
+    letter-spacing: 0.5px;
+  }
+}
+
 /* --- Entradas ------------------------------------------------------------------ */
 
 /* Aparición escalonada: cada elemento entra un poco después del anterior
@@ -1436,31 +1532,16 @@
   outline-offset: 2px;
 }
 
-/* Que las 7 pestañas quepan en una fila junto a la marca y la sesión (medido
-   con la sesión de Benji): bajo 1536 px se juntan un poco; bajo 1440 px se
-   quita «ORÁCULO» (index.css); bajo 1280 px se achican y se quita el nombre
-   de la persona, que se sigue viendo al pasar el mouse (title). Bajo 1024 px
-   ya no caben y se deslizan a lo ancho. */
-@media (max-width: 1535px) {
-  .encabezado .hud-tab {
-    padding-inline: 0.6rem;
-  }
-}
-@media (max-width: 1279px) {
+/* Con el menú a la izquierda (HudDock), arriba solo van la marca y la
+   sesión, así que el nombre de la persona cabe en cualquier pantalla ancha.
+   En celular se quita (se sigue viendo al pasar el dedo, title). */
+@media (max-width: 639px) {
   .user-capsule__name {
     display: none;
   }
   .user-capsule__who {
     padding: 0 8px;
   }
-  .encabezado .hud-tab {
-    padding-inline: 0.5rem;
-    font-size: 10px;
-    letter-spacing: 1px;
-  }
-}
-
-@media (max-width: 639px) {
   .user-capsule {
     gap: 2px;
   }
@@ -1471,12 +1552,6 @@
   }
   .user-capsule__who {
     height: 30px;
-  }
-  /* Pestañas: deslizables a lo ancho, un poco más compactas. */
-  .encabezado .hud-tab {
-    padding: 0.65rem 0.7rem;
-    font-size: 11px;
-    letter-spacing: 0.16em;
   }
 }
 
