@@ -277,9 +277,10 @@ select optgroup {
 }
 
 /* --- Encabezado (ADR-0108) ------------------------------------------------
-   El de Oráculo core: una franja oscura que se aclara hacia la derecha, con
-   una línea cian abajo que se desvanece. Sin desenfoque (ADR-0036): sobre el
-   globo, el tinte basta para leer. */
+   Sin franja (Benji, 17/11/2026: «ese rectángulo feo… no se tiene que ver»).
+   Antes era la franja oscura de Oráculo core con su línea cian abajo; con el
+   menú a la izquierda, arriba solo flotan la marca y la sesión sobre el globo
+   o el fondo. `.encabezado` (App.tsx) ya no lleva estilo propio. */
 :root {
   /* Alto del encabezado: Explorar dibuja el globo debajo y corre sus paneles.
      En celular son dos renglones (ExploreGlobe usa estos 6.25rem). */
@@ -295,20 +296,6 @@ select optgroup {
        encabezado y no ocupa nada a un lado. */
     --dock-w: 92px;
   }
-}
-
-.encabezado {
-  border-width: 0 0 1px;
-  border-style: solid;
-  border-image: linear-gradient(
-      90deg,
-      rgb(0 210 255 / 0.35),
-      rgb(0 210 255 / 0.08) 60%,
-      transparent
-    )
-    1;
-  background: linear-gradient(to right, rgb(5 5 5 / 0.6), rgb(0 210 255 / 0.06));
-  box-shadow: 0 4px 32px rgb(0 0 0 / 0.35);
 }
 
 /* La marca: el logo de Oráculo en su círculo y «ORÁCULO» (.oraculo-logo). */
@@ -343,10 +330,13 @@ a.oraculo-logo:focus-visible {
     0 0 12px rgb(0 210 255 / 0.22);
   transition: box-shadow 0.25s;
 }
-/* El logo es más grande que su círculo, como en Oráculo. */
+/* El logo es más grande que su círculo, como en Oráculo. El margen negativo
+   (la mitad de lo que sobra: (40 - 50) / 2) lo centra; sin él se salía solo
+   hacia la derecha y abajo y el monito se veía chueco (Benji, 17/11/2026). */
 .oraculo-icon-box img {
   width: 50px;
   height: 50px;
+  margin: -5px;
   max-width: none;
   filter: drop-shadow(0 0 4px rgb(0 210 255 / 0.8));
 }
@@ -370,6 +360,7 @@ a.oraculo-logo:hover .oraculo-icon-box {
   .oraculo-icon-box img {
     width: 40px;
     height: 40px;
+    margin: -4px;
   }
 }
 
