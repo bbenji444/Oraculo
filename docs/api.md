@@ -239,6 +239,18 @@ curl -s -X POST http://localhost:8080/api/v1/searches -H 'Content-Type: applicat
 { "error": { "code": "invalid_request", "message": "Para un rango fijo manda date_from y date_to.", "details": {} } }
 ```
 
+## Búsqueda rápida (gasta, ADR-0110)
+
+`POST /searches/quick`: como el buscador de Google, sin concepto guardado. En lugar de `concept_ids` lleva `text`, lo que se busca en palabras del analista. Lo demás es igual (`region_id`, `days` o fechas, `providers`).
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/searches/quick -H 'Content-Type: application/json' -d '{"text":"robo de autos con violencia en Jalisco","region_id":15,"days":7}'
+```
+
+La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como en Google» con ellas. Luego se lanza la búsqueda con los mismos topes de `POST /searches`. Responde `202` con lo mismo que `POST /searches`, más `concept` (con `is_quick: true`) y `suggestion_cost_usd`.
+
+El concepto oculto no sale en `GET /concepts`. `POST /concepts/{id}/keep` lo vuelve normal. Si ya hay otro con ese nombre responde `409`: cámbialo antes con `PATCH /concepts/{id}`.
+
 ## Estado y avance de una búsqueda
 
 `GET /searches/{id}`. Mientras corre, `progress.stage` dice en qué etapa va (`query`, `dedupe`, `extract`, `enrich`, `geocode`, `filter`, `close`) y los conteos crecen.

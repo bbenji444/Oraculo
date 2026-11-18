@@ -690,8 +690,10 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | POST | `/concepts/suggest` | La IA propone nombre, frases tipo titular y exclusiones a partir de lo que el analista escribió; no guarda el concepto, solo deja la propuesta en la bitácora (ADR-0109) |
 | POST | `/concepts/preview?region_id=&days=` | Lo mismo con un concepto sin guardar (en el cuerpo), para "Probar concepto" antes de guardar (H2) |
 | POST | `/concepts/{id}/preview?region_id=&days=` | Consultas que se generarían, sin gastar créditos |
+| POST | `/concepts/{id}/keep` | «Guardar como concepto» una búsqueda rápida: deja de estar oculto (ADR-0110) |
 | POST | `/searches/estimate` | Estimación de consultas y créditos |
 | POST | `/searches` | Crea búsqueda → `202 {search_id}` |
+| POST | `/searches/quick` | Búsqueda rápida con un texto libre: la IA propone las frases, se crea un concepto oculto «como en Google» y se lanza la búsqueda → `202` (ADR-0110) |
 | GET | `/searches/{id}` | Estado y progreso |
 | GET | `/searches` | Historial (paginación por cursor) |
 | GET | `/searches/{id}/articles?cursor=&limit=&relevant=&in_region=&precision=&concept_id=` | Resultados (paginación por cursor). Por defecto solo las relevantes (`relevant=all` trae todas); `in_region` = `true`, `false` o `none` (sin ubicación) |

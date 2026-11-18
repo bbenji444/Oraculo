@@ -5,6 +5,7 @@ aplicación al arrancar (``app.state``) y llaman a un caso de uso.
 
 - ``POST /searches/estimate``: qué se haría y cuánto costaría. No gasta.
 - ``POST /searches``: lanza la búsqueda (``202``); el worker la corre.
+- ``POST /searches/quick``: búsqueda rápida con un texto libre (ADR-0110).
 - ``GET /searches/{id}`` y ``GET /searches``: estado y avance, e historial.
 - ``GET /searches/{id}/articles``: sus notas, con filtros y cursor.
 - ``GET /searches/{id}/aggregates``: conteos por región para el mapa de calor.
@@ -21,10 +22,13 @@ from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from app.api.auth import CurrentUser
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.articles import Articles
-from app.api.v1.concepts import get_actor
+from app.api.v1.concepts import Concepts, TermSuggester, get_actor
 from app.api.v1.schemas.articles import AggregatesOut, ArticlePageOut
+from app.api.v1.schemas.concepts import ConceptOut
 from app.api.v1.schemas.searches import (
     EstimateOut,
+    QuickSearchIn,
+    QuickSearchStartedOut,
     SearchIn,
     SearchOut,
     SearchPageOut,
@@ -41,6 +45,7 @@ from app.application.ports.search_reads import (
 )
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
+from app.application.use_cases.quick_search import QuickSearchRequest, StartQuickSearch
 from app.application.use_cases.search_reads import (
     DEFAULT_ARTICLE_PAGE_SIZE,
     DEFAULT_PAGE_SIZE,
@@ -164,6 +169,44 @@ async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) ->
         search_id=str(started.search_id),
         status="pending",
         estimate=EstimateOut.from_estimate(started.estimate),
+    )
+
+
+@router.post(
+    "/quick",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=QuickSearchStartedOut,
+    summary="Búsqueda rápida: buscar con un texto, sin concepto guardado",
+    responses=error_responses(404, 409, 503),
+)
+async def start_quick_search(
+    body: QuickSearchIn,
+    suggester: TermSuggester,
+    concepts: Concepts,
+    starter: Starter,
+    actor: CurrentActor,
+) -> QuickSearchStartedOut:
+    """Como el buscador de Google (ADR-0110): escribe lo que buscas y listo.
+
+    La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como
+    en Google» con ellas; luego se lanza la búsqueda igual que en
+    ``POST /searches``, con los mismos topes. El concepto no sale en la lista
+    hasta guardarlo con ``POST /concepts/{id}/keep``.
+    """
+    request = QuickSearchRequest(
+        actor.user_id,
+        body.text,
+        body.region_id,
+        body.window(mexico_city_today()),
+        tuple(body.providers) if body.providers is not None else None,
+    )
+    started = await StartQuickSearch(suggester, concepts, starter).execute(request, actor)
+    return QuickSearchStartedOut(
+        search_id=str(started.search.search_id),
+        status="pending",
+        estimate=EstimateOut.from_estimate(started.search.estimate),
+        concept=ConceptOut.from_domain(started.concept),
+        suggestion_cost_usd=started.proposal.cost_usd,
     )
 
 

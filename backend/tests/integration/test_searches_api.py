@@ -21,15 +21,19 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
+from app.api.v1.concepts import get_term_suggester
 from app.api.v1.searches import get_search_queue
+from app.application.ports.llm import TermSuggestionResult
+from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role
-from app.domain.enrichment import Enrichment
+from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
 from app.main import create_app
 from tests.integration.geo_fixture import load_fixture_catalog
 from tests.integration.test_search_repository import REPLIES, new_search, run_search
 from tests.unit.application.test_run_search import IZTA_SEARCHAPI, LLM, MADRID, enrichment
+from tests.unit.application.test_suggest_terms import PRICES, FakeSuggester
 
 pytestmark = pytest.mark.integration
 
@@ -675,3 +679,44 @@ def test_un_usuario_normal_lanza_la_suya_y_nadie_mas_la_ve(
         assert pepe.get(URL, params={"scope": "all"}).json()["items"] == []
         assert pepe.delete(f"{URL}/{search_id}").status_code == 404
         assert ana.delete(f"{URL}/{search_id}").status_code == 204
+
+
+def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
+    settings: Settings, engine: Engine, queue: FakeQueue, ids: dict[str, int]
+) -> None:
+    # ADR-0110: la IA es de mentira; la búsqueda no corre (cola falsa).
+    proposal = TermSuggestionResult(
+        "Prueba API rápida",
+        ("cobro de piso", "extorsión comerciantes"),
+        ("simulacro",),
+        LLMUsage(1000, 250),
+        "gpt-6-luna",
+        "terms_v1",
+    )
+    with make_client(settings, queue) as client:
+        app = cast(FastAPI, client.app)
+        repo = app.state.concept_repository
+        app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
+            FakeSuggester(proposal), PRICES, repo
+        )
+        text_ = "extorsión a comerciantes en la Ciudad de México"
+        response = client.post(
+            f"{URL}/quick", json={"text": text_, "region_id": ids["cdmx"], "days": 7}
+        )
+        listed = client.get("/api/v1/concepts").json()["items"]
+        concept_id = response.json()["concept"]["id"]
+        kept = client.post(f"/api/v1/concepts/{concept_id}/keep")
+        listed_after = client.get("/api/v1/concepts").json()["items"]
+
+    assert response.status_code == 202
+    data = response.json()
+    assert data["concept"]["is_quick"] is True
+    assert data["concept"]["description"] == text_
+    assert data["concept"]["query_mode"] == "open"
+    assert data["suggestion_cost_usd"] == pytest.approx(0.002)
+    assert queue.sent == [UUID(data["search_id"])]
+    # Oculto en la lista hasta guardarlo.
+    assert concept_id not in [c["id"] for c in listed]
+    assert kept.status_code == 200
+    assert kept.json()["is_quick"] is False
+    assert concept_id in [c["id"] for c in listed_after]

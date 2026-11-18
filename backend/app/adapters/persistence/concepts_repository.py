@@ -3,7 +3,8 @@
 Implementa ``ConceptRepositoryPort`` con SQL explícito, como el de regiones,
 para que las consultas se puedan copiar a DBeaver o ``psql`` tal cual.
 
-- Solo ve conceptos vigentes (``deleted_at IS NULL``).
+- Solo ve conceptos vigentes (``deleted_at IS NULL``). Los de búsqueda rápida
+  (``is_quick``, ADR-0110) no salen en la lista ni ocupan su nombre.
 - Cada escritura y su registro en ``audit_log`` van en una sola transacción.
 - La base es la última defensa del nombre único: si dos personas guardan el
   mismo nombre a la vez, el índice único parcial rechaza al segundo y aquí
@@ -32,7 +33,7 @@ SUGGESTION_ENTITY_ID = 0
 _NAME_UNIQUE_INDEX = "concepts_name_norm_active_key"
 _COLUMNS = """
     c.id, c.name, c.description, c.keywords, c.exclude_terms, c.color, c.is_active,
-    c.created_by, c.created_at, c.updated_at, c.category_id, c.query_mode
+    c.created_by, c.created_at, c.updated_at, c.category_id, c.query_mode, c.is_quick
 """
 
 
@@ -55,6 +56,7 @@ def _to_concept(row: RowMapping) -> Concept:
         row["created_at"],
         row["updated_at"],
         row["category_id"],
+        row["is_quick"],
     )
 
 
@@ -116,7 +118,7 @@ class PostgresConceptRepository:
         return await self._fetch(
             f"""
             SELECT {_COLUMNS} FROM concepts c
-            WHERE c.deleted_at IS NULL
+            WHERE c.deleted_at IS NULL AND NOT c.is_quick
               AND (CAST(:active AS boolean) IS NULL OR c.is_active = :active)
               AND (CAST(:after_name AS text) IS NULL
                    OR (c.name_norm, c.id) > (:after_name, :after_id))
@@ -154,13 +156,16 @@ class PostgresConceptRepository:
             taken = await conn.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM concepts WHERE name_norm = :n "
-                    "AND deleted_at IS NULL AND id <> COALESCE(CAST(:except_id AS bigint), 0))"
+                    "AND deleted_at IS NULL AND NOT is_quick "
+                    "AND id <> COALESCE(CAST(:except_id AS bigint), 0))"
                 ),
                 {"n": name_norm, "except_id": except_id},
             )
             return bool(taken.scalar_one())
 
-    async def create(self, data: ConceptDraft, created_by: str, audit: AuditEntry) -> Concept:
+    async def create(
+        self, data: ConceptDraft, created_by: str, audit: AuditEntry, *, quick: bool = False
+    ) -> Concept:
         """Ver ``ConceptRepositoryPort.create``."""
         try:
             async with self._engine.begin() as conn:
@@ -170,13 +175,15 @@ class PostgresConceptRepository:
                             text(
                                 f"""
                                 INSERT INTO concepts AS c (name, name_norm, description, keywords,
-                                    exclude_terms, color, is_active, query_mode, created_by)
+                                    exclude_terms, color, is_active, query_mode, created_by,
+                                    is_quick)
                                 VALUES (:name, :name_norm, :description, :keywords,
-                                    :exclude_terms, :color, :is_active, :query_mode, :created_by)
+                                    :exclude_terms, :color, :is_active, :query_mode, :created_by,
+                                    :is_quick)
                                 RETURNING {_COLUMNS}
                                 """  # noqa: S608 — fragmentos SQL constantes del módulo
                             ),
-                            {**_values(data), "created_by": created_by},
+                            {**_values(data), "created_by": created_by, "is_quick": quick},
                         )
                     )
                     .mappings()
@@ -221,6 +228,39 @@ class PostgresConceptRepository:
             if _is_name_clash(error):
                 raise ConceptNameTakenError(
                     f'Ya existe un concepto llamado "{data.name}".', {"name": data.name}
+                ) from error
+            raise
+        return _to_concept(row)
+
+    async def keep(self, concept_id: int, audit: AuditEntry) -> Concept:
+        """Ver ``ConceptRepositoryPort.keep``."""
+        try:
+            async with self._engine.begin() as conn:
+                row = (
+                    (
+                        await conn.execute(
+                            text(
+                                f"""
+                                UPDATE concepts AS c SET is_quick = false
+                                WHERE c.id = :id AND c.is_quick AND c.deleted_at IS NULL
+                                RETURNING {_COLUMNS}
+                                """  # noqa: S608 — fragmentos SQL constantes del módulo
+                            ),
+                            {"id": concept_id},
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if row is None:
+                    raise ConceptNotFoundError(
+                        "No hay una búsqueda rápida con ese id.", {"id": concept_id}
+                    )
+                await _write_audit(conn, concept_id, audit)
+        except IntegrityError as error:
+            if _is_name_clash(error):
+                raise ConceptNameTakenError(
+                    "Ya existe un concepto con ese nombre.", {"id": concept_id}
                 ) from error
             raise
         return _to_concept(row)

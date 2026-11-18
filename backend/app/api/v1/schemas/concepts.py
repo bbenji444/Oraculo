@@ -116,6 +116,13 @@ class ConceptOut(BaseModel):
             "``null`` en la FGR y en los conceptos de cada analista."
         ),
     )
+    is_quick: bool = Field(
+        default=False,
+        description=(
+            "Si lo creó una búsqueda rápida (ADR-0110): no sale en la lista hasta que "
+            "se guarda con ``POST /concepts/{id}/keep``."
+        ),
+    )
 
     @classmethod
     def from_domain(cls, concept: Concept) -> "ConceptOut":
@@ -142,6 +149,7 @@ class ConceptOut(BaseModel):
             created_at=concept.created_at,
             updated_at=concept.updated_at,
             category_id=concept.category_id,
+            is_quick=concept.is_quick,
         )
 
 

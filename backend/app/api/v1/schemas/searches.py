@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
-from app.api.v1.schemas.concepts import PlannedQueryOut
+from app.api.v1.schemas.concepts import ConceptOut, PlannedQueryOut
 from app.application.pagination import Page
 from app.application.ports.search_reads import SearchDetail
 from app.application.use_cases.plan_search import SearchEstimate
@@ -25,14 +25,14 @@ from app.domain.search import SearchTrigger
 _MAX_CONCEPTS = 20
 # "Últimos 7 días": el rango de la historia H1.
 DEFAULT_DAYS = 7
+# Tope de transporte, como el de /concepts/suggest: el límite real (500, la
+# descripción de un concepto) lo pone el dominio con su mensaje en español.
+_MAX_QUICK_TEXT = 2_000
 
 
-class SearchIn(BaseModel):
-    """Qué buscar: conceptos, región y fechas (últimos N días o un rango fijo)."""
+class _WhereAndWhen(BaseModel):
+    """Dónde y cuándo buscar, y con qué fuentes: común a las dos formas de buscar."""
 
-    concept_ids: list[int] = Field(
-        min_length=1, max_length=_MAX_CONCEPTS, examples=[[3]], description="Conceptos."
-    )
     region_id: int = Field(description="Región (``/regions``).", examples=[15])
     days: int = Field(
         default=DEFAULT_DAYS, description="Últimos N días (1 a 90). Se ignora con fechas fijas."
@@ -46,15 +46,6 @@ class SearchIn(BaseModel):
             "lista vacía o una fuente sin configurar responde 422."
         ),
         examples=[["google_news_rss", "indice_local"]],
-    )
-    category_ids: list[int] = Field(
-        default_factory=list,
-        max_length=_MAX_CONCEPTS,
-        description=(
-            "Subdivisiones (``/categories``) para los conceptos como la FGR: cada nota "
-            "debe traer las palabras del concepto y las de una subdivisión."
-        ),
-        examples=[[5]],
     )
 
     def window(self, today: date) -> DateWindow:
@@ -75,6 +66,33 @@ class SearchIn(BaseModel):
         if self.date_from is None or self.date_to is None:
             raise InvalidRequestError("Para un rango fijo manda date_from y date_to.")
         return DateWindow.between(self.date_from, self.date_to)
+
+
+class SearchIn(_WhereAndWhen):
+    """Qué buscar: conceptos, región y fechas (últimos N días o un rango fijo)."""
+
+    concept_ids: list[int] = Field(
+        min_length=1, max_length=_MAX_CONCEPTS, examples=[[3]], description="Conceptos."
+    )
+    category_ids: list[int] = Field(
+        default_factory=list,
+        max_length=_MAX_CONCEPTS,
+        description=(
+            "Subdivisiones (``/categories``) para los conceptos como la FGR: cada nota "
+            "debe traer las palabras del concepto y las de una subdivisión."
+        ),
+        examples=[[5]],
+    )
+
+
+class QuickSearchIn(_WhereAndWhen):
+    """Búsqueda rápida (ADR-0110): lo que se quiere encontrar, sin concepto guardado."""
+
+    text: str = Field(
+        max_length=_MAX_QUICK_TEXT,
+        description="Lo que se busca, en palabras del analista.",
+        examples=["robo de autos con violencia en Jalisco"],
+    )
 
 
 class ConceptRefOut(BaseModel):
@@ -160,6 +178,18 @@ class SearchStartedOut(BaseModel):
     search_id: str = Field(examples=["b01afb0d-e78b-4257-8a14-5d2e98082d83"])
     status: str = Field(examples=["pending"])
     estimate: EstimateOut
+
+
+class QuickSearchStartedOut(BaseModel):
+    """Búsqueda rápida lanzada, con el concepto oculto que la sostiene."""
+
+    search_id: str = Field(examples=["b01afb0d-e78b-4257-8a14-5d2e98082d83"])
+    status: str = Field(examples=["pending"])
+    estimate: EstimateOut
+    concept: ConceptOut = Field(
+        description="Concepto oculto: «Guardar como concepto» con ``POST /concepts/{id}/keep``."
+    )
+    suggestion_cost_usd: float = Field(description="Lo que costó que la IA propusiera las frases.")
 
 
 class SearchOut(BaseModel):

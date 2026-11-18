@@ -362,6 +362,8 @@ class Concept:
         category_id: Si es el tema general de una subdivisión (02/11/2026),
             la categoría que representa («Homicidio»); ``None`` en los demás
             (la FGR y los que crea cada analista).
+        is_quick: Si lo creó una búsqueda rápida (ADR-0110): no sale en la
+            lista de conceptos ni ocupa su nombre hasta que se guarda.
     """
 
     id: int
@@ -370,6 +372,7 @@ class Concept:
     created_at: datetime
     updated_at: datetime
     category_id: int | None = None
+    is_quick: bool = False
 
     @property
     def keywords(self) -> tuple[str, ...]:
