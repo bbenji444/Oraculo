@@ -11,9 +11,18 @@ import { ApiError, badFormat, requestJson } from './http';
 
 export { ApiError };
 
+/**
+ * Nivel de una región del catálogo: los de las teselas del mapa más «Mundo»
+ * (ADR-0112), que no tiene teselas ni se resalta: es la Tierra entera.
+ */
+export type CatalogLevel = 'world' | RegionLevel;
+
+/** Clave de la región «Mundo» (la crea la migración 0048 del backend). */
+export const WORLD_CODE = 'WLD';
+
 export interface Region {
   id: number;
-  level: RegionLevel;
+  level: CatalogLevel;
   code: string;
   name: string;
   display_name: string;
@@ -31,7 +40,7 @@ export interface Region {
 
 export interface RegionRef {
   id: number;
-  level: RegionLevel;
+  level: CatalogLevel;
   code: string;
   name: string;
 }
@@ -41,7 +50,7 @@ export interface RegionDetail extends Region {
   breadcrumb: string;
 }
 
-const LEVELS = new Set(['country', 'state', 'municipality', 'locality']);
+const LEVELS = new Set(['world', 'country', 'state', 'municipality', 'locality']);
 
 function isRegion(value: unknown): value is Region {
   if (typeof value !== 'object' || value === null) return false;
@@ -126,7 +135,7 @@ async function collect(
  * @param level Nivel.
  * @param signal Señal para cancelar.
  */
-export function listRegionsByLevel(level: RegionLevel, signal?: AbortSignal): Promise<Region[]> {
+export function listRegionsByLevel(level: CatalogLevel, signal?: AbortSignal): Promise<Region[]> {
   return collect('regions', { level }, MAX_FILTER_OPTIONS, signal);
 }
 

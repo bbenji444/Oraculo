@@ -56,7 +56,9 @@ Limit = Annotated[int, Query(description="Tamaño de página (1 a 200).")]
 @router.get("", response_model=RegionPageOut, summary="Regiones de un nivel")
 async def list_regions(
     repository: Repository,
-    level: Annotated[LevelLiteral, Query(description="country, state, municipality o locality")],
+    level: Annotated[
+        LevelLiteral, Query(description="world, country, state, municipality o locality")
+    ],
     cursor: Cursor = None,
     limit: Limit = DEFAULT_PAGE_SIZE,
 ) -> RegionPageOut:

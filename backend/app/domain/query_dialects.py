@@ -162,6 +162,11 @@ def gdelt_country(place: QueryPlace) -> str:
 
 
 def _gdelt_suffix(place: QueryPlace, window: DateWindow) -> list[str]:
+    # «Mundo» (ADR-0112): sin sourcecountry, GDELT busca en la prensa de todos
+    # los países; sourcelang lo deja en español (su documentación los describe
+    # como operadores independientes).
+    if place.country.worldwide:
+        return ["sourcelang:spanish"]
     return ["sourcelang:spanish", f"sourcecountry:{gdelt_country(place)}"]
 
 

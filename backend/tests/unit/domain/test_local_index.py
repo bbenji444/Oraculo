@@ -60,6 +60,14 @@ def test_mexico_a_nivel_pais_no_filtra_lugar_y_otro_pais_pide_su_nombre() -> Non
     assert criteria_for(guatemala, CDMX_TZ).place_terms == ("GUATEMALA",)
 
 
+def test_en_el_mundo_no_filtra_lugar() -> None:
+    # «Mundo» (ADR-0112): no se pide la palabra «Mundo» en la nota.
+    world = CountryFilter.world("Mundo")
+    criteria = criteria_for(query(QueryPlace((), (), world), country=world), CDMX_TZ)
+
+    assert criteria.place_terms == ()
+
+
 def test_nombre_repetido_lleva_el_estado() -> None:
     facts = PlaceFacts(
         RegionLevel.MUNICIPALITY, "Benito Juárez", (), True, "Quintana Roo", (), MEXICO, "23"

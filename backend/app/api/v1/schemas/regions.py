@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.application.pagination import Page
 from app.domain.region import Region, RegionDetail, RegionRef
 
-LevelLiteral = Literal["country", "state", "municipality", "locality"]
+LevelLiteral = Literal["world", "country", "state", "municipality", "locality"]
 
 
 class PointOut(BaseModel):

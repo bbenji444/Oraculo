@@ -52,6 +52,10 @@ ENGINE = "google_news"
 LANGUAGE = "es"
 # Si un país no tiene código ISO-2, se usa México (foco del sistema).
 FALLBACK_COUNTRY = "mx"
+# «Mundo» (ADR-0112): sin `gl`. SearchApi no ofrece «sin país»: su
+# documentación dice que sin él usa Estados Unidos («The default parameter `us`
+# defines the country of the search», docs/google-news, 18/11/2026). Lo que
+# limita al español es `hl` y que la consulta va en español.
 # Una búsqueda exitosa = 1 crédito (página de precios de SearchApi); cada
 # página es una búsqueda (medido el 21/10/2026).
 CREDITS_PER_PAGE = 1
@@ -179,14 +183,10 @@ class SearchApiProvider:
 
     def request_params(self, query: PlannedQuery) -> dict[str, str]:
         """Ver ``NewsProviderPort.request_params`` (la llave no va aquí)."""
-        return {
-            "engine": ENGINE,
-            "q": query.text,
-            "gl": (query.country.iso_a2 or FALLBACK_COUNTRY).lower(),
-            "hl": LANGUAGE,
-            "link": "resolved",
-            **time_params(query.window),
-        }
+        params = {"engine": ENGINE, "q": query.text}
+        if not query.country.worldwide:
+            params["gl"] = (query.country.iso_a2 or FALLBACK_COUNTRY).lower()
+        return {**params, "hl": LANGUAGE, "link": "resolved", **time_params(query.window)}
 
     def estimate_cost(self, query: PlannedQuery) -> int:
         """Lo más que puede costar: una página llena tras otra hasta el máximo."""

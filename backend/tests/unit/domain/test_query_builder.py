@@ -127,6 +127,18 @@ def test_pais_seleccionado_no_agrega_lugar_al_texto() -> None:
     ]
 
 
+def test_en_el_mundo_no_hay_lugar_ni_pais_en_gdelt() -> None:
+    # «Mundo» (ADR-0112): ni palabras de lugar ni sourcecountry; solo idioma.
+    world = place_for(facts(RegionLevel.WORLD, "Mundo", country=CountryFilter.world("Mundo")))
+    by_provider = texts(world)
+
+    assert world.terms == ()
+    assert world.required_terms == ()
+    assert all("sourcecountry" not in text for text in by_provider[Provider.GDELT])
+    assert all(text.endswith("sourcelang:spanish") for text in by_provider[Provider.GDELT])
+    assert by_provider[Provider.SEARCHAPI] == texts(NATIONAL)[Provider.SEARCHAPI]
+
+
 def test_cdmx_se_busca_con_sus_terminos_curados() -> None:
     cdmx = place_for(facts(RegionLevel.STATE, "Ciudad de México", search_terms=CDMX_TERMS))
 

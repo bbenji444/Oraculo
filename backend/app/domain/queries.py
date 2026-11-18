@@ -152,12 +152,27 @@ class CountryFilter:
         iso_a2: Código ISO de 2 letras (SearchApi, Google News RSS).
         fips_code: Código FIPS (GDELT), si existe.
         name_en: Nombre en inglés (respaldo de GDELT sin FIPS).
+        worldwide: ``True`` en «Mundo» (ADR-0112): ningún proveedor filtra
+            por país; solo por idioma.
     """
 
     name: str
     iso_a2: str | None
     fips_code: str | None
     name_en: str
+    worldwide: bool = False
+
+    @classmethod
+    def world(cls, name: str) -> "CountryFilter":
+        """El «país» de una búsqueda en todo el mundo: no filtra por ninguno.
+
+        Args:
+            name: Nombre para mostrar («Mundo»).
+
+        Returns:
+            Un filtro sin códigos de país.
+        """
+        return cls(name=name, iso_a2=None, fips_code=None, name_en="", worldwide=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +212,7 @@ class QueryPlace:
     """Cómo se nombra el lugar dentro de la consulta.
 
     Attributes:
-        terms: Palabras del lugar (se unen con OR). Vacío en un país.
+        terms: Palabras del lugar (se unen con OR). Vacío en un país o en el mundo.
         required_terms: Palabras del estado que también deben aparecer, para
             distinguir nombres repetidos. Vacío si no hace falta.
         country: País por el que filtran los proveedores.
@@ -221,7 +236,7 @@ def place_for(facts: PlaceFacts) -> QueryPlace:
         >>> place_for(benito_juarez_quintana_roo).required_terms
         ('Quintana Roo',)
     """
-    if facts.level is RegionLevel.COUNTRY:
+    if facts.level in (RegionLevel.WORLD, RegionLevel.COUNTRY):
         return QueryPlace((), (), facts.country)
     terms = facts.search_terms or (facts.name,)
     needs_state = facts.level is RegionLevel.LOCALITY or (

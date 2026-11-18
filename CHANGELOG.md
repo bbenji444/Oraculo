@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Buscar en todo el mundo, en español (18/11/2026, ADR-0112, migración 0048).** Benji: «si yo quisiera buscar bases de datos hackeadas, pero en todo el mundo, no tengo esa opción».
+  - En «Dónde», arriba: **«México · Todo el mundo»**. Con «Todo el mundo» no hay estados que elegir, la frase dice «Rastrear… en todo el mundo» y el globo se aleja.
+  - En la búsqueda rápida basta escribir «en todo el mundo», «a nivel mundial» o «a nivel global». Si el texto nombra un lugar del catálogo, gana ese lugar.
+  - Solo noticias en español. Ningún proveedor filtra por país: GDELT va sin `sourcecountry`, SearchApi sin `gl` (usa su país por omisión) y Google News RSS con la edición de Estados Unidos en español, que es la menos cargada a un país (medido).
+  - Toda nota con lugar cuenta como «dentro». El reporte cuenta las notas por país y su mapa pinta los países.
+  - Por dentro es una región nueva, «Mundo» (`WLD`), de un nivel propio (`world`) arriba de los países; por eso también sirve en el historial y en los envíos programados.
+
 - **Ver el reporte sin descargarlo (17/11/2026, ADR-0111).** Pedido del jefe de Benji: «no quiere tener que descargar un archivo cada vez que quiera ver un reporte».
   - En el expediente, debajo del título: **«Ver reporte»** y **«Descargar PDF»**.
   - «Ver reporte» abre el mismo reporte que el PDF en una ventana grande del monitor, con más cosas: índice a la izquierda que marca dónde vas, secciones que se pliegan, buscador de noticias por título, medio o estado, la cifra exacta al pasar el mouse por barras, dona, línea del tiempo y mapa, y los links de las notas en otra pestaña.

@@ -1007,7 +1007,15 @@ export function ExploreGlobe({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready || region?.id !== regionId) return;
-    const source = SOURCE_BY_LEVEL[region.level];
+    // «Mundo» (ADR-0112) no tiene forma que resaltar: el globo se aleja a la
+    // vista que gira, la Tierra entera.
+    if (region.level === 'world') {
+      levelRef.current = null;
+      useExplorerStore.getState().showOverview();
+      return;
+    }
+    const level = region.level;
+    const source = SOURCE_BY_LEVEL[level];
     const key: FeatureIdentifier = { source, sourceLayer: source, id: region.id };
     map.setFeatureState(key, { selected: true });
     const previous = levelRef.current;
@@ -1054,7 +1062,7 @@ export function ExploreGlobe({
         zoom,
         padding: inset,
         bearing: REGION_BEARING,
-        pitch: flyPitch(region.level),
+        pitch: flyPitch(level),
         curve: FLY_CURVE,
         duration,
         essential: false,
