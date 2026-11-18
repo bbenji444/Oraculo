@@ -27,6 +27,10 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
    - Se lanza la búsqueda con `StartSearch`, con los mismos topes y revisiones que una normal.
    - Los ocultos no salen en `GET /concepts` ni ocupan el nombre: los índices parciales de la migración 0005 se rehicieron con `AND NOT is_quick`.
    - «Guardar como concepto» (`POST /concepts/{id}/keep`) lo vuelve normal. Si el nombre ya existe responde 409 y hay que cambiarlo antes.
+3. **D3 — Dónde se ve:**
+   - Una barra «Busca noticias como en Google…» arriba de la consulta: en la consola del Centro de mando y en el panel del diseño clásico (`QuickSearchBar`).
+   - Usa el lugar, las fechas y las fuentes de la consulta. Sin lugar elegido, busca en México.
+   - Con los resultados a la vista sale «Guardar como concepto». Solo en la búsqueda rápida recién lanzada: no se recuerda entre visitas.
 
 ## Alternativas consideradas
 
@@ -51,4 +55,8 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
 - **Los conceptos ocultos se acumulan:** uno por búsqueda rápida. Son filas pequeñas y sus búsquedas los necesitan para el historial. Si estorban, se podrán borrar los que no tengan búsquedas.
 - **Si la búsqueda se rechaza** (sin llave de la IA, tope de consultas o de créditos), el concepto oculto y la propuesta ya quedaron creados. No estorban, pero la propuesta sí se pagó.
 - **Más peticiones a Google News RSS:** cada búsqueda rápida son hasta 12 consultas. Varias seguidas pueden hacer que responda 429 (ADR-0109).
+- **Primera búsqueda rápida real (17/11/2026):** «robo de autos con violencia en Jalisco», sin lugar elegido (México), 7 días, solo fuentes gratuitas.
+  - La IA propuso «Robo violento de autos» con 8 frases («roban autos», «asaltan automovilistas»…), ninguna con el lugar.
+  - 57 notas, 0 créditos, 0.018 USD de IA. Ninguna nombra Jalisco en el título, y solo 2 quedaron relevantes, de Chihuahua y de la CDMX.
+  - Conclusión: si el texto nombra un lugar, la búsqueda tiene que ir a ese lugar. Hoy hay que elegirlo en «Dónde». Queda como siguiente paso.
 - **Bajar la migración 0047** vuelve normales a los ocultos: si alguno repite el nombre de otro vigente, hay que renombrarlo o borrarlo antes.

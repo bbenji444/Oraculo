@@ -23,9 +23,12 @@ import {
   isFinished,
   listAllArticles,
   type HistoryScope,
+  type QuickSearchInput,
+  type QuickSearchStarted,
   listSearches,
   restoreSearch,
   type SearchInput,
+  startQuickSearch,
   startSearch,
 } from '../services/searches';
 import { useDebouncedValue } from './useDebouncedValue';
@@ -124,5 +127,13 @@ export function useRestoreSearch() {
   return useMutation({
     mutationFn: (searchId: string) => restoreSearch(searchId),
     onSuccess: invalidate,
+  });
+}
+
+/** Lanza una búsqueda rápida (ADR-0110); `onSuccess` recibe su id y su concepto oculto. */
+export function useStartQuickSearch(onStarted: (started: QuickSearchStarted) => void) {
+  return useMutation({
+    mutationFn: (input: QuickSearchInput) => startQuickSearch(input),
+    onSuccess: onStarted,
   });
 }

@@ -710,7 +710,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 
 ### 14.1 Pantallas
 
-1. **Explorar** (principal): globo + panel de búsqueda + resultados.
+1. **Explorar** (principal): globo + panel de búsqueda + resultados. Arriba de la consulta va la **búsqueda rápida** (ADR-0110): se escribe lo que se busca, como en Google, y se busca con el lugar, las fechas y las fuentes de la consulta (México si no se eligió lugar), sin guardar un concepto. Con sus resultados a la vista, «Guardar como concepto» la deja en Conceptos.
 2. **Conceptos:** tabla + formulario + "Probar concepto". El formulario es de una sola pantalla (ADR-0110): basta con escribir «¿Qué noticias quieres seguir?» en palabras del analista. «Proponer frases con la IA» llena nombre, frases y exclusiones para revisarlos; si se guarda sin frases o sin nombre, la IA los propone al guardar. Los nuevos se buscan «como en Google» (ADR-0109); los exactos que ya existían se editan sin cambiar de modo.
 3. **Historial:** búsquedas anteriores, reabrir y comparar.
 

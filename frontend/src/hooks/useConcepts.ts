@@ -13,6 +13,7 @@ import {
   type ConceptPatch,
   createConcept,
   deleteConcept,
+  keepConcept,
   listConcepts,
   previewQueries,
   suggestTerms,
@@ -72,4 +73,10 @@ export function useQueryPreview() {
  */
 export function useSuggestTerms() {
   return useMutation({ mutationFn: suggestTerms });
+}
+
+/** «Guardar como concepto» una búsqueda rápida (ADR-0110); luego sale en la lista. */
+export function useKeepConcept() {
+  const invalidate = useInvalidateConcepts();
+  return useMutation({ mutationFn: keepConcept, onSuccess: invalidate });
 }

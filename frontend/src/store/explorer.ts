@@ -16,7 +16,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { type MotionPreset } from '../map/motion';
 import { prefersReducedMotion } from '../map/spin';
 import type { EarthMode } from '../map/style';
-import type { InRegionFilter, SearchInput } from '../services/searches';
+import type { InRegionFilter, QuickSearchInput, SearchInput } from '../services/searches';
 
 /** Rango de fechas del panel (§14.3): hoy, 7 días, 30 días o personalizado. */
 export type RangeKind = 'today' | '7' | '30' | 'custom';
@@ -167,6 +167,34 @@ export function searchInput(
     ...(providers ? { providers } : {}),
     ...(subdivisions.length > 0 ? { category_ids: [...subdivisions].sort((a, b) => a - b) } : {}),
   };
+  if (state.range.kind !== 'custom') return { ...base, days: RANGE_DAYS[state.range.kind] };
+  if (!state.range.from || !state.range.to) return null;
+  return { ...base, date_from: state.range.from, date_to: state.range.to };
+}
+
+/**
+ * Cuerpo de una búsqueda rápida (ADR-0110): el texto con la región, las
+ * fechas y las fuentes elegidas en la consulta.
+ *
+ * @param text Lo que escribió el analista.
+ * @param state Región y fechas de la consulta.
+ * @param fallbackRegionId Región si no se eligió ninguna (México).
+ * @param providers Fuentes encendidas, si ya se conocen.
+ * @returns El cuerpo, o `null` si falta texto, región, fuente o fechas.
+ * @example quickSearchInput('roban autos', { regionId: null, range: { kind: '7' } }, 1)
+ * // { text: 'roban autos', region_id: 1, days: 7 }
+ */
+export function quickSearchInput(
+  text: string,
+  state: Pick<ExplorerState, 'regionId' | 'range'>,
+  fallbackRegionId: number | null,
+  providers?: string[],
+): QuickSearchInput | null {
+  const clean = text.trim();
+  const regionId = state.regionId ?? fallbackRegionId;
+  // Sin ninguna fuente encendida no hay dónde buscar, igual que en searchInput.
+  if (clean === '' || regionId === null || providers?.length === 0) return null;
+  const base = { text: clean, region_id: regionId, ...(providers ? { providers } : {}) };
   if (state.range.kind !== 'custom') return { ...base, days: RANGE_DAYS[state.range.kind] };
   if (!state.range.from || !state.range.to) return null;
   return { ...base, date_from: state.range.from, date_to: state.range.to };
