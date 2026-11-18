@@ -10,7 +10,9 @@
  *
  * La API responde con respuestas reales grabadas de la base local
  * (src/test/fixtures/explorar/, búsqueda "Extorsión · Jalisco"): nunca hay red
- * ni se gastan créditos. El globo (MapLibre) y el fondo espacial (three.js)
+ * ni se gastan créditos. A las notas grabadas se sumaron tres hechas a mano
+ * (ids 9001 a 9003: Facebook, YouTube y X, ADR-0117) para probar las
+ * pestañas de plataforma y las bandas de relevancia (src/test/README.md). El globo (MapLibre) y el fondo espacial (three.js)
  * necesitan WebGL, que jsdom no tiene: se reemplazan por un sustituto que
  * recibe las mismas notas y muestra la ficha de la elegida.
  */
@@ -304,6 +306,80 @@ describe('flujo principal (H1, Centro de mando)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
     });
+    // Las dos de puntaje 0 las descartó la IA (leyó solo el título): no salen,
+    // pero un botón las muestra con su marca y se vuelven a ocultar (ADR-0117).
+    expect(within(dossier).queryByText(/no tratar del tema/)).toBeNull();
+    const discarded = articles.items.filter((a) =>
+      a.concepts.every((c) => !c.is_relevant && c.relevance_score < 0.3),
+    );
+    expect(discarded).toHaveLength(2);
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Ver las 2 que descartó la IA' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length + discarded.length);
+    expect(within(list).getAllByText('Descartada por la IA')).toHaveLength(discarded.length);
+    await waitFor(() => {
+      expect(screen.getByTestId('globo').dataset.notas).toBe(
+        String(relevant.length + discarded.length),
+      );
+    });
+    fireEvent.click(
+      within(dossier).getByRole('button', { name: 'Ocultar las 2 que descartó la IA' }),
+    );
+    expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
+
+    // 6b. Fraccionado por plataforma, como Google (ADR-0117): «Facebook» deja
+    //     solo esa en la lista y en el globo; la ficha abre la publicación.
+    const platformTabs = within(dossier).getByRole('group', { name: 'Filtrar por plataforma' });
+    expect(
+      within(platformTabs)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['Todo: 4 notas', 'Noticias: 2 notas', 'Facebook: 1 nota', 'YouTube: 1 nota']);
+    fireEvent.click(within(platformTabs).getByRole('button', { name: /^Facebook/ }));
+    const onFacebook = (relevant as Article[]).filter((a) => a.platform === 'facebook');
+    const [post] = onFacebook;
+    if (!post) throw new Error('El fixture necesita una publicación relevante de Facebook.');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(onFacebook.length);
+    await waitFor(() => {
+      expect(screen.getByTestId('globo').dataset.notas).toBe(String(onFacebook.length));
+    });
+    fireEvent.click(
+      within(list).getByRole('button', { name: new RegExp(post.title.slice(0, 20)) }),
+    );
+    const postCard = await within(screen.getByTestId('globo')).findByRole('article');
+    expect(
+      within(postCard)
+        .getByRole('link', { name: /Ver publicación en Facebook/ })
+        .getAttribute('href'),
+    ).toBe(post.url);
+    // Tocarla otra vez regresa a «Todo».
+    fireEvent.click(within(platformTabs).getByRole('button', { name: /^Facebook/ }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
+    await waitFor(() => {
+      expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
+    });
+    // El conteo es facetado: con «Sin lugar» en «Filtro» bajan las pestañas, la
+    // ventana dice los mismos números y coinciden con la lista (revisión del
+    // 18/11/2026: la ventana contaba sobre todas).
+    fireEvent.click(within(dossier).getByRole('button', { name: /^Filtro/ }));
+    const filter = screen.getByRole('dialog', { name: 'Filtrar el expediente' });
+    const location = within(filter).getByRole('region', { name: 'Ubicación' });
+    fireEvent.click(within(location).getByRole('button', { name: 'Sin lugar' }));
+    const unlocated = relevant.filter((a) => a.in_region === null);
+    expect(
+      within(platformTabs)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['Todo: 2 notas', 'Noticias: 1 nota', 'YouTube: 1 nota']);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(unlocated.length);
+    const inFilter = within(filter).getByRole('group', { name: 'Plataformas a mostrar' });
+    expect(
+      within(inFilter)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Todas', 'Noticias1', 'YouTube1']);
+    fireEvent.click(within(location).getByRole('button', { name: 'Todas' }));
+    fireEvent.click(within(filter).getByRole('button', { name: 'Listo' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(relevant.length);
 
     // 7. El resumen se pliega aparte para dar todo el alto a la lista; el
     //    reporte sigue a la mano junto a las pestañas.
@@ -526,13 +602,41 @@ describe('diseño de columna (?clasico, H1)', () => {
     expect(original.getAttribute('target')).toBe('_blank');
     expect(original.getAttribute('rel')).toContain('noopener');
 
-    // 6. "No relevantes" muestra las descartadas en la lista y en el globo a la vez.
+    // 6. "No relevantes" suma las cercanas en la lista y en el globo a la vez;
+    //    las que descartó la IA (menos de 0.3) salen solo con su botón (ADR-0117).
+    const nearby = articles.items.filter((a) =>
+      a.concepts.some((c) => c.is_relevant || c.relevance_score >= 0.3),
+    );
+    expect(nearby.length).toBeGreaterThan(relevant.length);
+    expect(nearby.length).toBeLessThan(articles.items.length);
     const showIrrelevant = within(list).getByRole('checkbox', { name: 'No relevantes' });
     fireEvent.click(showIrrelevant);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(nearby.length);
+    expect(screen.getByTestId('globo').dataset.notas).toBe(String(nearby.length));
+    expect(within(list).getByText('Cercana')).toBeTruthy();
+    expect(within(list).queryByText(/no tratar del tema/)).toBeNull();
+    fireEvent.click(within(list).getByRole('button', { name: 'Ver las 2 que descartó la IA' }));
     expect(within(list).getAllByRole('listitem')).toHaveLength(articles.items.length);
-    expect(screen.getByTestId('globo').dataset.notas).toBe(String(articles.items.length));
+    expect(within(list).getAllByText('Descartada por la IA')).toHaveLength(2);
+    fireEvent.click(within(list).getByRole('button', { name: 'Ocultar las 2 que descartó la IA' }));
     fireEvent.click(showIrrelevant);
     expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
+
+    // 6b. Las pestañas de plataforma cuentan con la pestaña de ubicación de la
+    //     lista, igual que el expediente (revisión del 18/11/2026).
+    const platformTabs = screen.getByRole('group', { name: 'Filtrar por plataforma' });
+    expect(within(platformTabs).getByRole('button', { name: 'Todo: 4 notas' })).toBeTruthy();
+    const unlocated = relevant.filter((a) => a.in_region === null);
+    fireEvent.click(
+      within(list).getByRole('tab', { name: `Sin ubicación · ${String(unlocated.length)}` }),
+    );
+    expect(
+      within(platformTabs)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual(['Todo: 2 notas', 'Noticias: 1 nota', 'YouTube: 1 nota']);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(unlocated.length);
+    fireEvent.click(within(list).getByRole('tab', { name: /^Todas/ }));
 
     // 7. Reporte en PDF (H5): se pide con POST y se guarda con el nombre de la API.
     const saved: string[] = [];

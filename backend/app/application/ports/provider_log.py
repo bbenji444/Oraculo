@@ -6,7 +6,7 @@ auditar el gasto (CLAUDE.md §8) y para el tope mensual de SearchApi.
 No hace: no decide si una consulta se envía (eso es el presupuesto).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Protocol
@@ -92,14 +92,18 @@ class ProviderQueryLogPort(Protocol):
         """
         ...
 
-    async def credits_used_since(self, provider: str, since: datetime) -> int:
-        """Créditos gastados en un proveedor desde una fecha.
+    async def credits_used_since(self, providers: Sequence[str], since: datetime) -> int:
+        """Créditos gastados por uno o varios proveedores desde una fecha.
+
+        Varios cuando comparten cuenta: SearchApi Google News y Google web
+        gastan los mismos créditos (ADR-0115).
 
         Args:
-            provider: Proveedor.
+            providers: Proveedores (``("searchapi", "searchapi_web")``). Un
+                solo nombre como texto también vale.
             since: Inicio del periodo (por ejemplo, el día 1 del mes, en UTC).
 
         Returns:
-            La suma de ``cost_credits``.
+            La suma de ``cost_credits`` de todos ellos.
         """
         ...

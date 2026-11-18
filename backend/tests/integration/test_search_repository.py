@@ -644,6 +644,42 @@ async def test_el_modo_como_en_google_se_copia_con_la_busqueda(
     assert stored.concepts[0].query_mode is QueryMode.OPEN
 
 
+async def test_los_terminos_obligatorios_se_copian_con_la_busqueda(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # ADR-0113: el juicio de la IA tiene a mano los nombres propios del concepto.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        cdmx = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    copied = SearchConcept(
+        concept_id,
+        CONCEPT_NAME,
+        "",
+        ("hacker eternal",),
+        query_mode=QueryMode.OPEN,
+        required_terms=("eternal",),
+    )
+    search_id = await searches.create(
+        NewSearch(
+            user_id="prueba",
+            region_id=cdmx,
+            date_from=date(2026, 11, 12),
+            date_to=date(2026, 11, 18),
+            concepts=(copied,),
+            queries_planned=1,
+            credits_estimated=0,
+            providers=(Provider.LOCAL_INDEX,),
+        )
+    )
+
+    stored = await searches.load(search_id)
+
+    assert stored is not None
+    assert stored.concepts[0].required_terms == ("eternal",)
+
+
 async def _izta(
     articles: PostgresArticleStore, search_id: UUID, *, relevant_only: bool
 ) -> ArticleItem | None:

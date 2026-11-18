@@ -16,7 +16,8 @@ from uuid import UUID
 
 from app.application.pagination import TimeCursor
 from app.domain.aggregates import NoteLocation
-from app.domain.authority import Authority
+from app.domain.authority import Authority, RelevanceBand, relevance_band
+from app.domain.concept import QueryMode
 from app.domain.enrichment import LLMUsage
 from app.domain.search import SearchStatus, SearchTrigger
 
@@ -265,6 +266,9 @@ class JudgementView:
         is_relevant: Si es relevante.
         relevance_score: De 0 a 1.
         relevance_reason: Por qué.
+        query_mode: Modo del concepto con que se juzgó. Decide las bandas
+            (``band``, ADR-0114). Por omisión exacto: así eran todos los
+            conceptos antes de ADR-0109 y así es el monitor FGR.
     """
 
     concept_id: int
@@ -272,6 +276,12 @@ class JudgementView:
     is_relevant: bool
     relevance_score: float
     relevance_reason: str | None
+    query_mode: QueryMode = QueryMode.EXACT
+
+    @property
+    def band(self) -> RelevanceBand:
+        """Banda del juicio según el modo de su concepto (``relevance_band``)."""
+        return relevance_band(self.is_relevant, self.relevance_score, self.query_mode)
 
 
 @dataclass(frozen=True, slots=True)

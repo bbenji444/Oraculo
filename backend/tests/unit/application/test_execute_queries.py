@@ -1,7 +1,8 @@
 """ExecuteQueries con proveedores, caché y registro en memoria (sin red)."""
 
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -99,13 +100,16 @@ class FakeLog:
         self.records: list[ProviderQueryRecord] = []
         self.used = used
         self.asked_since: list[datetime] = []
+        self.asked_providers: list[tuple[str, ...]] = []
 
     async def record(self, entry: ProviderQueryRecord, actor: Actor | None = None) -> int:
         self.records.append(entry)
         return len(self.records)
 
-    async def credits_used_since(self, provider: str, since: datetime) -> int:
+    async def credits_used_since(self, providers: Sequence[str], since: datetime) -> int:
+        # Varios proveedores cuando comparten cuenta (ADR-0115).
         self.asked_since.append(since)
+        self.asked_providers.append(tuple(providers))
         return self.used
 
     async def runs_of(self, provider: str, query_text: str) -> list[QueryRun]:
@@ -119,12 +123,14 @@ def use_case(
     caps: QueryCaps = CAPS,
     monthly_limit: int = 100,
     ttl_hours: float = 6,
+    on_notice: Callable[[UUID, str], None] | None = None,
 ) -> tuple[ExecuteQueries, FakeCache, FakeLog]:
     cache = cache or FakeCache()
     log = log or FakeLog()
     limits = ExecutionLimits(caps, ttl_hours, {Provider.SEARCHAPI: monthly_limit})
     by_provider = {p.provider: p for p in providers}
-    return ExecuteQueries(by_provider, cache, log, limits, now=lambda: NOW), cache, log
+    execute = ExecuteQueries(by_provider, cache, log, limits, now=lambda: NOW, on_notice=on_notice)
+    return execute, cache, log
 
 
 async def test_demasiadas_consultas_se_rechazan_sin_enviar_nada() -> None:

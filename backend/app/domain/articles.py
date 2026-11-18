@@ -75,6 +75,9 @@ class RawArticle:
         snippet: Fragmento o resumen del proveedor, si viene.
         language: Idioma que reporta el proveedor, si lo reporta.
         raw: El resultado original del proveedor, para depurar.
+        title_truncated: Si el proveedor cortó el título («Hackean 746 mil
+            cuentas de ...», Google web, ADR-0115). Así se reconoce como la
+            misma nota que la del título completo.
     """
 
     provider: Provider
@@ -87,6 +90,7 @@ class RawArticle:
     snippet: str | None
     language: str | None
     raw: Mapping[str, object]
+    title_truncated: bool = False
 
     @classmethod
     def create(  # noqa: PLR0913 — un argumento por campo del contrato §8, todos por nombre (*)
@@ -102,6 +106,7 @@ class RawArticle:
         snippet: str | None = None,
         language: str | None = None,
         raw: Mapping[str, object] | None = None,
+        title_truncated: bool = False,
     ) -> "RawArticle":
         """Valida y limpia un resultado.
 
@@ -116,6 +121,8 @@ class RawArticle:
             snippet: Fragmento.
             language: Idioma.
             raw: Resultado original.
+            title_truncated: Si el proveedor cortó el título (ya sin los
+                puntos suspensivos).
 
         Returns:
             La nota en el formato común.
@@ -148,4 +155,5 @@ class RawArticle:
             snippet=clean_text(snippet),
             language=clean_text(language),
             raw=dict(raw or {}),
+            title_truncated=title_truncated,
         )

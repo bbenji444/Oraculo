@@ -132,6 +132,98 @@
       },
       "in_region": false,
       "providers": ["indice_local"]
+    },
+    {
+      "article_id": 9001,
+      "title": "Comerciantes del mercado de Tlaquepaque denuncian cobro de piso",
+      "source_name": "Facebook",
+      "source_domain": "facebook.com",
+      "url": "https://news.google.com/rss/articles/CBMiPRUEBA-tlaquepaque-cobro-de-piso?oc=5",
+      "published_at": "2026-10-16T19:30:00-06:00",
+      "summary": "Comerciantes de un mercado de Tlaquepaque denunciaron en una publicación que les cobran cuota semanal a cambio de dejarlos trabajar.",
+      "event_type": "extorsión",
+      "event_date": null,
+      "extraction_status": "fallback",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": true,
+          "relevance_score": 0.92,
+          "relevance_reason": "Denuncia un cobro de piso a comerciantes de Tlaquepaque.",
+          "relevance_band": "relevant"
+        }
+      ],
+      "primary_location": {
+        "mention": "Tlaquepaque",
+        "role": "event",
+        "precision": "municipality",
+        "confidence": 0.9,
+        "is_primary": true,
+        "region_id": 99001,
+        "region_code": "14098",
+        "place": "Municipio San Pedro Tlaquepaque",
+        "lon": -103.3115,
+        "lat": 20.6409
+      },
+      "in_region": true,
+      "providers": ["google_news_rss"],
+      "platform": "facebook"
+    },
+    {
+      "article_id": 9002,
+      "title": "Transportistas de Zapopan cuentan cómo los amenazan para cobrarles",
+      "source_name": "YouTube · Canal de prueba GDL",
+      "source_domain": "youtube.com",
+      "url": "https://www.youtube.com/watch?v=PRUEBA00001",
+      "published_at": "2026-10-16T18:10:00-06:00",
+      "summary": "Choferes de transporte público relatan amenazas de un grupo que les exige pagos.",
+      "event_type": "extorsión",
+      "event_date": null,
+      "extraction_status": "fallback",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": true,
+          "relevance_score": 0.7,
+          "relevance_reason": "Habla de amenazas para cobrar, pero solo con el título no queda claro el hecho.",
+          "relevance_band": "unconfirmed"
+        }
+      ],
+      "primary_location": null,
+      "in_region": null,
+      "providers": ["searchapi_web"],
+      "platform": "youtube"
+    },
+    {
+      "article_id": 9003,
+      "title": "Hilo: así operan las llamadas de extorsión desde penales",
+      "source_name": "X · cuenta_de_prueba",
+      "source_domain": "x.com",
+      "url": "https://x.com/cuenta_de_prueba/status/1",
+      "published_at": "2026-10-16T17:05:00-06:00",
+      "summary": "Un hilo explica en general cómo funcionan las llamadas de extorsión hechas desde cárceles.",
+      "event_type": "extorsión",
+      "event_date": null,
+      "extraction_status": "fallback",
+      "enrichment_status": "ok",
+      "concepts": [
+        {
+          "concept_id": 3,
+          "name": "Extorsión",
+          "is_relevant": false,
+          "relevance_score": 0.45,
+          "relevance_reason": "Es del tema, pero es una explicación general y no un caso en Jalisco.",
+          "relevance_band": "related"
+        }
+      ],
+      "primary_location": null,
+      "in_region": null,
+      "providers": ["searchapi_web"],
+      "platform": "x"
     }
   ],
   "next_cursor": null

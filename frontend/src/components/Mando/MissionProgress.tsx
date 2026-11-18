@@ -12,6 +12,9 @@
  * - las que faltan laten en ola, una tras otra;
  * - la bitácora escribe con cursor.
  *
+ * Abajo, en letra chica, los avisos de la búsqueda (Google web sin créditos,
+ * ADR-0115).
+ *
  * Recibe la búsqueda ya consultada (se renueva sola mientras corre); no pide
  * nada por su cuenta.
  */
@@ -20,6 +23,7 @@ import type { CSSProperties } from 'react';
 import { useNow } from '../../hooks/useNow';
 import type { Search } from '../../services/searches';
 import { STAGES, stageProgress } from '../Explore/format';
+import { SearchNotices } from '../Explore/SearchNotices';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { elapsedLabel, missionLog, STAGE_SHORT, stageIndex } from './mission';
@@ -147,6 +151,8 @@ export function MissionProgress({ search }: { search: Search }) {
         ))}
       </ul>
       {search.error_summary && <p className="text-[11px] text-rose-200">{search.error_summary}</p>}
+      {/* Google web sin créditos o con la cuenta caída (ADR-0115). */}
+      <SearchNotices search={search} />
     </div>
   );
 }

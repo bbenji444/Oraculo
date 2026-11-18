@@ -7,6 +7,10 @@
  * elegirla en el globo (store). Si la elegida está dentro de la historia, la
  * historia se abre sola para que se vea.
  *
+ * Cada renglón lleva la marca de su plataforma si no es de un medio («f
+ * Facebook», ADR-0117) y, si no es relevante del todo, su marca («Por
+ * confirmar», «Cercana») con la razón de la IA en letra chica.
+ *
  * No hace: no agrupa (eso es `groupByStory`) ni pide datos.
  */
 import { type Ref, useState } from 'react';
@@ -14,6 +18,10 @@ import { type Ref, useState } from 'react';
 import type { Article } from '../../services/searches';
 import { CategoryTag } from './CategoryTag';
 import { formatDay, isCoarse, PRECISION_LABEL, providersLabel } from './format';
+import { PlatformMark } from './PlatformMark';
+import { isNewsPlatform, outletName, platformOf } from './platforms';
+import { standingNote } from './relevance';
+import { StandingBadge, StandingReason } from './StandingNote';
 import { moreOutletsLabel, type StoryGroup } from './stories';
 import { Icon } from '../ui/Icon';
 
@@ -57,6 +65,14 @@ function ArticleRow({
       {location?.place ?? PRECISION_LABEL.unknown}
     </span>
   );
+  // Redes y otros sitios llevan su marca; el nombre ya no repite la red (ADR-0117).
+  const platform = platformOf(article);
+  const outlet = outletName(article) ?? (isNewsPlatform(platform) ? '—' : null);
+  const meta = [outlet, article.published_at ? formatDay(article.published_at) : null]
+    .filter(Boolean)
+    .join(' · ');
+  // «Por confirmar», «Cercana», «Descartada por la IA» o «Sin revisar», con la razón.
+  const note = standingNote(article);
   return (
     <button
       ref={isSelected ? selectedRef : undefined}
@@ -90,10 +106,10 @@ function ArticleRow({
         </span>
         {dense ? (
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-slate-400">
+            <PlatformMark platform={platform} />
             <span className="min-w-0 shrink truncate">
-              {article.source_name ?? article.source_domain ?? '—'}
-              {article.published_at && ` · ${formatDay(article.published_at)}`}
-              {' · '}
+              {meta}
+              {meta && ' · '}
               {place}
             </span>
             <span className="ml-auto max-w-[45%] shrink-0">
@@ -101,11 +117,19 @@ function ArticleRow({
             </span>
           </span>
         ) : (
-          <span className="mt-0.5 block truncate text-[11px] text-slate-400">
-            {article.source_name ?? article.source_domain ?? '—'}
-            {article.published_at && ` · ${formatDay(article.published_at)}`}
-            {' · '}
-            {place}
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-slate-400">
+            <PlatformMark platform={platform} />
+            <span className="min-w-0 truncate">
+              {meta}
+              {meta && ' · '}
+              {place}
+            </span>
+          </span>
+        )}
+        {note && (
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px]">
+            <StandingBadge note={note} />
+            <StandingReason note={note} truncate={dense && !isSelected} className="min-w-0" />
           </span>
         )}
         {!dense && (Boolean(article.category) || article.providers.length > 0) && (

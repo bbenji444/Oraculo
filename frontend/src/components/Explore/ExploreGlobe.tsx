@@ -65,7 +65,7 @@ import { smoothFlights } from '../../map/flight';
 import {
   articleOffset,
   auraOpacity,
-  ringAround,
+  globeOutline,
   articleZoom,
   calloutWidth,
   columnInTheWay,
@@ -267,37 +267,6 @@ const AURA_SCALE = 2.8;
 const SUN_GLARE_SCALE = 1.25;
 const SUN_DISTANCE = 1.02;
 const SUN_ANGLE = (-140 * Math.PI) / 180;
-// Búsqueda del borde: 16 direcciones y anillos de 60° a 90° del centro cada 2°
-// (con la cámara inclinada el borde visible queda antes de los 90°). Son ~250
-// proyecciones por cuadro: medido, no se nota.
-const LIMB_DIRECTIONS = 16;
-const LIMB_FROM_DEG = 60;
-const LIMB_TO_DEG = 90;
-const LIMB_STEP_DEG = 2;
-
-/**
- * Dónde se ve el globo en pantalla: centro y radio de su silueta.
- *
- * MapLibre no lo expone. Se proyectan anillos de puntos cada vez más lejos del
- * centro y, en cada dirección, se queda el más lejano (ese es el borde).
- */
-function globeOutline(map: MapLibreMap): { x: number; y: number; radius: number } {
-  const center = map.getCenter();
-  const origin = map.project(center);
-  const edge = Array.from({ length: LIMB_DIRECTIONS }, () => ({ d: 0, x: origin.x, y: origin.y }));
-  for (let distance = LIMB_FROM_DEG; distance <= LIMB_TO_DEG; distance += LIMB_STEP_DEG) {
-    ringAround([center.lng, center.lat], distance, LIMB_DIRECTIONS).forEach((point, i) => {
-      const p = map.project(point);
-      const d = Math.hypot(p.x - origin.x, p.y - origin.y);
-      const best = edge[i];
-      if (best && Number.isFinite(d) && d > best.d) edge[i] = { d, x: p.x, y: p.y };
-    });
-  }
-  const x = edge.reduce((sum, p) => sum + p.x, 0) / edge.length;
-  const y = edge.reduce((sum, p) => sum + p.y, 0) / edge.length;
-  const radius = edge.reduce((sum, p) => sum + Math.hypot(p.x - x, p.y - y), 0) / edge.length;
-  return { x, y, radius };
-}
 
 /**
  * Pone la aureola y el brillo del Sol alrededor del globo, donde esté y del
@@ -310,7 +279,8 @@ function placeAura(map: MapLibreMap, aura: HTMLElement | null, sun: HTMLElement 
   sun.style.opacity = String(opacity);
   // Apagadas no hace falta buscar el borde (y de cerca ni se ve).
   if (opacity === 0) return;
-  const { x, y, radius } = globeOutline(map);
+  const center = map.getCenter();
+  const { x, y, radius } = globeOutline((point) => map.project(point), [center.lng, center.lat]);
   const size = radius * AURA_SCALE;
   Object.assign(aura.style, {
     left: `${String(x - size / 2)}px`,

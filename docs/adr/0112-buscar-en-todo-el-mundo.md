@@ -31,7 +31,7 @@ Antes de decidir se consultó la documentación de cada proveedor (18/11/2026):
 2. **Solo noticias en español**, como pidió Benji:
    - `CountryFilter.worldwide` le dice a cada proveedor que no filtre por país;
    - GDELT recibe solo `sourcelang:spanish`;
-   - SearchApi va sin `gl`, con `hl=es`;
+   - SearchApi (Google News) va sin `gl`, con `hl=es`. Google web (ADR-0115, posterior) sí lleva `gl=mx`: ahí `gl` es el país de quien busca y sin él traía muy pocos resultados;
    - Google News RSS usa la edición `US:es-419`, marcada `# VERIFICAR` porque no tiene documentación.
    - El índice local no exige ninguna palabra de lugar.
 3. **Dentro y fuera:** en «Mundo» toda nota con lugar está dentro. Una sin lugar queda «Sin ubicación», como en un país. El reporte cuenta las notas por país y su mapa pinta los países, sin contorno.

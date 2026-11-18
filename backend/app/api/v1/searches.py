@@ -46,7 +46,11 @@ from app.application.ports.search_reads import (
 )
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
-from app.application.use_cases.quick_search import QuickSearchRequest, StartQuickSearch
+from app.application.use_cases.quick_search import (
+    QUICK_DEFAULT_SOURCES,
+    QuickSearchRequest,
+    StartQuickSearch,
+)
 from app.application.use_cases.search_reads import (
     DEFAULT_ARTICLE_PAGE_SIZE,
     DEFAULT_PAGE_SIZE,
@@ -59,6 +63,7 @@ from app.application.use_cases.start_search import StartSearch
 from app.application.use_cases.trash import DeleteSearch, RestoreSearch
 from app.domain.aggregates import AggregateLevel
 from app.domain.budget import QueryCaps
+from app.domain.queries import Provider
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
 
@@ -174,11 +179,16 @@ async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) ->
 
 
 def get_start_quick_search(
-    suggester: TermSuggester, concepts: Concepts, starter: Starter, regions: Regions
+    request: Request,
+    suggester: TermSuggester,
+    concepts: Concepts,
+    starter: Starter,
+    regions: Regions,
 ) -> StartQuickSearch:
     """Caso de uso de la búsqueda rápida con las piezas compartidas.
 
     Args:
+        request: Petición actual (para ``QUICK_DEFAULT_SOURCES``, ADR-0115).
         suggester: La IA que propone las frases.
         concepts: Repositorio de conceptos.
         starter: Lanzador de búsquedas.
@@ -187,7 +197,12 @@ def get_start_quick_search(
     Returns:
         El caso de uso.
     """
-    return StartQuickSearch(suggester, concepts, starter, regions)
+    # Las pruebas de la API arman app.state sin esta pieza: sin ella, las de
+    # siempre de la búsqueda rápida.
+    defaults: tuple[Provider, ...] = getattr(
+        request.app.state, "quick_default_sources", QUICK_DEFAULT_SOURCES
+    )
+    return StartQuickSearch(suggester, concepts, starter, regions, defaults)
 
 
 QuickStarter = Annotated[StartQuickSearch, Depends(get_start_quick_search)]
@@ -212,7 +227,9 @@ async def start_quick_search(
     ``POST /searches``, con los mismos topes. Si el texto nombra un lugar del
     catálogo («en Jalisco»), se busca ahí en vez de en ``region_id`` y sale en
     ``place_region``. El concepto no sale en la lista hasta guardarlo con
-    ``POST /concepts/{id}/keep``.
+    ``POST /concepts/{id}/keep``. Sin ``providers`` busca en
+    ``QUICK_DEFAULT_SOURCES`` (con Google web, ADR-0115); si Google web no
+    alcanza créditos, se busca sin él y ``notice`` lo dice.
     """
     request = QuickSearchRequest(
         actor.user_id,
@@ -234,6 +251,7 @@ async def start_quick_search(
             if place is not None
             else None
         ),
+        notice=started.notice,
     )
 
 

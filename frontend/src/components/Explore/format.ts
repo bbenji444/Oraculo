@@ -12,6 +12,7 @@ import type {
   SearchProgress,
 } from '../../services/searches';
 import { isFinished } from '../../services/searches';
+import { isShown } from './relevance';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const DATE_TIME = new Intl.DateTimeFormat('es-MX', {
@@ -128,14 +129,22 @@ export function formatUsd(value: number): string {
  * para algún concepto. Las dos vistas usan esta misma función para que nunca
  * muestren cosas distintas (antes el globo pintaba también las descartadas).
  *
+ * Con «No relevantes» se suman solo las cercanas (mismo tema, otra entidad o
+ * lugar) y las que la IA no leyó; las que descartó la IA (ajenas) se suman
+ * aparte, con «Ver las N que descartó la IA» (ADR-0117, `relevance.ts`).
+ *
  * @param articles Todas las notas de la búsqueda.
  * @param showIrrelevant Si el interruptor "No relevantes" está prendido.
+ * @param showDiscarded Si se pidió ver las que descartó la IA.
  * @returns Las notas a mostrar, en el mismo orden.
  * @example visibleArticles(notas, false) // solo las relevantes
  */
-export function visibleArticles(articles: readonly Article[], showIrrelevant: boolean): Article[] {
-  if (showIrrelevant) return [...articles];
-  return articles.filter((article) => article.concepts.some((c) => c.is_relevant));
+export function visibleArticles(
+  articles: readonly Article[],
+  showIrrelevant: boolean,
+  showDiscarded = false,
+): Article[] {
+  return articles.filter((article) => isShown(article, showIrrelevant, showDiscarded));
 }
 
 /** Encabezado de la lista de noticias y su ayuda (ver `newsCount`). */
@@ -311,6 +320,8 @@ export const PROVIDER_LABEL: Readonly<Record<string, string>> = {
   google_news_rss: 'Google News RSS',
   indice_local: 'Índice local',
   searchapi: 'SearchApi',
+  // Búsqueda web de Google por SearchApi: redes y otros sitios (ADR-0117).
+  searchapi_web: 'Google web',
   gdelt: 'GDELT',
   browserwork_bing: 'Bing',
   browserwork_google2: 'Google 2',

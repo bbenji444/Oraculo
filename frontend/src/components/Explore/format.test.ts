@@ -85,14 +85,21 @@ describe('textos', () => {
 
 describe('notas visibles (lista y globo)', () => {
   const kept = article([[3, 'Extorsión', true]]);
+  // El ayudante pone puntaje 1: una no relevante así es «cercana» (ADR-0117).
   const discarded = article([[3, 'Extorsión', false]]);
+  const unrelated = {
+    ...discarded,
+    article_id: 2,
+    concepts: discarded.concepts.map((c) => ({ ...c, relevance_score: 0 })),
+  };
 
   it('por defecto solo las relevantes para algún concepto', () => {
     expect(visibleArticles([kept, discarded], false)).toEqual([kept]);
   });
 
-  it('con "No relevantes" se ven todas', () => {
-    expect(visibleArticles([kept, discarded], true)).toEqual([kept, discarded]);
+  it('con "No relevantes" se suman las cercanas, pero nunca las ajenas (ADR-0117)', () => {
+    // Antes se veían todas; desde el 18/11/2026 las de menos de 0.3 no salen.
+    expect(visibleArticles([kept, discarded, unrelated], true)).toEqual([kept, discarded]);
   });
 });
 

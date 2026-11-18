@@ -20,7 +20,8 @@ from app.application.ports.search_reads import (
     LocationView,
 )
 from app.application.use_cases.search_reads import AggregatesView
-from app.domain.authority import Authority
+from app.domain.authority import Authority, RelevanceBand
+from app.domain.platforms import Platform, platform_of
 
 
 class JudgementOut(BaseModel):
@@ -31,6 +32,17 @@ class JudgementOut(BaseModel):
     is_relevant: bool
     relevance_score: float = Field(ge=0, le=1)
     relevance_reason: str | None
+    relevance_band: RelevanceBand = Field(
+        examples=["related"],
+        description=(
+            "Banda del juicio (ADR-0114), calculada al leer con la relevancia final. "
+            "En un concepto abierto: relevant (relevante, 0.8 o más), unconfirmed "
+            "(relevante por confirmar, 0.6 a 0.79), related (no relevante pero del "
+            "mismo tema, 0.3 a 0.59) o unrelated (no tiene nada que ver, menos de 0.3). "
+            "En un concepto exacto (monitor FGR, temas): relevant si es relevante y "
+            "related si no, sin importar el puntaje."
+        ),
+    )
 
     @classmethod
     def from_view(cls, view: JudgementView) -> "JudgementOut":
@@ -48,6 +60,7 @@ class JudgementOut(BaseModel):
             is_relevant=view.is_relevant,
             relevance_score=view.relevance_score,
             relevance_reason=view.relevance_reason,
+            relevance_band=view.band,
         )
 
 
@@ -134,6 +147,15 @@ class ArticleOut(BaseModel):
     )
     in_region: bool | None = Field(description="true dentro, false fuera, null sin ubicación.")
     providers: list[str] = Field(examples=[["searchapi", "indice_local"]])
+    platform: Platform = Field(
+        default=Platform.NEWS,
+        examples=["facebook"],
+        description=(
+            "Dónde se publicó (ADR-0115): news, facebook, x, youtube, instagram, tiktok, "
+            "reddit, telegram o web (otros sitios). Se calcula al leer, con el dominio, "
+            "el link y quién la encontró."
+        ),
+    )
     story_id: int | None = Field(
         default=None,
         description=(
@@ -186,6 +208,7 @@ class ArticleOut(BaseModel):
             primary_location=LocationOut.from_view(item.primary) if item.primary else None,
             in_region=item.in_region,
             providers=list(item.providers),
+            platform=platform_of(item.source_domain, item.url, item.providers, item.source_name),
             story_id=item.story_id,
             category=CategoryOut.from_view(item.category) if item.category else None,
             category_raw=item.category_raw,

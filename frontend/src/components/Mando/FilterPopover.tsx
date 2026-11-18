@@ -4,11 +4,16 @@
  * «que la ventana pop aparezca en el centro»).
  *
  * Adentro, ordenado:
+ * - **Plataforma** (ADR-0117): Noticias, Facebook, X, YouTube… una o varias
+ *   (`PlatformFilter`), contadas igual que las pestañas del expediente; solo
+ *   sale si hay más de una;
  * - **Categorías**: cuadros de color en cuadrícula (`CategoryFilter`), uno o
  *   varios;
  * - **Estado**: lista desplegable;
  * - **Ubicación**: todas, dentro de la región, fuera o sin lugar;
- * - **No relevantes**: incluirlas o no.
+ * - **No relevantes**: incluirlas o no. Solo suma las cercanas (del mismo
+ *   tema) y las que la IA no leyó; las que descartó la IA tienen su propio
+ *   botón en el expediente («Ver las N que descartó la IA»).
  *
  * El botón dice cuántos filtros hay puestos («Filtro · 2»). Se cierra con
  * «Listo», con Esc o con un clic en el fondo oscuro.
@@ -22,6 +27,7 @@ import { createPortal } from 'react-dom';
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
+import { platformsIn } from '../Explore/platforms';
 import { statesIn } from '../Explore/timelineData';
 import { GLASS } from '../Explore/ui';
 import { HudSegmented } from '../ui/HudSegmented';
@@ -29,6 +35,7 @@ import { HudSelect } from '../ui/HudSelect';
 import { HudSwitch } from '../ui/HudSwitch';
 import { CategoryFilter } from './CategoryFilter';
 import { activeFilters } from './mission';
+import { PlatformFilter } from './PlatformFilter';
 import { Icon } from '../ui/Icon';
 
 const LOCATIONS = [
@@ -41,23 +48,32 @@ const LOCATIONS = [
 interface FilterPopoverProps {
   /** Las notas de la consulta, antes de estos filtros (para contar). */
   articles: readonly Article[];
+  /**
+   * Con qué se cuentan las plataformas: las mismas notas que las pestañas del
+   * expediente (`platformFacet`), para que la misma plataforma nunca salga con
+   * dos números (revisión del 18/11/2026). Sin darlo, `articles`.
+   */
+  platformArticles?: readonly Article[];
 }
 
-export function FilterPopover({ articles }: FilterPopoverProps) {
+export function FilterPopover({ articles, platformArticles = articles }: FilterPopoverProps) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const stateId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const categoryIds = useTimelineStore((s) => s.categoryIds);
   const stateCode = useTimelineStore((s) => s.stateCode);
+  const platforms = useTimelineStore((s) => s.platforms);
   const setState = useTimelineStore((s) => s.setState);
   const clearTimeline = useTimelineStore((s) => s.clear);
   const listFilter = useExplorerStore((s) => s.listFilter);
   const setListFilter = useExplorerStore((s) => s.setListFilter);
   const showIrrelevant = useExplorerStore((s) => s.showIrrelevant);
   const setShowIrrelevant = useExplorerStore((s) => s.setShowIrrelevant);
-  const count = activeFilters(categoryIds, stateCode, listFilter, showIrrelevant);
+  const count = activeFilters(categoryIds, stateCode, listFilter, showIrrelevant, platforms);
   const states = statesIn(articles);
+  // Con una sola plataforma (y ninguna elegida) la sección no serviría de nada.
+  const manyPlatforms = platformsIn(platformArticles).length > 1 || platforms.length > 0;
 
   // Esc la cierra y, al abrir, el foco entra a la ventana.
   useEffect(() => {
@@ -138,6 +154,13 @@ export function FilterPopover({ articles }: FilterPopoverProps) {
                 </div>
               </div>
 
+              {manyPlatforms && (
+                <section aria-label="Plataforma" className="space-y-2">
+                  <p className="hud-label mb-0">Plataforma</p>
+                  <PlatformFilter articles={platformArticles} />
+                </section>
+              )}
+
               <section aria-label="Categorías" className="space-y-2">
                 <p className="hud-label mb-0">Categorías</p>
                 <CategoryFilter articles={articles} />
@@ -176,7 +199,15 @@ export function FilterPopover({ articles }: FilterPopoverProps) {
               </div>
 
               <div className="flex items-center justify-between gap-3 border-t border-sky-400/10 pt-3">
-                <span className="text-[11.5px] text-slate-300">Incluir las no relevantes</span>
+                <span className="text-[11.5px] text-slate-300">
+                  Incluir las no relevantes
+                  {/* Qué suma y qué no (ADR-0117): las que descartó la IA van
+                      con su propio botón, junto al conteo del expediente. */}
+                  <span className="mt-0.5 block text-[10.5px] text-slate-500">
+                    Suma las cercanas (del mismo tema) y las que la IA no leyó. Las que descartó la
+                    IA se ven con «Ver las … que descartó la IA», junto al conteo.
+                  </span>
+                </span>
                 <HudSwitch
                   checked={showIrrelevant}
                   onChange={setShowIrrelevant}

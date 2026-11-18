@@ -28,11 +28,38 @@ import {
 } from 'maplibre-gl';
 
 import { metersInMercatorUnits } from '../muro/geometry';
+import {
+  type Attribute,
+  bindAttributes,
+  buildProgram,
+  createMesh,
+  deleteMesh,
+  GLSL_GRID_LINE,
+  glslFloat,
+  GRID_MERIDIAN_WIDTH,
+  GRID_MERIDIANS,
+  GRID_PARALLEL_WIDTH,
+  GRID_PARALLELS,
+  type GpuMesh,
+  type Mesh,
+  setProjectionUniforms,
+  type UniformLookup,
+  uniformLookup,
+  upload,
+} from './gl';
 
 const DOME_LAYER = 'radar-dome';
 
-// Radio medio de la Tierra (m), el mismo que usa MapLibre para el globo.
-const EARTH_RADIUS_M = 6_371_008.8;
+/**
+ * Velocidad del haz del radar (radianes por segundo): una vuelta en ~4 s. La
+ * esfera de «Todo el mundo» (shell.ts) usa la misma para que se sientan iguales.
+ */
+export const BEAM_SPEED_RAD_S = 1.6;
+/** Qué tan rápido se apaga la cola del haz detrás de él (por radián). */
+export const BEAM_TAIL = 2.4;
+
+/** Radio medio de la Tierra (m), el mismo que usa MapLibre para el globo. */
+export const EARTH_RADIUS_M = 6_371_008.8;
 const DEG = Math.PI / 180;
 // Resolución de la malla: 24 anillos × 64 gajos se ven redondos de cerca.
 const RINGS = 24;
@@ -49,9 +76,10 @@ const RADIUS_PADDING = 1.1;
 const METERS_PER_DEGREE = 111_320;
 // Los contactos caen dentro de este tanto del radio (lejos del borde).
 const CONTACT_SPREAD = 0.8;
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-// Parte fraccionaria de la razón áurea: reparte los radios sin amontonarlos.
-const GOLDEN_FRACTION = 0.6180339887;
+/** Ángulo áureo (radianes): reparte rumbos sin repetirlos ni amontonarlos. */
+export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+/** Parte fraccionaria de la razón áurea: reparte los radios sin amontonarlos. */
+export const GOLDEN_FRACTION = 0.6180339887;
 // Mezcla del plano y el globo (igual que map/muro/engine.ts).
 const Z_GLOBENESS_THRESHOLD = 0.2;
 
@@ -150,12 +178,6 @@ export function destination(
 // unidades Mercator (1), u, t, tipo (3), nacimiento en segundos (1) y una
 // semilla 0–1 para que cada contacto lata a su ritmo (1).
 const STRIDE = 9;
-
-/** Vértices intercalados e índices de triángulos. */
-interface Mesh {
-  floats: Float32Array;
-  indices: Uint32Array;
-}
 
 /** Arma una malla de anillos × gajos; `place` da lugar y altura de cada vértice. */
 function addGrid(
@@ -301,7 +323,7 @@ vec4 projectPoint(vec2 mercator, float meters, float flatElevation) {
   vec4 flatPosition = u_projection_fallback_matrix * vec4(mercator, flatElevation, 1.0);
   vec4 result = globePosition;
   result.xyw = mix(flatPosition.xyw, globePosition.xyw, u_projection_transition);
-  float globeness = (u_projection_transition - ${Z_GLOBENESS_THRESHOLD.toFixed(1)}) / ${(1 - Z_GLOBENESS_THRESHOLD).toFixed(1)};
+  float globeness = (u_projection_transition - ${glslFloat(Z_GLOBENESS_THRESHOLD)}) / ${glslFloat(1 - Z_GLOBENESS_THRESHOLD)};
   result.z = mix(0.0, globePosition.z, clamp(globeness, 0.0, 1.0));
   return result;
 #else
@@ -312,7 +334,7 @@ void main() {
   // Sin animación todo aparece ya encendido y quieto.
   float age = u_still > 0.5 ? 100.0 : u_time - a_birth;
   // La columna sube desde el piso en casi un segundo al encenderse.
-  float grow = abs(a_uvk.z - ${KIND_PILLAR.toFixed(1)}) < 0.5
+  float grow = abs(a_uvk.z - ${glslFloat(KIND_PILLAR)}) < 0.5
     ? smoothstep(0.0, 1.0, clamp(age / 0.9, 0.0, 1.0))
     : 1.0;
   gl_Position = projectPoint(a_pos, a_elev * grow, a_elev_flat * grow);
@@ -332,11 +354,7 @@ in float v_age;
 in float v_seed;
 uniform float u_time;
 out vec4 fragColor;
-const float TAU = 6.2831853;
-float line(float value, float count, float width) {
-  float d = abs(fract(value * count + 0.5) - 0.5);
-  return 1.0 - smoothstep(0.0, width, d);
-}
+const float TAU = 6.2831853;${GLSL_GRID_LINE}
 void main() {
   float u = v_uvk.x;
   float r = v_uvk.y;
@@ -344,9 +362,9 @@ void main() {
   vec3 cyan = vec3(0.0, 0.82, 1.0);
   vec3 white = vec3(0.85, 0.98, 1.0);
   if (v_age < 0.0) discard;
-  if (kind > ${(KIND_PILLAR - 0.5).toFixed(1)}) {
+  if (kind > ${glslFloat(KIND_PILLAR - 0.5)}) {
     float flash = exp(-v_age * 2.2);
-    if (kind < ${(KIND_RIPPLE - 0.5).toFixed(1)}) {
+    if (kind < ${glslFloat(KIND_RIPPLE - 0.5)}) {
       // Columna: r es la altura (0 abajo, 1 arriba).
       float fade = pow(1.0 - r, 1.4);
       float flicker = 0.85 + 0.15 * sin(u_time * 7.0 + v_seed * 40.0);
@@ -362,12 +380,12 @@ void main() {
     }
     return;
   }
-  float sweep = mod(u_time * 1.6, TAU);
+  float sweep = mod(u_time * ${glslFloat(BEAM_SPEED_RAD_S)}, TAU);
   float behind = mod(sweep - u * TAU + TAU, TAU);
-  float beam = exp(-behind * 2.4);
+  float beam = exp(-behind * ${glslFloat(BEAM_TAIL)});
   float a;
   if (kind < 0.5) {
-    float grid = max(line(u, 12.0, 0.04), line(r, 6.0, 0.05));
+    float grid = max(line(u, ${glslFloat(GRID_MERIDIANS)}, ${glslFloat(GRID_MERIDIAN_WIDTH)}), line(r, ${glslFloat(GRID_PARALLELS)}, ${glslFloat(GRID_PARALLEL_WIDTH)}));
     a = 0.035 + 0.22 * pow(r, 3.0) + 0.22 * grid + 0.35 * beam * (0.25 + 0.75 * r);
   } else {
     float wave = exp(-pow((r - fract(u_time * 0.35)) * 22.0, 2.0));
@@ -378,43 +396,15 @@ void main() {
   fragColor = vec4(cyan * a, a);
 }`;
 
-function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
-  const shader = gl.createShader(type);
-  if (!shader) throw new Error('WebGL no pudo crear el shader del radar.');
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    throw new Error(`Shader del radar: ${gl.getShaderInfoLog(shader) ?? 'error'}`);
-  }
-  return shader;
-}
-
-/** Una malla en la tarjeta de video: su VAO, sus búferes y cuántos índices tiene. */
-interface GpuMesh {
-  vao: WebGLVertexArrayObject;
-  vbo: WebGLBuffer;
-  ibo: WebGLBuffer;
-  count: number;
-}
-
-function createMesh(gl: WebGL2RenderingContext): GpuMesh {
-  const vao = gl.createVertexArray();
-  const vbo = gl.createBuffer();
-  const ibo = gl.createBuffer();
-  gl.bindVertexArray(vao);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-  gl.bindVertexArray(null);
-  return { vao, vbo, ibo, count: 0 };
-}
-
-function upload(gl: WebGL2RenderingContext, target: GpuMesh, mesh: Mesh): void {
-  gl.bindBuffer(gl.ARRAY_BUFFER, target.vbo);
-  gl.bufferData(gl.ARRAY_BUFFER, mesh.floats, gl.STATIC_DRAW);
-  gl.bindVertexArray(target.vao);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
-  gl.bindVertexArray(null);
-  target.count = mesh.indices.length;
-}
+// Atributos del vértice (nombre, tamaño, desde qué número): ver STRIDE.
+const ATTRIBUTES: readonly Attribute[] = [
+  ['a_pos', 2, 0],
+  ['a_elev', 1, 2],
+  ['a_elev_flat', 1, 3],
+  ['a_uvk', 3, 4],
+  ['a_birth', 1, 7],
+  ['a_seed', 1, 8],
+];
 
 /** La capa de la cúpula, su piso y los contactos. */
 class DomeLayer implements CustomLayerInterface {
@@ -424,6 +414,7 @@ class DomeLayer implements CustomLayerInterface {
   private map: MapLibreMap | null = null;
   private program: WebGLProgram | null = null;
   private programKey = '';
+  private uniform: UniformLookup = () => null;
   private dome: GpuMesh | null = null;
   private contacts: GpuMesh | null = null;
   private births: number[] = [];
@@ -457,37 +448,11 @@ class DomeLayer implements CustomLayerInterface {
   private ensureProgram(gl: WebGL2RenderingContext, args: CustomRenderMethodInput): WebGLProgram {
     const { shaderData } = args;
     if (this.program && this.programKey === shaderData.variantName) return this.program;
-    const vertex = `#version 300 es\n${shaderData.vertexShaderPrelude}\n${shaderData.define}\n${VERTEX}`;
-    const program = gl.createProgram();
-    gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vertex));
-    gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, FRAGMENT));
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      throw new Error(`Programa del radar: ${gl.getProgramInfoLog(program) ?? 'error'}`);
-    }
-    const attributes: [string, number, number][] = [
-      ['a_pos', 2, 0],
-      ['a_elev', 1, 2],
-      ['a_elev_flat', 1, 3],
-      ['a_uvk', 3, 4],
-      ['a_birth', 1, 7],
-      ['a_seed', 1, 8],
-    ];
-    for (const mesh of [this.dome, this.contacts]) {
-      if (!mesh) continue;
-      gl.bindVertexArray(mesh.vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vbo);
-      for (const [name, size, offset] of attributes) {
-        const location = gl.getAttribLocation(program, name);
-        if (location >= 0) {
-          gl.enableVertexAttribArray(location);
-          gl.vertexAttribPointer(location, size, gl.FLOAT, false, STRIDE * 4, offset * 4);
-        }
-      }
-    }
-    gl.bindVertexArray(null);
+    const program = buildProgram(gl, args, VERTEX, FRAGMENT);
+    bindAttributes(gl, program, [this.dome, this.contacts], ATTRIBUTES, STRIDE);
     this.program = program;
     this.programKey = shaderData.variantName;
+    this.uniform = uniformLookup(gl, program);
     return program;
   }
 
@@ -498,22 +463,9 @@ class DomeLayer implements CustomLayerInterface {
       this.contactsDirty = false;
     }
     const program = this.ensureProgram(gl, args);
-    const projection = args.defaultProjectionData;
-    const uniform = (name: string) => gl.getUniformLocation(program, name);
+    const uniform = this.uniform;
     gl.useProgram(program);
-    gl.uniformMatrix4fv(
-      uniform('u_projection_matrix'),
-      false,
-      new Float32Array(projection.mainMatrix),
-    );
-    gl.uniform4f(uniform('u_projection_tile_mercator_coords'), ...projection.tileMercatorCoords);
-    gl.uniform4f(uniform('u_projection_clipping_plane'), ...projection.clippingPlane);
-    gl.uniform1f(uniform('u_projection_transition'), projection.projectionTransition);
-    gl.uniformMatrix4fv(
-      uniform('u_projection_fallback_matrix'),
-      false,
-      new Float32Array(projection.fallbackMatrix),
-    );
+    setProjectionUniforms(gl, uniform, args.defaultProjectionData);
     gl.uniform1f(uniform('u_time'), this.animate ? performance.now() / 1000 : 0);
     gl.uniform1f(uniform('u_still'), this.animate ? 0 : 1);
     gl.enable(gl.BLEND);
@@ -533,15 +485,13 @@ class DomeLayer implements CustomLayerInterface {
 
   onRemove(_map: MapLibreMap, gl: WebGL2RenderingContext): void {
     for (const mesh of [this.dome, this.contacts]) {
-      if (!mesh) continue;
-      gl.deleteVertexArray(mesh.vao);
-      gl.deleteBuffer(mesh.vbo);
-      gl.deleteBuffer(mesh.ibo);
+      if (mesh) deleteMesh(gl, mesh);
     }
     if (this.program) gl.deleteProgram(this.program);
     this.dome = null;
     this.contacts = null;
     this.program = null;
+    this.uniform = () => null;
     this.map = null;
   }
 }

@@ -66,8 +66,73 @@ describe('FilterPopover', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('cuenta categorías, estado, ubicación y no relevantes', () => {
-    expect(activeFilters([], null, 'all', false)).toBe(0);
-    expect(activeFilters([2, 7], '08', 'none', true)).toBe(5);
+  it('cuenta categorías, plataformas, estado, ubicación y no relevantes', () => {
+    expect(activeFilters([], null, 'all', false, [])).toBe(0);
+    expect(activeFilters([2, 7], '08', 'none', true, [])).toBe(5);
+    // Cada plataforma elegida cuenta, como cada categoría (ADR-0117).
+    expect(activeFilters([], null, 'all', false, ['facebook'])).toBe(1);
+    expect(activeFilters([2], '08', 'all', false, ['facebook', 'x'])).toBe(4);
+  });
+
+  it('la sección «Plataforma» elige varias y «Quitar filtros» las limpia', () => {
+    const social = [
+      ...NOTES,
+      { ...note(5, '2026-10-28T12:50:00Z', HUACHICOL), platform: 'facebook' as const },
+      { ...note(6, '2026-10-28T12:55:00Z', HUACHICOL), platform: 'x' as const },
+    ];
+    render(<FilterPopover articles={social} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filtro' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filtrar el expediente' });
+    const section = within(dialog).getByRole('region', { name: 'Plataforma' });
+    // Va antes que las categorías.
+    const order = [...dialog.querySelectorAll('section')].map((s) => s.getAttribute('aria-label'));
+    expect(order.indexOf('Plataforma')).toBeLessThan(order.indexOf('Categorías'));
+    const group = within(section).getByRole('group', { name: 'Plataformas a mostrar' });
+    expect(within(group).getByRole('button', { name: /^Noticias/ }).textContent).toBe('Noticias4');
+
+    fireEvent.click(within(group).getByRole('button', { name: /^Facebook/ }));
+    fireEvent.click(within(group).getByRole('button', { name: /^X/ }));
+
+    expect(useTimelineStore.getState().platforms).toEqual(['facebook', 'x']);
+    expect(screen.getByRole('button', { name: /^Filtro/ }).textContent).toBe('Filtro2');
+    // Volver a tocar una la apaga y deja la otra.
+    fireEvent.click(within(group).getByRole('button', { name: /^X/ }));
+    expect(useTimelineStore.getState().platforms).toEqual(['facebook']);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar filtros' }));
+    expect(useTimelineStore.getState().platforms).toEqual([]);
+  });
+
+  it('«Plataforma» cuenta con las mismas notas que las pestañas del expediente', () => {
+    const social = [
+      ...NOTES,
+      { ...note(5, '2026-10-28T12:50:00Z', HUACHICOL), platform: 'facebook' as const },
+      { ...note(6, '2026-10-28T12:55:00Z', ORGANIZADA), platform: 'facebook' as const },
+      { ...note(7, '2026-10-28T12:58:00Z', ORGANIZADA), platform: 'x' as const },
+    ];
+    // Con «Delincuencia organizada» elegida, las pestañas cuentan solo esas.
+    const faceted = social.filter((a) => a.category?.id === ORGANIZADA.id);
+    render(<FilterPopover articles={social} platformArticles={faceted} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filtro' }));
+    const group = screen.getByRole('group', { name: 'Plataformas a mostrar' });
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Todas', 'Noticias1', 'Facebook1', 'X1']);
+  });
+
+  it('el interruptor de no relevantes no dice que las demás no tratan del tema', () => {
+    render(<FilterPopover articles={NOTES} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filtro' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filtrar el expediente' });
+    expect(dialog.textContent).not.toMatch(/no tienen nada que ver|no tratan del tema/);
+    expect(dialog.textContent).toContain('que descartó la IA');
+  });
+
+  it('sin más de una plataforma no hay sección «Plataforma»', () => {
+    render(<FilterPopover articles={NOTES} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filtro' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filtrar el expediente' });
+    expect(within(dialog).queryByRole('region', { name: 'Plataforma' })).toBeNull();
   });
 });

@@ -99,3 +99,23 @@ def test_google_news_rss_activado_por_defecto_y_se_puede_apagar(env: pytest.Monk
 
     env.setenv("NEWS_RSS_ENABLED", "false")
     assert build_settings().news_rss_enabled is False
+
+
+def test_google_web_va_por_defecto_solo_en_la_busqueda_rapida(
+    env: pytest.MonkeyPatch,
+) -> None:
+    # ADR-0115: Google web manda una consulta por concepto; en la manual se
+    # enciende con su switch para no gastar varios créditos por búsqueda.
+    # Las corridas automáticas siguen solo con fuentes gratis.
+    settings = build_settings()
+
+    assert settings.manual_default_sources == "google_news_rss,indice_local"
+    assert settings.quick_default_sources == "google_news_rss,indice_local,searchapi_web"
+    assert settings.automatic_sources == "google_news_rss,indice_local"
+
+
+def test_el_saldo_real_de_searchapi_se_revisa_por_defecto(env: pytest.MonkeyPatch) -> None:
+    # Las pruebas lo apagan en tests/conftest.py para no llamar a internet.
+    env.delenv("SEARCHAPI_BALANCE_CHECK", raising=False)
+
+    assert build_settings().searchapi_balance_check is True

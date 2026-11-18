@@ -5,9 +5,11 @@ from typing import Any, cast
 import pytest
 
 from app.domain.concept import (
+    MAX_REQUIRED_TERMS,
     MAX_TERMS,
     NAME_MAX_LENGTH,
     OPEN_MAX_PHRASES,
+    REQUIRED_FIELD,
     ConceptChanges,
     ConceptDraft,
     QueryMode,
@@ -199,3 +201,56 @@ def test_cambios_parciales_conservan_el_modo() -> None:
     current = draft(query_mode=QueryMode.OPEN)
 
     assert ConceptChanges(color="#000000").apply_to(current).query_mode is QueryMode.OPEN
+
+
+# --- Términos obligatorios de la búsqueda rápida (ADR-0113) ---
+
+
+def test_sin_terminos_obligatorios_el_concepto_no_cambia() -> None:
+    assert draft().required_terms == ()
+
+
+def test_terminos_obligatorios_se_limpian_y_validan() -> None:
+    assert draft(required_terms=(" Eternal ", "")).required_terms == ("Eternal",)
+    assert fields(required_terms=("Eternal", "eternal")) == [REQUIRED_FIELD]
+    assert fields(required_terms=('"Eternal"',)) == [REQUIRED_FIELD]
+    too_many = tuple(f"nombre {i}" for i in range(MAX_REQUIRED_TERMS + 1))
+    assert fields(required_terms=too_many) == [REQUIRED_FIELD]
+
+
+def test_editar_desde_el_formulario_no_borra_los_terminos_obligatorios() -> None:
+    current = draft(required_terms=("Eternal",), query_mode=QueryMode.OPEN)
+
+    edited = ConceptChanges(name="hacker eternal", keywords=("hacker eternal",)).apply_to(current)
+
+    assert edited.required_terms == ("Eternal",)
+
+
+# Revisión del 18/11/2026 (hallazgo 7): el literal de la búsqueda rápida se
+# busca completo aunque pase de 80 caracteres; el formulario no cambia.
+LONG_LITERAL = (
+    "ataques de hackers a la Secretaría de la Defensa Nacional y a otras dependencias "
+    "del gobierno federal mexicano"
+)
+
+
+def test_el_literal_de_la_busqueda_rapida_puede_pasar_de_80_caracteres() -> None:
+    quick = draft(
+        keywords=(LONG_LITERAL, "hackean Sedena"),
+        query_mode=QueryMode.OPEN,
+        literal_max_words=32,
+    )
+
+    assert quick.keywords[0] == LONG_LITERAL
+
+
+def test_solo_el_literal_tiene_tope_de_palabras() -> None:
+    # La segunda frase y el formulario siguen con el tope de 80 caracteres.
+    assert fields(
+        keywords=("hackean Sedena", LONG_LITERAL), query_mode=QueryMode.OPEN, literal_max_words=32
+    ) == ["keywords"]
+    assert fields(keywords=(LONG_LITERAL,), query_mode=QueryMode.OPEN) == ["keywords"]
+    words = " ".join(f"palabra{i}" for i in range(33))
+    assert fields(keywords=(words,), query_mode=QueryMode.OPEN, literal_max_words=32) == [
+        "keywords"
+    ]

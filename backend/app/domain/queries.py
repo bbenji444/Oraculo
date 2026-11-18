@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, tzinfo
 from enum import StrEnum
 
+from app.domain.core_terms import CoreTerms
 from app.domain.errors import InvalidRequestError
 from app.domain.region import RegionLevel
 
@@ -38,6 +39,10 @@ class Provider(StrEnum):
     """Proveedores de noticias (especificación §8), en el orden en que se muestran."""
 
     SEARCHAPI = "searchapi"
+    # SearchApi con el motor ``google`` (búsqueda web normal, ADR-0115): trae
+    # Facebook, X, YouTube, Instagram y sitios que Google News no indexa.
+    # Comparte cuenta y tope mensual con SEARCHAPI.
+    SEARCHAPI_WEB = "searchapi_web"
     GOOGLE_NEWS_RSS = "google_news_rss"
     GDELT = "gdelt"
     # Índice propio que llena la ingesta periódica (ADR-0013): GDELT por
@@ -48,6 +53,18 @@ class Provider(StrEnum):
     # pero lento, y solo en la búsqueda manual.
     BROWSERWORK_BING = "browserwork_bing"
     BROWSERWORK_GOOGLE2 = "browserwork_google2"
+
+
+# Buscadores que buscan en el texto completo de la nota, no solo en el título
+# (ADR-0038: «los buscadores encuentran la palabra en todo el artículo»). Si
+# uno trajo una nota con una consulta que llevaba la entidad pedida, la
+# entidad está en algún lado de la nota aunque el título no la nombre
+# (ADR-0114, regla de procedencia). El índice local no cuenta: busca solo en
+# título y resumen (ADR-0013). GDELT y BrowserWork tampoco: no se ha medido
+# que exijan todas las palabras de la consulta.
+FULL_TEXT_PROVIDERS = frozenset(
+    {Provider.GOOGLE_NEWS_RSS, Provider.SEARCHAPI, Provider.SEARCHAPI_WEB}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +286,9 @@ class PlannedQuery:
         topic_terms: Palabras de la subdivisión (02/11/2026): si no está
             vacío, la nota debe traer también una de ellas. «FGR + Homicidio»
             pide las palabras de la FGR y, además, las de Homicidio.
+        core: Lo que deben nombrar las notas de un concepto abierto (ADR-0114):
+            sus entidades y alguna raíz del tema. ``None`` en los conceptos
+            exactos y el monitor FGR, que no se filtran así.
     """
 
     provider: Provider
@@ -281,3 +301,4 @@ class PlannedQuery:
     exclude_terms: tuple[str, ...] = ()
     place: QueryPlace | None = None
     topic_terms: tuple[str, ...] = ()
+    core: CoreTerms | None = None

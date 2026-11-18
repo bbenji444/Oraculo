@@ -33,7 +33,8 @@ SUGGESTION_ENTITY_ID = 0
 _NAME_UNIQUE_INDEX = "concepts_name_norm_active_key"
 _COLUMNS = """
     c.id, c.name, c.description, c.keywords, c.exclude_terms, c.color, c.is_active,
-    c.created_by, c.created_at, c.updated_at, c.category_id, c.query_mode, c.is_quick
+    c.created_by, c.created_at, c.updated_at, c.category_id, c.query_mode, c.is_quick,
+    c.required_terms
 """
 
 
@@ -48,6 +49,7 @@ def _to_concept(row: RowMapping) -> Concept:
         color=row["color"],
         is_active=row["is_active"],
         query_mode=QueryMode(row["query_mode"]),
+        required_terms=tuple(row["required_terms"]),
     )
     return Concept(
         row["id"],
@@ -70,6 +72,7 @@ def _values(data: ConceptDraft) -> dict[str, Any]:
         "color": data.color,
         "is_active": data.is_active,
         "query_mode": data.query_mode.value,
+        "required_terms": list(data.required_terms),
     }
 
 
@@ -175,11 +178,11 @@ class PostgresConceptRepository:
                             text(
                                 f"""
                                 INSERT INTO concepts AS c (name, name_norm, description, keywords,
-                                    exclude_terms, color, is_active, query_mode, created_by,
-                                    is_quick)
+                                    exclude_terms, color, is_active, query_mode, required_terms,
+                                    created_by, is_quick)
                                 VALUES (:name, :name_norm, :description, :keywords,
-                                    :exclude_terms, :color, :is_active, :query_mode, :created_by,
-                                    :is_quick)
+                                    :exclude_terms, :color, :is_active, :query_mode,
+                                    :required_terms, :created_by, :is_quick)
                                 RETURNING {_COLUMNS}
                                 """  # noqa: S608 — fragmentos SQL constantes del módulo
                             ),
@@ -210,7 +213,8 @@ class PostgresConceptRepository:
                                 UPDATE concepts AS c SET name = :name, name_norm = :name_norm,
                                     description = :description, keywords = :keywords,
                                     exclude_terms = :exclude_terms, color = :color,
-                                    is_active = :is_active, query_mode = :query_mode
+                                    is_active = :is_active, query_mode = :query_mode,
+                                    required_terms = :required_terms
                                 WHERE c.id = :id AND c.deleted_at IS NULL
                                 RETURNING {_COLUMNS}
                                 """  # noqa: S608 — fragmentos SQL constantes del módulo

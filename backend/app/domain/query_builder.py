@@ -23,12 +23,18 @@ segundo grupo con las palabras del tema, que también deben aparecer. Si ese
 grupo no cabe en el límite del proveedor, se parte en varios y cada parte
 lleva sus propias consultas.
 
+Google web (``literal_only``, ADR-0115) recibe **una sola** consulta: la
+primera palabra clave tal cual, más el lugar si la región es un estado o
+municipio. Sin OR, sin comillas ni exclusiones, como se busca en Google:
+ese buscador trae redes sociales y sitios que no son de noticias, y cada
+consulta cuesta un crédito.
+
 No hace: no aplica los topes por búsqueda (``MAX_QUERIES_PER_SEARCH`` y
 ``MAX_FREE_QUERIES_PER_SEARCH``) ni la caché; eso es de la búsqueda completa (F3/F4).
 """
 
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Protocol
 
 from app.domain.concept import OPEN_MAX_PHRASES, QueryMode
@@ -112,6 +118,44 @@ def _days(window: DateWindow) -> list[DateWindow]:
     ]
 
 
+def manual_window(date_from: date, date_to: date, today: date) -> DateWindow:
+    """La ventana con la que corre una búsqueda manual ya guardada (ADR-0113).
+
+    ``searches`` guarda solo las fechas, así que «últimos 7 días» llegaba al
+    pipeline como un rango fijo: Google News RSS recibía ``after:``/``before:``,
+    que no respeta (medido el 16/10/2026), en lugar del ``when:7d`` que sí
+    muestra la vista previa. Si la ventana termina hoy y pasa de
+    ``SPLIT_MAX_DAYS`` días, vuelve a ser «últimos N días»: ``when:Nd`` en el
+    RSS, ``time_period`` en SearchApi y ``timespan`` en GDELT.
+
+    Las de 1 a ``SPLIT_MAX_DAYS`` días se quedan fijas a propósito: las de 2
+    y 3 se parten por día y traen más notas (medido el 27/10/2026: 281 por
+    palabra y por día; solo por palabra, a lo más 200), y «Hoy» con ``when:1d`` contaría 24
+    horas hacia atrás y podría llenar el tope de 100 notas con las de ayer,
+    que luego se tiran por la ventana estricta.
+
+    Args:
+        date_from: Primer día guardado.
+        date_to: Último día guardado.
+        today: Hoy en la Ciudad de México.
+
+    Returns:
+        «Últimos N días» si aplica; si no, el rango fijo.
+
+    Raises:
+        InvalidRequestError: Si las fechas están al revés o pasan de 90 días.
+
+    Example:
+        >>> manual_window(date(2026, 11, 12), date(2026, 11, 18), date(2026, 11, 18))
+        DateWindow(date_from=..., date_to=..., relative_days=7)
+    """
+    window = DateWindow.between(date_from, date_to)
+    span = (date_to - date_from).days + 1
+    if date_to == today and span > SPLIT_MAX_DAYS:
+        return DateWindow.last_days(span, today)
+    return window
+
+
 def _split_topic(
     dialect: QueryDialect,
     concept: ConceptTerms,
@@ -183,6 +227,55 @@ def _plan(
     return [(chunk, window) for chunk in chunks]
 
 
+def _literal_query(
+    dialect: QueryDialect,
+    concept: ConceptTerms,
+    place: QueryPlace,
+    window: DateWindow,
+    topic: tuple[str, ...],
+) -> PlannedQuery:
+    """La única consulta de un proveedor «como Google» (``literal_only``, ADR-0115).
+
+    Lleva la primera palabra clave tal cual, sin comillas (en la búsqueda
+    rápida es lo que escribió el analista), y el lugar si la región es un
+    estado, municipio o localidad; en un país o en «Mundo», solo el texto.
+    No lleva exclusiones ni la subdivisión en el texto: así se busca en
+    Google. La subdivisión sí queda en ``topic_terms`` para que el pipeline
+    descarte lo que no la mencione, igual que con los demás proveedores.
+
+    Args:
+        dialect: Dialecto del proveedor.
+        concept: Concepto (se usa su primera palabra clave).
+        place: Lugar.
+        window: Rango de fechas (va como parámetro en el adaptador).
+        topic: Palabras de la subdivisión, si hay.
+
+    Returns:
+        La consulta.
+
+    Raises:
+        QueryTooLongError: Si el texto con el lugar no cabe en el límite.
+    """
+    literal = concept.keywords[0]
+    text = dialect.render((literal,), place, (), window, exact=False)
+    if not dialect.fits(text):
+        raise QueryTooLongError(
+            f"La consulta para {dialect.label} no cabe en su límite. Usa un texto más corto.",
+            {"proveedor": dialect.provider.value, "palabra": literal},
+        )
+    return PlannedQuery(
+        provider=dialect.provider,
+        text=text,
+        keywords=(literal,),
+        country=place.country,
+        language=SEARCH_LANGUAGE,
+        window=window,
+        estimated_credits=dialect.credits_per_query,
+        place=place,
+        topic_terms=topic,
+    )
+
+
 def build_queries(
     concept: ConceptTerms,
     place: QueryPlace,
@@ -222,6 +315,9 @@ def build_queries(
     queries = []
     for provider in providers:
         dialect = DIALECTS[provider]
+        if dialect.literal_only:
+            queries.append(_literal_query(dialect, concept, place, window, topic))
+            continue
         for topic_chunk in _split_topic(dialect, concept, place, window, topic):
             for chunk, span in _plan(dialect, concept, place, window, topic_chunk):
                 # Sin comillas solo la frase que va sola: Google lee

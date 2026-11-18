@@ -12,6 +12,8 @@ import {
   listAllArticles,
   listSearches,
   type Search,
+  searchNotices,
+  startQuickSearch,
   startSearch,
 } from './searches';
 
@@ -109,6 +111,28 @@ describe('servicio de búsquedas', () => {
     });
   });
 
+  it('la búsqueda rápida trae el aviso de Google web si lo hubo (ADR-0115)', async () => {
+    const started = {
+      search_id: 'q1',
+      status: 'pending',
+      concept: { id: 41, name: 'Hacker Eternal' },
+      place_region: null,
+    };
+    respondSequence(
+      { body: { ...started, notice: 'Sin créditos de Google web: se buscó en noticias' } },
+      { body: { ...started, notice: null } },
+      // Respuestas de antes del aviso: sin el campo.
+      { body: started },
+    );
+    const input = { text: 'hacker eternal', region_id: 1, days: 7 };
+
+    expect((await startQuickSearch(input)).notice).toBe(
+      'Sin créditos de Google web: se buscó en noticias',
+    );
+    expect((await startQuickSearch(input)).notice).toBeNull();
+    expect((await startQuickSearch(input)).notice).toBeNull();
+  });
+
   it('lee el avance y el historial', async () => {
     const spy = respondSequence({ body: SEARCH }, { body: { items: [SEARCH], next_cursor: 'c2' } });
 
@@ -168,5 +192,24 @@ describe('servicio de búsquedas', () => {
     expect(['completed', 'partial', 'failed'].every((s) => isFinished(s as Search['status']))).toBe(
       true,
     );
+  });
+
+  it('junta los avisos de Google web: el del lanzamiento y el del worker, sin repetir', () => {
+    const NO_CREDITS = 'Sin créditos de Google web: se buscó en noticias';
+    const ACCOUNT = 'Google web no respondió (la cuenta de SearchApi): se buscó sin él';
+    const launched = { searchId: SEARCH.search_id, notice: NO_CREDITS };
+
+    expect(searchNotices(SEARCH, null)).toEqual([]);
+    expect(searchNotices(SEARCH, launched)).toEqual([NO_CREDITS]);
+    // El del lanzamiento solo vale para su búsqueda.
+    expect(searchNotices(SEARCH, { searchId: 'otra', notice: NO_CREDITS })).toEqual([]);
+    const withWorker = { ...SEARCH, progress: { ...SEARCH.progress, notice: ACCOUNT } };
+    expect(searchNotices(withWorker, null)).toEqual([ACCOUNT]);
+    expect(searchNotices(withWorker, launched)).toEqual([NO_CREDITS, ACCOUNT]);
+    // El mismo texto por los dos lados sale una vez; los vacíos no salen.
+    const same = { ...SEARCH, progress: { ...SEARCH.progress, notice: NO_CREDITS } };
+    expect(searchNotices(same, launched)).toEqual([NO_CREDITS]);
+    const blank = { ...SEARCH, progress: { ...SEARCH.progress, notice: '  ' } };
+    expect(searchNotices(blank, { searchId: SEARCH.search_id, notice: null })).toEqual([]);
   });
 });

@@ -9,6 +9,10 @@ Proveedores de una búsqueda (plan de F4): SearchApi (con créditos, si hay
 llave) y el índice local (gratis). La API de GDELT y Google News RSS
 siguen apagados (ADR-0011 y ADR-0012).
 
+Si la cuenta de SearchApi no deja buscar a Google web (sin saldo o llave
+rechazada), ``ExecuteQueries`` avisa y ``NoticedSearchStore`` deja el aviso
+en ``searches.progress.notice`` (revisión del 18/11/2026, ADR-0115).
+
 No hace: no decide cuándo correr ni muestra nada.
 """
 
@@ -37,6 +41,7 @@ from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionL
 from app.application.use_cases.extraction import ExtractTexts
 from app.application.use_cases.geocoding import GeocodeMentions
 from app.application.use_cases.run_search import PipelineLimits, RunSearch, SearchReport
+from app.application.use_cases.search_notices import NoticedSearchStore, SearchNotices
 from app.application.use_cases.stories import GroupStories
 from app.core.config import Settings
 from app.domain.queries import Provider
@@ -48,12 +53,18 @@ logger = logging.getLogger(__name__)
 # está configurado y no recibe consultas.
 SEARCH_PROVIDERS = (
     Provider.SEARCHAPI,
+    # Google web (ADR-0115): misma llave que SearchApi; sin ella no se ofrece.
+    Provider.SEARCHAPI_WEB,
     Provider.GOOGLE_NEWS_RSS,
     Provider.LOCAL_INDEX,
     # Sin BROWSERWORK_BASE_URL dicen que no están configurados (ADR-0028).
     Provider.BROWSERWORK_BING,
     Provider.BROWSERWORK_GOOGLE2,
 )
+
+
+def _no_progress(_search_id: UUID, _progress: Mapping[str, object]) -> None:
+    """Aviso de avance que no hace nada (la tarea de Celery no muestra nada)."""
 
 
 def build_providers(settings: Settings, engine: AsyncEngine) -> dict[Provider, NewsProviderPort]:
@@ -93,6 +104,8 @@ async def search_pipeline(
     extractor = build_extractor(settings)
     providers = build_providers(settings, engine)
     gazetteer = PostgresGazetteer(engine)
+    # Lo que ExecuteQueries avisa (Google web sin saldo) llega al avance.
+    notices = SearchNotices()
     try:
         executor = ExecuteQueries(
             providers,
@@ -101,11 +114,14 @@ async def search_pipeline(
             ExecutionLimits(
                 settings.query_caps,
                 settings.query_cache_ttl_hours,
+                # Un solo tope para la cuenta de SearchApi: cubre Google News y
+                # Google web (credit_account, ADR-0115).
                 {Provider.SEARCHAPI: settings.searchapi_monthly_credit_limit},
             ),
+            on_notice=notices.put,
         )
         use_case = RunSearch(
-            searches=PostgresSearchStore(engine),
+            searches=NoticedSearchStore(PostgresSearchStore(engine), notices),
             articles=PostgresArticleStore(engine),
             regions=PostgresRegionRepository(engine),
             gazetteer=gazetteer,
@@ -130,7 +146,9 @@ async def search_pipeline(
                 llm.price_input_per_million,
                 llm.price_output_per_million,
             ),
-            **({"log_progress": log_progress} if log_progress else {}),
+            # Sin aviso, el que no hace nada: se pasa por nombre para que el
+            # tipo se revise contra log_progress y no contra los demás.
+            log_progress=log_progress or _no_progress,
         )
         yield use_case, llm, engine
     finally:

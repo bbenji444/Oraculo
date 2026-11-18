@@ -1,10 +1,12 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v5.md`` para
-enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v6.md`` para
+enriquecer una nota, con ``enrich_v6_open.md`` o ``enrich_v6_exact.md`` según
+haya conceptos abiertos, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
-caso, ``terms_v2.md`` para proponer las frases de un concepto y el lugar que nombra) y su
-respuesta se valida con el mismo modelo de Pydantic
+caso, ``terms_v3.md`` para proponer las frases de un concepto, el lugar que
+nombra y sus nombres propios) y su respuesta se valida con el mismo modelo de
+Pydantic
 (``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``, ``TermsOut``). Así, cambiar de
 proveedor no cambia lo que se pide ni lo que se acepta.
 
@@ -31,6 +33,7 @@ from app.application.ports.llm import (
 )
 from app.domain.authority import parse_authority
 from app.domain.concept import QueryMode
+from app.domain.core_terms import QueryOrigin
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.entity_extraction import RawProposal
 from app.domain.geocoding import Mention, MentionRole
@@ -47,8 +50,39 @@ from app.domain.region import RegionLevel
 # Antes de publicarse se le quitó, solo a esos conceptos, la exigencia de un
 # hecho concreto y el descarte por tener solo el título: en la primera
 # búsqueda real dejaba 5 relevantes de 150 (ADR-0109, «Primera búsqueda real»).
-PROMPT_VERSION = "enrich_v5"
+# v6 (18/11/2026, ADR-0114): solo cambian los conceptos abiertos. Se juzga
+# contra lo pedido con entidad y región, la procedencia de la nota y cuatro
+# bandas de puntaje (relevante, por confirmar, cercana, ajena). Con solo
+# conceptos exactos (FGR, temas) el texto es el mismo de v5, palabra por
+# palabra: el bloque de abiertos de v5 está copiado en enrich_v6_exact.md.
+# Cambiar la versión invalida la caché: cada nota se vuelve a juzgar una vez.
+PROMPT_VERSION = "enrich_v6"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
+# Reglas de los conceptos abiertos (v6) y, sin ellos, las de v5 tal cual.
+OPEN_RULES_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}_open.md"
+EXACT_RULES_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}_exact.md"
+# Primera línea del prompt. La de los exactos es la de v5 sin tocar (asume
+# México, como siempre); la de los abiertos dice dónde se busca.
+EXACT_INTRO = (
+    "Eres un analista que lee noticias en español para un monitor de noticias "
+    "geolocalizadas sobre México. Lee la nota y responde SOLO con el JSON pedido."
+)
+OPEN_INTRO = (
+    "Eres un analista que lee noticias en español para un monitor de noticias "
+    "geolocalizadas.{region} Lee la nota y responde SOLO con el JSON pedido."
+)
+OPEN_INTRO_REGION = " La búsqueda es en: {region}."
+# Búsqueda mixta (revisión del 18/11/2026, hallazgo 6): una búsqueda manual
+# con la FGR (exacta) y un concepto abierto. La primera línea sigue siendo la
+# de v5 («sobre México») para el exacto, y la región se dice solo para los
+# abiertos; una línea al final de sus reglas aclara que el lugar y las bandas
+# no le aplican al exacto.
+MIXED_INTRO_REGION = " Los conceptos que traen «Lo que busca el analista» se buscan en: {region}."
+MIXED_RULES_NOTE = (
+    "   - Los conceptos sin «Lo que busca el analista» se juzgan con las reglas "
+    "generales, como siempre en este monitor sobre México: la regla de lugar y las "
+    "bandas de arriba son solo para los que lo traen."
+)
 # Respuestas consistentes: se extraen datos, no se escribe creativo.
 TEMPERATURE = 0.2
 # Tope de la respuesta: evita respuestas desbocadas que cuestan. Con 2048,
@@ -117,17 +151,28 @@ class EnrichmentOut(BaseModel):
     locations: list[LocationOut] = Field(default_factory=list)
 
 
+def _is_open(concept: ConceptBrief) -> bool:
+    """Si el concepto se juzga contra lo que escribió el analista (ADR-0109 D4).
+
+    Sin descripción no hay contra qué juzgar, así que se presenta como exacto.
+    """
+    return concept.query_mode is QueryMode.OPEN and bool(concept.description.strip())
+
+
 def _concept_line(concept: ConceptBrief) -> str:
     terms = ", ".join(concept.keywords)
     head = f"- concept_id {concept.concept_id}: {concept.name}."
     # ADR-0109 (D4): en un concepto abierto manda lo que escribió el analista y
-    # las frases son solo pista. Sin descripción no hay contra qué juzgar, así
-    # que se presenta como uno exacto.
-    if concept.query_mode is QueryMode.OPEN and concept.description.strip():
-        return (
+    # las frases son solo pista.
+    if _is_open(concept):
+        line = (
             f"{head} Lo que busca el analista: {concept.description} "
             f"(frases de búsqueda, solo como pista: {terms})"
         )
+        # ADR-0114: la entidad que pidió («hacker Eternal») es condición.
+        if concept.required_terms:
+            line += f" Debe hablar de: {', '.join(concept.required_terms)}."
+        return line
     return f"{head} {concept.description} (palabras clave: {terms})"
 
 
@@ -135,19 +180,98 @@ def _concepts_text(concepts: Sequence[ConceptBrief]) -> str:
     return "\n".join(_concept_line(c) for c in concepts)
 
 
+def _origin_line(origin: QueryOrigin) -> str:
+    search = (
+        "busca en el texto completo de las notas"
+        if origin.full_text
+        else "no cuenta como buscador de texto completo"
+    )
+    keywords = " o ".join(f"«{k}»" for k in origin.keywords)
+    # Con la sección («Google web, videos»): un carrusel no es texto completo.
+    return f"- {origin.full_label} ({search}), con {keywords}."
+
+
+def _context_lines(request: EnrichmentRequest, names: str) -> list[str]:
+    """Lo que se sabe de las entidades por otras notas (revisión del 18/11/2026, hallazgo 4).
+
+    Sin esas notas también se dice: así el juez sabe que no hay hechos con
+    qué comparar el título y la nota de solo título queda cercana.
+    """
+    if not request.entity_context:
+        return [
+            f"Ninguna otra nota de esta búsqueda nombra a {names}: "
+            "no hay hechos con qué comparar el título."
+        ]
+    return [
+        f"Lo que se sabe de {names} por otras notas de esta búsqueda que sí lo nombran:",
+        *(f"- {fragment}" for fragment in request.entity_context),
+    ]
+
+
+def _origins_text(request: EnrichmentRequest) -> str:
+    """El bloque «Cómo llegó la nota» (ADR-0114), o ``""`` si no se sabe.
+
+    Lleva las consultas y buscadores que trajeron la nota y, si el título no
+    nombra una entidad pedida, lo que se sabe de ella por otras notas de la
+    búsqueda (``EnrichmentRequest.entity_context``). Termina con una línea en
+    blanco para que la plantilla siga igual sin él.
+    """
+    lines = [_origin_line(o) for o in request.origins]
+    if request.unconfirmed_terms:
+        names = ", ".join(f"«{t}»" for t in request.unconfirmed_terms)
+        lines.append(f"El título y el fragmento no nombran a {names}.")
+        lines.extend(_context_lines(request, names))
+    if not lines:
+        return ""
+    return "Cómo llegó la nota:\n" + "\n".join(lines) + "\n\n"
+
+
+def _intro(region: str | None, *, mixed: bool) -> str:
+    """La primera línea de una búsqueda con conceptos abiertos.
+
+    Args:
+        region: Dónde se busca, si se sabe.
+        mixed: Si también hay conceptos exactos: entonces es la línea de v5
+            («sobre México») y la región se dice solo para los abiertos.
+    """
+    if mixed:
+        return EXACT_INTRO + (MIXED_INTRO_REGION.format(region=region) if region else "")
+    where = OPEN_INTRO_REGION.format(region=region) if region else ""
+    return OPEN_INTRO.format(region=where)
+
+
 def build_prompt(request: EnrichmentRequest) -> str:
     """Llena la plantilla del prompt vigente (``PROMPT_VERSION``) con la nota.
 
+    Con algún concepto abierto (ADR-0114) lleva la región de la búsqueda, las
+    reglas de ``enrich_v6_open.md``, cómo llegó la nota y lo que se sabe de
+    la entidad que su título no nombra. Si además hay conceptos exactos
+    (búsqueda mixta), la primera línea sigue diciendo «sobre México», la
+    región se dice solo para los abiertos y se aclara que sus reglas de lugar
+    y bandas no aplican al exacto. Con solo conceptos exactos (el monitor
+    FGR, los temas) el texto es el de ``enrich_v5`` sin cambiar nada: primera
+    línea «sobre México», sus reglas (``enrich_v6_exact.md``) y sin
+    procedencia.
+
     Args:
-        request: Nota y conceptos.
+        request: Nota, conceptos, región, procedencia y contexto de la entidad.
 
     Returns:
         El texto que se manda a la IA.
     """
     template = PROMPT_PATH.read_text(encoding="utf-8")
     published = request.published_at.date().isoformat() if request.published_at else "desconocida"
+    is_open = any(_is_open(c) for c in request.concepts)
+    mixed = is_open and not all(_is_open(c) for c in request.concepts)
+    rules = (OPEN_RULES_PATH if is_open else EXACT_RULES_PATH).read_text(encoding="utf-8")
+    rules = rules.rstrip("\n")
+    if mixed:
+        rules += "\n" + MIXED_RULES_NOTE
     return template.format(
+        intro=_intro(request.region, mixed=mixed) if is_open else EXACT_INTRO,
+        open_rules=rules,
         concepts=_concepts_text(request.concepts),
+        origins=_origins_text(request) if is_open else "",
         published_at=published,
         title=request.title,
         text=request.text,
@@ -375,16 +499,20 @@ def to_labels(
     return tuple(labels)
 
 
-# Frases de un concepto «como en Google» (ADR-0109).
-TERMS_PROMPT_VERSION = "terms_v2"
+# Frases de un concepto «como en Google» (ADR-0109). v3 (18/11/2026,
+# ADR-0113): copia exactos los nombres propios que escribió la persona
+# («hacker» no es «hackeo»), los devuelve en ``entities`` y los pone en
+# todas las frases. terms_v2 se queda en prompts/ como histórico. Cambiar
+# esta versión no invalida ninguna caché: solo queda en la bitácora.
+TERMS_PROMPT_VERSION = "terms_v3"
 TERMS_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{TERMS_PROMPT_VERSION}.md"
-# 12 frases cortas, 6 exclusiones y un nombre son ~150 tokens; 600 dejan
-# margen sin pagar respuestas desbocadas.
+# 12 frases cortas, 6 exclusiones, un nombre y unas cuantas entidades son
+# ~200 tokens; 600 dejan margen sin pagar respuestas desbocadas.
 TERMS_MAX_OUTPUT_TOKENS = 600
 
 
 class TermsOut(BaseModel):
-    """Esquema de la propuesta de frases (``terms_v2``: con el lugar, ADR-0110).
+    """Esquema de la propuesta de frases (``terms_v3``: lugar y nombres propios).
 
     Las listas no tienen tope aquí: el dominio recorta a ``OPEN_MAX_PHRASES``
     y descarta lo que no se pueda buscar (``clean_suggestion``).
@@ -396,10 +524,13 @@ class TermsOut(BaseModel):
     # terms_v2: el lugar que nombró la persona y su estado (búsqueda rápida).
     place: str | None = None
     place_state: str | None = None
+    # terms_v3 (ADR-0113): nombres propios, alias, grupos o siglas tal como
+    # los escribió la persona. Una respuesta de v2 no los trae: lista vacía.
+    entities: list[str] = Field(default_factory=list)
 
 
 def build_terms_prompt(request: TermSuggestionRequest) -> str:
-    """Llena la plantilla ``terms_v2`` con lo que busca el analista.
+    """Llena la plantilla ``terms_v3`` con lo que busca el analista.
 
     Args:
         request: Descripción y topes.

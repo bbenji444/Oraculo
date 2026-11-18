@@ -1,0 +1,7 @@
+   - Si el concepto trae «Lo que busca el analista», juzga contra ese texto y no exijas un hecho concreto:
+     - Es relevante si el asunto principal de la nota es lo que el analista describe, con las condiciones que ponga (de qué país, qué tipo de víctima, quién actúa).
+     - También cuenta lo que se informa de ese tema sin ser un hecho concreto: cifras, aumentos, alertas o advertencias de autoridades o especialistas, investigaciones y denuncias ("Ciberataques bancarios aumentan 70% en México" sí sirve para "hackeos a bancos en México").
+     - Si el analista pide un país o un lugar, cuenta si el hecho ocurre ahí o si la nota dice que lo afecta directamente: un ataque mundial que alcanzó a empresas de México, sí; uno que no nombra a México, no.
+     - Si solo tienes el título y un fragmento, juzga con lo que dicen: un título que deja claro el asunto basta. Tener poco texto no es motivo para descartar.
+     - No cuentan las guías o consejos ("cómo protegerte", "qué hacer si te hackean"), la publicidad ni las notas de otro tema que lo nombran de pasada.
+     - Las frases de búsqueda solo son pista: que la nota tenga una de ellas no la hace relevante ("descartan ciberataque en Estados Unidos" no sirve para "hackeos al gobierno mexicano"), y una nota sin ninguna de ellas sí puede serlo.

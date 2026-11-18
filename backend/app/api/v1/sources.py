@@ -1,8 +1,11 @@
 """Fuentes que el analista puede encender o apagar en la búsqueda manual (F12.2).
 
 ``GET /sources`` alimenta los switches del panel de búsqueda: nombre, si
-cuesta créditos, si está configurada y si va encendida por defecto. La
-elección se manda luego en ``providers`` de ``/searches`` (ADR-0027).
+cuesta créditos, si está configurada, si va encendida por defecto (en la
+manual y en la rápida) y, en las
+de pago, cuántos créditos quedan (saldo real de SearchApi o, si no se pudo
+leer, el tope mensual local; ADR-0115). La elección se manda luego en
+``providers`` de ``/searches`` (ADR-0027).
 
 No hace: no decide qué fuentes existen (``app.domain.sources``) ni cuáles
 están configuradas (``PlanSearch.source_options``).
@@ -34,7 +37,28 @@ class SourceOut(BaseModel):
     configured: bool = Field(
         description="Si tiene lo necesario para consultar; si no, el switch se deshabilita."
     )
-    default_on: bool = Field(description="Si va encendida al abrir la búsqueda.")
+    default_on: bool = Field(
+        description=(
+            "Si va encendida al abrir la búsqueda. Una de pago solo si le quedan "
+            "créditos (``credits_remaining > 0``)."
+        )
+    )
+    quick_default_on: bool = Field(
+        description=(
+            "Si va encendida en la búsqueda rápida mientras el analista no toque los "
+            "switches (``QUICK_DEFAULT_SOURCES``, con Google web; ADR-0115). Una de "
+            "pago solo si le quedan créditos."
+        )
+    )
+    credits_remaining: int | None = Field(
+        default=None,
+        examples=[46],
+        description=(
+            "Solo en las de pago configuradas: créditos que se pueden gastar (el menor "
+            "entre el saldo real de la cuenta de SearchApi y lo que deja el tope "
+            "mensual). ``null`` en las gratuitas. Solo lectura."
+        ),
+    )
 
     @classmethod
     def from_option(cls, option: SourceOption) -> "SourceOut":
@@ -53,6 +77,8 @@ class SourceOut(BaseModel):
             slow=option.source.slow,
             configured=option.configured,
             default_on=option.default_on,
+            quick_default_on=option.quick_default_on,
+            credits_remaining=option.credits_remaining,
         )
 
 
@@ -65,4 +91,5 @@ class SourceListOut(BaseModel):
 @router.get("", response_model=SourceListOut, summary="Fuentes de la búsqueda manual")
 async def list_sources(planner: Planner) -> SourceListOut:
     """Switches de fuentes: cuáles hay, cuáles cuestan y cuáles están encendidas."""
-    return SourceListOut(items=[SourceOut.from_option(o) for o in planner.source_options()])
+    options = await planner.source_options()
+    return SourceListOut(items=[SourceOut.from_option(o) for o in options])

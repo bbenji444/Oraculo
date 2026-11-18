@@ -1,0 +1,20 @@
+   - Si el concepto trae «Lo que busca el analista», juzga contra ese texto. Para ese concepto, estas reglas mandan sobre las demás:
+     - Es relevante solo si el asunto central de la nota es exactamente lo que pide el analista. Mismo tema general no basta: si pide "hackeos a bancos en México", un hackeo a una tienda o a un gobierno no sirve.
+     - No exijas un hecho concreto: cifras, investigaciones o denuncias de exactamente lo pedido sí cuentan ("Ciberataques bancarios aumentan 70% en México" sí sirve para "hackeos a bancos en México").
+     - Si el concepto trae «Debe hablar de: …», la nota tiene que tratar de esa persona, grupo, alias, empresa u operación: que la nombre, a ella o a un alias, o que la identifique sin duda. Una nota del mismo tema sin esa entidad NO es relevante: es cercana (un ciberataque de otro grupo no sirve para "hacker Eternal"). La única excepción es la de procedencia, más abajo.
+     - El lugar lo revisa el sistema con la región de la búsqueda: no descartes una nota por el país o el lugar donde ocurre. Solo si el texto del analista pide expresamente un lugar distinto de la región de la búsqueda, ese lugar es condición.
+     - Las alertas genéricas, las guías o consejos ("cómo protegerte", "qué hacer si te hackean"), los recuentos de varios casos, las estafas de temporada, la publicidad y las notas de otro tema que lo nombran de pasada no son relevantes: son cercanas.
+     - Las frases de búsqueda solo son pista: que la nota tenga una de ellas no la hace relevante ("descartan ciberataque en Estados Unidos" no sirve para "hackeos al gobierno mexicano").
+     - Si solo tienes el título y un fragmento, juzga con lo que dicen: un título que deja claro el asunto basta. Tener poco texto no es motivo para descartar.
+     - Procedencia: después de los conceptos se dice con qué consulta y en qué buscador llegó la nota y, si el título no nombra la entidad pedida, lo que se sabe de ella por otras notas de esta búsqueda que sí la nombran. Si solo tienes el título, el título no nombra la entidad pedida, pero la nota llegó por una consulta con esa entidad en un buscador que busca en el texto completo de las notas:
+       - márcala relevante "por confirmar", con relevance_score de 0.65 a 0.75, solo si el título coincide con un hecho concreto de lo que se sabe de la entidad: la misma víctima, empresa, institución, dato filtrado o cifra. Ser del mismo tema no basta. Dilo en relevance_reason (por ejemplo, si se sabe que Eternal vendió datos del Buró Laboral, "Revelan listas negras laborales; vende hacker datos" coincide: "El buscador la encontró por «hacker eternal»; el título no nombra a Eternal, pero habla del hackeo al Buró Laboral.").
+       - si el título es del mismo tema pero no coincide con ningún hecho de lo que se sabe de la entidad, o no se sabe nada de ella, es cercana, con relevance_score de 0.35 a 0.5, y relevance_reason lo dice con la entidad pedida: "El título no nombra a Eternal y no coincide con lo que se sabe de Eternal." (por ejemplo, "Ariana Grande demanda a hackers" para "hacker eternal").
+       - si el título no tiene que ver con el tema pedido, es ajena.
+       - Es la única excepción a "Si dudas, NO es relevante".
+     - Si la nota no nombra la entidad pedida y tampoco llegó así, no es relevante: es cercana si es del mismo tema y ajena si no.
+     - relevance_score de este concepto va por bandas, que mandan sobre la regla general del puntaje:
+       - 0.8 a 1: relevante; la nota trata de exactamente lo pedido.
+       - 0.6 a 0.79: relevante "por confirmar"; es muy probable, pero falta leer la nota completa para estar seguros.
+       - 0.3 a 0.59: no relevante, cercana; es del mismo tema, pero de otra entidad o de otro lugar pedido, es una alerta genérica o lo nombra de pasada.
+       - 0 a 0.29: no relevante, ajena; no tiene nada que ver con lo pedido.
+       - is_relevant es true solo con 0.6 o más.

@@ -8,7 +8,11 @@ principal antes y después, y los conteos de dentro, fuera y sin ubicación.
 Con ``--con-ia`` además vuelve a pasar por la IA el texto guardado de cada
 nota (sirve cuando cambia el prompt o faltan datos que antes no se
 guardaban, como las pistas de lugar). Antes de gastar muestra el costo
-estimado y pide escribir "si". Nunca consulta proveedores: 0 créditos.
+estimado y pide escribir "si". Nunca consulta proveedores: 0 créditos. En
+una búsqueda con conceptos abiertos (ADR-0114) avisa, antes de gastar, qué
+no se puede rearmar del juicio en vivo (``ReprocessSearch.warnings``): qué
+consulta trajo cada nota, la sección de Google web, o la entidad en las
+búsquedas de antes de la migración 0049.
 
 Uso:
     ``make reubicar`` (la búsqueda más reciente),
@@ -75,6 +79,16 @@ def show(relocations: Sequence[Relocation]) -> None:
         for value, label in ((True, "dentro"), (False, "fuera"), (None, "sin ubicación"))
     }
     logger.info(" · ".join(f"{label}: {n}" for label, n in counts.items()))
+
+
+def warn(warnings: Sequence[str]) -> None:
+    """Avisa qué no se puede rearmar del juicio en vivo antes de gastar (ADR-0114).
+
+    Args:
+        warnings: ``ReprocessSearch.warnings`` (vacío en la FGR y los temas).
+    """
+    for warning in warnings:
+        logger.warning(f"Aviso: {warning}")
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -144,16 +158,8 @@ async def _reprocess(
         estimate = estimated_usage(len(texts)).cost_usd(
             llm.price_input_per_million, llm.price_output_per_million
         )
-        heading(logger, "Volver a pasar por la IA (todavía no se ha gastado nada)")
-        logger.info(
-            f"{len(texts)} notas con texto guardado · IA: {llm.provider} · {llm.llm.model} · "
-            f"~{estimate:.4f} USD · 0 créditos de SearchApi"
-        )
-        if ask(f'Escribe "{CONFIRMATION}" para reprocesar: ').strip().lower() != CONFIRMATION:
-            logger.warning("Cancelado: no se gastó nada.")
-            return 1
         gazetteer = PostgresGazetteer(engine)
-        report = await ReprocessSearch(
+        use_case = ReprocessSearch(
             searches=PostgresSearchStore(engine),
             store=store,
             gazetteer=gazetteer,
@@ -165,7 +171,19 @@ async def _reprocess(
                 llm.price_input_per_million,
                 llm.price_output_per_million,
             ),
-        ).run(search_id)
+        )
+        heading(logger, "Volver a pasar por la IA (todavía no se ha gastado nada)")
+        logger.info(
+            f"{len(texts)} notas con texto guardado · IA: {llm.provider} · {llm.llm.model} · "
+            f"~{estimate:.4f} USD · 0 créditos de SearchApi"
+        )
+        # Revisión del 18/11/2026 (hallazgo 5): en los conceptos abiertos el
+        # juicio guardado no es igual al de en vivo; se avisa antes de gastar.
+        warn(await use_case.warnings(search_id))
+        if ask(f'Escribe "{CONFIRMATION}" para reprocesar: ').strip().lower() != CONFIRMATION:
+            logger.warning("Cancelado: no se gastó nada.")
+            return 1
+        report = await use_case.run(search_id)
     finally:
         await llm.llm.aclose()
     show(report.relocations)

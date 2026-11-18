@@ -126,6 +126,7 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
     assert body["window"]["description"] == "últimos 7 días"
     assert [q["provider"] for q in body["queries"]] == [
         "searchapi",
+        "searchapi_web",
         "google_news_rss",
         "gdelt",
         "indice_local",
@@ -138,7 +139,8 @@ def test_probar_borrador_sin_guardar(client: TestClient, concepts: FakeConceptRe
         "language": "español",
         "period": "últimos 7 días",
     }
-    assert (body["total_queries"], body["total_credits"]) == (6, 1)
+    # Google web (ADR-0115) es la segunda consulta de pago: 1 crédito más.
+    assert (body["total_queries"], body["total_credits"]) == (7, 2)
     assert concepts.concepts == {}
 
 
@@ -163,7 +165,8 @@ def test_probar_concepto_guardado(client: TestClient) -> None:
 
     # Sin ?days= se usa el rango de la historia H1: últimos 7 días.
     assert body["concept_name"] == "Ciberseguridad"
-    assert body["queries"][1]["text"].endswith("when:7d")
+    [rss] = [q for q in body["queries"] if q["provider"] == "google_news_rss"]
+    assert rss["text"].endswith("when:7d")
 
 
 @pytest.mark.parametrize(

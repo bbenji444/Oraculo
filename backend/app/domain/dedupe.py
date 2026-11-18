@@ -19,17 +19,34 @@ abrir y el que identifica al medio.
 duplicados, ADR-0025): la misma nota que llega en otra búsqueda con otro
 link se reutiliza en lugar de guardarse otra vez.
 
+Google web (ADR-0115) agrega tres reglas:
+
+- **Redes sociales, solo por link.** Las publicaciones de una misma página
+  repiten título («Ignacio Gómez Villaseñor on X»): por título se juntarían
+  publicaciones distintas. Los alias de cada red (``m.facebook.com``,
+  ``twitter.com``, ``youtu.be``) se vuelven uno en ``canonical_url``. La
+  única excepción es la misma publicación que llega por Google News RSS (con
+  el link de Google) y por Google web (con el link real): misma red, mismo
+  texto largo y fechas cercanas (``_same_post``); se queda el link real.
+- **Títulos cortados.** Google web corta los títulos largos («Hackean 746
+  mil cuentas de ...»). Un título cortado es la misma nota que la de título
+  completo si coincide palabra por palabra al inicio; la que se conserva
+  se queda con el título completo.
+- **Mejor link.** Si la nota guardada tenía el link de Google News y llega el
+  del medio (``refreshes_link``), el pipeline vuelve a leer su texto.
+
 No hace: no consulta la base (los candidatos los trae el pipeline).
 """
 
 import hashlib
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.domain.articles import RawArticle
 from app.domain.names import normalize_name
+from app.domain.platforms import is_social
 
 # Similitud mínima de títulos para "casi iguales" (§9).
 NEAR_DUPLICATE_SIMILARITY = 0.9
@@ -45,6 +62,37 @@ SAME_OUTLET_WINDOW = timedelta(days=7)
 # Pero un medio sí repite títulos cortos: sus columnas («Portafolios Político»,
 # «Se pudrió el PAN») salen con el mismo nombre en días distintos.
 SAME_OUTLET_MIN_WORDS = 6
+# Un título cortado por Google web cuenta como la misma nota si sus primeras
+# palabras son las del título completo. Se piden al menos 6, como en
+# SAME_OUTLET_MIN_WORDS: con menos, inicios genéricos («Detienen a dos...»)
+# juntarían notas distintas.
+TRUNCATED_MIN_WORDS = 6
+# Las fechas relativas de Google web («hace 5 días») tienen un día de
+# redondeo: a la ventana de casi iguales (±1 día) se le suma ese día.
+TRUNCATED_TITLE_WINDOW = NEAR_DUPLICATE_WINDOW + timedelta(days=1)
+# La misma publicación de una red por el RSS y por Google web (revisión del
+# 18/11/2026): se pide un texto de al menos 6 palabras, como en
+# SAME_OUTLET_MIN_WORDS. Con menos suele ser el nombre de la página («Ignacio
+# Gómez Villaseñor»), que se repite en todas sus publicaciones.
+SAME_POST_MIN_WORDS = SAME_OUTLET_MIN_WORDS
+# Hosts de la misma red con otro nombre (ADR-0115): la versión móvil o la
+# marca anterior. La misma publicación llega con cualquiera de ellos.
+_HOST_ALIASES = {
+    "m.facebook.com": "facebook.com",
+    "mobile.facebook.com": "facebook.com",
+    "twitter.com": "x.com",
+    "mobile.twitter.com": "x.com",
+    "m.twitter.com": "x.com",
+    "mobile.x.com": "x.com",
+    "m.youtube.com": "youtube.com",
+}
+# Link corto de YouTube: youtu.be/<id> es youtube.com/watch?v=<id>.
+_YOUTU_BE = "youtu.be"
+_YOUTUBE = "youtube.com"
+_YOUTUBE_WATCH = "/watch"
+_YOUTUBE_VIDEO_PARAM = "v"
+# Parámetros de YouTube que solo dicen cómo se compartió el link (si=, feature=).
+_YOUTUBE_TRACKING = frozenset({"si", "feature"})
 # Parámetros que solo rastrean de dónde vino el clic; no cambian la nota.
 _TRACKING_PARAMS = frozenset(
     {
@@ -83,28 +131,41 @@ def canonical_url(url: str) -> str:
     Returns:
         URL en ``https``, dominio en minúsculas sin ``www.``, sin fragmento,
         sin parámetros de rastreo (los demás, ordenados) y sin ``/amp`` final
-        ni diagonal final.
+        ni diagonal final. Las redes quedan con un solo host (ADR-0115):
+        ``m.facebook.com`` → ``facebook.com``, ``twitter.com`` → ``x.com`` y
+        ``youtu.be/<id>`` → ``youtube.com/watch?v=<id>``.
 
     Example:
         >>> canonical_url("http://www.Milenio.com/nota/?utm_source=x&id=2#top")
         'https://milenio.com/nota?id=2'
+        >>> canonical_url("https://youtu.be/jMs7fCiEHRo?si=abc")
+        'https://youtube.com/watch?v=jMs7fCiEHRo'
     """
     parts = urlsplit(url.strip())
     host = (parts.hostname or "").lower()
     if host.startswith(_WWW):
         host = host[len(_WWW) :]
+    host = _HOST_ALIASES.get(host, host)
+    params = parse_qsl(parts.query, keep_blank_values=True)
+    path = parts.path or "/"
+    if host == _YOUTU_BE and len(path) > 1:
+        host = _YOUTUBE
+        params = [(_YOUTUBE_VIDEO_PARAM, path.strip("/")), *params]
+        path = _YOUTUBE_WATCH
     if parts.port and parts.port not in (80, 443):
         host = f"{host}:{parts.port}"
-    path = parts.path or "/"
     for suffix in _AMP_SUFFIXES:
         if path.endswith(suffix) and len(path) > len(suffix):
             path = path[: -len(suffix)]
     if len(path) > 1:
         path = path.rstrip("/")
+    extra_tracking = _YOUTUBE_TRACKING if host == _YOUTUBE else frozenset()
     query = sorted(
         (key, value)
-        for key, value in parse_qsl(parts.query, keep_blank_values=True)
-        if key.lower() not in _TRACKING_PARAMS and not key.lower().startswith(_TRACKING_PREFIXES)
+        for key, value in params
+        if key.lower() not in _TRACKING_PARAMS
+        and key.lower() not in extra_tracking
+        and not key.lower().startswith(_TRACKING_PREFIXES)
     )
     return urlunsplit(("https", host, path, urlencode(query), ""))
 
@@ -146,6 +207,9 @@ class DedupedArticle:
         sightings: Todos los proveedores que la encontraron.
         known_id: Id de la misma nota ya guardada con otro link, si la hay
             (lo pone el pipeline con ``match_known``).
+        refresh_text: Si la nota guardada tenía el link de Google News y ahora
+            llegó el del medio (``refreshes_link``): su texto se vuelve a leer
+            si antes solo se tuvo título y fragmento (ADR-0115).
     """
 
     article: RawArticle
@@ -153,16 +217,46 @@ class DedupedArticle:
     title_norm: str
     sightings: list[Sighting] = field(default_factory=list)
     known_id: int | None = None
+    refresh_text: bool = False
 
 
-def _close(
+def _prefix_of(short: str, full: str) -> bool:
+    """El título cortado ``short`` es el inicio de ``full`` (su última palabra puede ir partida)."""
+    cut, whole = short.split(), full.split()
+    if len(cut) < TRUNCATED_MIN_WORDS or len(cut) > len(whole):
+        return False
+    last = len(cut) - 1
+    return whole[:last] == cut[:last] and whole[last].startswith(cut[last])
+
+
+def _truncated_match(
+    title_a: str, published_a: datetime | None, title_b: str, published_b: datetime | None
+) -> bool:
+    """Un título cortado y el completo: mismo inicio y, si hay fechas, a ±2 días."""
+    shorter, longer = sorted((title_a, title_b), key=len)
+    if not _prefix_of(shorter, longer):
+        return False
+    if published_a is None or published_b is None:
+        return True
+    return abs(published_a - published_b) <= TRUNCATED_TITLE_WINDOW
+
+
+def _close(  # noqa: PLR0913 — dos títulos con su fecha, la similitud y la marca de título cortado (*)
     title_a: str,
     published_a: datetime | None,
     title_b: str,
     published_b: datetime | None,
     similarity: TitleSimilarity,
+    *,
+    truncated: bool = False,
 ) -> bool:
-    """Regla de «casi iguales» (§9): título ≥ 0.9 de parecido y fechas a ±1 día."""
+    """Regla de «casi iguales» (§9): título ≥ 0.9 de parecido y fechas a ±1 día.
+
+    Con ``truncated`` (uno de los títulos vino cortado, ADR-0115) también
+    cuenta que uno sea el inicio del otro.
+    """
+    if truncated and _truncated_match(title_a, published_a, title_b, published_b):
+        return True
     if published_a is None or published_b is None:
         # Sin fechas no se puede comprobar la ventana: solo cuenta el título idéntico.
         return title_a == title_b
@@ -172,7 +266,89 @@ def _close(
 
 
 def _near(a: DedupedArticle, b: RawArticle, title_b: str, similarity: TitleSimilarity) -> bool:
-    return _close(a.title_norm, a.article.published_at, title_b, b.published_at, similarity)
+    truncated = a.article.title_truncated or b.title_truncated
+    return _close(
+        a.title_norm,
+        a.article.published_at,
+        title_b,
+        b.published_at,
+        similarity,
+        truncated=truncated,
+    )
+
+
+def _social(article: RawArticle) -> bool:
+    return is_social(article.source_domain, article.url, article.source_name)
+
+
+def _network_host(domain: str | None) -> str | None:
+    """Dominio de una red sin ``www.`` ni su alias (``m.facebook.com`` → ``facebook.com``)."""
+    host = (domain or "").strip().lower()
+    if host.startswith(_WWW):
+        host = host[len(_WWW) :]
+    return _HOST_ALIASES.get(host, host) or None
+
+
+def _same_text(
+    title_a: str,
+    published_a: datetime | None,
+    title_b: str,
+    published_b: datetime | None,
+    *,
+    truncated: bool,
+) -> bool:
+    """Mismo texto largo (o uno cortado que es el inicio del otro) y, con fechas, a ±2 días."""
+    if (
+        published_a is not None
+        and published_b is not None
+        and abs(published_a - published_b) > TRUNCATED_TITLE_WINDOW
+    ):
+        return False
+    if title_a == title_b:
+        return len(title_a.split()) >= SAME_POST_MIN_WORDS
+    return truncated and _truncated_match(title_a, published_a, title_b, published_b)
+
+
+def _same_post(kept: DedupedArticle, article: RawArticle, url: str, title: str) -> bool:
+    """La misma publicación de una red por Google News RSS y por Google web.
+
+    Revisión del 18/11/2026 (hallazgo 7): el RSS da la publicación con el link
+    de Google News y el dominio de la red; Google web, con el link real. Solo
+    por link nunca se juntaban y salía dos veces. Se juntan si una de las dos
+    trae el link de Google News y la otra no, son de la misma red y dicen lo
+    mismo (``_same_text``). Dos con link real nunca se juntan por texto: una
+    página repite publicaciones parecidas.
+    """
+    if not _social(kept.article) or is_google_news(kept.url_canonical) == is_google_news(url):
+        return False
+    host = _network_host(article.source_domain)
+    if host is None or host != _network_host(kept.article.source_domain):
+        return False
+    return _same_text(
+        kept.title_norm,
+        kept.article.published_at,
+        title,
+        article.published_at,
+        truncated=kept.article.title_truncated or article.title_truncated,
+    )
+
+
+def _completed(base: RawArticle, other: RawArticle) -> RawArticle:
+    """``base`` con lo que le falta tomado de ``other``, la otra copia de la misma nota.
+
+    Si ``base`` no tenía fecha, toma la de ``other`` siempre (revisión del
+    18/11/2026, hallazgo 2): Google web casi nunca trae fecha y, como va antes
+    que el RSS y el índice, su nota se guardaba sin fecha aunque las otras
+    copias sí la traían. Si el título de ``base`` vino cortado y el de
+    ``other`` no, se queda con el completo. El link es siempre el de ``base``.
+    """
+    full_title = base.title_truncated and not other.title_truncated
+    title = other.title if full_title else base.title
+    truncated = False if full_title else base.title_truncated
+    published = base.published_at or other.published_at
+    if (title, truncated, published) == (base.title, base.title_truncated, base.published_at):
+        return base
+    return replace(base, title=title, title_truncated=truncated, published_at=published)
 
 
 def is_google_news(url: str) -> bool:
@@ -211,15 +387,35 @@ def dedupe(articles: Sequence[RawArticle], similarity: TitleSimilarity) -> list[
         url = canonical_url(article.url)
         title = normalize_name(article.title)
         sighting = Sighting(article.provider.value, article.provider_rank)
-        match = by_url.get(url) or next(
-            (k for k in kept if _near(k, article, title, similarity)), None
-        )
+        match = by_url.get(url)
+        if match is None and not _social(article):
+            # Las redes solo se juntan por link (ADR-0115): las publicaciones
+            # de una página repiten título y por título se volverían una.
+            match = next(
+                (
+                    k
+                    for k in kept
+                    if not _social(k.article) and _near(k, article, title, similarity)
+                ),
+                None,
+            )
+        elif match is None:
+            # Salvo la misma publicación por el RSS (link de Google News) y por
+            # Google web (link real): se juntan y gana el link real.
+            match = next((k for k in kept if _same_post(k, article, url, title)), None)
         if match is None:
             match = DedupedArticle(article, url, title)
             kept.append(match)
         elif is_google_news(match.url_canonical) and not is_google_news(url):
-            # Misma nota: nos quedamos con el link del medio, no con el de Google.
-            match.article, match.url_canonical, match.title_norm = article, url, title
+            # Misma nota: nos quedamos con el link del medio, no con el de
+            # Google (y con el título completo si el del medio vino cortado).
+            match.article = _completed(article, match.article)
+            match.url_canonical = url
+            match.title_norm = normalize_name(match.article.title)
+        else:
+            completed = _completed(match.article, article)
+            if completed is not match.article:
+                match.article, match.title_norm = completed, normalize_name(completed.title)
         by_url[url] = match
         if sighting not in match.sightings:
             match.sightings.append(sighting)
@@ -270,6 +466,12 @@ def match_known(
     vuelve a dar notas viejas con otra fecha. Si varias cumplen, gana la de
     título más parecido.
 
+    Las redes sociales no se buscan por título (ADR-0115): una publicación ya
+    guardada se reconoce solo por su link, y eso lo resuelve el guardado. La
+    excepción es la guardada con el link de Google News (del RSS) que ahora
+    llega con el link real: misma red y mismo texto largo (``_same_post``).
+    Un título cortado por Google web cuenta si es el inicio del guardado.
+
     Args:
         item: Nota nueva, ya sin duplicados dentro de su búsqueda.
         known: Candidatas que trajo la base (pueden no cumplir la regla).
@@ -282,14 +484,65 @@ def match_known(
         >>> match_known(nota_de_google_news, [misma_nota_del_medio], rapidfuzz).article_id
         1504
     """
+    if _social(item.article):
+        return _known_post(item, known)
     published = item.article.published_at
+    truncated = item.article.title_truncated
     matches = [
         k
         for k in known
         if k.url_canonical != item.url_canonical
+        and not is_social(k.source_domain, k.url_canonical)
         and (
-            _close(k.title_norm, k.published_at, item.title_norm, published, similarity)
+            _close(
+                k.title_norm,
+                k.published_at,
+                item.title_norm,
+                published,
+                similarity,
+                truncated=truncated,
+            )
             or _same_outlet(k, item)
         )
     ]
     return max(matches, key=lambda k: similarity(k.title_norm, item.title_norm), default=None)
+
+
+def _known_post(item: DedupedArticle, known: Sequence[KnownArticle]) -> KnownArticle | None:
+    """La misma publicación ya guardada con el link de Google News (ver ``_same_post``)."""
+    host = _network_host(item.article.source_domain)
+    if host is None or is_google_news(item.url_canonical):
+        return None
+    return next(
+        (
+            k
+            for k in known
+            if is_google_news(k.url_canonical)
+            and _network_host(k.source_domain) == host
+            and _same_text(
+                k.title_norm,
+                k.published_at,
+                item.title_norm,
+                item.article.published_at,
+                truncated=item.article.title_truncated,
+            )
+        ),
+        None,
+    )
+
+
+def refreshes_link(item: DedupedArticle, known: KnownArticle) -> bool:
+    """Dice si la nota nueva trae el link del medio de una guardada con el de Google News.
+
+    Pasa con Google web (ADR-0115): Google News RSS da links de Google que no
+    se pueden leer y la IA solo vio el título; Google web da el link real. El
+    guardado cambia el link y el pipeline vuelve a leer el texto.
+
+    Args:
+        item: Nota nueva.
+        known: La misma nota ya guardada (``match_known``).
+
+    Returns:
+        ``True`` si la guardada tiene link de Google News y la nueva no.
+    """
+    return is_google_news(known.url_canonical) and not is_google_news(item.url_canonical)

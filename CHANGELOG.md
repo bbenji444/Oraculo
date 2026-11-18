@@ -8,6 +8,34 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **La búsqueda rápida busca lo que escribiste, tal cual (18/11/2026, ADR-0113, migración 0049).** Benji: «me cambia de Hacker Eternal a Hackeo Eternal, es decir, modifica mi búsqueda lo cual no debería de pasar».
+  - Lo escrito es la primera consulta y el nombre de la búsqueda. Solo se le quita el lugar («en Jalisco»), «en todo el mundo», las fechas y las comillas. La IA agrega frases después (prompt `terms_v3`), sin cambiar el texto.
+  - Los nombres propios del texto («Eternal», «LockBit», «Pemex») quedan como **términos obligatorios** (`required_terms`, columna nueva en conceptos y búsquedas). Las frases de la IA que no los llevan se tiran. Un lugar no cuenta como nombre.
+  - Basta un texto de 2 letras («IA»); el literal puede tener hasta 32 palabras si cabe en la consulta de cada fuente.
+
+- **Resultados de redes sociales «como en Google» (18/11/2026, ADR-0115 y ADR-0117).** Benji: «cuando buscas algo como esto en Google te salen noticias, links de redes sociales, de YouTube… me gustaría que en filtros pudiera poner únicamente lo que salió en Facebook o en X».
+  - Fuente nueva **«Google web»** (SearchApi, motor `google`): trae publicaciones de Facebook, X, YouTube, Instagram, TikTok y sitios que no son de noticias. Usa la misma cuenta de créditos que SearchApi: **1 crédito por búsqueda**.
+  - Va encendida por defecto **solo en la búsqueda rápida** y solo si la cuenta tiene saldo; debajo de la barra se dice «Incluye Google web… 1 crédito». En la búsqueda manual se enciende con su switch, porque manda una consulta por concepto. Las corridas automáticas no cambian.
+  - Se lee el **saldo real** de SearchApi (`GET /me`, no gasta). Los switches de pago dicen cuántos créditos quedan. Sin saldo, la búsqueda rápida sigue con las fuentes de noticias y lo avisa.
+  - Cada nota dice de qué **plataforma** es. En el expediente hay pestañas tipo Google («Todo · Noticias · Facebook · X · YouTube…») con su conteo, y la ventana «Filtro» tiene la sección «Plataforma» para elegir varias. Las notas de redes llevan su marca y el botón «Ver publicación en Facebook».
+  - El reporte en Excel y CSV agrega la columna «Plataforma».
+  - Si Google no encuentra nada, la búsqueda ya no queda «parcial»: es una respuesta sin resultados, no una falla.
+  - En «Todo el mundo», Google web busca como desde México (`gl=mx`): sin país traía la mitad de resultados y en otros idiomas. El país solo ordena, no filtra.
+  - Si Google no dice a dónde lleva un link (contesta con su página «Verificando tu solicitud»), el resultado se queda con su link de Google, que abre en el navegador; antes se perdían casi todas las publicaciones de redes. No se intenta pasar esa verificación ni se insiste: los demás links de la página ya no se le piden. Esos links no se descargan; la IA los lee con título y fragmento.
+
+- **Relevancia más estricta (18/11/2026, ADR-0114 y ADR-0117).** Benji: «que la información sea lo que de verdad estoy pidiendo… que las "No relevantes" no sean taaan irrelevantes».
+  - Antes de pagar a la IA, en los conceptos «como en Google» y la búsqueda rápida se quitan las notas que no nombran lo pedido. Lo que trajo un buscador de texto completo con el nombre en la consulta pasa «por confirmar»; lo demás necesita el nombre y el tema en el título o el fragmento. El avance de la búsqueda guarda cuántas se quitaron y unos títulos de ejemplo (`off_core`).
+  - La IA (prompt `enrich_v6`) sabe dónde se buscó, qué nombre falta en el título, cómo llegó la nota y lo que dicen de ese nombre las otras notas de la búsqueda. Los conceptos exactos, como la FGR, se juzgan igual que antes.
+  - Cuatro bandas: **relevante** (0.8 o más), **por confirmar** (0.6 a 0.79), **cercana** (0.3 a 0.59, con «Incluir las no relevantes») y **ajena** (menos de 0.3, solo con el botón «Ver las N que descartó la IA»). Cada no relevante dice «Por qué no: …».
+  - Con el tope de notas de la IA, primero se juzgan las que nombran lo pedido.
+  - Un nombre de persona de dos o tres palabras cuenta con su apellido: «Harfuch» nombra a «Omar García Harfuch». Las instituciones y los alias («Fiscalía General de la República», «El Mencho») no se cortan.
+  - Un nombre de tres palabras de contenido o más cuenta con su sigla: «FGR» nombra a la «Fiscalía General de la República» y «CJNG» al «Cártel Jalisco Nueva Generación». Una sigla de 2 letras o que se lea como palabra común («MAS») no cuenta.
+  - `make revisar-relevancia ARGS="--busqueda <id>"` muestra cómo quedó cada nota de una búsqueda, sin gastar.
+
+- **Esfera de búsqueda en «Todo el mundo» (18/11/2026, ADR-0116).** Benji: «la animación de la cúpula para todo el mundo se ve mal… me gustaría que encerraras todo el mundo en una esfera».
+  - Con «Todo el mundo», en lugar de la cúpula, una esfera tenue con la misma textura envuelve el planeta mientras se busca: sube del suelo, un meridiano de luz le da la vuelta, cada nota enciende un destello y al terminar se expande y se desvanece. La cámara ya no vuela ni se inclina.
+  - Las demás regiones conservan la cúpula. Con «menos movimiento» la esfera queda quieta; sin WebGL se ve el radar plano.
+
 - **Buscar en todo el mundo, en español (18/11/2026, ADR-0112, migración 0048).** Benji: «si yo quisiera buscar bases de datos hackeadas, pero en todo el mundo, no tengo esa opción».
   - En «Dónde», arriba: **«México · Todo el mundo»**. Con «Todo el mundo» no hay estados que elegir, la frase dice «Rastrear… en todo el mundo» y el globo se aleja.
   - En la búsqueda rápida basta escribir «en todo el mundo», «a nivel mundial» o «a nivel global». Si el texto nombra un lugar del catálogo, gana ese lugar.

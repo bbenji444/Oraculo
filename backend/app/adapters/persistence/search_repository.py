@@ -55,8 +55,10 @@ from app.application.ports.search_store import (
     ProcessingErrorRecord,
     SearchClosing,
     SearchConcept,
+    SearchProvenance,
     SearchResultRow,
     StoredArticle,
+    StoredOrigin,
     StoredSearch,
     StoredText,
 )
@@ -157,8 +159,9 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO search_concepts (search_id, concept_id, concept_name, "
-                        "keywords, exclude_terms, topic_terms, category_ids, query_mode) "
-                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats, :mode)"
+                        "keywords, exclude_terms, topic_terms, category_ids, query_mode, "
+                        "required_terms) "
+                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats, :mode, :required)"
                     ),
                     {
                         "s": search_id,
@@ -169,6 +172,7 @@ class PostgresSearchStore:
                         "topic": list(concept.topic_terms),
                         "cats": list(concept.category_ids),
                         "mode": concept.query_mode.value,
+                        "required": list(concept.required_terms),
                     },
                 )
         return search_id
@@ -198,7 +202,8 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT sc.concept_id, sc.concept_name, c.description, sc.keywords, "
-                            "sc.exclude_terms, sc.topic_terms, sc.category_ids, sc.query_mode "
+                            "sc.exclude_terms, sc.topic_terms, sc.category_ids, sc.query_mode, "
+                            "sc.required_terms "
                             "FROM search_concepts sc "
                             "JOIN concepts c ON c.id = sc.concept_id "
                             "WHERE sc.search_id = :id ORDER BY sc.concept_id"
@@ -227,6 +232,7 @@ class PostgresSearchStore:
                     tuple(c["topic_terms"]),
                     tuple(c["category_ids"]),
                     QueryMode(c["query_mode"]),
+                    tuple(c["required_terms"]),
                 )
                 for c in concepts
             ),
@@ -651,7 +657,8 @@ async def _store_article(conn: AsyncConnection, item: DedupedArticle) -> int:
                     """
                     UPDATE articles SET url_canonical = :url, url_hash = :hash,
                         source_domain = COALESCE(:source_domain, source_domain),
-                        source_name = COALESCE(:source_name, source_name), updated_at = now()
+                        source_name = COALESCE(NULLIF(source_name, ''), :source_name),
+                        updated_at = now()
                     WHERE id = :id AND url_canonical LIKE :google
                     """
                 ),
@@ -756,7 +763,7 @@ class PostgresArticleStore:
                                 (SELECT r.code FROM article_locations al
                                     JOIN regions r ON r.id = al.region_id
                                     WHERE al.article_id = a.id AND al.is_primary) AS primary_code,
-                                a.published_at, a.event_date
+                                a.published_at, a.event_date, a.extraction_status
                             FROM articles a WHERE a.id = ANY(:ids)
                             """
                         ),
@@ -774,6 +781,7 @@ class PostgresArticleStore:
                 row["primary_code"],
                 row["published_at"],
                 row["event_date"],
+                row["extraction_status"],
             )
             for row in known
         }
@@ -961,6 +969,42 @@ class PostgresArticleStore:
                 )
             ).all()
         return [StoredText(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
+    async def search_provenance(self, search_id: UUID) -> SearchProvenance:
+        """Ver ``ReprocessStorePort.search_provenance``.
+
+        Usa los índices de ``search_results`` (llave primaria por búsqueda) y
+        ``provider_queries_search``.
+        """
+        async with self._engine.connect() as conn:
+            notes = (
+                await conn.execute(
+                    text(
+                        "SELECT a.id, a.title, a.snippet, "
+                        "array_agg(r.provider ORDER BY r.provider_rank, r.provider) "
+                        "FROM search_results r JOIN articles a ON a.id = r.article_id "
+                        "WHERE r.search_id = :s GROUP BY a.id, a.title, a.snippet "
+                        "ORDER BY min(r.provider_rank), a.id"
+                    ),
+                    {"s": search_id},
+                )
+            ).all()
+            queries = (
+                await conn.execute(
+                    text(
+                        "SELECT provider, query_text FROM provider_queries "
+                        "WHERE search_id = :s AND status = 'ok' ORDER BY id"
+                    ),
+                    {"s": search_id},
+                )
+            ).all()
+        texts: dict[str, dict[str, None]] = {}
+        for provider, query_text in queries:
+            texts.setdefault(provider, {})[query_text] = None
+        return SearchProvenance(
+            tuple(StoredOrigin(r[0], r[1], r[2], tuple(r[3])) for r in notes),
+            {provider: tuple(sent) for provider, sent in texts.items()},
+        )
 
     async def add_llm_usage(
         self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor
@@ -1265,10 +1309,13 @@ async def _write_locations(
 
 # Juicios de la IA para los conceptos de la búsqueda, con su nombre de entonces
 # y la regla actual del concepto (la de «FGR federal» se aplica al armarlos,
-# ADR-0030).
+# ADR-0030). El modo es el de la copia de la búsqueda: con él se juzgó y él
+# decide las bandas de relevancia (ADR-0114). Mismo orden que
+# ``ALL_JUDGEMENTS`` (lo lee ``judgement_view``).
 _JUDGEMENTS_IN_SEARCH = """
     COALESCE((SELECT json_agg(json_build_array(ac.concept_id, sc.concept_name,
-        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule)
+        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule,
+        sc.query_mode)
         ORDER BY ac.concept_id)
         FROM article_concepts ac JOIN search_concepts sc
             ON sc.concept_id = ac.concept_id AND sc.search_id = :s

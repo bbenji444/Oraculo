@@ -18,7 +18,8 @@
  *   gráficas "Top 5 estados" y "Tipos de noticias": no aportaban).
  * - Izquierda, debajo de la búsqueda: la cronología (F12.7), una línea vertical
  *   con cada hecho, del más reciente al más viejo, sin repetidos; sus filtros
- *   se aplican al globo. «☰ Lista» la cambia por la lista de noticias.
+ *   se aplican al globo. «☰ Lista» la cambia por la lista de noticias. Arriba
+ *   de las dos, las pestañas de plataforma (ADR-0117), si hay más de una.
  * - Abajo a la derecha: giro, día/noche, velocidad y leyenda de precisión.
  * - Abajo al centro: el aviso "Búsqueda lista" cuando termina la que se vio correr.
  * - Modo caso (9.6): con `#/explorar?caso=<id>` el globo muestra el muro del
@@ -45,6 +46,7 @@ import { NARROW_MAX_WIDTH } from '../../map/framing';
 import { wallCaseFromHash } from '../../map/muro/orbit';
 import { DOSSIER_RESERVE_PX, MandoPanels } from '../Mando/MandoPanels';
 import { isMandoMode } from '../Mando/mission';
+import { PlatformTabs } from '../Mando/PlatformTabs';
 import { ScanOverlay } from '../Mando/ScanOverlay';
 import { CasesOnGlobe } from './CasesOnGlobe';
 import { CaseWall } from './CaseWall';
@@ -53,10 +55,11 @@ import { ExploreGlobe } from './ExploreGlobe';
 import { GlobeUnavailable, GraphicsBoundary } from './GraphicsBoundary';
 import { LatestRunCard } from './LatestRunCard';
 import { visibleArticles } from './format';
+import { discardedCount } from './relevance';
 import { ResultsList } from './ResultsList';
 import { SearchPanel } from './SearchPanel';
 import { Chronology } from './Chronology';
-import { applyTimeline } from './timelineData';
+import { applyTimeline, platformFacet } from './timelineData';
 import { useFinishNotice } from './useFinishNotice';
 import { useIdleSpin } from './useIdleSpin';
 import { Icon } from '../ui/Icon';
@@ -98,18 +101,33 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
     [concepts],
   );
   const showIrrelevant = useExplorerStore((s) => s.showIrrelevant);
+  const showDiscarded = useExplorerStore((s) => s.showDiscarded);
   const relevant = useMemo(
-    () => visibleArticles(articles, showIrrelevant),
-    [articles, showIrrelevant],
+    () => visibleArticles(articles, showIrrelevant, showDiscarded),
+    [articles, showIrrelevant, showDiscarded],
   );
   const range = useTimelineStore((s) => s.range);
   const categoryIds = useTimelineStore((s) => s.categoryIds);
   const stateCode = useTimelineStore((s) => s.stateCode);
+  const platforms = useTimelineStore((s) => s.platforms);
   const clearTimeline = useTimelineStore((s) => s.clear);
   // Lo mismo para el globo, la lista y la línea del tiempo: nunca muestran notas distintas.
   const shown = useMemo(
-    () => applyTimeline(relevant, { range, categoryIds, stateCode }),
-    [relevant, range, categoryIds, stateCode],
+    () => applyTimeline(relevant, { range, categoryIds, stateCode, platforms }),
+    [relevant, range, categoryIds, stateCode, platforms],
+  );
+  // Diseño de columna: las pestañas de plataforma cuentan con lo mismo que se
+  // ve abajo, menos su propio filtro; con la lista abierta, también con su
+  // pestaña de ubicación (Dentro, Fuera…), como el expediente.
+  const listFilter = useExplorerStore((s) => s.listFilter);
+  const listOpen = useTimelineStore((s) => s.listOpen);
+  const forPlatforms = useMemo(
+    () =>
+      platformFacet(relevant, {
+        filters: { range, categoryIds, stateCode },
+        listFilter: listOpen ? listFilter : 'all',
+      }),
+    [relevant, range, categoryIds, stateCode, listOpen, listFilter],
   );
   const hasResults = finished && articles.length > 0;
   const panelOpen = useExplorerStore((s) => s.panelOpen);
@@ -119,7 +137,6 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
   // Tras 5 minutos sin tocar nada, el globo gira solo (Benji, 11/11/2026).
   useIdleSpin(active);
   const earth = useExplorerStore((s) => s.earth);
-  const listOpen = useTimelineStore((s) => s.listOpen);
   const wallCaseId = useExplorerStore((s) => s.wallCaseId);
   const inWall = wallCaseId !== null;
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -247,9 +264,19 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
               </div>
               {/* Debajo de la búsqueda, la cronología; «☰ Lista» la cambia por la lista. */}
               {hasResults && (
-                <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col">
+                <div className="pointer-events-auto flex min-h-[14rem] flex-1 flex-col gap-2">
+                  {/* Las mismas pestañas de plataforma que el expediente (ADR-0117). */}
+                  <PlatformTabs
+                    articles={forPlatforms}
+                    className="hud-panel shrink-0 bg-[#050505]/90 px-2 py-1.5"
+                  />
                   {listOpen ? (
-                    <ResultsList articles={shown} total={articles.length} colors={colors} />
+                    <ResultsList
+                      articles={shown}
+                      total={articles.length}
+                      colors={colors}
+                      discarded={discardedCount(articles)}
+                    />
                   ) : (
                     <Chronology articles={relevant} />
                   )}

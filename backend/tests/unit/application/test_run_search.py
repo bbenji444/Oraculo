@@ -288,6 +288,7 @@ def pipeline(
     region_missing: bool = False,
     stories: Any = None,
     classifier: Any = None,
+    today: date = date(2026, 11, 18),
 ) -> tuple[RunSearch, Searches, Articles, LLM, Extractor]:
     sources = (
         sources
@@ -323,6 +324,7 @@ def pipeline(
         limits=PipelineLimits(max_llm_articles, 2, 0.10, 0.50),
         stories=stories,
         classifier=classifier,
+        today=lambda: today,
     )
     return use_case, searches, articles, llm, extractor
 
@@ -370,6 +372,65 @@ async def test_busqueda_completa_de_punta_a_punta() -> None:
     assert [q["provider"] for q in closing.queries_executed] == ["searchapi", "indice_local"]
     assert searches.actor == Actor("benji")
     assert searches.errors == []
+
+
+async def test_la_ia_tiene_a_mano_los_terminos_obligatorios() -> None:
+    # ADR-0113: los nombres propios de la búsqueda rápida llegan al juicio.
+    rapida = SearchConcept(
+        9,
+        "hacker eternal",
+        "hacker eternal",
+        ("hacker eternal",),
+        query_mode=QueryMode.OPEN,
+        required_terms=("eternal",),
+    )
+    # ADR-0114: desde el filtro de palabras, una nota de la búsqueda rápida
+    # tiene que hablar de lo pedido para llegar a la IA (las de extorsión
+    # de las fuentes de siempre ya no llegan).
+    title = "El hacker Eternal filtra datos del IMSS"
+    eternal = raw(Provider.SEARCHAPI, 1, "https://milenio.com/eternal", title)
+    use_case, _, _, llm, _ = pipeline(
+        sources=[Source(Provider.SEARCHAPI, [eternal], cost=1)],
+        search=stored_search(rapida),
+        replies={title: enrichment()},
+    )
+
+    await use_case.run(uuid4())
+
+    assert [c.required_terms for c in llm.requests[0].concepts] == [("eternal",)]
+
+
+async def test_busqueda_manual_de_los_ultimos_7_dias_manda_when_7d() -> None:
+    # ADR-0113: searches guarda solo las fechas y el RSS recibía after:/before:,
+    # que Google News no respeta, en lugar de when:7d.
+    rss = Source(Provider.GOOGLE_NEWS_RSS, [])
+    searchapi = Source(Provider.SEARCHAPI, [], cost=1)
+    last_week = replace(stored_search(), date_from=date(2026, 11, 12), date_to=date(2026, 11, 18))
+    use_case, *_ = pipeline(sources=[searchapi, rss], search=last_week, today=date(2026, 11, 18))
+
+    await use_case.run(uuid4())
+
+    assert rss.queries
+    assert all(q.text.endswith("when:7d") for q in rss.queries)
+    assert {q.window.relative_days for q in searchapi.queries} == {7}
+
+
+async def test_una_corrida_automatica_sigue_con_fechas_fijas() -> None:
+    # Las corridas tienen sus horas (time_window): no son «últimos N días».
+    rss = Source(Provider.GOOGLE_NEWS_RSS, [])
+    start = datetime(2026, 11, 12, 6, tzinfo=UTC)
+    run = replace(
+        stored_search(),
+        date_from=date(2026, 11, 12),
+        date_to=date(2026, 11, 18),
+        time_window=RunWindow(start, start + timedelta(days=6)),
+    )
+    use_case, *_ = pipeline(sources=[rss], search=run, today=date(2026, 11, 18))
+
+    await use_case.run(uuid4())
+
+    assert all("after:2026-11-12" in q.text for q in rss.queries)
+    assert {q.window.relative_days for q in rss.queries} == {None}
 
 
 async def test_la_ia_recibe_el_modo_de_cada_concepto() -> None:

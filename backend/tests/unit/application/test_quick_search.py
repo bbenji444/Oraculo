@@ -1,10 +1,11 @@
-"""Búsqueda rápida: de un texto libre a una búsqueda con un concepto oculto (ADR-0110)."""
+"""Búsqueda rápida: de un texto libre a una búsqueda con un concepto oculto (ADR-0110, ADR-0113)."""
 
 from dataclasses import replace
 
 import pytest
 
 from app.application.audit import CONCEPT_CREATED, CONCEPT_TERMS_SUGGESTED, CONCEPT_UPDATED
+from app.application.ports.llm import TermSuggestionResult
 from app.application.use_cases.concepts import ListConcepts
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.quick_search import (
@@ -22,6 +23,7 @@ from app.domain.concept import NAME_MAX_LENGTH, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError, LLMNotConfiguredError
 from app.domain.queries import Provider
 from app.domain.region import RegionLevel
+from app.domain.term_suggestions import EmptySuggestionError
 from tests.unit.application.test_execute_queries import FakeLog
 from tests.unit.application.test_plan_search import OPENAI, WEEK, concept
 from tests.unit.application.test_run_search import Source
@@ -50,7 +52,14 @@ CHIHUAHUA = make_region(
 CUAUHTEMOC_CHIH = make_region(11, "Cuauhtémoc", parent_id=10, code="08017")
 # «Mundo» (ADR-0112), para las búsquedas en todo el mundo.
 WORLD = make_region(12, "Mundo", RegionLevel.WORLD, code="WLD", prefix="")
-REGIONS = (*ALL, CHIHUAHUA, CUAUHTEMOC_CHIH, WORLD)
+# Estados para el lugar que se quita del literal (ADR-0113).
+JALISCO = make_region(
+    13, "Jalisco", RegionLevel.STATE, parent_id=1, code="14", prefix="Entidad federativa"
+)
+SINALOA = make_region(
+    14, "Sinaloa", RegionLevel.STATE, parent_id=1, code="25", prefix="Entidad federativa"
+)
+REGIONS = (*ALL, CHIHUAHUA, CUAUHTEMOC_CHIH, WORLD, JALISCO, SINALOA)
 
 
 def quick(
@@ -59,6 +68,7 @@ def quick(
     configured: bool = True,
     place: str | None = None,
     place_state: str | None = None,
+    answer: TermSuggestionResult | None = None,
 ) -> tuple[StartQuickSearch, Store, Queue]:
     regions = FakeRegionRepository(REGIONS)
     planner = PlanSearch(
@@ -74,7 +84,8 @@ def quick(
     store, queue = Store(), Queue()
     suggester = SuggestConceptTerms(
         FakeSuggester(
-            result("filtran datos", "hackeo gobierno", place=place, place_state=place_state)
+            answer
+            or result("filtran datos", "hackeo gobierno", place=place, place_state=place_state)
         ),
         PRICES,
         repo,
@@ -91,11 +102,14 @@ async def test_crea_un_concepto_oculto_y_lanza_la_busqueda() -> None:
 
     hidden = started.concept
     assert hidden.is_quick
+    # ADR-0113: el texto del analista es el nombre y la primera frase; la IA
+    # («Hackeos a gobierno») ya no lo renombra.
     assert (hidden.data.name, hidden.data.description, hidden.data.keywords) == (
-        "Hackeos a gobierno",
         TEXT,
-        ("filtran datos", "hackeo gobierno"),
+        TEXT,
+        (TEXT, "filtran datos", "hackeo gobierno"),
     )
+    assert hidden.data.required_terms == ()
     assert (hidden.data.query_mode, hidden.data.color) == (QueryMode.OPEN, QUICK_COLOR)
     assert queue.sent == [started.search.search_id]
     [created] = store.created
@@ -109,12 +123,12 @@ async def test_crea_un_concepto_oculto_y_lanza_la_busqueda() -> None:
 
 async def test_no_choca_con_el_nombre_de_un_concepto_guardado() -> None:
     repo = FakeConceptRepository()
-    repo.add(concept("Hackeos a gobierno"))
+    repo.add(concept(TEXT))
     use, _, _ = quick(repo)
 
     started = await use.execute(QuickSearchRequest("benji", TEXT, IZTAPALAPA.id, WEEK), ACTOR)
 
-    assert started.concept.data.name == "Hackeos a gobierno"
+    assert started.concept.data.name == TEXT
 
 
 async def test_si_la_busqueda_no_se_puede_lanzar_el_error_llega_igual() -> None:
@@ -126,10 +140,12 @@ async def test_si_la_busqueda_no_se_puede_lanzar_el_error_llega_igual() -> None:
     assert (store.created, queue.sent) == ([], [])
 
 
-def test_el_nombre_sale_del_texto_si_la_ia_no_dio_uno() -> None:
-    assert quick_name("Robo de autos", "x") == "Robo de autos"
-    assert quick_name("", "  robo de autos   en Jalisco ") == "robo de autos en Jalisco"
-    long = quick_name("", "palabra " * 30)
+def test_el_nombre_es_el_literal_o_si_no_hay_el_texto() -> None:
+    # ADR-0113: el primer argumento ya no es el nombre de la IA sino el literal.
+    assert quick_name("hacker eternal", "x") == "hacker eternal"
+    assert quick_name(None, "  robo de autos   en Jalisco ") == "robo de autos en Jalisco"
+    assert quick_name("", "robo de autos") == "robo de autos"
+    long = quick_name(None, "palabra " * 30)
     assert len(long) <= NAME_MAX_LENGTH
     assert long.endswith("palabra")
 
@@ -259,3 +275,218 @@ async def test_un_lugar_del_catalogo_gana_sobre_en_el_mundo() -> None:
     assert started.place_region == CDMX
     [created] = store.created
     assert created.region_id == CDMX.id
+
+
+# --- El texto se busca tal cual (ADR-0113) ---
+
+
+def eternal(
+    *phrases: str, name: str = "Hackeo Eternal", entities: tuple[str, ...] = ("Eternal",)
+) -> TermSuggestionResult:
+    """Lo que respondió la IA real el 18/11/2026, con las entidades de terms_v3."""
+    return result(*phrases, excludes=(), name=name, entities=entities)
+
+
+async def test_hacker_eternal_busca_el_texto_tal_cual_y_no_lo_renombra() -> None:
+    # Benji, 18/11/2026: buscó «hacker eternal» en todo el mundo; la IA lo
+    # volvió «Hackeo Eternal», nunca se mandó «hacker eternal» y salieron 0.
+    answer = eternal("hackean Eternal", "hackeo Eternal", "hackers Eternal")
+    use, _, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "hacker eternal", WORLD.id, WEEK), ACTOR
+    )
+
+    data = started.concept.data
+    assert data.keywords[0] == "hacker eternal"
+    assert data.name == "hacker eternal"
+    assert data.keywords == (
+        "hacker eternal",
+        "hackean Eternal",
+        "hackeo Eternal",
+        "hackers Eternal",
+    )
+    # El nombre propio con la grafía de la persona, para el juicio de la IA.
+    assert data.required_terms == ("eternal",)
+
+
+async def test_hacker_eternal_conserva_las_mayusculas() -> None:
+    use, _, _ = quick(FakeConceptRepository(), answer=eternal("hackeo Eternal"))
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "Hacker Eternal", WORLD.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.name == "Hacker Eternal"
+    assert started.concept.data.keywords[0] == "Hacker Eternal"
+    assert started.concept.data.required_terms == ("Eternal",)
+
+
+async def test_si_la_ia_quita_el_nombre_propio_el_literal_sigue_primero() -> None:
+    # Concepto 34 de la VM: con «eternal hacker» la IA dio frases sin Eternal
+    # («hackean sistemas») y trajo 122 notas de ciberataques cualquiera.
+    answer = eternal("hackean sistemas", "roban datos", name="Hackeos")
+    use, _, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "eternal hacker", WORLD.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.keywords == ("eternal hacker",)
+
+
+async def test_si_la_ia_no_reconoce_el_nombre_el_literal_va_primero_igual() -> None:
+    answer = eternal("hackean sistemas", "roban datos", name="Hackeos", entities=())
+    use, _, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "eternal hacker", WORLD.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.keywords == ("eternal hacker", "hackean sistemas", "roban datos")
+    assert started.concept.data.required_terms == ()
+
+
+async def test_entidad_que_no_esta_en_el_texto_no_se_exige() -> None:
+    # La IA «corrige» hacker a hackeo: eso no lo escribió la persona.
+    answer = eternal("hackeo Eternal", entities=("Hackeo",))
+    use, _, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "hacker eternal", WORLD.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.required_terms == ()
+    assert started.concept.data.keywords == ("hacker eternal", "hackeo Eternal")
+
+
+async def test_el_literal_quita_el_lugar_y_todo_el_mundo() -> None:
+    use, store, _ = quick(FakeConceptRepository(), place="Jalisco")
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "robo de autos en Jalisco", MEXICO.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.keywords[0] == "robo de autos"
+    assert started.concept.data.name == "robo de autos"
+    [created] = store.created
+    assert created.region_id == JALISCO.id
+
+    use, _, _ = quick(FakeConceptRepository())
+    world = await use.execute(
+        QuickSearchRequest("benji", "bases de datos hackeadas en todo el mundo", MEXICO.id, WEEK),
+        ACTOR,
+    )
+
+    assert world.concept.data.keywords[0] == "bases de datos hackeadas"
+
+
+async def test_cartel_de_sinaloa_no_pierde_de_sinaloa() -> None:
+    # Aunque la IA diga que el lugar es Sinaloa, «de Sinaloa» es parte del nombre.
+    use, _, _ = quick(FakeConceptRepository(), place="Sinaloa")
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "ataques del Cártel de Sinaloa", MEXICO.id, WEEK), ACTOR
+    )
+
+    assert started.concept.data.keywords[0] == "ataques del Cártel de Sinaloa"
+
+
+async def test_un_texto_de_mas_de_80_caracteres_se_busca_tal_cual() -> None:
+    # Revisión del 18/11/2026 (hallazgo 7): antes, de 80 caracteres para arriba
+    # no había literal y solo se buscaban las frases de la IA.
+    text = (
+        "hackeos y filtraciones de bases de datos de dependencias del gobierno federal "
+        "y de los estados"
+    )
+    use, store, _ = quick(FakeConceptRepository())
+
+    started = await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert started.concept.data.keywords == (text, "filtran datos", "hackeo gobierno")
+    assert len(started.concept.data.name) <= NAME_MAX_LENGTH
+    assert text.startswith(started.concept.data.name)
+    assert len(store.created) == 1
+
+
+async def test_literal_que_no_cabe_en_google_no_se_agrega_pero_la_busqueda_sale() -> None:
+    # Más de 32 palabras (el tope de Google): no hay literal.
+    text = " ".join(["hackeos a dependencias del gobierno federal"] * 7)
+    use, store, _ = quick(FakeConceptRepository())
+
+    started = await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert started.concept.data.keywords == ("filtran datos", "hackeo gobierno")
+    assert len(started.concept.data.name) <= NAME_MAX_LENGTH
+    assert len(store.created) == 1
+
+
+@pytest.mark.parametrize("text", ["Pemex", "LockBit", "IA"])
+async def test_un_nombre_solo_se_busca(text: str) -> None:
+    # Revisión del 18/11/2026 (hallazgo 7): con menos de 10 caracteres se
+    # rechazaba; en Google basta escribir «Pemex».
+    answer = eternal(f"{text} filtra", f"hackean {text}", name=text, entities=(text,))
+    use, store, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert started.concept.data.keywords[0] == text
+    assert started.concept.data.name == text
+    assert started.concept.data.required_terms == (text,)
+    assert len(store.created) == 1
+
+
+async def test_sin_literal_ni_frases_con_el_nombre_es_error_claro() -> None:
+    # Más de 32 palabras (el tope de Google): no hay literal.
+    text = " ".join(["todo lo que ha hecho el hacker eternal con las bases de datos"] * 3)
+    answer = eternal("hackean sistemas", name="Hackeos")
+    repo = FakeConceptRepository()
+    use, store, _ = quick(repo, answer=answer)
+
+    with pytest.raises(EmptySuggestionError, match="más corto"):
+        await use.execute(QuickSearchRequest("benji", text, MEXICO.id, WEEK), ACTOR)
+
+    assert store.created == []
+    assert [entry.action for _, entry in repo.audit] == [CONCEPT_TERMS_SUGGESTED]
+
+
+# --- Un lugar no es nombre propio (revisión del 18/11/2026, hallazgo 3) ---
+
+ROBO_PHRASES = (
+    "roban autos con violencia",
+    "robo de vehículos con violencia",
+    "asaltan automovilistas",
+)
+
+
+async def test_jalisco_como_entidad_no_se_exige_ni_protege_el_lugar() -> None:
+    # rv25_sim.py: con entities=["Jalisco"] el literal se quedaba con «en
+    # Jalisco», las frases de la IA se tiraban y se exigía «Jalisco».
+    answer = result(*ROBO_PHRASES, place="Jalisco", entities=("Jalisco",))
+    use, store, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "robo de autos con violencia en Jalisco", MEXICO.id, WEEK),
+        ACTOR,
+    )
+
+    data = started.concept.data
+    assert data.required_terms == ()
+    assert data.keywords == ("robo de autos con violencia", *ROBO_PHRASES)
+    [created] = store.created
+    assert created.region_id == JALISCO.id
+
+
+async def test_el_alias_del_lugar_tampoco_es_entidad() -> None:
+    # La IA dice «Ciudad de México» y marca «CDMX» (su alias) como nombre propio.
+    answer = result(*ROBO_PHRASES, place="Ciudad de México", entities=("CDMX", "Eternal"))
+    use, _, _ = quick(FakeConceptRepository(), answer=answer)
+
+    started = await use.execute(
+        QuickSearchRequest("benji", "robo de autos del hacker Eternal en CDMX", MEXICO.id, WEEK),
+        ACTOR,
+    )
+
+    data = started.concept.data
+    assert data.required_terms == ("Eternal",)
+    assert data.keywords[0] == "robo de autos del hacker Eternal"

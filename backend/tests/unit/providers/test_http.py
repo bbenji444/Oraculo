@@ -8,6 +8,7 @@ import pytest
 from app.adapters.providers.http import ProviderHttpClient
 from app.domain.errors import (
     ProviderAuthError,
+    ProviderNoCreditsError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderUnavailableError,
@@ -167,3 +168,31 @@ async def test_cada_intento_fallido_queda_en_el_registro(caplog: pytest.LogCaptu
     assert "gdelt: intento 1 falló" in caplog.text
     assert "one every 5 seconds" in caplog.text
     assert "siguiente intento en 15 s" in caplog.text
+
+
+@pytest.mark.parametrize("status", [402, 429])
+async def test_sin_creditos_no_se_reintenta_y_conserva_el_texto(status: int) -> None:
+    # SearchApi sin saldo (ADR-0115): reintentar solo retrasa la búsqueda.
+    recorder = Recorder(httpx2.Response(status, text='{"error": "No searches left"}'))
+    no_credits = ProviderHttpClient(
+        Provider.SEARCHAPI_WEB,
+        timeout_seconds=5,
+        max_attempts=3,
+        max_concurrency=1,
+        transport=httpx2.MockTransport(recorder),
+        no_credit_statuses=frozenset({402, 429}),
+    )
+
+    with pytest.raises(ProviderNoCreditsError, match="No searches left") as error:
+        await no_credits.get(URL, {})
+    assert len(recorder.requests) == 1
+    assert error.value.http_status == status
+    assert error.value.retryable is False
+
+
+async def test_sin_esa_configuracion_un_429_se_sigue_reintentando() -> None:
+    recorder = Recorder(*(httpx2.Response(429) for _ in range(3)))
+
+    with pytest.raises(ProviderRateLimitError):
+        await client(recorder).get(URL, {})
+    assert len(recorder.requests) == 3

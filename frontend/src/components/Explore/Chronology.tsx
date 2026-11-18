@@ -20,6 +20,10 @@
  *   expediente del Centro de mando (`variant="dossier"`), más compacto para
  *   que quepan más noticias (Benji, 27/10/2026).
  *
+ * Cada hecho lleva la marca de su plataforma si no es de un medio («f
+ * Facebook») y, si no es relevante del todo, «Por confirmar», «Cercana» o
+ * «Descartada por la IA» con la razón de la IA al pasar el mouse (ADR-0117).
+ *
  * Los filtros viven en `useTimelineStore` y `ExplorePage` los aplica a la lista
  * que usa el globo, así todo queda sincronizado. El globo queda libre en el
  * centro; la lista de noticias del panel izquierdo solo sale con «☰ Lista».
@@ -46,6 +50,10 @@ import {
 import { CategoryTag } from './CategoryTag';
 import { categoryColor } from './categoryColor';
 import { eventDateNote } from './format';
+import { PlatformMark } from './PlatformMark';
+import { isNewsPlatform, outletName, platformInfo, platformOf } from './platforms';
+import { standingNote } from './relevance';
+import { StandingBadge } from './StandingNote';
 import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
 import { ExternalLink } from '../ExternalLink';
@@ -211,6 +219,11 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
   // «ocurrió» ese día (la IA suele dar la fecha de los antecedentes).
   const background = eventDateNote(article.event_date, article.published_at);
   const place = target.primary_location?.place;
+  // Redes y otros sitios llevan su marca (ADR-0117); las que no son
+  // relevantes del todo, la suya con la razón de la IA al pasar el mouse.
+  const platform = platformOf(article);
+  const outlet = outletName(article) ?? (isNewsPlatform(platform) ? 'Medio sin nombre' : null);
+  const standing = standingNote(article);
   return (
     // Dentro de un tema no hay columna de hora ni nodo (no cabrían dos
     // sangrías en el panel): el día y la hora van en el renglón de datos.
@@ -278,9 +291,9 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
                 {shortDay(item.at)} {HOUR.format(new Date(item.at))}
               </span>
             )}
-            <span className="max-w-[12rem] truncate text-sky-200/90">
-              {article.source_name ?? article.source_domain ?? 'Medio sin nombre'}
-            </span>
+            <PlatformMark platform={platform} />
+            {outlet && <span className="max-w-[12rem] truncate text-sky-200/90">{outlet}</span>}
+            {standing && <StandingBadge note={standing} title={standing.reason ?? standing.hint} />}
             {located ? (
               place && <span className="max-w-[11rem] truncate">⌖ {place}</span>
             ) : (
@@ -321,11 +334,15 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
                     {note.published_at ? HOUR.format(new Date(note.published_at)) : '—'}
                   </span>
                   <span className="min-w-0">
+                    <PlatformMark platform={platformOf(note)} />{' '}
                     <ExternalLink
                       href={note.url}
                       className="text-sky-300 hover:text-sky-100 hover:underline"
                     >
-                      {note.source_name ?? note.source_domain ?? 'Medio sin nombre'}{' '}
+                      {outletName(note) ??
+                        (isNewsPlatform(platformOf(note))
+                          ? 'Medio sin nombre'
+                          : platformInfo(platformOf(note)).label)}{' '}
                       <Icon name="open_in_new" />
                     </ExternalLink>
                     {note.title !== article.title && (
@@ -445,6 +462,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
     range,
     categoryIds,
     stateCode,
+    platforms,
     setOpen,
     setListOpen,
     toggleRange,
@@ -457,15 +475,16 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
   const selectedRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // La curva respeta categoría y estado; la lista, además, el tramo elegido.
+  // La curva respeta categoría, estado y plataforma; la lista, además, el
+  // tramo elegido.
   const forSpark = useMemo(
-    () => applyTimeline(articles, { range: null, categoryIds, stateCode }),
-    [articles, categoryIds, stateCode],
+    () => applyTimeline(articles, { range: null, categoryIds, stateCode, platforms }),
+    [articles, categoryIds, stateCode, platforms],
   );
   const timeline = useMemo(() => buildTimeline(forSpark), [forSpark]);
   const items = useMemo(
-    () => storyItems(applyTimeline(articles, { range, categoryIds, stateCode })),
-    [articles, range, categoryIds, stateCode],
+    () => storyItems(applyTimeline(articles, { range, categoryIds, stateCode, platforms })),
+    [articles, range, categoryIds, stateCode, platforms],
   );
   // Los hechos de la misma persona o caso se juntan en un tema (themes.ts).
   const days = useMemo(() => {
@@ -479,7 +498,8 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
   }, [items]);
   const categories = useMemo(() => categoriesIn(articles), [articles]);
   const states = useMemo(() => statesIn(articles), [articles]);
-  const filtered = range !== null || categoryIds.length > 0 || stateCode !== null;
+  const filtered =
+    range !== null || categoryIds.length > 0 || stateCode !== null || platforms.length > 0;
   const notes = items.reduce((total, item) => total + item.articleIds.length, 0);
 
   // Solo se desplaza la lista: `scrollIntoView` también movía la página entera

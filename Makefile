@@ -32,7 +32,7 @@ COVERAGE_MIN := 85
         geo-terms geo-basemap geo-places db-shell db-dump seed probar-proveedor gdelt-diagnostico ingesta \
         ingesta-historial ngramas-muestra buscar reubicar geo-earth extraer-entidades reparar-texto \
         limpiar-duplicados agrupar-historias comparar-fuentes clasificar retirar-conceptos \
-        corrida-fgr instalar-servicio crear-llave acceso
+        corrida-fgr instalar-servicio crear-llave acceso revisar-relevancia
 
 help: ## Muestra esta ayuda
 	@echo "Uso (desde PowerShell, en la carpeta del proyecto): wsl make <comando>"
@@ -135,6 +135,9 @@ buscar: ## Búsqueda real de punta a punta, con costo y confirmación (ARGS="--c
 
 reubicar: ## Vuelve a ubicar las notas de una búsqueda sin pagar a la IA (ARGS="--busqueda <id>")
 	$(UV_RUN) python -m app.cli.reubicar $(ARGS)
+
+revisar-relevancia: ## Solo lectura: pedido, descartadas antes de la IA, bandas y una fila por nota (ARGS="--busqueda <id>")
+	$(UV_RUN) python -m app.cli.revisar_relevancia $(ARGS)
 
 reparar-texto: ## Repara el Mojibake de las notas guardadas: sin ARGS solo muestra 5 ejemplos; ARGS=--aplicar guarda (pide "si")
 	$(UV_RUN) python -m app.cli.reparar_texto $(ARGS)

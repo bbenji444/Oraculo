@@ -11,7 +11,7 @@
  * No hace: no dibuja ni pide datos; recibe lo que ya trajeron los hooks.
  */
 import type { DateRange, ListFilter } from '../../store/explorer';
-import { isFinished, type Search } from '../../services/searches';
+import { isFinished, type Platform, type Search } from '../../services/searches';
 import type { SourceOption } from '../../services/sources';
 import { formatRange, STAGE_LABEL, STAGES } from '../Explore/format';
 
@@ -438,15 +438,27 @@ export function missionLog(
   return lines;
 }
 
-/** Cuántos filtros hay puestos, para el número del botón. */
+/**
+ * Cuántos filtros hay puestos, para el número del botón «Filtro».
+ *
+ * @param categoryIds Categorías elegidas (cada una cuenta).
+ * @param stateCode Estado elegido.
+ * @param listFilter Ubicación elegida.
+ * @param showIrrelevant Si se incluyen las no relevantes.
+ * @param platforms Plataformas elegidas (cada una cuenta, ADR-0117), con las
+ *   pestañas o en la ventana.
+ * @example activeFilters([2], null, 'all', false, ['facebook']) // 2
+ */
 export function activeFilters(
   categoryIds: readonly number[],
   stateCode: string | null,
   listFilter: ListFilter,
   showIrrelevant: boolean,
+  platforms: readonly Platform[],
 ): number {
   return (
     categoryIds.length +
+    platforms.length +
     (stateCode === null ? 0 : 1) +
     (listFilter === 'all' ? 0 : 1) +
     (showIrrelevant ? 1 : 0)

@@ -90,6 +90,10 @@ _DEFAULT_SEARCHAPI_MONTHLY_LIMIT = 100
 # se piden solo mientras vengan llenas). Medido el 21/10/2026 (ADR-0019).
 _DEFAULT_SEARCHAPI_MAX_PAGES = 3
 _MAX_SEARCHAPI_PAGES = 10
+# Páginas de Google web por consulta (ADR-0115): 10 resultados y 1 crédito
+# cada una. Una sola por defecto: la cuenta de prueba tenía 47 créditos que no
+# se renuevan (18/11/2026).
+_DEFAULT_SEARCHAPI_WEB_MAX_PAGES = 1
 
 # Ingesta al índice local (ADR-0013):
 # - 90 días de notas, igual que la ventana que cubre la API de GDELT.
@@ -231,13 +235,32 @@ class Settings(BaseSettings):
     searchapi_max_pages: int = Field(
         default=_DEFAULT_SEARCHAPI_MAX_PAGES, ge=1, le=_MAX_SEARCHAPI_PAGES
     )
+    # Google web por SearchApi (ADR-0115): misma llave y mismo tope mensual
+    # (SEARCHAPI_MONTHLY_CREDIT_LIMIT cuenta los dos motores juntos).
+    searchapi_web_max_pages: int = Field(
+        default=_DEFAULT_SEARCHAPI_WEB_MAX_PAGES, ge=1, le=_MAX_SEARCHAPI_PAGES
+    )
     # Google News RSS: activado por defecto desde el dictamen de la Dirección del
     # 24/10/2026 (ADR-0021, sustituye al 0011). NEWS_RSS_ENABLED=false lo apaga.
     news_rss_enabled: bool = True
     # Fuentes encendidas por defecto en la búsqueda manual (switches, F12.2,
-    # ADR-0027). SearchApi va apagado: en la medición del 25/10/2026, 27 de sus
-    # 30 notas ya venían en el RSS (decisión de Benji). El analista lo enciende.
+    # ADR-0027). SearchApi (Google News) va apagado: en la medición del
+    # 25/10/2026, 27 de sus 30 notas ya venían en el RSS (decisión de Benji).
+    # Google web también va apagado aquí (ADR-0115): manda una consulta por
+    # concepto, y una búsqueda de la FGR con sus subdivisiones gastaría
+    # varios de los créditos que no se renuevan. Se enciende con el switch.
+    # Las corridas automáticas no cambian (AUTOMATIC_SOURCES).
     manual_default_sources: str = "google_news_rss,indice_local"
+    # Fuentes por defecto de la búsqueda rápida (ADR-0115): las de la manual
+    # más Google web, que trae Facebook, X y YouTube «como en Google»
+    # (1 crédito por búsqueda). Solo sale encendido si la cuenta tiene saldo
+    # (``/sources``); si no alcanza, se busca sin él y la respuesta lo dice.
+    quick_default_sources: str = "google_news_rss,indice_local,searchapi_web"
+    # Leer el saldo real de la cuenta de SearchApi (GET /api/v1/me, no gasta
+    # créditos) antes de ofrecer o lanzar Google web (ADR-0115). Con false
+    # solo cuenta el tope mensual local; las pruebas lo apagan para no salir
+    # a internet.
+    searchapi_balance_check: bool = True
     # BrowserWork (ADR-0028): servicio del jefe de Benji que busca en Bing y en
     # Google 2 con un Chrome real. Sin dirección no se ofrece. No lleva llave.
     browserwork_base_url: str | None = None
@@ -322,7 +345,7 @@ class Settings(BaseSettings):
     # prueba manual («Mandar prueba») funciona aunque esté apagado.
     deliveries_enabled: bool = False
 
-    @field_validator("manual_default_sources", "automatic_sources")
+    @field_validator("manual_default_sources", "automatic_sources", "quick_default_sources")
     @classmethod
     def _known_sources(cls, value: str) -> str:
         """Falla al arrancar si las fuentes nombran una que no existe."""

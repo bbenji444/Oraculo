@@ -32,6 +32,16 @@ describe('cúpula 3D del radar (11/11/2026)', () => {
     expect(domeShape([-99.1, 19.4, -99.09, 19.41]).radiusM).toBe(8_000);
   });
 
+  it('con el rectángulo de «Mundo» caería en Ghana y con el radio en tope (por eso, la esfera)', () => {
+    // focus_bbox de la región WLD (migración 0048 del backend). La cúpula no
+    // sirve para todo el planeta: el centro queda en el golfo de Guinea y
+    // 1,600 km no representan «todo el mundo» (ADR-0116, shell.ts).
+    const world = domeShape([-180, -58, 180, 75]);
+
+    expect(world.center).toEqual([0, 8.5]);
+    expect(world.radiusM).toBe(1_600_000);
+  });
+
   it('sabe si la zona está lejos de lo que se ve', () => {
     expect(angularDistance([-99, 19], [-99, 19])).toBe(0);
     expect(angularDistance([0, 0], [90, 0])).toBeCloseTo(90);

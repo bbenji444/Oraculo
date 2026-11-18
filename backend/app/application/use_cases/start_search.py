@@ -19,12 +19,13 @@ from uuid import UUID
 from app.application.ports.search_queue import SearchQueuePort
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchEstimate, SearchRequest
-from app.domain.budget import QueryCaps, check_query_count
+from app.domain.budget import QueryCaps, account_label, check_query_count
 from app.domain.errors import (
     CreditLimitReachedError,
     LLMNotConfiguredError,
     ServiceUnavailableError,
 )
+from app.domain.queries import Provider
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +77,8 @@ class StartSearch:
             LLMNotConfiguredError: Si falta la llave de la IA.
             ServiceUnavailableError: Si no hay ningún proveedor disponible.
             QueryBudgetExceededError: Si planea más consultas de las permitidas.
-            CreditLimitReachedError: Si pasaría el tope mensual de créditos.
+            CreditLimitReachedError: Si pasaría el tope mensual de créditos o si
+                la cuenta de SearchApi no tiene saldo para la búsqueda.
             InvalidRequestError, ConceptNotFoundError, RegionNotFoundError:
                 Ver ``PlanSearch.estimate``.
         """
@@ -90,9 +92,18 @@ class StartSearch:
         if not estimate.queries:
             raise ServiceUnavailableError("No hay ningún proveedor de noticias disponible.")
         check_query_count([q.provider for q in estimate.queries], self._query_caps)
+        if estimate.over_balance:
+            # El saldo real de la cuenta (GET /me, ADR-0115) manda sobre el
+            # tope local: la cuenta de prueba no se renueva cada mes.
+            raise CreditLimitReachedError(
+                f"La cuenta de {account_label(Provider.SEARCHAPI)} no tiene saldo para "
+                "esta búsqueda; apaga Google web o SearchApi.",
+                {"creditos": estimate.credits, "saldo_de_la_cuenta": estimate.credits_balance},
+            )
         if estimate.over_limit:
             raise CreditLimitReachedError(
-                "Esta búsqueda pasaría el tope mensual de créditos de SearchApi.",
+                "Esta búsqueda pasaría el tope mensual de créditos de "
+                f"{account_label(Provider.SEARCHAPI)}.",
                 {
                     "creditos": estimate.credits,
                     "usados_en_el_mes": estimate.credits_month,

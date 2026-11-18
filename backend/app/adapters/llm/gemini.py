@@ -292,6 +292,7 @@ class GeminiEnricher:
             TERMS_PROMPT_VERSION,
             place=out.place,
             place_state=out.place_state,
+            entities=tuple(out.entities),
         )
 
 

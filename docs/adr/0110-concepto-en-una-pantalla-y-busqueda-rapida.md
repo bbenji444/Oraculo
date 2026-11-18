@@ -24,6 +24,10 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
    - `POST /api/v1/searches/quick` recibe el texto, la región, las fechas y las fuentes.
    - La IA propone las frases (`SuggestConceptTerms`, ~0.0001 USD, queda en la bitácora).
    - Se crea un concepto «como en Google» **oculto** (`concepts.is_quick`, migración 0047): lo escrito es lo que la IA juzga y las frases son las de la IA. Su color es el cian de la consola (`#00D2FF`). Si la IA no da nombre, se usa el texto.
+   - **Cambió con ADR-0113 (18/11/2026), ver ADR-0113:**
+     - El nombre y la primera frase son lo que escribió el analista, sin el lugar ni las fechas (el «literal»). La IA ya no le pone nombre.
+     - Sus frases van después y deben llevar los nombres propios del texto, que se guardan en `required_terms`.
+     - El prompt pasó a `terms_v3`.
    - Se lanza la búsqueda con `StartSearch`, con los mismos topes y revisiones que una normal.
    - Los ocultos no salen en `GET /concepts` ni ocupan el nombre: los índices parciales de la migración 0005 se rehicieron con `AND NOT is_quick`.
    - «Guardar como concepto» (`POST /concepts/{id}/keep`) lo vuelve normal. Si el nombre ya existe responde 409 y hay que cambiarlo antes.
@@ -37,6 +41,7 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
    - Si lo encuentra, se busca ahí aunque se haya elegido otro lugar (lo escrito es lo último que dijo el analista), y la respuesta lo trae en `place_region`. La pantalla lo deja elegido en «Dónde» para que el mapa y la consulta digan dónde se buscó.
    - Si el texto no nombra lugar, solo dice «México» o el lugar no está en el catálogo, se busca en el lugar de la consulta.
    - Las frases siguen sin lugar (ADR-0109): el lugar lo pone la región, como en cualquier búsqueda.
+   - Desde ADR-0113 el prompt es `terms_v3`, que conserva `place` y `place_state`. Al literal se le quita la mención de ese lugar («en Jalisco»), salvo que sea parte de un nombre («Cártel de Sinaloa»). Ver ADR-0113.
 
 ## Alternativas consideradas
 

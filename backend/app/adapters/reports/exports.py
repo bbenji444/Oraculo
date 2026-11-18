@@ -1,7 +1,9 @@
 """Notas de una búsqueda en CSV y GeoJSON (especificación §15, ADR-0018).
 
 - **CSV:** una fila por nota relevante, en UTF-8 con BOM para que Excel
-  muestre la Ñ y los acentos al abrirlo con doble clic.
+  muestre la Ñ y los acentos al abrirlo con doble clic. La columna
+  «plataforma» dice dónde se publicó (Noticias, Facebook, X, YouTube...,
+  ADR-0115).
 - **GeoJSON** (RFC 7946): un punto por nota ubicada, para QGIS o Google
   Earth. Las notas sin ubicación no tienen punto: solo van en el CSV.
 
@@ -19,10 +21,12 @@ from typing import Any
 from app.adapters.reports.labels import PRECISION_LABEL, PROVIDER_LABEL, mexico_datetime
 from app.application.ports.search_reads import ArticleItem
 from app.application.use_cases.reports import ExportData
+from app.domain.platforms import PLATFORM_LABELS, platform_of
 
 CSV_COLUMNS = (
     "titulo",
     "medio",
+    "plataforma",
     "publicada",
     "lugar",
     "precision",
@@ -50,6 +54,9 @@ def _fields(article: ArticleItem) -> dict[str, Any]:
     return {
         "titulo": article.title,
         "medio": article.source_name or article.source_domain or "",
+        "plataforma": PLATFORM_LABELS[
+            platform_of(article.source_domain, article.url, article.providers, article.source_name)
+        ],
         "publicada": mexico_datetime(article.published_at) if article.published_at else "",
         "lugar": (primary.place or "") if primary else "",
         "precision": PRECISION_LABEL[primary.precision if primary else "unknown"],

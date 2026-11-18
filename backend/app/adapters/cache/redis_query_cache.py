@@ -47,6 +47,7 @@ def to_json(articles: tuple[RawArticle, ...]) -> str:
                 "snippet": a.snippet,
                 "language": a.language,
                 "raw": dict(a.raw),
+                "title_truncated": a.title_truncated,
             }
             for a in articles
         ],
@@ -78,6 +79,8 @@ def from_json(text: str) -> tuple[RawArticle, ...]:
             snippet=item["snippet"],
             language=item["language"],
             raw=item["raw"],
+            # Las respuestas guardadas antes de ADR-0115 no traen el campo.
+            title_truncated=bool(item.get("title_truncated", False)),
         )
         for item in items
     )

@@ -72,4 +72,53 @@ describe('switches de fuentes', () => {
     expect((local as HTMLButtonElement).disabled).toBe(true);
     expect(local.textContent).toContain('No configurada');
   });
+
+  it('junto a Google web dice cuántos créditos quedan, si el servidor lo sabe (ADR-0115)', () => {
+    // Sin `credits_remaining`: como llega de un servidor que no lo sabe.
+    const withoutCredits: SourceOption = {
+      id: 'searchapi_web',
+      label: 'Google web',
+      paid: true,
+      configured: true,
+      default_on: true,
+    };
+    const web: SourceOption = { ...withoutCredits, credits_remaining: 46 };
+    const { rerender } = render(
+      <SourceSwitches options={[web]} chosen={['searchapi_web']} onChange={vi.fn()} />,
+    );
+    expect(screen.getByRole('switch', { name: /Google web/ }).textContent).toContain(
+      'Gasta créditos · quedan 46',
+    );
+
+    rerender(
+      <SourceSwitches
+        options={[{ ...web, credits_remaining: 1 }]}
+        chosen={['searchapi_web']}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('switch', { name: /Google web/ }).textContent).toContain(
+      'Gasta créditos · queda 1',
+    );
+
+    // Sin saldo: lo dice en lugar de «Gasta créditos» (el servidor ya la apaga).
+    rerender(
+      <SourceSwitches
+        options={[{ ...web, credits_remaining: 0 }]}
+        chosen={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('switch', { name: /Google web/ }).textContent).toContain(
+      'Sin créditos',
+    );
+
+    // Sin el dato (servidor viejo o cuenta sin consultar): como antes.
+    rerender(
+      <SourceSwitches options={[withoutCredits]} chosen={['searchapi_web']} onChange={vi.fn()} />,
+    );
+    const note = screen.getByRole('switch', { name: /Google web/ }).textContent;
+    expect(note).toContain('Gasta créditos');
+    expect(note).not.toContain('queda');
+  });
 });

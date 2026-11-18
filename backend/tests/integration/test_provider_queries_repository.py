@@ -124,6 +124,25 @@ async def test_suma_los_creditos_del_periodo_por_proveedor(
     assert await log.credits_used_since("gdelt", since) == 0
 
 
+async def test_google_news_y_google_web_suman_juntos_la_cuenta_de_searchapi(
+    test_engine: AsyncEngine, sync_engine: Engine
+) -> None:
+    # Revisión del 18/11/2026 (hallazgo 10): las dos fuentes de SearchApi gastan
+    # la misma cuenta (ADR-0115); el tope se mide con las dos filas juntas.
+    log = PostgresProviderQueryLog(test_engine)
+    await log.record(record(provider="searchapi", cost_credits=2))
+    await log.record(record(provider="searchapi_web", cost_credits=1))
+    await log.record(record(provider="searchapi_web", cost_credits=1))
+    # Sin saldo: el error queda registrado pero no se cobra.
+    await log.record(record(provider="searchapi_web", status="error", cost_credits=0))
+    await log.record(record(provider="google_news_rss", cost_credits=0))
+    since = datetime.now(UTC) - timedelta(days=1)
+
+    assert await log.credits_used_since(["searchapi", "searchapi_web"], since) == 4
+    assert await log.credits_used_since(["searchapi_web"], since) == 2
+    assert await log.credits_used_since("searchapi", since) == 2
+
+
 async def test_un_vacio_despues_de_429_queda_como_falla_en_provider_queries(
     test_engine: AsyncEngine, sync_engine: Engine
 ) -> None:

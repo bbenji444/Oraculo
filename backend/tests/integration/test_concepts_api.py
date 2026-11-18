@@ -157,11 +157,13 @@ def test_vista_previa_del_caso_de_la_especificacion(client: TestClient, engine: 
         '(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) '
         "Iztapalapa -curso -webinar -diplomado"
     )
-    # Una búsqueda consulta SearchApi, Google News RSS (ADR-0021) y el índice
-    # local (GDELT llega por la ingesta, ADR-0014); los textos de los otros
-    # dialectos se prueban en test_query_builder.py.
+    # Una búsqueda puede consultar SearchApi, Google web (ADR-0115: su primera
+    # palabra clave tal cual, con el lugar), Google News RSS (ADR-0021) y el
+    # índice local (GDELT llega por la ingesta, ADR-0014); los textos de los
+    # otros dialectos se prueban en test_query_builder.py.
     assert [q["text"] for q in body["queries"]] == [
         base,
+        "ciberataque Iztapalapa",
         f"{base} when:7d",
         'contiene: ciberataque, hackeo, ransomware, "filtración de datos" o phishing'
         " · lugar: Iztapalapa · sin: curso, webinar o diplomado",

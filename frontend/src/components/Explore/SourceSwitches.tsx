@@ -4,16 +4,34 @@
  * BrowserWork. Cada switch dice si la fuente es gratis o gasta créditos (y si
  * tarda más, como BrowserWork, que abre un navegador real); las
  * que no están configuradas en el servidor se ven apagadas y deshabilitadas.
+ * Si el servidor sabe cuántos créditos le quedan a una de pago
+ * (`credits_remaining`, ADR-0115), lo dice al lado: «Gasta créditos · quedan
+ * 46», o «Sin créditos» si ya no hay.
  *
  * No hace: no pide datos (los recibe) ni calcula costos (la estimación se
  * recalcula sola porque la elección forma parte de la búsqueda).
  */
 import type { SourceOption } from '../../services/sources';
 
-/** «Gratis», «Gasta créditos», «Gratis · tarda más» o «No configurada». */
+/** Lo que dice una fuente de pago: con o sin saldo conocido. */
+function paidNote(option: SourceOption): string {
+  const left = option.credits_remaining;
+  if (left === undefined || left === null) return 'Gasta créditos';
+  // Sin saldo el servidor ya la apaga (default_on); aquí solo se dice por qué.
+  if (left === 0) return 'Sin créditos';
+  return `Gasta créditos · ${left === 1 ? 'queda 1' : `quedan ${left.toLocaleString('es-MX')}`}`;
+}
+
+/**
+ * Texto chico bajo el nombre de la fuente.
+ *
+ * @param option La fuente como la manda `/sources`.
+ * @returns «Gratis», «Gasta créditos» (con «· quedan N» si se sabe),
+ *   «Sin créditos», «Gratis · tarda más» o «No configurada».
+ */
 function sourceNote(option: SourceOption): string {
   if (!option.configured) return 'No configurada';
-  const cost = option.paid ? 'Gasta créditos' : 'Gratis';
+  const cost = option.paid ? paidNote(option) : 'Gratis';
   // BrowserWork abre un Chrome real: tarda minutos y puede pedir captcha (ADR-0028).
   return option.slow ? `${cost} · tarda más` : cost;
 }

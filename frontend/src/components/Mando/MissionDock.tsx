@@ -647,7 +647,7 @@ export function MissionDock({ active }: MissionDockProps) {
         </header>
         {/* ADR-0110: o escribir lo que se busca, como en Google, sin concepto. */}
         <div className="mando-console-quick">
-          <QuickSearchBar providers={launcher.providers} busy={launcher.busy} />
+          <QuickSearchBar providers={launcher.quickProviders} busy={launcher.busy} />
         </div>
         <div className="mando-console-grid">
           <MissionScope ready={Boolean(launcher.input) && !launcher.blocked} />

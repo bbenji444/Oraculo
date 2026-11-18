@@ -140,3 +140,66 @@ def test_el_prompt_pide_el_lugar_y_su_estado() -> None:
     assert "place:" in prompt
     assert "place_state:" in prompt
     assert '"Guadalajara" → "Jalisco"' in prompt
+
+
+# --- terms_v3: nombres propios copiados tal cual (ADR-0113) ---
+
+
+def test_el_prompt_v3_exige_copiar_los_nombres_propios_tal_cual() -> None:
+    prompt = build_terms_prompt(TermSuggestionRequest("hacker eternal", 12, 6))
+
+    assert TERMS_PROMPT_VERSION == "terms_v3"
+    assert "Copia EXACTOS los nombres propios" in prompt
+    assert '"hacker" no es "hackeo"' in prompt
+    assert "TODAS las frases lo llevan" in prompt
+    assert "Ponlos en entities" in prompt
+    # El lugar que es parte de un nombre no es el lugar.
+    assert "Cártel de Sinaloa" in prompt
+    # Ejemplo resuelto con el caso de Benji.
+    assert "La persona escribió: hacker eternal" in prompt
+    assert prompt.rstrip().endswith("hacker eternal")
+
+
+def test_el_esquema_estricto_pide_las_entidades() -> None:
+    assert "entities" in TERMS_SCHEMA["required"]
+    assert TERMS_SCHEMA["properties"]["entities"] == {
+        "type": "array",
+        "items": {"type": "string"},
+    }
+
+
+async def test_openai_devuelve_las_entidades() -> None:
+    answer = VALID | {"place": None, "place_state": None, "entities": ["Eternal"]}
+    llm = enricher(httpx2.Response(200, json=api_reply(json.dumps(answer), 400, 90)), seen=[])
+
+    result = await llm.suggest_terms(REQUEST)
+
+    assert result.entities == ("Eternal",)
+    await llm.aclose()
+
+
+async def test_gemini_devuelve_las_entidades_y_una_respuesta_vieja_trae_ninguna() -> None:
+    models = FakeModels(
+        reply(VALID | {"entities": ["Eternal", "LockBit"]}, 380, 80), reply(VALID, 380, 80)
+    )
+    llm = GeminiEnricher(models, "gemini-2.5-flash")
+
+    with_entities = await llm.suggest_terms(REQUEST)
+    without = await llm.suggest_terms(REQUEST)
+
+    assert with_entities.entities == ("Eternal", "LockBit")
+    assert without.entities == ()
+
+
+def test_el_prompt_v3_dice_que_un_lugar_no_es_entidad() -> None:
+    # Revisión del 18/11/2026 (hallazgo 3): pedía «nombres propios» sin decir
+    # que un lugar no va ahí; con «Jalisco» en entities se tiraban las frases.
+    prompt = build_terms_prompt(
+        TermSuggestionRequest("robo de autos con violencia en Jalisco", 12, 6)
+    )
+
+    assert (
+        "- Un lugar (país, estado, ciudad, alcaldía o colonia) NO va en entities: el lugar "
+        'se busca aparte. Solo va si es parte de un nombre propio ("Cártel de Sinaloa", '
+        '"Universidad de Guadalajara"), y entonces va el nombre completo.'
+    ) in prompt

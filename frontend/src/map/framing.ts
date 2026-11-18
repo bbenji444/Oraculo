@@ -293,6 +293,55 @@ export function ringAround(
   });
 }
 
+/** Dónde se ve el globo en pantalla: centro y radio de su silueta, en píxeles. */
+export interface GlobeOutline {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+// Búsqueda del borde: 16 direcciones y anillos de 60° a 90° del centro cada 2°
+// (con la cámara inclinada el borde visible queda antes de los 90°). Son ~250
+// proyecciones por cuadro: medido, no se nota.
+const LIMB_DIRECTIONS = 16;
+const LIMB_FROM_DEG = 60;
+const LIMB_TO_DEG = 90;
+const LIMB_STEP_DEG = 2;
+
+/**
+ * Dónde se ve el globo en pantalla: centro y radio de su silueta.
+ *
+ * MapLibre no lo expone. Se proyectan anillos de puntos cada vez más lejos del
+ * centro y, en cada dirección, se queda el más lejano (ese es el borde). Lo
+ * usan la aureola del globo (ExploreGlobe) y los letreros de la esfera de
+ * «Todo el mundo» (ScanOverlay, ADR-0116).
+ *
+ * @param project Convierte `[lng, lat]` en píxeles (`map.project`).
+ * @param center Centro de la cámara `[lng, lat]` (`map.getCenter()`).
+ * @returns Centro y radio de la silueta en pantalla.
+ *
+ * @example globeOutline((p) => map.project(p), [-35, 20]) // { x: 640, y: 380, radius: 330 }
+ */
+export function globeOutline(
+  project: (lngLat: [number, number]) => { x: number; y: number },
+  center: [number, number],
+): GlobeOutline {
+  const origin = project(center);
+  const edge = Array.from({ length: LIMB_DIRECTIONS }, () => ({ d: 0, x: origin.x, y: origin.y }));
+  for (let distance = LIMB_FROM_DEG; distance <= LIMB_TO_DEG; distance += LIMB_STEP_DEG) {
+    ringAround(center, distance, LIMB_DIRECTIONS).forEach((point, i) => {
+      const p = project(point);
+      const d = Math.hypot(p.x - origin.x, p.y - origin.y);
+      const best = edge[i];
+      if (best && Number.isFinite(d) && d > best.d) edge[i] = { d, x: p.x, y: p.y };
+    });
+  }
+  const x = edge.reduce((sum, p) => sum + p.x, 0) / edge.length;
+  const y = edge.reduce((sum, p) => sum + p.y, 0) / edge.length;
+  const radius = edge.reduce((sum, p) => sum + Math.hypot(p.x - x, p.y - y), 0) / edge.length;
+  return { x, y, radius };
+}
+
 /**
  * Cuánto se ven la aureola y el brillo del Sol alrededor del globo: completos
  * con el globo entero en pantalla y se apagan al acercarse (ya no hay borde).

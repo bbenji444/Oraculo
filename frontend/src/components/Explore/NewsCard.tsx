@@ -6,6 +6,10 @@
  * mencionado" si no es la del hecho), proveedores y "Ver nota original", que
  * abre en otra pestaña. Abajo, «Agregar al caso» (Fase 9.3, `AddToCase`).
  *
+ * Las publicaciones de redes y otros sitios llevan la marca de su plataforma
+ * y su botón dice «Ver publicación en Facebook» (ADR-0117). Las «por
+ * confirmar», cercanas o sin revisar dicen por qué, con la razón de la IA.
+ *
  * Nunca muestra el texto completo de la nota (CLAUDE.md §8): solo el resumen
  * propio y el link al medio.
  */
@@ -20,6 +24,10 @@ import {
   PRECISION_LABEL,
   providersLabel,
 } from './format';
+import { PlatformMark } from './PlatformMark';
+import { isNewsPlatform, originalLinkLabel, outletName, platformOf } from './platforms';
+import { standingNote } from './relevance';
+import { StandingBadge, StandingReason } from './StandingNote';
 import { ExternalLink } from '../ExternalLink';
 import { Icon } from '../ui/Icon';
 
@@ -34,6 +42,11 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
   const eventDate = eventDateNote(article.event_date, article.published_at);
   const authority = authorityNote(article.authority);
   const relevant = article.concepts.filter((c) => c.is_relevant);
+  const platform = platformOf(article);
+  // En las redes la marca ya dice «Facebook»; el nombre dice la cuenta.
+  const outlet = outletName(article) ?? (isNewsPlatform(platform) ? 'Medio sin nombre' : null);
+  const when = article.published_at ? formatMexicoCity(article.published_at) : null;
+  const note = standingNote(article);
   return (
     <article className="space-y-2.5 text-sm" aria-label={article.title}>
       <div className="flex items-start justify-between gap-2">
@@ -49,10 +62,17 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
           </button>
         )}
       </div>
-      <p className="text-xs text-slate-400">
-        {article.source_name ?? article.source_domain ?? 'Medio sin nombre'}
-        {article.published_at && ` · ${formatMexicoCity(article.published_at)}`}
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+        <PlatformMark platform={platform} size="card" />
+        <span>{[outlet, when].filter(Boolean).join(' · ')}</span>
       </p>
+      {note && (
+        // Por qué no es relevante del todo, en palabras de la IA (ADR-0117).
+        <div className="-mt-1 text-[11px] leading-snug">
+          <StandingBadge note={note} />
+          <StandingReason note={note} className="mt-1" />
+        </div>
+      )}
       {eventDate && (
         <p
           className="-mt-1.5 text-xs text-amber-200/90"
@@ -125,10 +145,12 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
           <span className="text-amber-200">· fuera de la región</span>
         )}
       </p>
-      <div className="flex items-center justify-between gap-2 pt-1">
+      {/* Se acomoda en dos renglones si no cabe: «Ver publicación en Facebook»
+          es más largo que «Ver nota original» y apretaba el nombre de la fuente. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <span className="text-[11px] text-slate-500">{providersLabel(article.providers)}</span>
         <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
-          Ver nota original <Icon name="open_in_new" />
+          {originalLinkLabel(platform)} <Icon name="open_in_new" />
         </ExternalLink>
       </div>
       <AddToCase articleId={article.article_id} />
