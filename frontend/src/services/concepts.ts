@@ -212,6 +212,15 @@ function isSuggestion(value: unknown): value is TermSuggestion {
  *   `description`), `empty_suggestion`, `term_suggestion_failed` o
  *   `llm_not_configured`.
  */
+/**
+ * «Guardar como concepto» una búsqueda rápida (ADR-0110): deja de estar oculto.
+ *
+ * @throws {ApiError} `concept_name_taken` (409) si ya hay uno con ese nombre.
+ */
+export async function keepConcept(id: number): Promise<Concept> {
+  return asConcept(await requestJson(apiUrl(`concepts/${String(id)}/keep`), { method: 'POST' }));
+}
+
 export async function suggestTerms(description: string): Promise<TermSuggestion> {
   const body = await requestJson(apiUrl('concepts/suggest'), {
     method: 'POST',

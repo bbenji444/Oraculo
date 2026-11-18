@@ -28,12 +28,13 @@ class ConceptRepositoryPort(Protocol):
             limit: Máximo de registros.
 
         Returns:
-            Hasta ``limit`` conceptos ordenados por (``name_norm``, ``id``).
+            Hasta ``limit`` conceptos ordenados por (``name_norm``, ``id``), sin
+            los de búsqueda rápida (ADR-0110).
         """
         ...
 
     async def get(self, concept_id: int) -> Concept | None:
-        """Busca un concepto vigente por id.
+        """Busca un concepto vigente por id, también uno de búsqueda rápida.
 
         Args:
             concept_id: Identificador.
@@ -55,7 +56,7 @@ class ConceptRepositoryPort(Protocol):
         ...
 
     async def name_taken(self, name_norm: str, except_id: int | None) -> bool:
-        """Dice si otro concepto vigente ya usa ese nombre.
+        """Dice si otro concepto vigente ya usa ese nombre (los ocultos no cuentan).
 
         Args:
             name_norm: Nombre normalizado.
@@ -66,18 +67,37 @@ class ConceptRepositoryPort(Protocol):
         """
         ...
 
-    async def create(self, data: ConceptDraft, created_by: str, audit: AuditEntry) -> Concept:
+    async def create(
+        self, data: ConceptDraft, created_by: str, audit: AuditEntry, *, quick: bool = False
+    ) -> Concept:
         """Guarda un concepto nuevo y su registro de auditoría.
 
         Args:
             data: Datos validados.
             created_by: Usuario que lo crea.
             audit: Registro para la bitácora.
+            quick: ``True`` si lo crea una búsqueda rápida (queda oculto).
 
         Returns:
             El concepto guardado.
 
         Raises:
+            ConceptNameTakenError: Si otro concepto ganó el nombre al mismo tiempo.
+        """
+        ...
+
+    async def keep(self, concept_id: int, audit: AuditEntry) -> Concept:
+        """Convierte un concepto de búsqueda rápida en uno normal (ADR-0110).
+
+        Args:
+            concept_id: Identificador.
+            audit: Registro para la bitácora.
+
+        Returns:
+            El concepto, ya visible en la lista.
+
+        Raises:
+            ConceptNotFoundError: Si no existe o no es de búsqueda rápida.
             ConceptNameTakenError: Si otro concepto ganó el nombre al mismo tiempo.
         """
         ...

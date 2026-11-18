@@ -40,6 +40,12 @@ from app.domain.term_suggestions import (
 COST_DECIMALS = 6
 
 
+def _clean_place(value: str | None) -> str | None:
+    """Un lugar sin espacios de más, o ``None`` si viene vacío."""
+    clean = " ".join((value or "").split())
+    return clean or None
+
+
 class TermSuggestionFailedError(ServiceUnavailableError):
     """La IA no respondió o no dio una propuesta válida."""
 
@@ -55,12 +61,17 @@ class TermProposal:
         query_mode: Siempre «como en Google»: las frases se pensaron para eso.
         model: Modelo que las propuso.
         cost_usd: Lo que costó la propuesta.
+        place: Lugar que nombró el analista («Jalisco»), o ``None``; lo usa
+            la búsqueda rápida (ADR-0110).
+        place_state: Estado de ese lugar si es un municipio o ciudad.
     """
 
     terms: SuggestedTerms
     query_mode: QueryMode
     model: str
     cost_usd: float
+    place: str | None = None
+    place_state: str | None = None
 
 
 class SuggestConceptTerms:
@@ -92,8 +103,7 @@ class SuggestConceptTerms:
         actor: Actor,
         intent: str,
         usage: LLMUsage,
-        terms: SuggestedTerms | None,
-        error: str | None = None,
+        details: dict[str, object],
     ) -> None:
         payload: dict[str, object] = {
             "descripcion": intent,
@@ -103,11 +113,9 @@ class SuggestConceptTerms:
             "tokens_salida": usage.tokens_out,
             "costo_usd": self._cost(usage),
         }
-        if terms is not None:
-            payload |= {"frases": list(terms.phrases), "exclusiones": list(terms.exclude_terms)}
-        if error is not None:
-            payload["error"] = error
-        await self._concepts.record_suggestion(AuditEntry(actor, CONCEPT_TERMS_SUGGESTED, payload))
+        await self._concepts.record_suggestion(
+            AuditEntry(actor, CONCEPT_TERMS_SUGGESTED, payload | details)
+        )
 
     async def execute(self, description: str, actor: Actor) -> TermProposal:
         """Pide la propuesta y la limpia.
@@ -129,7 +137,7 @@ class SuggestConceptTerms:
         try:
             result: TermSuggestionResult = await self._suggester.suggest_terms(request)
         except TermSuggestionError as error:
-            await self._record(actor, intent, error.usage, None, str(error))
+            await self._record(actor, intent, error.usage, {"error": str(error)})
             raise TermSuggestionFailedError(
                 "La IA no dio una propuesta válida. Intenta de nuevo o escribe las frases a mano."
             ) from error
@@ -142,7 +150,21 @@ class SuggestConceptTerms:
             terms = clean_suggestion(result.name, result.phrases, result.exclude_terms)
         except EmptySuggestionError:
             # Sin frases útiles también se pagó: queda en la bitácora.
-            await self._record(actor, intent, result.usage, None, "sin frases útiles")
+            await self._record(actor, intent, result.usage, {"error": "sin frases útiles"})
             raise
-        await self._record(actor, intent, result.usage, terms)
-        return TermProposal(terms, QueryMode.OPEN, result.model, self._cost(result.usage))
+        place = _clean_place(result.place)
+        details: dict[str, object] = {
+            "frases": list(terms.phrases),
+            "exclusiones": list(terms.exclude_terms),
+        }
+        if place is not None:
+            details["lugar"] = place
+        await self._record(actor, intent, result.usage, details)
+        return TermProposal(
+            terms,
+            QueryMode.OPEN,
+            result.model,
+            self._cost(result.usage),
+            place,
+            _clean_place(result.place_state),
+        )

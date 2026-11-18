@@ -1,5 +1,6 @@
 """Repositorio de conceptos en memoria para pruebas unitarias (sin base de datos)."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.application.audit import AuditEntry
@@ -21,9 +22,14 @@ class FakeConceptRepository:
         self._next_id = 1
 
     def add(
-        self, data: ConceptDraft, created_by: str = "prueba", category_id: int | None = None
+        self,
+        data: ConceptDraft,
+        created_by: str = "prueba",
+        category_id: int | None = None,
+        *,
+        quick: bool = False,
     ) -> Concept:
-        concept = Concept(self._next_id, data, created_by, NOW, NOW, category_id)
+        concept = Concept(self._next_id, data, created_by, NOW, NOW, category_id, quick)
         self.concepts[concept.id] = concept
         self._next_id += 1
         return concept
@@ -31,7 +37,11 @@ class FakeConceptRepository:
     async def list_concepts(
         self, active: bool | None, after: NameCursor | None, limit: int
     ) -> list[Concept]:
-        rows = [c for c in self.concepts.values() if active is None or c.data.is_active is active]
+        rows = [
+            c
+            for c in self.concepts.values()
+            if not c.is_quick and (active is None or c.data.is_active is active)
+        ]
         rows.sort(key=lambda c: (c.data.name_norm, c.id))
         if after:
             rows = [c for c in rows if (c.data.name_norm, c.id) > (after.name_norm, after.id)]
@@ -45,13 +55,25 @@ class FakeConceptRepository:
 
     async def name_taken(self, name_norm: str, except_id: int | None) -> bool:
         return any(
-            c.data.name_norm == name_norm and c.id != except_id for c in self.concepts.values()
+            c.data.name_norm == name_norm and c.id != except_id and not c.is_quick
+            for c in self.concepts.values()
         )
 
-    async def create(self, data: ConceptDraft, created_by: str, audit: AuditEntry) -> Concept:
-        concept = self.add(data, created_by)
+    async def create(
+        self, data: ConceptDraft, created_by: str, audit: AuditEntry, *, quick: bool = False
+    ) -> Concept:
+        concept = self.add(data, created_by, quick=quick)
         self.audit.append((concept.id, audit))
         return concept
+
+    async def keep(self, concept_id: int, audit: AuditEntry) -> Concept:
+        current = self.concepts.get(concept_id)
+        if current is None or not current.is_quick:
+            raise ConceptNotFoundError("No hay una búsqueda rápida con ese id.")
+        kept = replace(current, is_quick=False)
+        self.concepts[concept_id] = kept
+        self.audit.append((concept_id, audit))
+        return kept
 
     async def update(self, concept_id: int, data: ConceptDraft, audit: AuditEntry) -> Concept:
         if concept_id not in self.concepts:

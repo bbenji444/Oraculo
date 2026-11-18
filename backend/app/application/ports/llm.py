@@ -474,7 +474,9 @@ class TermSuggestionResult:
         exclude_terms: Exclusiones.
         usage: Tokens gastados (suma de intentos, si hubo reintento).
         model: Modelo usado.
-        prompt_version: Versión del prompt (``terms_v1``).
+        prompt_version: Versión del prompt (``terms_v2``).
+        place: Lugar que nombró la persona («Jalisco»), o ``None``.
+        place_state: Estado de ese lugar si es un municipio o ciudad, o ``None``.
     """
 
     name: str
@@ -483,6 +485,8 @@ class TermSuggestionResult:
     usage: LLMUsage
     model: str
     prompt_version: str
+    place: str | None = None
+    place_state: str | None = None
 
 
 class TermSuggestionError(RuntimeError):

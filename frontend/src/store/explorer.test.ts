@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { searchInput, useExplorerStore } from './explorer';
+import { quickSearchInput, searchInput, useExplorerStore } from './explorer';
 
 const initial = useExplorerStore.getState();
 
@@ -271,5 +271,26 @@ describe('subdivisiones (ADR-0038)', () => {
       dateTo: '2026-11-02',
     });
     expect(useExplorerStore.getState().subdivisionIds).toEqual([]);
+  });
+});
+
+describe('cuerpo de la búsqueda rápida (ADR-0110)', () => {
+  const week = { kind: '7' } as const;
+
+  it('lleva el texto en lugar de conceptos y usa México si no hay región', () => {
+    expect(quickSearchInput('  roban autos ', { regionId: null, range: week }, 1)).toEqual({
+      text: 'roban autos',
+      region_id: 1,
+      days: 7,
+    });
+    expect(
+      quickSearchInput('roban autos', { regionId: 15, range: week }, 1, ['indice_local']),
+    ).toEqual({ text: 'roban autos', region_id: 15, days: 7, providers: ['indice_local'] });
+  });
+
+  it('sin texto, región o fuentes no hay búsqueda', () => {
+    expect(quickSearchInput('  ', { regionId: 15, range: week }, 1)).toBeNull();
+    expect(quickSearchInput('roban autos', { regionId: null, range: week }, null)).toBeNull();
+    expect(quickSearchInput('roban autos', { regionId: 15, range: week }, 1, [])).toBeNull();
   });
 });

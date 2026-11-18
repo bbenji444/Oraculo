@@ -307,6 +307,14 @@
   gap: 0.3rem 0.75rem;
   margin-bottom: 0.15rem;
 }
+/* Búsqueda rápida a todo el ancho, arriba de la frase (ADR-0110). */
+.mando-console-quick {
+  position: relative;
+  z-index: 1;
+  margin: 0.35rem 0 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgb(0 210 255 / 0.1);
+}
 /* Pie a todo el ancho: los resultados anteriores completos. */
 .mando-console-foot {
   position: relative;

@@ -37,6 +37,7 @@ from app.application.use_cases.concepts import (
     UpdateConcept,
 )
 from app.application.use_cases.plan_search import PlanSearch
+from app.application.use_cases.quick_search import KeepQuickConcept
 from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.domain.errors import LLMNotConfiguredError
 from app.domain.queries import Provider
@@ -242,6 +243,23 @@ async def delete_concept(
     """Borrado lógico si el concepto ya se usó en búsquedas; físico si no."""
     await DeleteConcept(concepts).execute(concept_id, actor)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{concept_id}/keep",
+    response_model=ConceptOut,
+    summary="Guardar una búsqueda rápida como concepto",
+    responses=error_responses(404, 409),
+)
+async def keep_quick_concept(
+    concepts: Concepts, actor: CurrentActor, concept_id: ConceptId
+) -> ConceptOut:
+    """La vuelve un concepto normal, visible en la lista (ADR-0110).
+
+    Responde ``409`` si ya hay un concepto con ese nombre: edítalo antes con
+    ``PATCH /concepts/{id}``.
+    """
+    return ConceptOut.from_domain(await KeepQuickConcept(concepts).execute(concept_id, actor))
 
 
 @router.post(

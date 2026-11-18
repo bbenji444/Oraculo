@@ -290,6 +290,8 @@ class GeminiEnricher:
             usage,
             self._model,
             TERMS_PROMPT_VERSION,
+            place=out.place,
+            place_state=out.place_state,
         )
 
 

@@ -294,6 +294,49 @@ export async function startSearch(input: SearchInput): Promise<string> {
   return data.search_id;
 }
 
+/** Búsqueda rápida (ADR-0110): un texto en lugar de conceptos. */
+export type QuickSearchInput = Omit<SearchInput, 'concept_ids' | 'category_ids'> & {
+  /** Lo que se busca, en palabras del analista. */
+  text: string;
+};
+
+/** Lo que responde una búsqueda rápida recién lanzada. */
+export interface QuickSearchStarted {
+  searchId: string;
+  /** El concepto oculto que la sostiene: «Guardar como concepto» lo usa. */
+  conceptId: number;
+  conceptName: string;
+  /** El lugar que nombró el texto («en Jalisco») si se buscó ahí; `null` si se buscó en la región elegida. */
+  placeRegionId: number | null;
+}
+
+/**
+ * Lanza una búsqueda rápida: la IA propone las frases y se busca como en
+ * Google, sin guardar un concepto (gasta tokens de la IA).
+ *
+ * @throws {ApiError} los mismos de `startSearch`, o `invalid_concept` si el
+ *   texto es muy corto o muy largo.
+ */
+export async function startQuickSearch(input: QuickSearchInput): Promise<QuickSearchStarted> {
+  const data = await requestJson(apiUrl('searches/quick'), { method: 'POST', body: input });
+  if (
+    !isRecord(data) ||
+    typeof data.search_id !== 'string' ||
+    !isRecord(data.concept) ||
+    typeof data.concept.id !== 'number' ||
+    typeof data.concept.name !== 'string'
+  ) {
+    throw badFormat();
+  }
+  const place = isRecord(data.place_region) ? data.place_region.id : null;
+  return {
+    searchId: data.search_id,
+    conceptId: data.concept.id,
+    conceptName: data.concept.name,
+    placeRegionId: typeof place === 'number' ? place : null,
+  };
+}
+
 /** Estado, avance y costo de una búsqueda. */
 export async function getSearch(searchId: string, signal?: AbortSignal): Promise<Search> {
   const data = await requestJson(apiUrl(`searches/${encodeURIComponent(searchId)}`), { signal });

@@ -1,10 +1,11 @@
 /**
  * Formulario de un concepto: crear o editar, con "Probar concepto" debajo.
  *
- * Un concepto nuevo empieza en dos pasos (ADR-0109): primero la persona
- * escribe en sus palabras qué noticias quiere seguir y la IA propone las
- * frases; luego revisa el formulario completo antes de guardar. Los nuevos
- * quedan «como en Google»; el selector de modo permite cambiarlo.
+ * Todo en una pantalla (ADR-0110): lo único obligatorio es escribir qué
+ * noticias se quieren seguir. «Proponer frases con la IA» llena las frases
+ * ahí mismo para revisarlas; si se guarda sin frases o sin nombre, la IA los
+ * propone al guardar. Los nuevos se buscan «como en Google» (ADR-0109); los
+ * exactos que ya existían (FGR, subdivisiones) se editan sin cambiar de modo.
  *
  * Los errores del backend se muestran junto a su campo; un nombre repetido
  * (409) se muestra en el campo nombre. Borrar pide confirmación.
@@ -28,15 +29,13 @@ import {
   type TermSuggestion,
   fieldErrors,
 } from '../../services/concepts';
-import { MODE_COPY, MODE_OPTIONS, applySuggestion } from './conceptDraft';
+import { MODE_COPY, applySuggestion, fillMissing, needsProposal } from './conceptDraft';
 import { DeleteConfirm } from './DeleteConfirm';
-import { IntentStep } from './IntentStep';
 import { KeywordChips } from './KeywordChips';
 import { QueryPreview } from './QueryPreview';
 import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
-import { HudSegmented } from '../ui/HudSegmented';
 import { Icon } from '../ui/Icon';
 import { formatUsd } from '../Explore/format';
 
@@ -92,16 +91,15 @@ function errorsFor(error: unknown): { fields: FieldErrors; general: string | nul
 
 export function ConceptForm({ concept, onSaved, onClose, embedded = false }: ConceptFormProps) {
   const [draft, setDraft] = useState<ConceptInput>(() => toInput(concept));
-  // Uno nuevo empieza preguntando qué se quiere seguir; uno guardado, con todo.
-  const [step, setStep] = useState<'intent' | 'details'>(concept ? 'details' : 'intent');
   const [proposal, setProposal] = useState<TermSuggestion | null>(null);
+  const [missingIntent, setMissingIntent] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const create = useCreateConcept();
   const update = useUpdateConcept();
   const remove = useDeleteConcept();
   const suggest = useSuggestTerms();
   const id = useId();
-  const saving = create.isPending || update.isPending;
+  const saving = create.isPending || update.isPending || suggest.isPending;
   const { fields, general } = errorsFor(concept ? update.error : create.error);
   const suggestion = errorsFor(suggest.error);
   const copy = MODE_COPY[draft.query_mode];
@@ -115,17 +113,34 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
       onSuccess: (proposed) => {
         setDraft((current) => applySuggestion(current, proposed));
         setProposal(proposed);
-        setStep('details');
       },
     });
   }
 
-  function save(event: React.FormEvent) {
+  async function save(event: React.FormEvent) {
     event.preventDefault();
+    const open = draft.query_mode === 'open';
+    // Sin lo que se busca ni frases no hay qué buscar ni contra qué juzgar.
+    if (open && draft.description.trim() === '' && draft.keywords.length === 0) {
+      setMissingIntent(true);
+      return;
+    }
+    let ready = draft;
+    if (needsProposal(draft)) {
+      let proposed: TermSuggestion;
+      try {
+        proposed = await suggest.mutateAsync(draft.description);
+      } catch {
+        return; // El error de la IA ya se muestra junto a la descripción.
+      }
+      ready = fillMissing(draft, proposed);
+      setDraft(ready);
+      setProposal(proposed);
+    }
     if (concept) {
-      update.mutate({ id: concept.id, patch: draft }, { onSuccess: onSaved });
+      update.mutate({ id: concept.id, patch: ready }, { onSuccess: onSaved });
     } else {
-      create.mutate(draft, { onSuccess: onSaved });
+      create.mutate(ready, { onSuccess: onSaved });
     }
   }
 
@@ -146,36 +161,22 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
       </button>
     </div>
   );
-  const descriptionErrors = fields.description ?? suggestion.fields.description;
-
-  if (step === 'intent') {
-    return (
-      <Frame embedded={embedded}>
-        <section {...labelling} className="space-y-5">
-          {header}
-          <IntentStep
-            id={id}
-            value={draft.description}
-            onChange={(value) => {
-              set('description', value);
-            }}
-            onPropose={propose}
-            onSkip={() => {
-              setStep('details');
-            }}
-            pending={suggest.isPending}
-            errors={suggestion.fields.description}
-            error={suggestion.general}
-          />
-        </section>
-      </Frame>
-    );
-  }
+  const descriptionErrors =
+    fields.description ??
+    suggestion.fields.description ??
+    (missingIntent ? ['Escribe qué noticias quieres seguir.'] : undefined);
+  const open = draft.query_mode === 'open';
 
   return (
     <div className="space-y-4">
       <Frame embedded={embedded}>
-        <form onSubmit={save} {...labelling} className="space-y-5">
+        <form
+          onSubmit={(event) => {
+            void save(event);
+          }}
+          {...labelling}
+          className="space-y-5"
+        >
           {header}
 
           {proposal && (
@@ -188,67 +189,36 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
             </p>
           )}
 
-          <div>
-            <p className="hud-label">Cómo se busca</p>
-            <HudSegmented
-              options={MODE_OPTIONS}
-              value={draft.query_mode}
-              label="Cómo se busca"
-              onChange={(mode) => {
-                set('query_mode', mode);
-              }}
-            />
-            <p className="mt-1.5 text-xs text-slate-500">{copy.explanation}</p>
-          </div>
-
-          <div>
-            <label htmlFor={`${id}-name`} className="hud-label">
-              Nombre
-            </label>
-            <input
-              id={`${id}-name`}
-              value={draft.name}
-              maxLength={80}
-              aria-invalid={fields.name !== undefined}
-              placeholder="Por ejemplo: Extorsión telefónica"
-              onChange={(event) => {
-                set('name', event.target.value);
-              }}
-              className={inputClass(fields.name !== undefined)}
-            />
-            {fields.name?.map((message) => (
-              <p key={message} className="mt-1 text-xs text-rose-300">
-                {message}
-              </p>
-            ))}
-          </div>
+          {copy.explanation && <p className="text-xs text-slate-400">{copy.explanation}</p>}
 
           <div>
             <label htmlFor={`${id}-description`} className="hud-label">
-              {copy.descriptionLabel}{' '}
-              {draft.query_mode === 'exact' && (
-                <span className="font-normal text-slate-500">(opcional)</span>
-              )}
+              {copy.descriptionLabel}
             </label>
             <textarea
               id={`${id}-description`}
               value={draft.description}
               maxLength={500}
-              rows={2}
+              rows={open ? 3 : 2}
+              aria-invalid={descriptionErrors !== undefined}
+              placeholder={
+                open
+                  ? 'Por ejemplo: robo de autos y camionetas con violencia en Jalisco'
+                  : undefined
+              }
               onChange={(event) => {
                 set('description', event.target.value);
+                setMissingIntent(false);
               }}
               className={inputClass(descriptionErrors !== undefined)}
             />
-            {copy.descriptionHint && (
-              <p className="mt-1 text-xs text-slate-500">{copy.descriptionHint}</p>
-            )}
+            <p className="mt-1 text-xs text-slate-500">{copy.descriptionHint}</p>
             {descriptionErrors?.map((message) => (
               <p key={message} className="mt-1 text-xs text-rose-300">
                 {message}
               </p>
             ))}
-            {draft.query_mode === 'open' && (
+            {open && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <HudButton
                   size="sm"
@@ -295,6 +265,30 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
               set('exclude_terms', terms);
             }}
           />
+
+          <div>
+            <label htmlFor={`${id}-name`} className="hud-label">
+              Nombre
+            </label>
+            <input
+              id={`${id}-name`}
+              value={draft.name}
+              maxLength={80}
+              aria-invalid={fields.name !== undefined}
+              placeholder={
+                open ? 'Si lo dejas vacío, la IA lo pone' : 'Por ejemplo: Extorsión telefónica'
+              }
+              onChange={(event) => {
+                set('name', event.target.value);
+              }}
+              className={inputClass(fields.name !== undefined)}
+            />
+            {fields.name?.map((message) => (
+              <p key={message} className="mt-1 text-xs text-rose-300">
+                {message}
+              </p>
+            ))}
+          </div>
 
           <fieldset>
             <legend className="hud-label">Color en el mapa</legend>
@@ -358,7 +352,13 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
 
           <div className="flex flex-wrap items-center gap-2 border-t border-sky-400/10 pt-5">
             <HudButton type="submit" variant="solid" disabled={saving}>
-              {saving ? 'Guardando…' : concept ? 'Guardar cambios' : 'Crear concepto'}
+              {suggest.isPending
+                ? 'La IA está pensando…'
+                : saving
+                  ? 'Guardando…'
+                  : concept
+                    ? 'Guardar cambios'
+                    : 'Crear concepto'}
             </HudButton>
             <HudButton variant="ghost" onClick={onClose}>
               Cancelar

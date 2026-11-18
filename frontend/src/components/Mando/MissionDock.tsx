@@ -38,6 +38,7 @@ import { latestRun, stageProgress } from '../Explore/format';
 import { RegionPicker } from '../Explore/RegionPicker';
 import { DateRange } from '../Explore/SearchPanel';
 import { SourceSwitches } from '../Explore/SourceSwitches';
+import { KeepQuickSearch, QuickSearchBar } from '../Explore/QuickSearchBar';
 import { useSearchLauncher } from '../Explore/useSearchLauncher';
 import { CountUp } from '../ui/CountUp';
 import { MissionProgress } from './MissionProgress';
@@ -575,6 +576,7 @@ export function MissionDock({ active }: MissionDockProps) {
         <p className="min-w-0 flex-1 truncate text-[13px] text-slate-100">
           {missionLabel(search)} · {search.results_count} notas
         </p>
+        <KeepQuickSearch searchId={search.search_id} />
         <button
           type="button"
           onClick={() => {
@@ -636,6 +638,10 @@ export function MissionDock({ active }: MissionDockProps) {
           )}
           <MinimizeButton />
         </header>
+        {/* ADR-0110: o escribir lo que se busca, como en Google, sin concepto. */}
+        <div className="mando-console-quick">
+          <QuickSearchBar providers={launcher.providers} busy={launcher.busy} />
+        </div>
         <div className="mando-console-grid">
           <MissionScope ready={Boolean(launcher.input) && !launcher.blocked} />
           <div className="min-w-0 self-center">

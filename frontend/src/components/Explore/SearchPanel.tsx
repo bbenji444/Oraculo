@@ -29,6 +29,7 @@ import { formatRange, formatUsd, stageProgress } from './format';
 import { RegionPicker } from './RegionPicker';
 import { SourceSwitches } from './SourceSwitches';
 import { GLASS, PANEL_TITLE, SMALL_BUTTON } from './ui';
+import { KeepQuickSearch, QuickSearchBar } from './QuickSearchBar';
 import { useSearchLauncher } from './useSearchLauncher';
 
 const RANGES: { kind: RangeKind; label: string }[] = [
@@ -271,6 +272,7 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
           ‹ Volver
         </button>
       </div>
+      <KeepQuickSearch searchId={searchId} />
       <DownloadButtons searchId={searchId} />
     </section>
   );
@@ -335,6 +337,8 @@ export function SearchPanel() {
           <CollapseSearchButton />
         </div>
       </div>
+      {/* ADR-0110: buscar como en Google sin elegir ni guardar un concepto. */}
+      <QuickSearchBar providers={providers} busy={busy} />
       <RegionPicker />
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
