@@ -284,11 +284,16 @@ select optgroup {
   /* Alto del encabezado: Explorar dibuja el globo debajo y corre sus paneles.
      En celular son dos renglones (ExploreGlobe usa estos 6.25rem). */
   --header-h: 6.25rem;
+  --dock-w: 0px;
 }
 @media (min-width: 640px) {
   :root {
     /* El --header-h de Oráculo. */
     --header-h: 62px;
+    /* Lo que ocupa a la izquierda el menú de secciones (.hud-dock): su ancho
+       de 72px más 14px de margen y 6px de aire. En celular el menú va en el
+       encabezado y no ocupa nada a un lado. */
+    --dock-w: 92px;
   }
 }
 
@@ -350,9 +355,9 @@ a.oraculo-logo:hover .oraculo-icon-box {
     0 0 0 1px rgb(0 210 255 / 0.6),
     0 0 20px rgb(0 210 255 / 0.4);
 }
-/* Bajo 1440 px «ORÁCULO» se quita para que quepan las 7 pestañas (ver
-   .user-capsule en hud.css): quedan el logo y la etiqueta «NOTICIAS». */
-@media (max-width: 1439px) {
+/* En celular «ORÁCULO» se quita para que quepa la sesión en el mismo
+   renglón: quedan el logo y la etiqueta «NOTICIAS». */
+@media (max-width: 639px) {
   .oraculo-logo-text {
     display: none;
   }

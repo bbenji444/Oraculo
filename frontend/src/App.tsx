@@ -1,5 +1,5 @@
 /**
- * Componente raíz: encabezado con pestañas y la pantalla activa.
+ * Componente raíz: encabezado, menú de secciones a la izquierda y la pantalla activa.
  *
  * Pestañas: "Explorar" (globo, búsqueda y resultados, F6), "Casos" (casos de
  * investigación con sus noticias, F9.3), "Conceptos" (administración y "Probar
@@ -41,7 +41,7 @@ import { HistoryPage } from './components/History/HistoryPage';
 import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
 import { StatusChip } from './components/SystemStatus/StatusChip';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
-import { HudTabs } from './components/ui/HudTabs';
+import { HudDock, type HudDockItem } from './components/ui/HudDock';
 import { useAppConfig } from './hooks/useAppConfig';
 import { useMe } from './hooks/useAuth';
 import type { Me, Section } from './services/auth';
@@ -55,20 +55,25 @@ const LAB_ENABLED = new URLSearchParams(window.location.search).has('laboratorio
 // La muestra del diseño nuevo (27/10/2026): solo con ?diseno en la URL.
 const DESIGN_ENABLED = new URLSearchParams(window.location.search).has('diseno');
 
-const ALL_TABS: { id: Tab; label: string }[] = [
-  { id: 'explorar', label: 'Explorar' },
-  { id: 'casos', label: 'Casos' },
-  { id: 'conceptos', label: 'Conceptos' },
-  { id: 'historial', label: 'Historial' },
-  { id: 'envios', label: 'Envíos' },
-  { id: 'estado', label: 'Estado del sistema' },
-  { id: 'accesos', label: 'Accesos' },
-  ...(LAB_ENABLED ? [{ id: 'laboratorio' as const, label: 'Laboratorio' }] : []),
-  ...(DESIGN_ENABLED ? [{ id: 'diseno' as const, label: 'Diseño' }] : []),
+// Cada sección con su icono y el nombre que cabe debajo de él en el menú.
+const ALL_TABS: HudDockItem<Tab>[] = [
+  { id: 'explorar', label: 'Explorar', short: 'Explorar', icon: 'public' },
+  { id: 'casos', label: 'Casos', short: 'Casos', icon: 'folder_shared' },
+  { id: 'conceptos', label: 'Conceptos', short: 'Conceptos', icon: 'label' },
+  { id: 'historial', label: 'Historial', short: 'Historial', icon: 'history' },
+  { id: 'envios', label: 'Envíos', short: 'Envíos', icon: 'send' },
+  { id: 'estado', label: 'Estado del sistema', short: 'Estado', icon: 'monitor_heart' },
+  { id: 'accesos', label: 'Accesos', short: 'Accesos', icon: 'manage_accounts' },
+  ...(LAB_ENABLED
+    ? [{ id: 'laboratorio' as const, label: 'Laboratorio', short: 'Lab', icon: 'science' as const }]
+    : []),
+  ...(DESIGN_ENABLED
+    ? [{ id: 'diseno' as const, label: 'Diseño', short: 'Diseño', icon: 'palette' as const }]
+    : []),
 ];
 
-/** Las pestañas que el rol permite (lo dice el servidor en `/auth/me`). */
-function tabsFor(me: Me): { id: Tab; label: string }[] {
+/** Las secciones que el rol permite (lo dice el servidor en `/auth/me`). */
+function tabsFor(me: Me): HudDockItem<Tab>[] {
   return ALL_TABS.filter(
     (t) =>
       (me.sections as string[]).includes(t.id) ||
@@ -215,11 +220,11 @@ function Monitor({ me }: { me: Me }) {
       >
         {outsideExplore && <Constellation />}
       </div>
-      {/* El encabezado de Oráculo: la marca a la izquierda, las pestañas al
-          centro y la sesión a la derecha. No atrapa clics fuera de sus piezas
-          (en Explorar el globo sigue detrás). En celular (Benji, 11/11/2026)
-          son dos renglones: arriba la marca y la sesión; abajo las pestañas,
-          que se deslizan. El orden lo dan las clases order-*. */}
+      {/* El encabezado de Oráculo: la marca a la izquierda y la sesión a la
+          derecha. El menú de secciones (HudDock) es la barra vertical de la
+          izquierda; en el HTML vive aquí porque en celular (Benji, 11/11/2026)
+          es el segundo renglón del encabezado y se desliza. No atrapa clics
+          fuera de sus piezas (en Explorar el globo sigue detrás). */}
       <header className="encabezado pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center px-3 sm:px-5">
         <div className="flex w-full min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-5">
           {/* Celular: este renglón junta la marca y la sesión. En pantallas
@@ -233,16 +238,17 @@ function Monitor({ me }: { me: Me }) {
             </div>
           </div>
           <div className="flex w-full min-w-0 justify-center *:pointer-events-auto sm:order-2 sm:flex-1">
-            <HudTabs tabs={tabs} active={tab} label="Secciones" />
+            <HudDock items={tabs} active={tab} label="Secciones" />
           </div>
         </div>
       </header>
       {/* Explorar empieza arriba de todo: el universo y el globo siguen detrás
-          del encabezado. Las demás pestañas empiezan debajo de él, para que su
-          contenido no pase por detrás del texto al desplazarse. */}
+          del encabezado y del menú (sus paneles se corren solos, ver
+          ExplorePage). Las demás pestañas empiezan debajo del encabezado y a
+          la derecha del menú (--dock-w), para que nada pase por detrás. */}
       <main
         className={`absolute inset-x-0 bottom-0 overflow-auto ${
-          outsideExplore ? 'top-[var(--header-h)] pb-16' : 'top-0'
+          outsideExplore ? 'top-[var(--header-h)] pb-16 pl-[var(--dock-w)]' : 'top-0'
         }`}
       >
         {exploreVisited && (
