@@ -21,6 +21,7 @@ import {
   GLOBE_EXPAND_ZOOM,
   GLOBE_FRAME_MAX_ZOOM,
   globeCamera,
+  globeOutline,
   MIN_FRAME_PX,
   MIN_FRAME_ZOOM,
   PANEL_CLEARANCE_PX,
@@ -258,6 +259,47 @@ describe('aureola del globo', () => {
         Math.cos(19 * DEG) * Math.cos(lat * DEG) * Math.cos((lng + 99) * DEG);
       expect(Math.acos(cosD) / DEG).toBeCloseTo(60);
     }
+  });
+});
+
+/**
+ * Proyección ortográfica de juguete: la Tierra vista desde muy lejos, con su
+ * centro en `screen` y de `radius` píxeles. Los puntos del lado oculto salen
+ * como NaN, igual que MapLibre no los puede poner en la pantalla.
+ */
+function orthographic(center: [number, number], screen: { x: number; y: number }, radius: number) {
+  const [lng0, lat0] = [center[0] * DEG, center[1] * DEG];
+  return ([lng, lat]: [number, number]) => {
+    const [l, p] = [lng * DEG, lat * DEG];
+    const cosC = Math.sin(lat0) * Math.sin(p) + Math.cos(lat0) * Math.cos(p) * Math.cos(l - lng0);
+    if (cosC < -1e-9) return { x: Number.NaN, y: Number.NaN };
+    return {
+      x: screen.x + radius * Math.cos(p) * Math.sin(l - lng0),
+      y:
+        screen.y -
+        radius * (Math.cos(lat0) * Math.sin(p) - Math.sin(lat0) * Math.cos(p) * Math.cos(l - lng0)),
+    };
+  };
+}
+
+describe('globeOutline (silueta del globo en pantalla, ADR-0116)', () => {
+  it('encuentra el centro y el radio del globo', () => {
+    const center: [number, number] = [-35, 20];
+    const outline = globeOutline(orthographic(center, { x: 640, y: 400 }, 330), center);
+
+    expect(outline.x).toBeCloseTo(640, 0);
+    expect(outline.y).toBeCloseTo(400, 0);
+    expect(outline.radius).toBeCloseTo(330, 0);
+  });
+
+  it('sigue al globo si la cámara lo corre a un lado y no se rompe con puntos ocultos', () => {
+    const center: [number, number] = [120, -45];
+    const outline = globeOutline(orthographic(center, { x: 300, y: 520 }, 180), center);
+
+    expect(Number.isFinite(outline.radius)).toBe(true);
+    expect(outline.x).toBeCloseTo(300, 0);
+    expect(outline.y).toBeCloseTo(520, 0);
+    expect(outline.radius).toBeCloseTo(180, 0);
   });
 });
 

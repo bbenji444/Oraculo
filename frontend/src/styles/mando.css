@@ -1727,3 +1727,55 @@
     transition: none;
   }
 }
+
+/* ─── Esfera de «Todo el mundo» (map/radar/shell.ts, ADR-0116) ────────────
+   Letreros sobre el borde de arriba de la esfera: el título con la cobertura
+   y, debajo, la etapa. El bloque se apoya por su pie en ese borde (de ahí el
+   -100%); ScanOverlay no lo deja subir hasta el encabezado. La cobertura usa
+   .mando-dome-coords (se oculta en celular igual que las coordenadas). */
+.mando-shell-labels {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.9rem;
+  translate: -50% -100%;
+  pointer-events: none;
+  /* Aparecen cuando la esfera ya subió (su aparición dura 1.4 s). */
+  animation: mando-shell-labels-in 0.8s var(--hud-ease) 0.6s both;
+  transition:
+    left 0.25s linear,
+    top 0.25s linear;
+}
+.mando-shell-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  color: var(--hud-cyan);
+  font: 600 10px/1 var(--font-display);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 10px rgb(0 210 255 / 0.6);
+  white-space: nowrap;
+}
+/* La etapa va en el flujo, debajo del título (no colgada del radar plano). */
+.mando-shell-status {
+  position: static;
+  translate: none;
+}
+@keyframes mando-shell-labels-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mando-shell-labels {
+    animation: none;
+    transition: none;
+  }
+}

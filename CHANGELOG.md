@@ -8,6 +8,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Esfera de búsqueda en «Todo el mundo» (18/11/2026, ADR-0116).** Benji: «la animación de la cúpula para todo el mundo se ve mal… me gustaría que encerraras todo el mundo en una esfera».
+  - Con «Todo el mundo», en lugar de la cúpula, una esfera tenue con la misma textura envuelve el planeta mientras se busca: sube del suelo, un meridiano de luz le da la vuelta, cada nota enciende un destello y al terminar se expande y se desvanece. La cámara ya no vuela ni se inclina.
+  - Las demás regiones conservan la cúpula. Con «menos movimiento» la esfera queda quieta; sin WebGL se ve el radar plano.
+
 - **Buscar en todo el mundo, en español (18/11/2026, ADR-0112, migración 0048).** Benji: «si yo quisiera buscar bases de datos hackeadas, pero en todo el mundo, no tengo esa opción».
   - En «Dónde», arriba: **«México · Todo el mundo»**. Con «Todo el mundo» no hay estados que elegir, la frase dice «Rastrear… en todo el mundo» y el globo se aleja.
   - En la búsqueda rápida basta escribir «en todo el mundo», «a nivel mundial» o «a nivel global». Si el texto nombra un lugar del catálogo, gana ese lugar.

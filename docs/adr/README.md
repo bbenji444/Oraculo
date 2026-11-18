@@ -75,3 +75,4 @@ Sirven para que alguien nuevo entienda _por qué_ el proyecto es como es, no sol
 | [0110](0110-concepto-en-una-pantalla-y-busqueda-rapida.md) | Concepto en una pantalla (basta con escribir qué noticias seguir; sin selector de modo) y búsqueda rápida con un concepto oculto que se puede guardar (F12) | Aceptado |
 | [0111](0111-reporte-en-pantalla.md) | Reporte en pantalla: la misma plantilla del PDF con índice, pliegues, filtro y ayudas, en un iframe con política propia y nonce (F12) | Aceptado |
 | [0112](0112-buscar-en-todo-el-mundo.md) | Buscar en todo el mundo, en español: región «Mundo» de nivel propio (`world`, `WLD`) que no filtra por país en ningún proveedor (F12) | Aceptado |
+| [0116](0116-esfera-de-busqueda-mundial.md) | Esfera de búsqueda en «Todo el mundo»: capa WebGL propia en lugar de la cúpula, sin mover la cámara (F12) | Propuesto |
