@@ -65,7 +65,7 @@ Medición sin gastar créditos:
    - El índice local no cuenta: es nuestra base y no la frena nadie.
    - Si una búsqueda pasa cualquiera de los dos topes, se rechaza antes de enviar nada. El mensaje dice qué tope pasó y cómo bajarlo («quita frases a los conceptos «como en Google»: cada frase es una consulta»).
    - Al RSS se le sigue pidiendo de 2 en 2 (`PROVIDER_MAX_CONCURRENCY`, sin cambio), con reintentos y espera cuando responde 429.
-6. **D5 — Secciones por categoría:** la lista de resultados de Explorar se agrupa por las 15 categorías (ADR-0029), con su conteo. El filtro de colores del Centro de mando se queda.
+6. **D5 — Secciones por categoría:** la lista de resultados de Explorar se agrupa por las 15 categorías (ADR-0029), con su conteo. También en la pestaña «Noticias» del expediente del Centro de mando, que usa la misma lista. Las secciones se pliegan; con una sola categoría no hay secciones, porque cada tarjeta ya lleva su etiqueta. El filtro de colores del Centro de mando se queda.
 7. **D6 — SearchApi sin gastar por ahora:** se queda como está. Usarlo de fijo se decide con un experimento de 3 créditos, solo si Benji lo aprueba.
 
 ## Alternativas consideradas

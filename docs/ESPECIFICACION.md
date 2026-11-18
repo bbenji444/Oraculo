@@ -760,6 +760,8 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 - Botón **Buscar**.
 - Barra de progreso por etapas.
 
+**Lista de resultados.** Si las notas son de más de una categoría, van en secciones plegables por categoría con su color y conteo («Corrupción · 17»), de la que tiene más notas a la que tiene menos; «Sin clasificar» va al final (ADR-0109, D5). Elegir una nota en el globo abre su sección.
+
 ### 14.4 Tarjeta de noticia
 
 - Título.
