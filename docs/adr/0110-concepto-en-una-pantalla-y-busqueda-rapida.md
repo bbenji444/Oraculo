@@ -71,5 +71,10 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
   - La IA propuso «Robo violento de autos» con 8 frases («roban autos», «asaltan automovilistas»…), ninguna con el lugar.
   - 57 notas, 0 créditos, 0.018 USD de IA. Ninguna nombra Jalisco en el título, y solo 2 quedaron relevantes, de Chihuahua y de la CDMX.
   - Conclusión: si el texto nombra un lugar, la búsqueda tiene que ir a ese lugar. De ahí sale D4.
+- **La misma búsqueda con D4 (18/11/2026):** el mismo texto con México elegido, 7 días, solo fuentes gratuitas.
+  - La IA dijo «Jalisco» y se buscó en Jalisco; la pantalla lo dejó elegido en «Dónde».
+  - Fueron 10 consultas a Google News RSS, una por frase y todas con «Jalisco». Dieron 228 resultados y 93 notas: 66 en Jalisco y 17 de ellas de vehículos. Costó 0 créditos y 0.027 USD de IA.
+  - Solo 1 quedó relevante: «Robo de Auto Termina en Enfrentamiento el Ocotlán, Jalisco» (N+). Las demás eran cateos y vehículos asegurados en Ocotlán, autos con reporte de robo o un robo fingido. El juicio del asunto principal (`enrich_v5`) las descarta con razón.
+  - Las dos búsquedas rápidas anteriores salieron como una sola consulta de frases exactas unidas con OR. El worker de desarrollo corría desde el 14/11, antes de ADR-0109, y rehacía el plan con el código viejo. Al reiniciarlo se buscó «como en Google». **Al publicar hay que reiniciar el worker**, no solo la API.
 - **El lugar del texto cambia la región elegida (D4):** si la IA entiende mal el lugar, se busca en otro sitio. Se ve porque «Dónde» cambia y la bitácora guarda el `lugar` de cada propuesta. Para buscar en otro lugar basta con no nombrarlo en el texto y elegirlo en «Dónde».
 - **Bajar la migración 0047** vuelve normales a los ocultos: si alguno repite el nombre de otro vigente, hay que renombrarlo o borrarlo antes.
