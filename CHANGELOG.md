@@ -59,6 +59,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - Campos: fondo oscuro, borde cian y brillo al escribir.
     - Interruptores, selector de opciones y pestañas como los de Oráculo.
     - Títulos de pantalla en cian con su brillo. Las pestañas ya no son letreros de neón.
+  - **Ventanas y tablas:** las ventanas (nuevo envío, filtro del expediente, «¿Qué rastrear?»…) son como las de Oráculo: sin borde, con sus dos corchetes, sombra honda y título en cian. Atrás se oscurece en lugar de desenfocarse, para no frenar el globo. Las tablas de Conceptos e Historial de envíos llevan los encabezados y renglones de las tablas de Oráculo.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;

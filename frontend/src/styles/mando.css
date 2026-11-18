@@ -1003,7 +1003,9 @@
 }
 
 /* La ventana del filtro, al centro sobre un fondo oscuro: entra con un
-   crecimiento corto. */
+   crecimiento corto. Oráculo core desenfoca la página de atrás en lugar de
+   oscurecerla; aquí se oscurece porque el desenfoque obligaría a la tarjeta
+   integrada a redibujar el globo en cada cuadro (ADR-0036, ADR-0108). */
 .mando-modal-backdrop {
   background: rgb(2 6 10 / 0.62);
   animation: hud-fade 0.2s var(--hud-ease) both;
@@ -1014,12 +1016,24 @@
   letter-spacing: 0.06em;
   white-space: nowrap;
 }
+/* La ventana, como .jarvis-modal-card de Oráculo core (ADR-0108): sin borde,
+   solo sus dos corchetes, con una sombra honda y entrando desde abajo. */
 .mando-modal {
   max-height: calc(100vh - 2rem);
-  /* Solo hacia abajo: las esquinas de mira (1 px afuera) sacaban una barra
+  /* Solo hacia abajo: los corchetes (1 px afuera) sacaban una barra
      horizontal. */
   overflow: hidden auto;
-  animation: mando-modal-in 0.28s var(--hud-ease) both;
+  border-color: transparent;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.85);
+  animation: mando-modal-in 0.28s ease-out both;
+}
+/* El título, en el renglón de arriba de cada ventana, como .jarvis-modal-title:
+   en cian, sin brillo y sin mayúsculas. */
+.mando-modal > :first-child > .mando-kicker {
+  font: 400 0.95rem/1.3 var(--font-display);
+  letter-spacing: 1.5px;
+  text-transform: none;
+  text-shadow: none;
 }
 
 /* Categorías como cuadros del mismo alto en la cuadrícula del filtro. */
@@ -1142,7 +1156,7 @@
 @keyframes mando-modal-in {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.97);
+    transform: translateY(20px) scale(0.98);
   }
   to {
     opacity: 1;

@@ -23,7 +23,7 @@ Son las piezas visuales que comparten todas las pantallas del monitor. Los estil
 - **Animar solo lo barato.** Se anima `transform`, `opacity` y sombras pequeñas. No se usan `backdrop-filter` ni filtros: el globo ya usa la tarjeta de video integrada.
 - **Respetar a quien no quiere movimiento.** Con «reducir animaciones» en el sistema operativo, todo queda quieto.
 - **Las clases sueltas también sirven:**
-  - `.hud-row` y `.hud-trow` para filas de lista y de tabla;
+  - `.hud-table` para tablas (la de Oráculo core), y `.hud-row` y `.hud-trow` para filas de lista y de tabla;
   - `.hud-field` y `.hud-input` para campos, y `.hud-label` para sus etiquetas;
   - `.hud-seg` para el selector, y `.hud-subtab` para las subpestañas;
   - `.hud-section-head` y `.hud-section-title` para el encabezado de una sección;
