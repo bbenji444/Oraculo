@@ -3,7 +3,8 @@
  * fechas, fuentes (switches, F12.2: apagar SearchApi deja la búsqueda en 0
  * créditos), estimación ("2 consultas · hasta 3 créditos": SearchApi pide páginas
  * solo mientras vengan llenas), botón Buscar y barra de
- * avance por etapas.
+ * avance por etapas. Junto a «Conceptos», «+ Nuevo concepto» (solo superusuarios)
+ * abre el formulario «como en Google» en una ventana (ADR-0109).
  *
  * Lanzar gasta créditos y tokens: la estimación siempre se ve antes del botón,
  * y el botón se apaga si se pasaría el tope o falta la llave de la IA.
@@ -21,6 +22,7 @@ import { useSearch } from '../../hooks/useSearches';
 import { isFinished } from '../../services/searches';
 import { type RangeKind, useExplorerStore } from '../../store/explorer';
 import { todayInMexico } from '../../ui/calendar';
+import { NewConceptButton } from '../Concepts/NewConceptButton';
 import { HudDatePicker } from '../ui/HudDatePicker';
 import { DownloadButtons } from './Controls';
 import { formatRange, formatUsd, stageProgress } from './format';
@@ -335,7 +337,11 @@ export function SearchPanel() {
       </div>
       <RegionPicker />
       <div className="space-y-2">
-        <p className="hud-label">Conceptos</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="hud-label mb-0">Conceptos</p>
+          {/* ADR-0109: crear uno «como en Google» sin salir de aquí. */}
+          <NewConceptButton className={`${SMALL_BUTTON} px-2 py-0.5 text-[11px]`} />
+        </div>
         <ConceptChips />
       </div>
       <DateRange />

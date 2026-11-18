@@ -78,3 +78,41 @@ describe('la lista junta las notas del mismo hecho', () => {
     expect(screen.queryByText(/tarjetas/)).toBeNull();
   });
 });
+
+describe('secciones por categoría (ADR-0109, D5)', () => {
+  const huachicol = { id: 7, name: 'Huachicol', color: '#A3E635', symbol: null };
+  const homicidio = { id: 5, name: 'Homicidio', color: '#FF4D6D', symbol: null };
+  const notes = [
+    {
+      ...article(11, 'Aseguran pipa con combustible robado', null, 'Milenio'),
+      category: huachicol,
+    },
+    { ...article(12, 'Hallan toma clandestina en Salamanca', null, 'AM'), category: huachicol },
+    { ...article(13, 'Asesinan a dos en Celaya', null, 'Infobae'), category: homicidio },
+  ];
+
+  it('con varias categorías, cada una es una sección con su conteo que se pliega', () => {
+    render(<ResultsList articles={notes} total={3} colors={new Map()} />);
+
+    const sections = screen.getAllByRole('button', { name: /: \d+ notas?$/ });
+    expect(sections.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Huachicol: 2 notas',
+      'Homicidio: 1 nota',
+    ]);
+    expect(screen.getByText('Hallan toma clandestina en Salamanca')).toBeTruthy();
+
+    const [first] = sections;
+    if (!first) throw new Error('falta la sección');
+    fireEvent.click(first);
+
+    expect(first.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Hallan toma clandestina en Salamanca')).toBeNull();
+    expect(screen.getByText('Asesinan a dos en Celaya')).toBeTruthy();
+  });
+
+  it('con una sola categoría no hay secciones', () => {
+    render(<ResultsList articles={notes.slice(0, 2)} total={2} colors={new Map()} />);
+
+    expect(screen.queryByRole('button', { name: /: \d+ notas?$/ })).toBeNull();
+  });
+});

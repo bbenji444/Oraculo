@@ -1,7 +1,8 @@
 """Arma la IA según ``LLM_PROVIDER`` (ADR-0016).
 
 Lo usan el pipeline de búsqueda, los reportes, la extracción de entidades
-de los casos (Fase 9.4), la API y los comandos. ``llm_info`` dice
+de los casos (Fase 9.4), las frases de un concepto (ADR-0109), la API y
+los comandos. ``llm_info`` dice
 qué modelo se usaría y cuánto cobra sin crear el cliente (la estimación de
 costo no necesita la llave); ``build_llm`` crea el adaptador.
 
@@ -18,6 +19,7 @@ from app.application.ports.llm import (
     LLMInfo,
     LLMPort,
     SummarizerPort,
+    TermSuggesterPort,
 )
 from app.core.config import Settings
 
@@ -173,6 +175,42 @@ def build_entity_extractor(settings: Settings) -> EntityExtractorSetup:
     """
     info, llm = _adapter(settings)
     return EntityExtractorSetup(
+        info.provider, llm, info.price_input_per_million, info.price_output_per_million
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TermSuggesterSetup:
+    """La IA que propone las frases de un concepto y lo que cuesta (ADR-0109).
+
+    Attributes:
+        provider: ``openai`` o ``gemini``.
+        suggester: El adaptador.
+        price_input_per_million: Dólares por millón de tokens de entrada.
+        price_output_per_million: Dólares por millón de tokens de salida.
+    """
+
+    provider: str
+    suggester: TermSuggesterPort
+    price_input_per_million: float
+    price_output_per_million: float
+
+
+def build_term_suggester(settings: Settings) -> TermSuggesterSetup:
+    """Crea la IA que propone frases (la misma que elige ``LLM_PROVIDER``).
+
+    Args:
+        settings: Configuración (``LLM_PROVIDER`` y la llave y modelo de ese
+            proveedor).
+
+    Returns:
+        El adaptador con sus precios.
+
+    Raises:
+        MissingLLMKeyError: Si falta la llave del proveedor elegido.
+    """
+    info, llm = _adapter(settings)
+    return TermSuggesterSetup(
         info.provider, llm, info.price_input_per_million, info.price_output_per_million
     )
 

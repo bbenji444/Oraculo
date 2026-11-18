@@ -14,11 +14,14 @@ from app.application.use_cases.execute_queries import (
     ExecutionStatus,
 )
 from app.domain.articles import RawArticle
-from app.domain.budget import QueryBudgetExceededError
+from app.domain.budget import QueryBudgetExceededError, QueryCaps
 from app.domain.errors import ProviderUnavailableError
 from app.domain.queries import CountryFilter, DateWindow, PlannedQuery, Provider
 
 pytestmark = pytest.mark.anyio
+
+# Los topes de .env por defecto: 10 de pago y 24 gratuitas (ADR-0109).
+CAPS = QueryCaps(10, 24)
 
 NOW = datetime(2026, 10, 16, 18, 0, tzinfo=UTC)
 MEXICO = CountryFilter("México", "MX", "MX", "Mexico")
@@ -113,24 +116,35 @@ def use_case(
     *providers: FakeProvider,
     cache: FakeCache | None = None,
     log: FakeLog | None = None,
-    max_queries: int = 10,
+    caps: QueryCaps = CAPS,
     monthly_limit: int = 100,
     ttl_hours: float = 6,
 ) -> tuple[ExecuteQueries, FakeCache, FakeLog]:
     cache = cache or FakeCache()
     log = log or FakeLog()
-    limits = ExecutionLimits(max_queries, ttl_hours, {Provider.SEARCHAPI: monthly_limit})
+    limits = ExecutionLimits(caps, ttl_hours, {Provider.SEARCHAPI: monthly_limit})
     by_provider = {p.provider: p for p in providers}
     return ExecuteQueries(by_provider, cache, log, limits, now=lambda: NOW), cache, log
 
 
 async def test_demasiadas_consultas_se_rechazan_sin_enviar_nada() -> None:
     gdelt = FakeProvider(Provider.GDELT)
-    execute, _, log = use_case(gdelt, max_queries=2)
+    execute, _, log = use_case(gdelt, caps=QueryCaps(10, 2))
 
     with pytest.raises(QueryBudgetExceededError):
         await execute.execute([planned(Provider.GDELT, str(i)) for i in range(3)])
     assert (gdelt.calls, log.records) == (0, [])
+
+
+async def test_las_gratuitas_no_gastan_el_tope_de_pago() -> None:
+    # ADR-0109: un concepto «como en Google» manda una consulta por frase al RSS.
+    rss = FakeProvider(Provider.GOOGLE_NEWS_RSS)
+    execute, _, _ = use_case(rss, caps=QueryCaps(1, 24))
+
+    result = await execute.execute([planned(Provider.GOOGLE_NEWS_RSS, str(i)) for i in range(12)])
+
+    assert result.status is ExecutionStatus.COMPLETED
+    assert rss.calls == 12
 
 
 async def test_todo_bien_registra_creditos_y_guarda_en_cache() -> None:

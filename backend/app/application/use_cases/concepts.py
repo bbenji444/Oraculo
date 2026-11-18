@@ -28,7 +28,7 @@ from app.application.clock import Today, mexico_city_today
 from app.application.pagination import NameCursor, Page, decode_cursor, encode_cursor
 from app.application.ports.concepts import ConceptRepositoryPort
 from app.application.ports.regions import RegionRepositoryPort
-from app.domain.concept import Concept, ConceptChanges, ConceptDraft
+from app.domain.concept import Concept, ConceptChanges, ConceptDraft, QueryMode
 from app.domain.errors import (
     ConceptNameTakenError,
     ConceptNotFoundError,
@@ -56,6 +56,7 @@ class ConceptInput:
         exclude_terms: Exclusiones.
         color: Color en hexadecimal.
         is_active: Si aparece en el panel de búsqueda.
+        query_mode: Frases exactas o «como en Google» (ADR-0109).
     """
 
     name: str
@@ -64,6 +65,7 @@ class ConceptInput:
     exclude_terms: tuple[str, ...]
     color: str
     is_active: bool = True
+    query_mode: QueryMode = QueryMode.EXACT
 
     def validated(self) -> ConceptDraft:
         """Aplica las reglas del dominio.
@@ -81,6 +83,7 @@ class ConceptInput:
             exclude_terms=self.exclude_terms,
             color=self.color,
             is_active=self.is_active,
+            query_mode=self.query_mode,
         )
 
 

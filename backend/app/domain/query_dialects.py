@@ -1,8 +1,9 @@
 """Cómo escribe cada proveedor una consulta: su "dialecto" (ADR-0009).
 
 Los tres proveedores entienden lo básico de la misma forma: frases entre
-comillas, grupos ``(a OR b)`` y exclusiones con signo menos. Cambian los
-filtros que van **dentro** del texto y los límites de largo:
+comillas, grupos ``(a OR b)`` y exclusiones con signo menos. En modo «como
+en Google» (ADR-0109) una frase que va sola se manda sin comillas. Cambian
+los filtros que van **dentro** del texto y los límites de largo:
 
 - **SearchApi** (Google News): solo el texto base. País, idioma y fechas
   van como parámetros (``gl``, ``hl``, ``time_period``) en el adaptador (F3).
@@ -46,7 +47,8 @@ FREE = 0
 # 27/10/2026 con la ventana de dos días de la corrida FGR: «("Fiscalía General
 # de la República" OR FGR)» llegó justo a 100; partida por palabra clave y por
 # día fueron 4 consultas (100 + 100 + 68 + 53) con 281 notas distintas. Con 4,
-# un concepto y los otros 5 proveedores caben en MAX_QUERIES_PER_SEARCH (10).
+# un concepto y los otros 5 proveedores cabían en el tope de 10 consultas, que
+# entonces contaba todas; desde ADR-0109 las gratuitas tienen el suyo (24).
 RSS_MAX_QUERIES_PER_CONCEPT = 4
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
@@ -64,7 +66,7 @@ def quote(term: str) -> str:
     return f'"{term}"' if " " in term else term
 
 
-def group(terms: Sequence[str]) -> str:
+def group(terms: Sequence[str], *, exact: bool = True) -> str:
     """Une términos con OR; un término solo va sin paréntesis.
 
     GDELT rechaza paréntesis que no rodeen un OR ("Parentheses may only be
@@ -72,11 +74,14 @@ def group(terms: Sequence[str]) -> str:
 
     Args:
         terms: Términos del grupo (al menos uno).
+        exact: Si las frases de varias palabras van entre comillas. Sin
+            comillas, el buscador exige cada palabra en cualquier orden, como
+            en Google (modo abierto, ADR-0109).
 
     Returns:
-        ``(a OR "b c")`` o ``a``.
+        ``(a OR "b c")`` o ``a``; con ``exact=False``, ``b c``.
     """
-    parts = [quote(term) for term in terms]
+    parts = [quote(term) if exact else term for term in terms]
     return parts[0] if len(parts) == 1 else f"({' OR '.join(parts)})"
 
 
@@ -85,6 +90,8 @@ def base_query(
     place: QueryPlace,
     exclusions: Sequence[str],
     topic: Sequence[str] = (),
+    *,
+    exact: bool = True,
 ) -> list[str]:
     """Partes comunes a los tres proveedores, en orden.
 
@@ -94,13 +101,16 @@ def base_query(
         exclusions: Términos de exclusión del concepto.
         topic: Palabras de la subdivisión, que también deben aparecer (un
             segundo grupo: los buscadores unen los grupos con «y»).
+        exact: Si las palabras clave van entre comillas. El lugar, la
+            subdivisión y las exclusiones siempre van exactos: «Ciudad de
+            México» sin comillas también traería «Ciudad Juárez, México».
 
     Returns:
         Las partes del texto: palabras clave, subdivisión, lugar, estado y
         exclusiones. VERIFICAR en F3 que GDELT acepte varios bloques OR
         hermanos (su documentación solo prohíbe anidarlos).
     """
-    parts = [group(keywords)]
+    parts = [group(keywords, exact=exact)]
     if topic:
         parts.append(group(topic))
     if place.terms:
@@ -213,6 +223,9 @@ class QueryDialect:
             (``None``: las palabras van juntas con OR, ver ``query_builder``).
         writer: Escritura propia del texto completo, en lugar del texto
             base más ``suffix`` (la usa el índice local).
+        external: Si es un buscador de afuera. Los gratuitos de afuera
+            cuentan para ``MAX_FREE_QUERIES_PER_SEARCH``; el índice local es
+            nuestra base y no cuenta (ADR-0109).
     """
 
     provider: Provider
@@ -226,14 +239,17 @@ class QueryDialect:
     writer: (
         Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow, Sequence[str]], str] | None
     ) = None
+    external: bool = True
 
-    def render(
+    def render(  # noqa: PLR0913 — las partes de una consulta, más «exact» solo por nombre (*)
         self,
         keywords: Sequence[str],
         place: QueryPlace,
         exclusions: Sequence[str],
         window: DateWindow,
         topic: Sequence[str] = (),
+        *,
+        exact: bool = True,
     ) -> str:
         """Escribe el texto completo de una consulta.
 
@@ -243,6 +259,8 @@ class QueryDialect:
             exclusions: Términos de exclusión.
             window: Rango de fechas.
             topic: Palabras de la subdivisión, que también deben aparecer.
+            exact: Si las palabras clave van entre comillas (``base_query``).
+                El índice local lo ignora: su texto es una descripción.
 
         Returns:
             El texto exacto que se enviará.
@@ -250,7 +268,10 @@ class QueryDialect:
         if self.writer is not None:
             return self.writer(keywords, place, exclusions, window, topic)
         return " ".join(
-            [*base_query(keywords, place, exclusions, topic), *self.suffix(place, window)]
+            [
+                *base_query(keywords, place, exclusions, topic, exact=exact),
+                *self.suffix(place, window),
+            ]
         )
 
     def fits(self, text: str) -> bool:
@@ -317,5 +338,6 @@ DIALECTS: dict[Provider, QueryDialect] = {
         _no_suffix,
         cacheable=False,
         writer=local_index_text,
+        external=False,
     ),
 }

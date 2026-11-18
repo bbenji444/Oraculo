@@ -99,7 +99,7 @@ async def search_pipeline(
             RedisQueryCache(redis),
             PostgresProviderQueryLog(engine),
             ExecutionLimits(
-                settings.max_queries_per_search,
+                settings.query_caps,
                 settings.query_cache_ttl_hours,
                 {Provider.SEARCHAPI: settings.searchapi_monthly_credit_limit},
             ),

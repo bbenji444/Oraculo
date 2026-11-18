@@ -331,7 +331,7 @@ async def _start(settings: Settings, engine: AsyncEngine, request: SearchRequest
         default_sources=profile.sources,
     )
     started = await StartSearch(
-        planner, PostgresSearchStore(engine), _RunsHere(), settings.max_queries_per_search
+        planner, PostgresSearchStore(engine), _RunsHere(), settings.query_caps
     ).execute(request)
     return started.search_id
 

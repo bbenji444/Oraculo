@@ -2,8 +2,9 @@
 
 Recibe las consultas ya planeadas (``build_queries``) y, para cada una:
 
-1. **Presupuesto.** Si la búsqueda planea más de ``MAX_QUERIES_PER_SEARCH``
-   consultas, se rechaza completa **antes** de enviar nada.
+1. **Presupuesto.** Si la búsqueda planea más consultas de pago que
+   ``MAX_QUERIES_PER_SEARCH`` o más gratuitas que ``MAX_FREE_QUERIES_PER_SEARCH``
+   (ADR-0109), se rechaza completa **antes** de enviar nada.
 2. **Proveedor disponible.** Si no está configurado (SearchApi sin llave) o
    está apagado (GDELT, ADR-0012; Google News RSS si se apaga, ADR-0021), la
    consulta se registra como ``skipped`` con el motivo.
@@ -38,7 +39,7 @@ from app.application.ports.provider_log import (
 from app.application.ports.providers import NewsProviderPort
 from app.application.ports.query_cache import QueryCachePort, cache_key
 from app.domain.articles import RawArticle
-from app.domain.budget import MonthlyCredits, check_query_count, month_start
+from app.domain.budget import MonthlyCredits, QueryCaps, check_query_count, month_start
 from app.domain.errors import ProviderError
 from app.domain.queries import PlannedQuery, Provider
 from app.domain.query_dialects import DIALECTS
@@ -114,13 +115,13 @@ class ExecutionLimits:
     """Límites configurables de la ejecución (``.env``).
 
     Attributes:
-        max_queries: ``MAX_QUERIES_PER_SEARCH``.
+        query_caps: Topes de consultas por búsqueda (de pago y gratuitas).
         cache_ttl_hours: ``QUERY_CACHE_TTL_HOURS`` (0 = sin caché).
         monthly_credit_limits: Tope mensual de créditos por proveedor de pago
             (``SEARCHAPI_MONTHLY_CREDIT_LIMIT``).
     """
 
-    max_queries: int
+    query_caps: QueryCaps
     cache_ttl_hours: float
     monthly_credit_limits: Mapping[Provider, int]
 
@@ -167,7 +168,7 @@ class ExecuteQueries:
             QueryBudgetExceededError: Si son más de las permitidas; en ese
                 caso no se envía nada.
         """
-        check_query_count(len(queries), self._limits.max_queries)
+        check_query_count([q.provider for q in queries], self._limits.query_caps)
         since = month_start(self._now(), MEXICO_CITY)
         budgets: dict[Provider, MonthlyCredits] = {}
         for provider, limit in self._limits.monthly_credit_limits.items():

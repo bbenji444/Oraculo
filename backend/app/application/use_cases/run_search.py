@@ -481,7 +481,8 @@ class RunSearch:
     async def _enrich(self, search: StoredSearch, tally: _Tally, pending: list[_Work]) -> None:
         await self._progress(search.search_id, tally, Stage.ENRICH)
         briefs = [
-            ConceptBrief(c.concept_id, c.name, c.description, c.keywords) for c in search.concepts
+            ConceptBrief(c.concept_id, c.name, c.description, c.keywords, c.query_mode)
+            for c in search.concepts
         ]
         semaphore = asyncio.Semaphore(self._limits.llm_concurrency)
         failures: list[str] = []

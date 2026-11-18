@@ -20,7 +20,8 @@ from app.domain.queries import DateWindow, Provider
 from app.domain.search import SearchTrigger
 
 # Tope de transporte: una búsqueda con más conceptos no cabría en el
-# presupuesto de consultas de todos modos (MAX_QUERIES_PER_SEARCH).
+# presupuesto de consultas de todos modos (MAX_QUERIES_PER_SEARCH y
+# MAX_FREE_QUERIES_PER_SEARCH).
 _MAX_CONCEPTS = 20
 # "Últimos 7 días": el rango de la historia H1.
 DEFAULT_DAYS = 7

@@ -38,6 +38,8 @@ from app.application.use_cases.run_search import (
     strict_window,
 )
 from app.domain.articles import RawArticle
+from app.domain.budget import QueryCaps
+from app.domain.concept import QueryMode
 from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import ConceptJudgement, Enrichment, LLMUsage
 from app.domain.errors import ProviderUnavailableError
@@ -305,7 +307,7 @@ def pipeline(
         providers,
         FakeCache(),
         FakeLog(),
-        ExecutionLimits(10, 0, {Provider.SEARCHAPI: 100}),
+        ExecutionLimits(QueryCaps(10, 24), 0, {Provider.SEARCHAPI: 100}),
     )
     use_case = RunSearch(
         searches=searches,
@@ -368,6 +370,22 @@ async def test_busqueda_completa_de_punta_a_punta() -> None:
     assert [q["provider"] for q in closing.queries_executed] == ["searchapi", "indice_local"]
     assert searches.actor == Actor("benji")
     assert searches.errors == []
+
+
+async def test_la_ia_recibe_el_modo_de_cada_concepto() -> None:
+    # ADR-0109 (D4): con el modo, la IA juzga un concepto abierto contra lo
+    # que escribió el analista.
+    abierto = SearchConcept(
+        8, "Hackeos", "hackeos al gobierno mexicano", ("filtran datos",), query_mode=QueryMode.OPEN
+    )
+    use_case, _, _, llm, _ = pipeline(search=stored_search(EXTORSION, abierto))
+
+    await use_case.run(uuid4())
+
+    assert [(c.concept_id, c.description, c.query_mode) for c in llm.requests[0].concepts] == [
+        (3, "Cobro de piso", QueryMode.EXACT),
+        (8, "hackeos al gobierno mexicano", QueryMode.OPEN),
+    ]
 
 
 async def test_nota_ya_enriquecida_se_reutiliza_sin_bajarla_ni_pagarla() -> None:

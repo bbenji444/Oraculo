@@ -67,6 +67,7 @@ async def test_crear_guarda_y_registra_en_la_bitacora(repo: FakeConceptRepositor
         "exclude_terms": ["curso", "webinar", "diplomado"],
         "color": "#2E86DE",
         "is_active": True,
+        "query_mode": "exact",
     }
 
 

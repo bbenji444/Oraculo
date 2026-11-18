@@ -12,11 +12,14 @@ from app.api.v1.concepts import (
     get_actor,
     get_concept_repository,
     get_preview_providers,
+    get_term_suggester,
 )
 from app.api.v1.regions import get_region_repository
 from app.application.audit import Actor
+from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.domain.queries import Provider
 from app.main import create_app
+from tests.unit.application.test_suggest_terms import INTENT, PRICES, FakeSuggester, result
 from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_regions import IZTAPALAPA, FakeRegionRepository
 
@@ -185,3 +188,113 @@ def test_la_ip_de_la_bitacora_solo_acepta_ips_validas(
     scope: dict[str, Any] = {"type": "http", "client": (host, 50000) if host else None}
 
     assert client_ip(Request(scope)) == expected
+
+
+# --- Modo «como en Google» (ADR-0109) ---
+
+OPEN_BODY: dict[str, Any] = {
+    "name": "Hackeos",
+    "description": "Hackeos y filtraciones de bases de datos en México",
+    "keywords": ["filtran datos", "hackeo gobierno"],
+    "color": "#2e86de",
+    "query_mode": "open",
+}
+
+
+def test_sin_query_mode_la_api_crea_un_concepto_exacto(client: TestClient) -> None:
+    # Quien ya usa la API sigue igual; el formulario manda «open».
+    body = client.post(URL, json=BODY).json()
+
+    assert (body["query_mode"], body["query_mode_label"]) == ("exact", "frases exactas")
+
+
+def test_crear_un_concepto_como_en_google(client: TestClient) -> None:
+    body = client.post(URL, json=OPEN_BODY).json()
+
+    assert (body["query_mode"], body["query_mode_label"]) == ("open", "como en Google")
+
+
+def test_cambiar_el_modo_con_patch(client: TestClient) -> None:
+    created = client.post(URL, json=BODY).json()
+
+    response = client.patch(f"{URL}/{created['id']}", json={"query_mode": "open"})
+
+    assert response.json()["query_mode"] == "open"
+
+
+def test_modo_desconocido_es_422(client: TestClient) -> None:
+    response = client.post(URL, json={**OPEN_BODY, "query_mode": "libre"})
+
+    assert response.status_code == 422
+
+
+def test_probar_como_en_google_manda_cada_frase_sola_a_google_news_rss(
+    client: TestClient,
+) -> None:
+    body = client.post(
+        f"{URL}/preview", params={"region_id": IZTAPALAPA.id, "days": 7}, json=OPEN_BODY
+    ).json()
+
+    rss = [q["text"] for q in body["queries"] if q["provider"] == "google_news_rss"]
+    assert rss == [
+        "filtran datos Iztapalapa when:7d",
+        "hackeo gobierno Iztapalapa when:7d",
+    ]
+
+
+# --- La IA propone las frases (ADR-0109) ---
+
+
+def test_proponer_frases_devuelve_la_propuesta_limpia(
+    client: TestClient, concepts: FakeConceptRepository
+) -> None:
+    suggester = FakeSuggester(
+        result("filtran datos", "Filtran datos", "hackeo gobierno", excludes=("curso",))
+    )
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
+        suggester, PRICES, concepts
+    )
+
+    response = client.post(f"{URL}/suggest", json={"description": INTENT})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "name": "Hackeos a gobierno",
+        "keywords": ["filtran datos", "hackeo gobierno"],
+        "exclude_terms": ["curso"],
+        "query_mode": "open",
+        "model": "gpt-6-luna",
+        "cost_usd": 0.002,
+    }
+    # No se guardó ningún concepto: solo la bitácora.
+    assert concepts.concepts == {}
+    assert [entry.action for _, entry in concepts.audit] == ["concept.terms_suggested"]
+
+
+def test_proponer_con_descripcion_corta_es_422_por_campo(
+    client: TestClient, concepts: FakeConceptRepository
+) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
+        FakeSuggester(result("filtran datos")), PRICES, concepts
+    )
+
+    response = client.post(f"{URL}/suggest", json={"description": "robo"})
+
+    assert response.status_code == 422
+    problems = response.json()["error"]["details"]["problemas"]
+    assert [p["campo"] for p in problems] == ["description"]
+
+
+def test_proponer_sin_ia_configurada_es_503(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.state.term_suggester = None
+
+    response = client.post(f"{URL}/suggest", json={"description": INTENT})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "llm_not_configured"

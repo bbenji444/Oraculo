@@ -1,10 +1,11 @@
 """Lo que comparten los adaptadores de IA: prompt, esquema y validación (§10; ADR-0016).
 
-Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v4.md`` para
+Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v5.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
-caso) y su respuesta se valida con el mismo modelo de Pydantic
-(``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``). Así, cambiar de
+caso, ``terms_v1.md`` para proponer las frases de un concepto) y su
+respuesta se valida con el mismo modelo de Pydantic
+(``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``, ``TermsOut``). Así, cambiar de
 proveedor no cambia lo que se pide ni lo que se acepta.
 
 No hace: no llama a ninguna IA.
@@ -26,8 +27,10 @@ from app.application.ports.llm import (
     EntityExtractionRequest,
     SummaryNote,
     SummaryRequest,
+    TermSuggestionRequest,
 )
 from app.domain.authority import parse_authority
+from app.domain.concept import QueryMode
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
 from app.domain.entity_extraction import RawProposal
 from app.domain.geocoding import Mention, MentionRole
@@ -38,7 +41,13 @@ from app.domain.region import RegionLevel
 # v3 (28/10/2026): la fecha y el tipo son los de lo que la nota informa (la
 # sentencia de hoy, no el delito de 2019), para que las corridas dejen fuera
 # solo los hechos de otros días (ADR-0031).
-PROMPT_VERSION = "enrich_v4"
+# v4: relevante solo si el concepto es el asunto principal de la nota (ADR-0044).
+# v5 (17/11/2026): en los conceptos «como en Google» la relevancia se juzga
+# contra lo que escribió el analista; las frases son solo pista (ADR-0109).
+# Antes de publicarse se le quitó, solo a esos conceptos, la exigencia de un
+# hecho concreto y el descarte por tener solo el título: en la primera
+# búsqueda real dejaba 5 relevantes de 150 (ADR-0109, «Primera búsqueda real»).
+PROMPT_VERSION = "enrich_v5"
 PROMPT_PATH = Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md"
 # Respuestas consistentes: se extraen datos, no se escribe creativo.
 TEMPERATURE = 0.2
@@ -108,12 +117,22 @@ class EnrichmentOut(BaseModel):
     locations: list[LocationOut] = Field(default_factory=list)
 
 
+def _concept_line(concept: ConceptBrief) -> str:
+    terms = ", ".join(concept.keywords)
+    head = f"- concept_id {concept.concept_id}: {concept.name}."
+    # ADR-0109 (D4): en un concepto abierto manda lo que escribió el analista y
+    # las frases son solo pista. Sin descripción no hay contra qué juzgar, así
+    # que se presenta como uno exacto.
+    if concept.query_mode is QueryMode.OPEN and concept.description.strip():
+        return (
+            f"{head} Lo que busca el analista: {concept.description} "
+            f"(frases de búsqueda, solo como pista: {terms})"
+        )
+    return f"{head} {concept.description} (palabras clave: {terms})"
+
+
 def _concepts_text(concepts: Sequence[ConceptBrief]) -> str:
-    return "\n".join(
-        f"- concept_id {c.concept_id}: {c.name}. {c.description} "
-        f"(palabras clave: {', '.join(c.keywords)})"
-        for c in concepts
-    )
+    return "\n".join(_concept_line(c) for c in concepts)
 
 
 def build_prompt(request: EnrichmentRequest) -> str:
@@ -354,3 +373,40 @@ def to_labels(
                 )
             )
     return tuple(labels)
+
+
+# Frases de un concepto «como en Google» (ADR-0109).
+TERMS_PROMPT_VERSION = "terms_v1"
+TERMS_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{TERMS_PROMPT_VERSION}.md"
+# 12 frases cortas, 6 exclusiones y un nombre son ~150 tokens; 600 dejan
+# margen sin pagar respuestas desbocadas.
+TERMS_MAX_OUTPUT_TOKENS = 600
+
+
+class TermsOut(BaseModel):
+    """Esquema de la propuesta de frases (``terms_v1``).
+
+    Las listas no tienen tope aquí: el dominio recorta a ``OPEN_MAX_PHRASES``
+    y descarta lo que no se pueda buscar (``clean_suggestion``).
+    """
+
+    name: str
+    phrases: list[str]
+    exclude_terms: list[str]
+
+
+def build_terms_prompt(request: TermSuggestionRequest) -> str:
+    """Llena la plantilla ``terms_v1`` con lo que busca el analista.
+
+    Args:
+        request: Descripción y topes.
+
+    Returns:
+        El texto que se manda a la IA.
+    """
+    template = TERMS_PROMPT_PATH.read_text(encoding="utf-8")
+    return template.format(
+        intent=request.intent,
+        max_phrases=request.max_phrases,
+        max_exclusions=request.max_exclusions,
+    )

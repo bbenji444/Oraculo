@@ -7,14 +7,18 @@
  * El encabezado dice cuántas se ven de cuántas trajo la búsqueda ("24 de 43").
  * Las notas del mismo hecho en varios medios van en una sola tarjeta con
  * «▸ +N medios» (ADR-0026); debajo de las pestañas se dice en cuántas.
+ * Si hay notas de más de una categoría, las tarjetas van en secciones
+ * plegables por categoría con su conteo (ADR-0109, D5).
  */
-import { type CSSProperties, useEffect, useRef } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
+import { Icon } from '../ui/Icon';
+import { type CategorySection, containsArticle, sectionsByCategory } from './categorySections';
 import { matchesListFilter, newsCount } from './format';
-import { groupByStory } from './stories';
+import { type StoryGroup, groupByStory } from './stories';
 import { StoryCard } from './StoryCard';
 import { GLASS, PANEL_TITLE } from './ui';
 
@@ -56,7 +60,31 @@ export function ResultsList({ articles, total, colors, variant = 'column' }: Res
   const shown = articles.filter((a) => matches(a, filter));
   // Mismo hecho en varios medios = una tarjeta con «▸ +N medios» (ADR-0026).
   const groups = groupByStory(shown);
+  const sections = sectionsByCategory(groups);
+  // Con una sola categoría la sección no dice nada nuevo: cada tarjeta ya
+  // lleva su etiqueta.
+  const sectioned = sections.length > 1;
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const count = newsCount(articles.length, total);
+  const toggleSection = (key: string) => {
+    setCollapsed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  };
+  const renderCard = (group: StoryGroup) => (
+    <li key={group.lead.article_id}>
+      <StoryCard
+        group={group}
+        colors={colors}
+        selectedId={articleId}
+        selectedRef={selectedRef}
+        onSelect={selectArticle}
+        dense={dossier}
+      />
+    </li>
+  );
 
   useEffect(() => {
     // La nota elegida en el globo se trae a la vista en la lista.
@@ -138,22 +166,67 @@ export function ResultsList({ articles, total, colors, variant = 'column' }: Res
         </p>
       )}
       <ul
-        className={`min-h-0 flex-1 overflow-y-auto pr-1 ${dossier ? 'space-y-1' : 'mt-3 space-y-1.5'}`}
+        className={`min-h-0 flex-1 overflow-y-auto pr-1 ${dossier ? '' : 'mt-3'} ${
+          sectioned ? 'space-y-2' : dossier ? 'space-y-1' : 'space-y-1.5'
+        }`}
       >
         {shown.length === 0 && <li className="text-xs text-slate-500">Nada en esta pestaña.</li>}
-        {groups.map((group) => (
-          <li key={group.lead.article_id}>
-            <StoryCard
-              group={group}
-              colors={colors}
-              selectedId={articleId}
-              selectedRef={selectedRef}
-              onSelect={selectArticle}
-              dense={dossier}
-            />
-          </li>
-        ))}
+        {sectioned
+          ? sections.map((section) => {
+              // La nota elegida en el globo abre su sección para que se vea.
+              const open = !collapsed.has(section.key) || containsArticle(section, articleId);
+              return (
+                <li key={section.key}>
+                  <CategoryHeader
+                    section={section}
+                    open={open}
+                    dense={dossier}
+                    onToggle={() => {
+                      toggleSection(section.key);
+                    }}
+                  />
+                  {open && (
+                    <ul className={`mt-1 ${dossier ? 'space-y-1' : 'space-y-1.5'}`}>
+                      {section.groups.map(renderCard)}
+                    </ul>
+                  )}
+                </li>
+              );
+            })
+          : groups.map(renderCard)}
       </ul>
     </section>
+  );
+}
+
+interface CategoryHeaderProps {
+  section: CategorySection;
+  open: boolean;
+  /** Más chica en el expediente del Centro de mando. */
+  dense: boolean;
+  onToggle: () => void;
+}
+
+/** Renglón de una categoría: color, nombre y cuántas notas trae; pliega la sección. */
+function CategoryHeader({ section, open, dense, onToggle }: CategoryHeaderProps) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={`${section.name}: ${String(section.count)} ${section.count === 1 ? 'nota' : 'notas'}`}
+      onClick={onToggle}
+      className={`flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left uppercase tracking-wider text-slate-300 hover:bg-sky-400/5 focus-visible:outline-2 focus-visible:outline-sky-400 ${
+        dense ? 'text-[10px]' : 'text-[11px]'
+      }`}
+    >
+      <Icon name={open ? 'expand_more' : 'chevron_right'} className="text-slate-500" />
+      <span
+        aria-hidden="true"
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: section.color }}
+      />
+      <span className="min-w-0 flex-1 truncate">{section.name}</span>
+      <span className="tabular-nums text-slate-400">{section.count}</span>
+    </button>
   );
 }

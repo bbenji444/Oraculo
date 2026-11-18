@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.adapters.persistence.concepts_repository import PostgresConceptRepository
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
-from app.application.audit import CONCEPT_CREATED, Actor, AuditEntry
+from app.application.audit import CONCEPT_CREATED, CONCEPT_TERMS_SUGGESTED, Actor, AuditEntry
 from app.application.pagination import NameCursor
 from app.application.use_cases.concepts import DeleteConcept
 from app.core.config import Settings
-from app.domain.concept import ConceptDraft
+from app.domain.concept import ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
 from app.domain.queries import CountryFilter
 from app.domain.region import RegionLevel
@@ -313,3 +313,43 @@ async def test_terminos_de_los_estados_para_reconocer_notas_de_mexico(
     # Nombre oficial y términos curados, sin repetir (ADR-0014).
     assert {"Ciudad de México", "CDMX", "Estado de México", "Edomex"} <= set(terms)
     assert len(terms) == len(set(terms))
+
+
+# --- Modo «como en Google» y propuestas de la IA (ADR-0109) ---
+
+
+async def test_el_modo_abierto_se_guarda_y_se_lee(repo: PostgresConceptRepository) -> None:
+    created = await repo.create(
+        draft("Hackeos", keywords=("filtran datos",), query_mode=QueryMode.OPEN), "prueba", AUDIT
+    )
+
+    loaded = await repo.get(created.id)
+
+    assert loaded is not None and loaded.query_mode is QueryMode.OPEN
+    changed = await repo.update(created.id, draft("Hackeos", keywords=("filtran datos",)), AUDIT)
+    assert changed.query_mode is QueryMode.EXACT
+
+
+async def test_la_propuesta_de_la_ia_queda_en_la_bitacora_sin_crear_concepto(
+    repo: PostgresConceptRepository, clean: Engine
+) -> None:
+    entry = AuditEntry(
+        Actor("benji", "10.0.0.1"),
+        CONCEPT_TERMS_SUGGESTED,
+        {"descripcion": "hackeos a bases de datos", "frases": ["filtran datos"]},
+    )
+
+    await repo.record_suggestion(entry)
+
+    assert audit_rows(clean) == [
+        (
+            "concept.terms_suggested",
+            "concept",
+            "0",
+            "benji",
+            "10.0.0.1",
+            {"descripcion": "hackeos a bases de datos", "frases": ["filtran datos"]},
+        )
+    ]
+    with clean.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM concepts")).scalar_one() == 0

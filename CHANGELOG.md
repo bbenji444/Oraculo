@@ -8,6 +8,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Conceptos «como en Google» (17/11/2026, ADR-0109, migración 0046).** Benji: «no me da toda la cantidad de resultados de calidad como si yo buscara la noticia de manera normal en Google».
+  - Cada concepto tiene un **modo de búsqueda**: «frases exactas» (como hasta hoy) o «como en Google».
+  - Como en Google, cada frase (hasta 12) se manda sola y sin comillas a Google News RSS, escrita como titular. Medido: «roban auto Jalisco» trajo 19 notas; el grupo de frases exactas de robo de vehículo, 5.
+  - Los conceptos que ya existían, incluida la FGR, siguen en frases exactas. Sin `query_mode`, la API crea conceptos exactos.
+  - **La IA propone las frases:** el analista escribe lo que busca en sus palabras y la IA propone un nombre, de 8 a 12 frases tipo titular y exclusiones. No guarda nada: el analista revisa antes. Ruta nueva `POST /api/v1/concepts/suggest`; cada propuesta queda en la bitácora (`concept.terms_suggested`) con su costo.
+  - **Formulario en dos pasos:** «¿Qué noticias quieres seguir?» y luego las frases propuestas, editables, con el selector «Como en Google / Frases exactas». En Explorar, «+ Nuevo concepto» (junto a los conceptos en el diseño clásico, al pie de «¿Qué rastrear?» en el Centro de mando) abre el mismo formulario en una ventana y deja elegido el concepto. La bitácora de «Accesos» muestra cada propuesta («Benji pidió a la IA las frases de un concepto»).
+  - **Noticias por categoría:** la lista de resultados, en Explorar y en el expediente del Centro de mando, va en secciones plegables por categoría con su conteo («Corrupción · 17», «Otros · 3»). Con una sola categoría se ve como antes.
+  - **La IA juzga contra lo que escribiste** (prompt `enrich_v5`): en un concepto «como en Google», una nota es relevante si trata de lo que el analista describió; las frases solo son pista. No exige un hecho concreto (también cuentan cifras y alertas del tema) ni descarta por tener solo el título: medido con una búsqueda real, las relevantes pasaron de 5 a 12. Los conceptos exactos se le presentan igual que antes. Las notas leídas con `enrich_v4` se vuelven a leer una vez si salen de nuevo.
+
 - **Casos más claros y revisión en bloque (11/11/2026, ADR-0107).** Benji: «que haya cosas que te permitan seleccionar todo» y «que realmente haya alguna relación la cual nos pueda servir para algo».
   - El caso se divide en pestañas: **Panorama**, Entidades, Vínculos y Noticias. Cada pestaña dice cuánto falta revisar.
   - **Panorama:** quién está en el caso, por tipo, y con quién se relaciona cada uno y por qué («participan en el mismo hecho en 2 notas»).
@@ -46,6 +55,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - Lo que ya existía queda a nombre de Benji y sigue igual.
 
 ### Cambiado
+
+- **Dos topes de consultas por búsqueda (17/11/2026, ADR-0109).** Para que quepan los conceptos «como en Google», que mandan una consulta por frase.
+  - `MAX_QUERIES_PER_SEARCH` (10) ahora cuenta solo las consultas de pago (SearchApi).
+  - Nuevo `MAX_FREE_QUERIES_PER_SEARCH` (24): cuenta las gratuitas a buscadores de afuera (Google News RSS, GDELT, BrowserWork). Alcanza para dos conceptos «como en Google».
+  - El índice local ya no cuenta para ningún tope. La corrida FGR y los envíos no cambian.
 
 - **Letras de Oráculo, a prueba (17/11/2026, ADR-0037).** Benji: «regresar a Orbitron… simplemente para que veamos». Primer paso para que el monitor se vea como Oráculo core, que lo abre desde su Hub como «Noticias Intelligence».
   - Títulos, botones, etiquetas y cifras en **Orbitron**, y el texto en **Roboto**, como en Oráculo. Antes eran Exo 2 e Inter.
@@ -87,6 +101,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **`make reubicar` ya no saca de «fuera» las notas de medios extranjeros (17/11/2026).** Al recalcular la región no pasaba el medio de la nota, como sí hace la búsqueda. En una búsqueda de país, una nota sin lugar de un medio `.cl` o `.ar` quedaba «sin ubicación» en vez de «fuera». Al volver a juzgar una búsqueda real, las notas fuera bajaron de 72 a 33.
 - **Los correos se reintentan hasta por 8 horas (13/11/2026).** El 12/11 Outlook (vía Composio) falló toda la tarde: a las 15:00 no llegó ningún correo y a las 23:00 faltaron 2. Antes los reintentos duraban 36 minutos (1, 5 y 30). Ahora hay 8 intentos a los 1, 5, 15, 30, 60, 120 y 240 minutos. Además, un 502 de Cloudflare se daba por perdido porque su texto decía «invalid»; las caídas del proveedor (500, 502, 503, 504) ahora siempre se reintentan.
 - **Un correo cortado a medias se reintenta solo (12/11/2026).** La VM se reinició a las 07:04 mientras mandaba la corrida de las 07:00, y el correo de Geovanni se quedó «enviando» para siempre. Ahora, una guía que lleva más de 15 minutos «enviando» cuenta como intento fallido y vuelve a la fila; si ya no le quedan intentos, queda «falló».
 - **«Llaves de sistema» ya no cuenta la llave de API (12/11/2026).** Benji: «¿por qué yo tengo dos llaves?». El contador y la lista sumaban la llave de API, que ya tiene su propio renglón. A Benji le marcaba 2 en vez de 1 y a Admin 1 en vez de 0.

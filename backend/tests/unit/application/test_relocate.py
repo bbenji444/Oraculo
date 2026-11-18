@@ -85,6 +85,20 @@ async def test_reubica_con_las_reglas_vigentes_sin_tocar_las_que_no_cambian() ->
     assert store.progress == {"in_region": 1, "out_of_region": 2, "unlocated": 0}
 
 
+async def test_en_una_busqueda_de_pais_el_medio_extranjero_sin_lugar_queda_fuera() -> None:
+    # Igual que la búsqueda (run_search): sin lugar y de un medio .cl, no es de
+    # México. Antes `reubicar` no pasaba el medio y la dejaba «sin ubicación»:
+    # el 17/11/2026 pasó de 72 notas fuera a 33 al volver a juzgar una búsqueda.
+    chilean = ArticleMentions(5, "Hackean al gobierno", (), None, "adnradio.cl")
+    unknown = ArticleMentions(6, "Filtran datos", (), None, "milenio.com")
+    store = Store([chilean, unknown])
+    searches = Searches(replace(stored_search(), region_code="MEX"))
+
+    await use_case(store, searches).run(uuid4())
+
+    assert store.in_region == {5: False, 6: None}
+
+
 async def test_busqueda_o_region_inexistentes() -> None:
     no_region = Searches(replace(stored_search(), region_code="99"))
 

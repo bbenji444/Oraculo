@@ -22,6 +22,7 @@ from uuid import UUID
 
 from app.application.audit import Actor
 from app.application.ports.llm import EnrichmentResult
+from app.domain.concept import QueryMode
 from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
@@ -46,6 +47,8 @@ class SearchConcept:
         topic_terms: Palabras de las subdivisiones elegidas, copiadas: cada
             nota debe traer también una («FGR + Homicidio», 02/11/2026).
         category_ids: Subdivisiones elegidas para este concepto.
+        query_mode: Modo de búsqueda copiado (ADR-0109): con él se puede
+            rehacer la consulta tal como se mandó.
     """
 
     concept_id: int
@@ -55,6 +58,7 @@ class SearchConcept:
     exclude_terms: tuple[str, ...] = ()
     topic_terms: tuple[str, ...] = ()
     category_ids: tuple[int, ...] = ()
+    query_mode: QueryMode = QueryMode.EXACT
 
 
 @dataclass(frozen=True, slots=True)
@@ -364,12 +368,15 @@ class ArticleMentions:
             a la migración 0014 solo traen texto, papel y, si era otro
             país, el país).
         primary_code: Clave de la ubicación principal actual, si tiene.
+        source_domain: Dominio del medio: sin lugar, un medio de otro país
+            cuenta como fuera en una búsqueda de país (``in_region``).
     """
 
     article_id: int
     title: str
     mentions: tuple[Mention, ...]
     primary_code: str | None
+    source_domain: str | None = None
 
 
 class RelocationStorePort(Protocol):
@@ -424,12 +431,14 @@ class StoredText:
         title: Título.
         text: Texto que se procesó (cuerpo o título + fragmento).
         published_at: Fecha de publicación, si se conoce.
+        source_domain: Dominio del medio (ver ``ArticleMentions``).
     """
 
     article_id: int
     title: str
     text: str
     published_at: datetime | None
+    source_domain: str | None = None
 
 
 class ReprocessStorePort(RelocationStorePort, Protocol):

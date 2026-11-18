@@ -1,4 +1,4 @@
-"""``LLMPort``, ``SummarizerPort`` y ``EntityExtractorPort`` con Gemini (§10, §15 y Fase 9.4).
+"""Los puertos de la IA (enriquecer, resumir, entidades y frases) con Gemini (§10, §15, ADR-0109).
 
 Usa el SDK oficial ``google-genai`` 1.20 (la 2.x choca con tenacity 9.2.1,
 ADR-0010). Firmas confirmadas con la versión instalada:
@@ -40,14 +40,18 @@ from app.adapters.llm.common import (
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_PROMPT_VERSION,
     TEMPERATURE,
+    TERMS_MAX_OUTPUT_TOKENS,
+    TERMS_PROMPT_VERSION,
     ClassificationOut,
     EnrichmentOut,
     EntitiesOut,
     SummaryOut,
+    TermsOut,
     build_classify_prompt,
     build_entities_prompt,
     build_prompt,
     build_summary_prompt,
+    build_terms_prompt,
     to_enrichment,
     to_labels,
     to_raw_proposals,
@@ -65,6 +69,9 @@ from app.application.ports.llm import (
     SummaryError,
     SummaryRequest,
     SummaryResult,
+    TermSuggestionError,
+    TermSuggestionRequest,
+    TermSuggestionResult,
 )
 from app.domain.enrichment import LLMUsage
 from app.domain.errors import (
@@ -157,6 +164,11 @@ class GeminiEnricher:
     def entities_prompt_version(self) -> str:
         """Ver ``EntityExtractorPort.entities_prompt_version``."""
         return ENTITIES_PROMPT_VERSION
+
+    @property
+    def terms_prompt_version(self) -> str:
+        """Ver ``TermSuggesterPort.terms_prompt_version``."""
+        return TERMS_PROMPT_VERSION
 
     async def aclose(self) -> None:
         """Ver ``LLMPort.aclose``.
@@ -260,6 +272,24 @@ class GeminiEnricher:
             )
         return EntityExtractionResult(
             to_raw_proposals(out), usage, self._model, ENTITIES_PROMPT_VERSION
+        )
+
+    async def suggest_terms(self, request: TermSuggestionRequest) -> TermSuggestionResult:
+        """Ver ``TermSuggesterPort.suggest_terms``."""
+        out, usage, error = await self._complete(
+            build_terms_prompt(request), TermsOut, TERMS_MAX_OUTPUT_TOKENS
+        )
+        if out is None:
+            raise TermSuggestionError(
+                f"Gemini no dio una propuesta de frases válida tras reintentar: {error}", usage
+            )
+        return TermSuggestionResult(
+            out.name,
+            tuple(out.phrases),
+            tuple(out.exclude_terms),
+            usage,
+            self._model,
+            TERMS_PROMPT_VERSION,
         )
 
 

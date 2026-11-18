@@ -90,6 +90,21 @@ describe('frases de la bitácora', () => {
     ).toBe('Benjamín confirmó un vínculo entre «FGR» y «Sinaloa»');
   });
 
+  it('la propuesta de frases dice qué se pidió y cuántas dio', () => {
+    const asked = { descripcion: 'robo de autos en Jalisco', frases: ['roban autos', 'x'] };
+    const ok = describeAudit(event('concept.terms_suggested', asked), PEOPLE);
+    const failed = describeAudit(
+      event('concept.terms_suggested', { ...asked, frases: undefined, error: 'sin frases útiles' }),
+      PEOPLE,
+    );
+
+    expect(ok.text).toBe(
+      'Benjamín pidió a la IA las frases de un concepto («robo de autos en Jalisco»)',
+    );
+    expect([ok.extra, ok.group, ok.alert]).toEqual(['2 frases', 'concepts', false]);
+    expect([failed.extra, failed.alert]).toEqual(['sin frases útiles', true]);
+  });
+
   it('una acción que no conoce se muestra tal cual, sin romperse', () => {
     const line = describeAudit(event('algo.nuevo'), PEOPLE);
 

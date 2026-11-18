@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
-from app.domain.concept import ConceptDraft
+from app.domain.concept import OPEN_MAX_PHRASES, ConceptDraft, QueryMode
 from app.domain.errors import ConceptValidationError, InvalidRequestError, QueryTooLongError
 from app.domain.queries import (
     CountryFilter,
@@ -501,3 +501,99 @@ def test_si_ninguna_palabra_de_la_subdivision_cabe_es_error_claro() -> None:
         build_queries(
             concept, NATIONAL, WEEK, [Provider.SEARCHAPI], topic_terms=("palabra larga de tema",)
         )
+
+
+# --- Modo «como en Google» (ADR-0109) ---
+
+JALISCO = place_for(facts(RegionLevel.STATE, "Jalisco"))
+ROBO_ABIERTO = ConceptDraft.validated(
+    name="Robo de vehículos",
+    description="Robos de autos, camionetas y motos",
+    keywords=("roban auto", "robo de vehículo"),
+    exclude_terms=("seguro de auto",),
+    color="#9B59B6",
+    query_mode=QueryMode.OPEN,
+)
+
+
+def test_abierto_manda_cada_frase_sola_y_sin_comillas_a_google_news_rss() -> None:
+    # Medido el 17/11/2026: «roban auto Jalisco» trajo 19 notas; el grupo de
+    # frases exactas de robo de vehículo, 5.
+    queries = build_queries(ROBO_ABIERTO, JALISCO, WEEK, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text for q in queries] == [
+        'roban auto Jalisco -"seguro de auto" when:7d',
+        'robo de vehículo Jalisco -"seguro de auto" when:7d',
+    ]
+    assert [q.keywords for q in queries] == [("roban auto",), ("robo de vehículo",)]
+
+
+def test_abierto_parte_por_dia_si_cabe_en_el_tope_de_frases() -> None:
+    window = DateWindow.between(date(2026, 11, 15), date(2026, 11, 16))
+
+    queries = build_queries(ROBO_ABIERTO, JALISCO, window, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text.split(" -")[0] for q in queries] == [
+        "roban auto Jalisco",
+        "roban auto Jalisco",
+        "robo de vehículo Jalisco",
+        "robo de vehículo Jalisco",
+    ]
+
+
+def test_abierto_con_doce_frases_nunca_las_junta_con_or() -> None:
+    # 12 frases x 3 días no caben: se manda cada frase con la ventana completa.
+    concept = ConceptDraft.validated(
+        name="Doce frases",
+        description="",
+        keywords=tuple(f"frase {i}" for i in range(OPEN_MAX_PHRASES)),
+        exclude_terms=(),
+        color="#000000",
+        query_mode=QueryMode.OPEN,
+    )
+    window = DateWindow.between(date(2026, 11, 14), date(2026, 11, 16))
+
+    queries = build_queries(concept, NATIONAL, window, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.keywords for q in queries] == [(k,) for k in concept.keywords]
+    assert all(" OR " not in q.text and '"' not in q.text for q in queries)
+
+
+def test_abierto_en_searchapi_junta_las_frases_exactas_para_no_gastar_creditos() -> None:
+    # Sin comillas, Google leería «(roban auto OR robo de vehículo)» como
+    # roban Y (auto O robo) Y de Y vehículo: al juntar frases se conservan.
+    [query] = build_queries(ROBO_ABIERTO, JALISCO, WEEK, [Provider.SEARCHAPI])
+
+    assert query.text == '("roban auto" OR "robo de vehículo") Jalisco -"seguro de auto"'
+
+
+def test_abierto_con_una_sola_frase_va_sin_comillas_en_todos_los_buscadores() -> None:
+    concept = ConceptDraft.validated(
+        name="Hackeos",
+        description="",
+        keywords=("bases de datos hackeadas",),
+        exclude_terms=(),
+        color="#000000",
+        query_mode=QueryMode.OPEN,
+    )
+
+    [query] = build_queries(concept, NATIONAL, WEEK, [Provider.SEARCHAPI])
+
+    assert query.text == "bases de datos hackeadas"
+
+
+def test_modo_exacto_no_cambia_en_google_news_rss() -> None:
+    exact = ConceptDraft.validated(
+        name="Robo de vehículos",
+        description="",
+        keywords=ROBO_ABIERTO.keywords,
+        exclude_terms=(),
+        color="#9B59B6",
+    )
+
+    queries = build_queries(exact, JALISCO, WEEK, [Provider.GOOGLE_NEWS_RSS])
+
+    assert [q.text for q in queries] == [
+        '"roban auto" Jalisco when:7d',
+        '"robo de vehículo" Jalisco when:7d',
+    ]

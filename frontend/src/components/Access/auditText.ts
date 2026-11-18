@@ -227,6 +227,16 @@ export function describeAudit(event: AuditEvent, people: readonly AuditPerson[])
     case 'case.entities_extracted':
     case 'entities.extract':
       return line(`${who} sacó entidades de una nota con IA`);
+    case 'concept.terms_suggested': {
+      // ADR-0109: la IA propuso frases; el concepto se guarda aparte (o no).
+      const asked = text(d.descripcion);
+      const phrases = Array.isArray(d.frases) ? `${String(d.frases.length)} frases` : null;
+      return line(
+        `${who} pidió a la IA las frases de un concepto${asked ? ` («${asked}»)` : ''}`,
+        text(d.error) ?? phrases,
+        text(d.error) !== null,
+      );
+    }
     default:
       break;
   }

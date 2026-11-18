@@ -105,7 +105,7 @@ class RelocateSearch:
                 resolutions = await self._geocoder.run(item.mentions, searched)
                 await self._store.save_locations(item.article_id, resolutions)
                 after = next((r.place for r in resolutions if r.is_primary), None)
-            inside = in_region(after, searched)
+            inside = in_region(after, searched, item.source_domain)
             await self._store.set_in_region(search_id, item.article_id, inside)
             relocations.append(Relocation(item.article_id, item.title, before, after, inside))
         await self._store.merge_progress(
@@ -192,7 +192,8 @@ class ReprocessSearch:
         if searched is None:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
         briefs = [
-            ConceptBrief(c.concept_id, c.name, c.description, c.keywords) for c in search.concepts
+            ConceptBrief(c.concept_id, c.name, c.description, c.keywords, c.query_mode)
+            for c in search.concepts
         ]
         before = {
             m.article_id: m.primary_code for m in await self._store.search_mentions(search_id)
@@ -224,7 +225,7 @@ class ReprocessSearch:
             resolutions = await self._geocoder.run(result.enrichment.locations, searched)
             await self._store.save_enrichment(item.article_id, result, resolutions)
             after = next((r.place for r in resolutions if r.is_primary), None)
-            inside = in_region(after, searched)
+            inside = in_region(after, searched, item.source_domain)
             await self._store.set_in_region(search_id, item.article_id, inside)
             code = before.get(item.article_id)
             old = await self._gazetteer.by_code(code) if code else None

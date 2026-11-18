@@ -432,11 +432,12 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 
 **Reglas:**
 - **Una consulta por proveedor y concepto.** Las palabras clave se unen con `OR`. Si se excede el límite de longitud del proveedor, se reparten en grupos. Excepción: Google News RSS trae a lo más 100 notas por consulta. Por eso se parte por palabra clave y, en ventanas de fechas fijas de hasta 3 días, por día, sin pasar de 4 consultas por concepto (ADR-0034).
+- **Modo «como en Google»** (`query_mode = open`, ADR-0109). Las palabras clave son frases cortas escritas como titular, con un máximo de 12. En Google News RSS cada frase va **sola y sin comillas**, nunca junto a otras con `OR`: `roban auto Jalisco when:7d`. Se parte por día si caben 12 consultas; si no, se manda una consulta por frase con la ventana completa. Los proveedores sin tope juntan las frases con `OR` y comillas, igual que en modo exacto, porque sin comillas Google leería mal el grupo. El lugar, la subdivisión y las exclusiones siempre van exactos. Los conceptos existentes quedan en `exact`; la API también usa `exact` si no se dice otra cosa.
 - **El nombre de la región se usa tal cual se escribe en medios.** Se usa `search_terms` de la región o, si está vacío, `name` (con acentos). Para CDMX: `("Ciudad de México" OR CDMX)`; para el estado 15, `("Estado de México" OR Edomex)`, nunca "México" solo. La lista curada vive en `geodata/search_terms.csv` (ADR-0009).
 - **Nombres repetidos.** Si un municipio comparte nombre con otro, la consulta exige también su estado (`"Benito Juárez" ("Quintana Roo")`). Las localidades siempre llevan su estado.
 - **Exclusiones** con signo menos en los tres proveedores. Las palabras no pueden contener comillas, paréntesis, dos puntos, guion inicial ni `OR`/`AND` sueltos.
 - **País seleccionado:** no se agrega lugar a la consulta; se usan los filtros de país e idioma del proveedor.
-- **Presupuesto:** máximo de consultas por búsqueda configurable (`MAX_QUERIES_PER_SEARCH`, por defecto 10). La UI muestra la estimación antes de ejecutar.
+- **Presupuesto:** dos topes por búsqueda, configurables. De pago: `MAX_QUERIES_PER_SEARCH`, por defecto 10, cuenta solo las consultas que cuestan créditos (SearchApi). Gratuitas: `MAX_FREE_QUERIES_PER_SEARCH`, por defecto 24, cuenta las que van a un buscador de afuera que no cobra (Google News RSS, GDELT, BrowserWork); el índice local no cuenta (ADR-0109). Si una búsqueda pasa cualquiera de los dos, se rechaza antes de enviar nada. La UI muestra la estimación antes de ejecutar.
 - **Caché:** una consulta idéntica (proveedor + texto + parámetros) dentro de `QUERY_CACHE_TTL_HOURS` (por defecto 6) no vuelve a gastar créditos. Google News RSS y el índice local no pasan por la caché: son gratis y la caché solo los volvía viejos (ADR-0034).
 - **"Probar concepto"** ejecuta `build_queries` sin llamar a ningún proveedor, y solo con los proveedores que recibiría una búsqueda real (los configurados): hoy SearchApi, el índice local y Google News RSS (ADR-0021).
 
@@ -508,7 +509,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ## 10. Enriquecimiento con LLM
 
 - **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
-- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigentes: `enrich_v2.md`, que agrega `municipality_hint` para colonias y calles, ADR-0020; `summary_v1.md` para el reporte; `entities_v1.md` para las entidades de un caso, §10.1). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
+- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigentes: `enrich_v5.md`, que juzga los conceptos «como en Google» contra lo que escribió el analista, ADR-0109; `summary_v1.md` para el reporte; `entities_v1.md` para las entidades de un caso, §10.1; `terms_v1.md` para proponer las frases de un concepto «como en Google», ADR-0109). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
 - **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; las corridas automáticas usan `AUTOMATIC_LLM_MAX_ARTICLES` (250, ADR-0031) y cubren solo lo publicado desde la corrida anterior (23:00–07:00, 07:00–15:00, 15:00–23:00); se registran tokens y costo estimado por búsqueda.
@@ -686,6 +687,7 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | GET | `/regions/search?q=izta` | Búsqueda difusa por nombre |
 | GET | `/regions/at?lon=&lat=&level=` | Región en un punto |
 | GET/POST/PATCH/DELETE | `/concepts` | CRUD (DELETE es borrado lógico si el concepto tiene búsquedas) |
+| POST | `/concepts/suggest` | La IA propone nombre, frases tipo titular y exclusiones a partir de lo que el analista escribió; no guarda el concepto, solo deja la propuesta en la bitácora (ADR-0109) |
 | POST | `/concepts/preview?region_id=&days=` | Lo mismo con un concepto sin guardar (en el cuerpo), para "Probar concepto" antes de guardar (H2) |
 | POST | `/concepts/{id}/preview?region_id=&days=` | Consultas que se generarían, sin gastar créditos |
 | POST | `/searches/estimate` | Estimación de consultas y créditos |
@@ -707,7 +709,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.1 Pantallas
 
 1. **Explorar** (principal): globo + panel de búsqueda + resultados.
-2. **Conceptos:** tabla + formulario + "Probar concepto".
+2. **Conceptos:** tabla + formulario + "Probar concepto". Un concepto nuevo se crea en dos pasos (ADR-0109): primero «¿Qué noticias quieres seguir?» en palabras del analista; después la IA propone nombre, frases y exclusiones, y el analista las revisa antes de guardar. También se pueden escribir a mano («Prefiero escribirlas yo»).
 3. **Historial:** búsquedas anteriores, reabrir y comparar.
 
 ### 14.2 Comportamiento del globo
@@ -752,11 +754,13 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.3 Panel de búsqueda
 
 - Región seleccionada.
-- Conceptos (chips multiselección, solo activos).
+- Conceptos (chips multiselección, solo activos). «+ Nuevo concepto» (junto a los conceptos en el diseño clásico, al pie de «¿Qué rastrear?» en el Centro de mando) abre el mismo formulario de dos pasos en una ventana y deja elegido el concepto al guardarlo (solo superusuarios).
 - Rango de fechas: hoy, 7 días, 30 días o personalizado.
 - Estimación ("3 consultas · ~1 crédito").
 - Botón **Buscar**.
 - Barra de progreso por etapas.
+
+**Lista de resultados.** Si las notas son de más de una categoría, van en secciones plegables por categoría con su color y conteo («Corrupción · 17»), de la que tiene más notas a la que tiene menos; «Sin clasificar» va al final (ADR-0109, D5). Elegir una nota en el globo abre su sección.
 
 ### 14.4 Tarjeta de noticia
 

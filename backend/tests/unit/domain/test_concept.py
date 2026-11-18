@@ -7,8 +7,10 @@ import pytest
 from app.domain.concept import (
     MAX_TERMS,
     NAME_MAX_LENGTH,
+    OPEN_MAX_PHRASES,
     ConceptChanges,
     ConceptDraft,
+    QueryMode,
 )
 from app.domain.errors import ConceptValidationError
 
@@ -148,3 +150,52 @@ def test_cambios_parciales_validan_el_resultado_completo() -> None:
     # La exclusión nueva choca con una palabra clave que no se tocó.
     with pytest.raises(ConceptValidationError, match="datos inválidos"):
         ConceptChanges(exclude_terms=("phishing",)).apply_to(draft())
+
+
+# --- Modo abierto (ADR-0109): frases tipo titular, una búsqueda por frase ---
+
+
+def test_sin_decir_el_modo_el_concepto_es_exacto() -> None:
+    # Los conceptos de antes (FGR, temas) no cambian de comportamiento.
+    assert draft().query_mode is QueryMode.EXACT
+
+
+def test_modo_abierto_se_guarda_en_el_borrador() -> None:
+    concept = draft(query_mode=QueryMode.OPEN, keywords=("roban auto", "filtran datos"))
+
+    assert concept.query_mode is QueryMode.OPEN
+    assert concept.keywords == ("roban auto", "filtran datos")
+
+
+def test_modo_abierto_admite_hasta_doce_frases() -> None:
+    phrases = tuple(f"frase {i}" for i in range(OPEN_MAX_PHRASES))
+
+    assert draft(query_mode=QueryMode.OPEN, keywords=phrases).keywords == phrases
+
+
+def test_modo_abierto_con_mas_de_doce_frases_es_error_claro() -> None:
+    phrases = tuple(f"frase {i}" for i in range(OPEN_MAX_PHRASES + 1))
+
+    found = problems(query_mode=QueryMode.OPEN, keywords=phrases)
+
+    assert [p["campo"] for p in found] == ["keywords"]
+    assert "cada frase es una búsqueda" in found[0]["mensaje"]
+
+
+def test_modo_exacto_sigue_admitiendo_mas_de_doce_palabras() -> None:
+    words = tuple(f"palabra{i}" for i in range(OPEN_MAX_PHRASES + 1))
+
+    assert draft(keywords=words).query_mode is QueryMode.EXACT
+
+
+def test_cambiar_el_modo_vuelve_a_validar_las_frases() -> None:
+    words = tuple(f"palabra{i}" for i in range(OPEN_MAX_PHRASES + 1))
+
+    with pytest.raises(ConceptValidationError, match="datos inválidos"):
+        ConceptChanges(query_mode=QueryMode.OPEN).apply_to(draft(keywords=words))
+
+
+def test_cambios_parciales_conservan_el_modo() -> None:
+    current = draft(query_mode=QueryMode.OPEN)
+
+    assert ConceptChanges(color="#000000").apply_to(current).query_mode is QueryMode.OPEN

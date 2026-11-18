@@ -70,3 +70,7 @@ class FakeConceptRepository:
 
     async def is_used_in_searches(self, concept_id: int) -> bool:
         return concept_id in self.used_in_searches
+
+    async def record_suggestion(self, audit: AuditEntry) -> None:
+        # 0: la propuesta todavía no es un concepto (igual que en Postgres).
+        self.audit.append((0, audit))

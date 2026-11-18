@@ -28,6 +28,8 @@ const TOPIC: Concept = {
   color: '#FF4D6D',
   is_active: true,
   category_id: 5,
+  query_mode: 'exact',
+  query_mode_label: 'frases exactas',
   created_by: 'semilla',
   created_at: '2026-11-02T18:00:00Z',
   updated_at: '2026-11-02T18:00:00Z',

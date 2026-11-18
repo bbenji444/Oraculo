@@ -8,6 +8,7 @@ import {
   fieldErrors,
   listConcepts,
   previewQueries,
+  suggestTerms,
   updateConcept,
 } from './concepts';
 import { ApiError } from './http';
@@ -21,6 +22,8 @@ const secuestro: Concept = {
   color: '#E74C3C',
   is_active: true,
   category_id: null,
+  query_mode: 'exact',
+  query_mode_label: 'frases exactas',
   created_by: 'semilla',
   created_at: '2026-10-16T18:00:00Z',
   updated_at: '2026-10-16T18:00:00Z',
@@ -32,6 +35,7 @@ const draft: ConceptInput = {
   exclude_terms: [],
   color: '#D35400',
   is_active: true,
+  query_mode: 'open',
 };
 
 function respondSequence(...bodies: { body: unknown; status?: number }[]) {
@@ -71,6 +75,46 @@ describe('listConcepts', () => {
     respondSequence({ body: { items: [{ id: 'x' }], next_cursor: null } });
 
     await expect(listConcepts()).rejects.toMatchObject({ code: 'bad_format' });
+  });
+
+  it('un servidor de antes del 17/11/2026 trae conceptos exactos', async () => {
+    const old: Record<string, unknown> = { ...secuestro };
+    delete old.query_mode;
+    delete old.query_mode_label;
+    respondSequence({ body: { items: [old], next_cursor: null } });
+
+    const [concept] = await listConcepts();
+
+    expect([concept?.query_mode, concept?.query_mode_label]).toEqual(['exact', 'frases exactas']);
+  });
+});
+
+describe('suggestTerms', () => {
+  it('pide la propuesta con lo que se escribió', async () => {
+    const proposal = {
+      name: 'Robo de vehículos',
+      keywords: ['roban autos'],
+      exclude_terms: [],
+      query_mode: 'open',
+      model: 'gpt-6-luna',
+      cost_usd: 0.0001,
+    };
+    const spy = respondSequence({ body: proposal });
+
+    const result = await suggestTerms('robo de autos en Jalisco');
+
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit];
+    expect([url, init.method]).toEqual(['/api/v1/concepts/suggest', 'POST']);
+    expect(JSON.parse(init.body as string)).toEqual({ description: 'robo de autos en Jalisco' });
+    expect(result).toEqual(proposal);
+  });
+
+  it('rechaza una respuesta con otra forma', async () => {
+    respondSequence({ body: { name: 'x' } });
+
+    await expect(suggestTerms('robo de autos en Jalisco')).rejects.toMatchObject({
+      code: 'bad_format',
+    });
   });
 });
 

@@ -9,7 +9,7 @@ import pytest
 from app.application.ports.search_store import NewSearch
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
 from app.application.use_cases.start_search import StartSearch
-from app.domain.budget import QueryBudgetExceededError
+from app.domain.budget import QueryBudgetExceededError, QueryCaps
 from app.domain.errors import (
     CreditLimitReachedError,
     LLMNotConfiguredError,
@@ -23,6 +23,9 @@ from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_regions import IZTAPALAPA, FakeRegionRepository
 
 pytestmark = pytest.mark.anyio
+
+# Los topes de .env por defecto: 10 de pago y 24 gratuitas (ADR-0109).
+CAPS = QueryCaps(10, 24)
 
 
 class Store(Searches):
@@ -44,7 +47,11 @@ class Queue:
 
 
 def starter(
-    *, configured: bool = True, providers: bool = True, used: int = 0, max_queries: int = 10
+    *,
+    configured: bool = True,
+    providers: bool = True,
+    used: int = 0,
+    caps: QueryCaps = CAPS,
 ) -> tuple[StartSearch, Store, Queue, SearchRequest]:
     repo = FakeConceptRepository()
     extorsion = repo.add(concept("Extorsión"))
@@ -64,7 +71,7 @@ def starter(
     )
     store, queue = Store(), Queue()
     request = SearchRequest("benji", (extorsion.id,), IZTAPALAPA.id, WEEK)
-    return StartSearch(planner, store, queue, max_queries), store, queue, request
+    return StartSearch(planner, store, queue, caps), store, queue, request
 
 
 async def test_crea_la_busqueda_y_la_encola() -> None:
@@ -87,7 +94,7 @@ async def test_crea_la_busqueda_y_la_encola() -> None:
     [
         ({"configured": False}, LLMNotConfiguredError),
         ({"providers": False}, ServiceUnavailableError),
-        ({"max_queries": 1}, QueryBudgetExceededError),
+        ({"caps": QueryCaps(0, 24)}, QueryBudgetExceededError),
         ({"used": 100}, CreditLimitReachedError),
     ],
 )

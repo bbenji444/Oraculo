@@ -52,6 +52,7 @@ from app.application.use_cases.search_reads import (
 from app.application.use_cases.start_search import StartSearch
 from app.application.use_cases.trash import DeleteSearch, RestoreSearch
 from app.domain.aggregates import AggregateLevel
+from app.domain.budget import QueryCaps
 
 router = APIRouter(prefix="/searches", tags=["búsquedas"], responses=ERROR_RESPONSES)
 
@@ -107,7 +108,7 @@ def get_start_search(
     """Caso de uso para lanzar búsquedas con las piezas compartidas.
 
     Args:
-        request: Petición actual (para ``MAX_QUERIES_PER_SEARCH``).
+        request: Petición actual (para los topes de consultas, ADR-0109).
         planner: Planeación.
         searches: Repositorio de búsquedas.
         queue: Cola del worker.
@@ -115,8 +116,8 @@ def get_start_search(
     Returns:
         El caso de uso.
     """
-    max_queries: int = request.app.state.max_queries_per_search
-    return StartSearch(planner, searches, queue, max_queries)
+    caps: QueryCaps = request.app.state.query_caps
+    return StartSearch(planner, searches, queue, caps)
 
 
 Starter = Annotated[StartSearch, Depends(get_start_search)]

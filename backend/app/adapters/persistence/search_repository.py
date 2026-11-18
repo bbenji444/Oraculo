@@ -61,6 +61,7 @@ from app.application.ports.search_store import (
     StoredText,
 )
 from app.domain.aggregates import NoteLocation
+from app.domain.concept import QueryMode
 from app.domain.dedupe import (
     GOOGLE_NEWS_HOST,
     NEAR_DUPLICATE_WINDOW,
@@ -156,8 +157,8 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO search_concepts (search_id, concept_id, concept_name, "
-                        "keywords, exclude_terms, topic_terms, category_ids) "
-                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats)"
+                        "keywords, exclude_terms, topic_terms, category_ids, query_mode) "
+                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats, :mode)"
                     ),
                     {
                         "s": search_id,
@@ -167,6 +168,7 @@ class PostgresSearchStore:
                         "ex": list(concept.exclude_terms),
                         "topic": list(concept.topic_terms),
                         "cats": list(concept.category_ids),
+                        "mode": concept.query_mode.value,
                     },
                 )
         return search_id
@@ -196,7 +198,7 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT sc.concept_id, sc.concept_name, c.description, sc.keywords, "
-                            "sc.exclude_terms, sc.topic_terms, sc.category_ids "
+                            "sc.exclude_terms, sc.topic_terms, sc.category_ids, sc.query_mode "
                             "FROM search_concepts sc "
                             "JOIN concepts c ON c.id = sc.concept_id "
                             "WHERE sc.search_id = :id ORDER BY sc.concept_id"
@@ -224,6 +226,7 @@ class PostgresSearchStore:
                     tuple(c["exclude_terms"]),
                     tuple(c["topic_terms"]),
                     tuple(c["category_ids"]),
+                    QueryMode(c["query_mode"]),
                 )
                 for c in concepts
             ),
@@ -874,7 +877,8 @@ class PostgresArticleStore:
                     await conn.execute(
                         text(
                             """
-                            SELECT a.id, a.title, al.mention_text, al.role, al.kind_hint,
+                            SELECT a.id, a.title, a.source_domain, al.mention_text, al.role,
+                                al.kind_hint,
                                 al.state_hint, al.municipality_hint,
                                 -- Filas anteriores a 0014: si se resolvió a otro país,
                                 -- ese país es la pista.
@@ -900,7 +904,7 @@ class PostgresArticleStore:
         grouped: dict[int, ArticleMentions] = {}
         for row in rows:
             current = grouped.get(row["id"]) or ArticleMentions(
-                row["id"], row["title"], (), row["primary_code"]
+                row["id"], row["title"], (), row["primary_code"], row["source_domain"]
             )
             if row["mention_text"] is not None:
                 mention = Mention(
@@ -948,15 +952,15 @@ class PostgresArticleStore:
             rows = (
                 await conn.execute(
                     text(
-                        "SELECT a.id, a.title, t.body, a.published_at FROM articles a "
-                        "JOIN article_texts t ON t.article_id = a.id "
+                        "SELECT a.id, a.title, t.body, a.published_at, a.source_domain "
+                        "FROM articles a JOIN article_texts t ON t.article_id = a.id "
                         "WHERE a.id IN (SELECT article_id FROM search_results "
                         "WHERE search_id = :s) ORDER BY a.id"
                     ),
                     {"s": search_id},
                 )
             ).all()
-        return [StoredText(r[0], r[1], r[2], r[3]) for r in rows]
+        return [StoredText(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
     async def add_llm_usage(
         self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor
