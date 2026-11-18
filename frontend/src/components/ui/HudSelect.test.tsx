@@ -129,4 +129,16 @@ describe('HudSelect', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('deja desplazar la lista con la rueda sin regresarla a la opción activa', () => {
+    // Bug (Benji, 18/11/2026): «no baja ni sube de manera fluida». Cada
+    // desplazamiento de la lista recolocaba el menú y eso la regresaba a la
+    // opción activa, peleando con la rueda del mouse.
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Estado' }));
+    const list = screen.getByRole('listbox');
+    list.scrollTop = 200;
+    fireEvent.scroll(list);
+    expect(list.scrollTop).toBe(200);
+  });
 });
