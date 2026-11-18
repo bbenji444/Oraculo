@@ -115,6 +115,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Los menús desplegables se deslizan con fluidez (18/11/2026).** Benji: «no baja ni sube de manera fluida». Al girar la rueda o deslizar el dedo, el menú se recolocaba y regresaba la lista a la opción marcada. Ahora solo se recoloca si se mueve la página o un panel, no la propia lista. Pasaba en todos los menús de la consola (Estado, Municipio, filtros).
+
 - **`make reubicar` ya no saca de «fuera» las notas de medios extranjeros (17/11/2026).** Al recalcular la región no pasaba el medio de la nota, como sí hace la búsqueda. En una búsqueda de país, una nota sin lugar de un medio `.cl` o `.ar` quedaba «sin ubicación» en vez de «fuera». Al volver a juzgar una búsqueda real, las notas fuera bajaron de 72 a 33.
 - **Los correos se reintentan hasta por 8 horas (13/11/2026).** El 12/11 Outlook (vía Composio) falló toda la tarde: a las 15:00 no llegó ningún correo y a las 23:00 faltaron 2. Antes los reintentos duraban 36 minutos (1, 5 y 30). Ahora hay 8 intentos a los 1, 5, 15, 30, 60, 120 y 240 minutos. Además, un 502 de Cloudflare se daba por perdido porque su texto decía «invalid»; las caídas del proveedor (500, 502, 503, 504) ahora siempre se reintentan.
 - **Un correo cortado a medias se reintenta solo (12/11/2026).** La VM se reinició a las 07:04 mientras mandaba la corrida de las 07:00, y el correo de Geovanni se quedó «enviando» para siempre. Ahora, una guía que lleva más de 15 minutos «enviando» cuenta como intento fallido y vuelve a la fila; si ya no le quedan intentos, queda «falló».

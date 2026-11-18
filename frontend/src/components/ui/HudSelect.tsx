@@ -112,12 +112,18 @@ export function HudSelect<T extends string | number>({
         }),
       );
     };
+    // Lo que se desplaza dentro de la propia lista no mueve el campo. Antes
+    // también recolocaba el menú, y eso regresaba la lista a la opción activa:
+    // la rueda del mouse «no bajaba ni subía de manera fluida» (18/11/2026).
+    const onScroll = (event: Event) => {
+      if (event.target !== listRef.current) reposition();
+    };
     reposition();
     // En captura: también cuando se desplaza un panel, no solo la página.
-    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', reposition);
     return () => {
-      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', reposition);
     };
   }, [open]);
