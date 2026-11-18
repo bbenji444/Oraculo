@@ -709,7 +709,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.1 Pantallas
 
 1. **Explorar** (principal): globo + panel de búsqueda + resultados.
-2. **Conceptos:** tabla + formulario + "Probar concepto". Un concepto nuevo se crea en dos pasos (ADR-0109): primero «¿Qué noticias quieres seguir?» en palabras del analista; después la IA propone nombre, frases y exclusiones, y el analista las revisa antes de guardar. También se pueden escribir a mano («Prefiero escribirlas yo»).
+2. **Conceptos:** tabla + formulario + "Probar concepto". El formulario es de una sola pantalla (ADR-0110): basta con escribir «¿Qué noticias quieres seguir?» en palabras del analista. «Proponer frases con la IA» llena nombre, frases y exclusiones para revisarlos; si se guarda sin frases o sin nombre, la IA los propone al guardar. Los nuevos se buscan «como en Google» (ADR-0109); los exactos que ya existían se editan sin cambiar de modo.
 3. **Historial:** búsquedas anteriores, reabrir y comparar.
 
 ### 14.2 Comportamiento del globo

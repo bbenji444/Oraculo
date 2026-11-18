@@ -53,7 +53,7 @@ Medición sin gastar créditos:
    - Las frases son de 2 o 3 palabras, porque al buscar se les agrega el lugar. Medido el 17/11/2026 con 4 temas reales, en 7 días de Google News RSS:
      - con frases de 2 a 4 palabras: 508 notas distintas, y 5 de 39 frases trajeron 0;
      - con frases de 2 o 3 palabras: 641 notas distintas, y 2 de 40 frases trajeron 0.
-   - El formulario va en dos pasos: «¿Qué noticias quieres seguir?» y luego las frases propuestas, ya editables. Se puede saltar la IA («Prefiero escribirlas yo»). Lo escrito en el primer paso queda como la descripción, que es contra lo que se juzga (D4).
+   - El formulario empieza con «¿Qué noticias quieres seguir?»; lo escrito queda como la descripción, que es contra lo que se juzga (D4). Se pasó a una sola pantalla y sin selector de modo en ADR-0110.
    - Se llega desde Conceptos y con «+ Nuevo concepto» en Explorar: junto a los conceptos en el diseño clásico, y al pie de «¿Qué rastrear?» en el Centro de mando. Abre el formulario en una ventana y deja elegido el concepto al guardarlo. Esc cierra solo esa ventana. En «¿Qué rastrear?» el concepto nuevo sale en «1 · ¿Relacionados con quién?», porque no es tema de un delito.
 4. **D4 — La IA juzga contra lo que se escribió:**
    - En los conceptos abiertos, la relevancia (prompt `enrich_v5`) se mide contra la descripción del analista. Las frases solo le sirven de pista.
