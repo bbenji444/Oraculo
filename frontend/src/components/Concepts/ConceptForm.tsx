@@ -23,6 +23,7 @@ import { QueryPreview } from './QueryPreview';
 import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
+import { Icon } from '../ui/Icon';
 
 interface ConceptFormProps {
   /** Concepto a editar; sin él, se crea uno nuevo. */
@@ -104,7 +105,7 @@ export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
               <DecodeText text={concept ? `Editar «${concept.name}»` : 'Nuevo concepto'} />
             </h2>
             <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
-              ×
+              <Icon name="close" className="text-lg" />
             </button>
           </div>
 
