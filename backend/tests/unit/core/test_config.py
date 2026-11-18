@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.config import Settings
+from app.domain.budget import QueryCaps
 
 BASE_ENV = {
     "POSTGRES_HOST": "db.local",
@@ -78,6 +79,8 @@ def test_la_llave_de_searchapi_es_opcional(env: pytest.MonkeyPatch) -> None:
     assert settings.searchapi_api_key is None
     assert settings.searchapi_monthly_credit_limit == 100
     assert settings.max_queries_per_search == 10
+    # ADR-0109: las gratuitas tienen su propio tope.
+    assert settings.query_caps == QueryCaps(paid=10, free=24)
 
 
 def test_la_llave_de_searchapi_no_aparece_al_imprimir(env: pytest.MonkeyPatch) -> None:

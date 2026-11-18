@@ -54,6 +54,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Dos topes de consultas por búsqueda (17/11/2026, ADR-0109).** Para que quepan los conceptos «como en Google», que mandan una consulta por frase.
+  - `MAX_QUERIES_PER_SEARCH` (10) ahora cuenta solo las consultas de pago (SearchApi).
+  - Nuevo `MAX_FREE_QUERIES_PER_SEARCH` (24): cuenta las gratuitas a buscadores de afuera (Google News RSS, GDELT, BrowserWork). Alcanza para dos conceptos «como en Google».
+  - El índice local ya no cuenta para ningún tope. La corrida FGR y los envíos no cambian.
+
 - **Letras de Oráculo, a prueba (17/11/2026, ADR-0037).** Benji: «regresar a Orbitron… simplemente para que veamos». Primer paso para que el monitor se vea como Oráculo core, que lo abre desde su Hub como «Noticias Intelligence».
   - Títulos, botones, etiquetas y cifras en **Orbitron**, y el texto en **Roboto**, como en Oráculo. Antes eran Exo 2 e Inter.
   - Va en un commit propio para regresar con `git revert` si no gusta.

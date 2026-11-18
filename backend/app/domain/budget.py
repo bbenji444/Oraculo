@@ -1,9 +1,17 @@
 """Presupuesto de una búsqueda: cuántas consultas y cuántos créditos (§7.2).
 
-Dos topes, ambos para no gastar de más por error:
+Tres topes, todos para no gastar ni saturar a nadie por error:
 
-- **Por búsqueda:** ``MAX_QUERIES_PER_SEARCH`` consultas (10 por defecto).
-  Si una búsqueda planea más, se rechaza completa **antes** de enviar nada.
+- **Consultas de pago por búsqueda:** ``MAX_QUERIES_PER_SEARCH`` (10 por
+  defecto). Cuenta solo las que cuestan créditos (SearchApi).
+- **Consultas gratuitas por búsqueda:** ``MAX_FREE_QUERIES_PER_SEARCH`` (24
+  por defecto, ADR-0109). Cuenta las que van a un buscador de afuera que no
+  cobra (Google News RSS, GDELT, BrowserWork): no cuestan, pero si se les
+  pide mucho seguido frenan las peticiones. El índice local no cuenta: es
+  nuestra base.
+
+  Si una búsqueda pasa cualquiera de los dos, se rechaza completa **antes**
+  de enviar nada.
 - **Por mes:** ``SEARCHAPI_MONTHLY_CREDIT_LIMIT`` créditos de SearchApi. El
   mes es el calendario de la Ciudad de México. Si una consulta haría pasar
   el tope, esa consulta se salta (los proveedores gratuitos siguen).
@@ -11,10 +19,13 @@ Dos topes, ambos para no gastar de más por error:
 No hace: no consulta la base; recibe los créditos ya gastados.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 
 from app.domain.errors import InvalidRequestError
+from app.domain.queries import Provider
+from app.domain.query_dialects import DIALECTS, FREE
 
 
 class QueryBudgetExceededError(InvalidRequestError):
@@ -23,22 +34,50 @@ class QueryBudgetExceededError(InvalidRequestError):
     code = "query_budget_exceeded"
 
 
-def check_query_count(planned: int, maximum: int) -> None:
+@dataclass(frozen=True, slots=True)
+class QueryCaps:
+    """Topes de consultas de una búsqueda (``.env``).
+
+    Attributes:
+        paid: ``MAX_QUERIES_PER_SEARCH``: consultas que cuestan créditos.
+        free: ``MAX_FREE_QUERIES_PER_SEARCH``: consultas gratuitas a
+            buscadores de afuera.
+    """
+
+    paid: int
+    free: int
+
+
+def check_query_count(providers: Sequence[Provider], caps: QueryCaps) -> None:
     """Rechaza una búsqueda que planea demasiadas consultas.
 
     Args:
-        planned: Consultas que se enviarían.
-        maximum: Máximo permitido por búsqueda.
+        providers: El proveedor de cada consulta que se enviaría.
+        caps: Topes por búsqueda.
 
     Raises:
-        QueryBudgetExceededError: Si ``planned`` pasa del máximo, con un
-            mensaje que sugiere cómo reducirla.
+        QueryBudgetExceededError: Si las de pago o las gratuitas pasan su
+            tope, con un mensaje que sugiere cómo reducirla.
+
+    Example:
+        >>> check_query_count([Provider.GOOGLE_NEWS_RSS] * 25, QueryCaps(10, 24))
+        QueryBudgetExceededError: ...25 consultas a buscadores gratuitos...
     """
-    if planned > maximum:
+    dialects = [DIALECTS[p] for p in providers]
+    paid = sum(1 for d in dialects if d.credits_per_query > FREE)
+    free = sum(1 for d in dialects if d.credits_per_query == FREE and d.external)
+    if paid > caps.paid:
         raise QueryBudgetExceededError(
-            f"La búsqueda generaría {planned} consultas y el máximo es {maximum}. "
+            f"La búsqueda generaría {paid} consultas de pago y el máximo es {caps.paid}. "
             "Elige menos conceptos o conceptos con menos palabras clave.",
-            {"consultas": planned, "maximo": maximum},
+            {"consultas": paid, "maximo": caps.paid, "tipo": "pago"},
+        )
+    if free > caps.free:
+        raise QueryBudgetExceededError(
+            f"La búsqueda generaría {free} consultas a buscadores gratuitos y el máximo "
+            f"es {caps.free}. Elige menos conceptos o quita frases a los conceptos "
+            "«como en Google»: cada frase es una consulta.",
+            {"consultas": free, "maximo": caps.free, "tipo": "gratuitas"},
         )
 
 

@@ -38,6 +38,7 @@ from app.application.use_cases.run_search import (
     strict_window,
 )
 from app.domain.articles import RawArticle
+from app.domain.budget import QueryCaps
 from app.domain.concept import QueryMode
 from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import ConceptJudgement, Enrichment, LLMUsage
@@ -306,7 +307,7 @@ def pipeline(
         providers,
         FakeCache(),
         FakeLog(),
-        ExecutionLimits(10, 0, {Provider.SEARCHAPI: 100}),
+        ExecutionLimits(QueryCaps(10, 24), 0, {Provider.SEARCHAPI: 100}),
     )
     use_case = RunSearch(
         searches=searches,

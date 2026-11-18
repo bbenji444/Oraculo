@@ -16,6 +16,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
+from app.domain.budget import QueryCaps
 from app.domain.schedule import parse_run_hours
 from app.domain.sources import parse_sources
 
@@ -71,8 +72,13 @@ _DEFAULT_GDELT_MIN_INTERVAL_SECONDS = 5.0
 # - GDELT: tras un 429, esperar al menos 15 s antes de reintentar. Medido el
 #   16/10/2026: reintentos a 1-5 s recibían 429 de nuevo (plan aprobado).
 _DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS = 15.0
-# - Especificación §7.2: máximo 10 consultas por búsqueda; caché de 6 h.
+# - Especificación §7.2: máximo 10 consultas de pago por búsqueda; caché de 6 h.
 _DEFAULT_MAX_QUERIES_PER_SEARCH = 10
+# - ADR-0109: las consultas gratuitas a buscadores de afuera tienen su propio
+#   tope. 24 alcanzan para dos conceptos «como en Google» (12 frases cada uno)
+#   en Google News RSS, que frenó con 429 tras ~90 consultas seguidas
+#   (medido el 17/11/2026).
+_DEFAULT_MAX_FREE_QUERIES_PER_SEARCH = 24
 # - Plan de fases §9.5 (rendimiento del muro): 150 nodos visibles; la 9.1
 #   midió que hasta ahí el muro cuesta de 0.5 a 2 ms de GPU por cuadro.
 _DEFAULT_CASE_MAX_VISIBLE_NODES = 150
@@ -218,6 +224,7 @@ class Settings(BaseSettings):
         default=_DEFAULT_GDELT_RATE_LIMIT_WAIT_SECONDS, ge=0
     )
     max_queries_per_search: int = Field(default=_DEFAULT_MAX_QUERIES_PER_SEARCH, ge=1)
+    max_free_queries_per_search: int = Field(default=_DEFAULT_MAX_FREE_QUERIES_PER_SEARCH, ge=1)
     case_max_visible_nodes: int = Field(default=_DEFAULT_CASE_MAX_VISIBLE_NODES, ge=1)
     query_cache_ttl_hours: float = Field(default=_DEFAULT_QUERY_CACHE_TTL_HOURS, ge=0)
     searchapi_monthly_credit_limit: int = Field(default=_DEFAULT_SEARCHAPI_MONTHLY_LIMIT, ge=0)
@@ -340,6 +347,15 @@ class Settings(BaseSettings):
             )
             raise ValueError(msg)
         return self
+
+    @property
+    def query_caps(self) -> QueryCaps:
+        """Los dos topes de consultas por búsqueda: de pago y gratuitas (ADR-0109).
+
+        Returns:
+            ``MAX_QUERIES_PER_SEARCH`` y ``MAX_FREE_QUERIES_PER_SEARCH``.
+        """
+        return QueryCaps(self.max_queries_per_search, self.max_free_queries_per_search)
 
     def database_url(self, *, test: bool = False) -> URL:
         """Construye la URL de conexión de SQLAlchemy con el driver psycopg 3.

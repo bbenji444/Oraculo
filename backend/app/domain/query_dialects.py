@@ -47,7 +47,8 @@ FREE = 0
 # 27/10/2026 con la ventana de dos días de la corrida FGR: «("Fiscalía General
 # de la República" OR FGR)» llegó justo a 100; partida por palabra clave y por
 # día fueron 4 consultas (100 + 100 + 68 + 53) con 281 notas distintas. Con 4,
-# un concepto y los otros 5 proveedores caben en MAX_QUERIES_PER_SEARCH (10).
+# un concepto y los otros 5 proveedores cabían en el tope de 10 consultas, que
+# entonces contaba todas; desde ADR-0109 las gratuitas tienen el suyo (24).
 RSS_MAX_QUERIES_PER_CONCEPT = 4
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
@@ -222,6 +223,9 @@ class QueryDialect:
             (``None``: las palabras van juntas con OR, ver ``query_builder``).
         writer: Escritura propia del texto completo, en lugar del texto
             base más ``suffix`` (la usa el índice local).
+        external: Si es un buscador de afuera. Los gratuitos de afuera
+            cuentan para ``MAX_FREE_QUERIES_PER_SEARCH``; el índice local es
+            nuestra base y no cuenta (ADR-0109).
     """
 
     provider: Provider
@@ -235,6 +239,7 @@ class QueryDialect:
     writer: (
         Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow, Sequence[str]], str] | None
     ) = None
+    external: bool = True
 
     def render(  # noqa: PLR0913 — las partes de una consulta, más «exact» solo por nombre (*)
         self,
@@ -333,5 +338,6 @@ DIALECTS: dict[Provider, QueryDialect] = {
         _no_suffix,
         cacheable=False,
         writer=local_index_text,
+        external=False,
     ),
 }

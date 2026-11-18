@@ -297,7 +297,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.category_store = PostgresCategoryStore(engine)
         app.state.article_store = PostgresArticleStore(engine)
         app.state.search_queue = CelerySearchQueue(celery_app)
-        app.state.max_queries_per_search = settings.max_queries_per_search
+        app.state.query_caps = settings.query_caps
         # Reportes (F7, ADR-0018): resumen ejecutivo, mapa estático y archivos.
         report_store = PostgresReportStore(engine)
         summarizer = _summarizer(settings)

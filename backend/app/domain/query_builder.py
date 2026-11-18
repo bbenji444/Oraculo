@@ -23,8 +23,8 @@ segundo grupo con las palabras del tema, que también deben aparecer. Si ese
 grupo no cabe en el límite del proveedor, se parte en varios y cada parte
 lleva sus propias consultas.
 
-No hace: no aplica el presupuesto por búsqueda (``MAX_QUERIES_PER_SEARCH``)
-ni la caché; eso es de la búsqueda completa (F3/F4).
+No hace: no aplica los topes por búsqueda (``MAX_QUERIES_PER_SEARCH`` y
+``MAX_FREE_QUERIES_PER_SEARCH``) ni la caché; eso es de la búsqueda completa (F3/F4).
 """
 
 from collections.abc import Sequence
@@ -43,7 +43,8 @@ from app.domain.queries import (
 from app.domain.query_dialects import DIALECTS, QueryDialect
 
 # Ventanas de fechas fijas de hasta tantos días se parten por día. Con más, las
-# consultas no cabrían en el máximo por búsqueda (MAX_QUERIES_PER_SEARCH = 10).
+# consultas no cabrían en el tope por búsqueda (se eligió con el de 10, que
+# contaba todas; desde ADR-0109 las gratuitas tienen su tope de 24).
 SPLIT_MAX_DAYS = 3
 
 

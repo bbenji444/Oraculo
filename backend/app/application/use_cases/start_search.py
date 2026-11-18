@@ -4,7 +4,8 @@ Lo usa ``POST /searches``. Antes de crear nada revisa que se pueda correr:
 
 - que la IA elegida tenga su llave (si no, ``503 llm_not_configured``);
 - que haya al menos un proveedor disponible;
-- que no pase el máximo de consultas por búsqueda (``MAX_QUERIES_PER_SEARCH``);
+- que no pase los topes de consultas por búsqueda: de pago
+  (``MAX_QUERIES_PER_SEARCH``) y gratuitas (``MAX_FREE_QUERIES_PER_SEARCH``);
 - que no haga pasar el tope mensual de créditos (``409 credit_limit_reached``).
 
 Si algo falla no se crea la búsqueda ni se gasta nada.
@@ -18,7 +19,7 @@ from uuid import UUID
 from app.application.ports.search_queue import SearchQueuePort
 from app.application.ports.search_store import SearchStorePort
 from app.application.use_cases.plan_search import PlanSearch, SearchEstimate, SearchRequest
-from app.domain.budget import check_query_count
+from app.domain.budget import QueryCaps, check_query_count
 from app.domain.errors import (
     CreditLimitReachedError,
     LLMNotConfiguredError,
@@ -47,7 +48,7 @@ class StartSearch:
         planner: PlanSearch,
         searches: SearchStorePort,
         queue: SearchQueuePort,
-        max_queries: int,
+        query_caps: QueryCaps,
     ) -> None:
         """Recibe las piezas.
 
@@ -55,12 +56,12 @@ class StartSearch:
             planner: Planeación y costo.
             searches: Búsquedas guardadas.
             queue: Cola del worker.
-            max_queries: ``MAX_QUERIES_PER_SEARCH``.
+            query_caps: Topes de consultas por búsqueda (de pago y gratuitas).
         """
         self._planner = planner
         self._searches = searches
         self._queue = queue
-        self._max_queries = max_queries
+        self._query_caps = query_caps
 
     async def execute(self, request: SearchRequest) -> StartedSearch:
         """Lanza la búsqueda.
@@ -88,7 +89,7 @@ class StartSearch:
             )
         if not estimate.queries:
             raise ServiceUnavailableError("No hay ningún proveedor de noticias disponible.")
-        check_query_count(len(estimate.queries), self._max_queries)
+        check_query_count([q.provider for q in estimate.queries], self._query_caps)
         if estimate.over_limit:
             raise CreditLimitReachedError(
                 "Esta búsqueda pasaría el tope mensual de créditos de SearchApi.",

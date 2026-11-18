@@ -35,6 +35,7 @@ from app.application.use_cases.run_search import PipelineLimits, RunSearch
 from app.cli import buscar, reubicar
 from app.core.config import Settings
 from app.domain.authority import Authority
+from app.domain.budget import QueryCaps
 from app.domain.concept import QueryMode
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
@@ -156,7 +157,10 @@ def run_search(
         gazetteer=gazetteer,
         providers=providers,
         executor=ExecuteQueries(
-            providers, FakeCache(), FakeLog(), ExecutionLimits(10, 0, {Provider.SEARCHAPI: 100})
+            providers,
+            FakeCache(),
+            FakeLog(),
+            ExecutionLimits(QueryCaps(10, 24), 0, {Provider.SEARCHAPI: 100}),
         ),
         extractor=ExtractTexts(Extractor({IZTA_SEARCHAPI.url: IZTA_BODY}), 2),
         llm=llm,
