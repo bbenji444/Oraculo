@@ -368,12 +368,15 @@ class ArticleMentions:
             a la migración 0014 solo traen texto, papel y, si era otro
             país, el país).
         primary_code: Clave de la ubicación principal actual, si tiene.
+        source_domain: Dominio del medio: sin lugar, un medio de otro país
+            cuenta como fuera en una búsqueda de país (``in_region``).
     """
 
     article_id: int
     title: str
     mentions: tuple[Mention, ...]
     primary_code: str | None
+    source_domain: str | None = None
 
 
 class RelocationStorePort(Protocol):
@@ -428,12 +431,14 @@ class StoredText:
         title: Título.
         text: Texto que se procesó (cuerpo o título + fragmento).
         published_at: Fecha de publicación, si se conoce.
+        source_domain: Dominio del medio (ver ``ArticleMentions``).
     """
 
     article_id: int
     title: str
     text: str
     published_at: datetime | None
+    source_domain: str | None = None
 
 
 class ReprocessStorePort(RelocationStorePort, Protocol):

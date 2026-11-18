@@ -877,7 +877,8 @@ class PostgresArticleStore:
                     await conn.execute(
                         text(
                             """
-                            SELECT a.id, a.title, al.mention_text, al.role, al.kind_hint,
+                            SELECT a.id, a.title, a.source_domain, al.mention_text, al.role,
+                                al.kind_hint,
                                 al.state_hint, al.municipality_hint,
                                 -- Filas anteriores a 0014: si se resolvió a otro país,
                                 -- ese país es la pista.
@@ -903,7 +904,7 @@ class PostgresArticleStore:
         grouped: dict[int, ArticleMentions] = {}
         for row in rows:
             current = grouped.get(row["id"]) or ArticleMentions(
-                row["id"], row["title"], (), row["primary_code"]
+                row["id"], row["title"], (), row["primary_code"], row["source_domain"]
             )
             if row["mention_text"] is not None:
                 mention = Mention(
@@ -951,15 +952,15 @@ class PostgresArticleStore:
             rows = (
                 await conn.execute(
                     text(
-                        "SELECT a.id, a.title, t.body, a.published_at FROM articles a "
-                        "JOIN article_texts t ON t.article_id = a.id "
+                        "SELECT a.id, a.title, t.body, a.published_at, a.source_domain "
+                        "FROM articles a JOIN article_texts t ON t.article_id = a.id "
                         "WHERE a.id IN (SELECT article_id FROM search_results "
                         "WHERE search_id = :s) ORDER BY a.id"
                     ),
                     {"s": search_id},
                 )
             ).all()
-        return [StoredText(r[0], r[1], r[2], r[3]) for r in rows]
+        return [StoredText(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
     async def add_llm_usage(
         self, search_id: UUID, usage: LLMUsage, cost_usd: float, actor: Actor

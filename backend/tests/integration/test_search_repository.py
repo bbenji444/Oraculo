@@ -463,6 +463,8 @@ async def test_las_pistas_se_guardan_y_se_reubica_sin_la_ia(
     izta = saved[IZTA_SEARCHAPI.title]
     assert izta.mentions == (IZTA_MENTION,)
     assert izta.primary_code == "09007"
+    # Para decidir «fuera» sin lugar en una búsqueda de país (in_region).
+    assert izta.source_domain == "milenio.com"
     assert saved[MADRID.title].mentions[0].country == "Francia"
     # Una ubicación vieja equivocada (antes de corregir el catálogo).
     async with test_engine.begin() as conn:
