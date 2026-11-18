@@ -1,9 +1,8 @@
-/** Cálculos de las animaciones: contador, descifrado, mini gráfica y luz del mouse. */
+/** Cálculos de las animaciones: contador, descifrado y mini gráfica. */
 import { describe, expect, it } from 'vitest';
 
 import { countAt, DECODE_GLYPHS, decodeAt, easeOutExpo } from './motion';
 import { sparklinePoints } from './sparkline';
-import { pointIn } from './spotlight';
 
 describe('easeOutExpo', () => {
   it('empieza en 0, termina en 1 y no se sale de ese rango', () => {
@@ -68,11 +67,5 @@ describe('sparklinePoints', () => {
 
   it('sin valores no hay puntos', () => {
     expect(sparklinePoints([], 100, 20)).toEqual([]);
-  });
-});
-
-describe('pointIn', () => {
-  it('da la posición del mouse dentro del elemento', () => {
-    expect(pointIn({ left: 100, top: 40 }, 160, 95)).toEqual({ x: 60, y: 55 });
   });
 });

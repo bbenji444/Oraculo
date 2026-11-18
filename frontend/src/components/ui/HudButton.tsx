@@ -1,13 +1,14 @@
 /**
  * Botón de la consola táctica (27/10/2026, styles/hud.css).
  *
- * Al pasar el mouse: se eleva, brilla, el texto se abre un poco y una franja
- * de luz lo cruza. Al presionar: se hunde y sale una onda desde el punto del
- * clic. Variantes:
+ * Tiene la forma del botón de Oráculo core (ADR-0108): tinte cian sin borde y
+ * rótulo de consola; al pasar el mouse y al presionar, el tinte sube.
+ * Variantes:
  * - `outline` (por defecto): la mayoría de las acciones;
- * - `solid`: la acción principal de la pantalla (Buscar, Crear caso);
- * - `ghost`: secundarias (Ocultar, Cancelar);
- * - `danger`: eliminar.
+ * - `solid`: la acción principal de la pantalla (Buscar, Crear caso), con el
+ *   tinte más alto;
+ * - `ghost`: secundarias (Ocultar, Cancelar), en gris;
+ * - `danger`: eliminar, en rojo.
  *
  * No hace: no decide qué pasa al hacer clic.
  */
@@ -19,7 +20,7 @@ interface HudButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: HudButtonVariant;
   size?: 'md' | 'sm';
-  /** Ícono al final (una flecha, por ejemplo): se adelanta al pasar el mouse. */
+  /** Ícono al final (una flecha, por ejemplo). */
   icon?: ReactNode;
 }
 

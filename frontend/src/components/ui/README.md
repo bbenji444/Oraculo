@@ -1,21 +1,21 @@
 # Piezas de la «consola táctica» (`components/ui`)
 
-Son las piezas visuales que comparten todas las pantallas del monitor. Los estilos están en `src/styles/hud.css` y la luz que sigue al mouse en `src/ui/spotlight.ts`. La muestra de todas está en `http://localhost:8080/?diseno#/diseno`.
+Son las piezas visuales que comparten todas las pantallas del monitor. Los estilos están en `src/styles/hud.css` y tienen la forma de la «consola HUD» de Oráculo core (ADR-0108). La muestra de todas está en `http://localhost:8080/?diseno#/diseno`.
 
 | Pieza            | Para qué                                                                | Qué hace al pasar el mouse                                                     |
 | ---------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `HudPanel`       | Toda caja: tarjetas, paneles, fichas                                    | Halo y borde de luz donde está el cursor; con `interactive`, se eleva          |
-| `HudButton`      | Todas las acciones (`solid` la principal, `outline`, `ghost`, `danger`) | Brilla, una franja de luz lo cruza, el texto se abre; al hacer clic, una onda  |
-| `HudChip`        | Estados y etiquetas (abierto, reservado, categoría)                     | Se enciende; con `live`, su punto late como radar                              |
-| `HudSegmented`   | Elegir una opción de pocas (Hoy · 7 días · 30 días)                     | Una pastilla de luz se desliza a la elegida                                    |
+| `HudPanel`       | Toda caja: tarjetas, paneles, fichas                                    | Con `interactive`, su borde se enciende                                        |
+| `HudButton`      | Todas las acciones (`solid` la principal, `outline`, `ghost`, `danger`) | Sube el tinte                                                                  |
+| `HudChip`        | Estados y etiquetas (abierto, reservado, categoría)                     | Nada; con `live`, su punto late como radar                                     |
+| `HudSegmented`   | Elegir una opción de pocas (Hoy · 7 días · 30 días)                     | Un tinte se desliza a la elegida                                               |
 | `HudSelect`      | Todos los menús desplegables (en lugar de `<select>`)                   | La lista se despliega, la opción activa se ilumina y la elegida lleva palomita |
 | `HudDatePicker`  | Fechas (en lugar de `<input type="date">`)                              | Los días se iluminan; el elegido brilla y el mes cambia deslizándose           |
-| `HudSwitch`      | Encender o apagar (fuentes)                                             | El punto viaja y se enciende                                                   |
+| `HudSwitch`      | Encender o apagar (fuentes)                                             | La perilla viaja y se enciende en cian                                         |
 | `HudTabs`        | Pestañas del encabezado                                                 | Una barra de luz sigue al mouse; los nombres se descifran                      |
 | `CountUp`        | Cifras                                                                  | Corren hasta su valor al aparecer o cambiar                                    |
 | `DecodeText`     | Títulos                                                                 | Se descifran letra por letra                                                   |
 | `Sparkline`      | Tendencia junto a una cifra                                             | Se dibuja de izquierda a derecha                                               |
-| `SectionHeading` | Encabezado de cada pantalla                                             | Línea que se dibuja y título que se descifra                                   |
+| `SectionHeading` | Encabezado de cada pantalla                                             | El título se descifra al aparecer                                              |
 | `Heartbeat`      | Latido de un servicio (Estado del sistema)                              | Un pulso de luz recorre la línea; plana y roja si falla                        |
 
 **Reglas:**

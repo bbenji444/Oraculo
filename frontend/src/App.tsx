@@ -37,7 +37,6 @@ import { useAppConfig } from './hooks/useAppConfig';
 import { useMe } from './hooks/useAuth';
 import type { Me, Section } from './services/auth';
 import { safeOraculoUrl } from './services/appConfig';
-import { installSpotlight } from './ui/spotlight';
 
 type Tab = Section | 'laboratorio' | 'diseno';
 
@@ -175,9 +174,6 @@ function Monitor({ me }: { me: Me }) {
   // (26/10/2026). Oculta, el globo deja de girar y no dibuja.
   const [exploreVisited, setExploreVisited] = useState(tab === 'explorar');
   if (tab === 'explorar' && !exploreVisited) setExploreVisited(true);
-
-  // La luz que sigue al mouse en paneles y botones (styles/hud.css).
-  useEffect(() => installSpotlight(), []);
 
   useEffect(() => {
     const onHashChange = () => {

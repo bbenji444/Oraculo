@@ -53,6 +53,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 - **El monitor se ve como Oráculo core (17/11/2026, ADR-0108).** Benji eligió el nivel medio: que al entrar desde el Hub no se note el brinco, con las mismas secciones de siempre. Cada paso va en su propio commit.
   - **Colores y esquinas:** verde, ámbar y rojo con los tonos exactos de Oráculo (`#00ff9d`, `#ffb020` y `#ff3333`) en todo el monitor. Las esquinas redondeadas pasan a casi rectas (4px).
   - **Paneles:** como las tarjetas de Oráculo, con dos corchetes (arriba a la izquierda y abajo a la derecha) en lugar de cuatro marcas, y su superficie de consola. Ya no hay luz que siga al mouse en los paneles ni se elevan al pasar encima. La barra «Consulta activa» es una píldora, como el dock de Oráculo.
+  - **Botones, etiquetas, campos y títulos:** con los tamaños y colores exactos de Oráculo.
+    - Botones: tinte cian sin borde; al pasar el mouse solo sube el tinte. Sin franja de luz ni onda al hacer clic. Los de cancelar van en gris y los de borrar en rojo.
+    - Etiquetas de estado: píldoras del color de su estado.
+    - Campos: fondo oscuro, borde cian y brillo al escribir.
+    - Interruptores, selector de opciones y pestañas como los de Oráculo.
+    - Títulos de pantalla en cian con su brillo. Las pestañas ya no son letreros de neón.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;

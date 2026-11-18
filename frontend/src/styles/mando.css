@@ -209,8 +209,8 @@
 
 /* --- Botón de lanzar ----------------------------------------------------------- */
 
-/* El botón va dentro de un marco: .hud-btn recorta lo que se sale (su
-   destello), y el aro y la onda tienen que verse por fuera. */
+/* El botón va dentro de un marco para que el aro y la onda se vean por
+   fuera. */
 .mando-launch-wrap {
   position: relative;
   isolation: isolate;
@@ -219,13 +219,21 @@
   position: relative;
   z-index: 1;
   min-width: 10.5rem;
+  /* El aro gira detrás del botón, y el tinte de Oráculo es translúcido: va
+     sobre el fondo de Oráculo (--jarvis-bg) para que el aro solo asome por la
+     orilla. */
+  background: linear-gradient(rgb(0 210 255 / 0.18) 0 0), #050505;
+}
+.mando-launch-wrap > .hud-btn:is(:hover, :active):not(:disabled) {
+  background: linear-gradient(rgb(0 210 255 / 0.28) 0 0), #050505;
 }
 /* Aro de carga: gira alrededor del botón al pasar el mouse. */
 .mando-launch-ring {
   position: absolute;
   inset: -2px;
   overflow: hidden;
-  border-radius: 12px;
+  /* Las esquinas del botón (4 px) más los 2 px que sobresale. */
+  border-radius: 6px;
   background: conic-gradient(from 0deg, transparent 0 60%, var(--hud-cyan) 78%, transparent 92%);
   opacity: 0;
   transition: opacity 0.4s var(--hud-ease);
@@ -1035,7 +1043,7 @@
 /* Pestaña en el borde para volver a abrir el expediente. */
 .mando-edge-tab {
   writing-mode: vertical-rl;
-  border-radius: 12px 0 0 12px;
+  border-radius: 4px 0 0 4px;
   border-right: 0;
 }
 
