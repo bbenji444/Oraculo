@@ -2,8 +2,9 @@
  * Búsqueda rápida «como en el buscador de Google» (ADR-0110).
  *
  * La persona escribe lo que busca y presiona Enter: la IA propone las frases
- * y se busca con la región, las fechas y las fuentes de la consulta (México
- * si no eligió región), sin guardar un concepto. Los resultados se ven como
+ * y se busca con las fechas y las fuentes de la consulta, sin guardar un
+ * concepto. Si el texto nombra un lugar («en Jalisco»), se busca ahí y queda
+ * elegido en «Dónde»; si no, en la región de la consulta (México si no eligió). Los resultados se ven como
  * los de cualquier búsqueda; `KeepQuickSearch` ofrece guardarla después.
  *
  * Lo usan la consola del Centro de mando y el panel del diseño clásico.
@@ -35,10 +36,13 @@ export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
   const regionId = useExplorerStore((s) => s.regionId);
   const range = useExplorerStore((s) => s.range);
   const openSearch = useExplorerStore((s) => s.openSearch);
+  const selectRegion = useExplorerStore((s) => s.selectRegion);
   const remember = useQuickSearchStore((s) => s.remember);
   const mexico = useRegionsByLevel('country').data?.find((r) => r.code === MEXICO_CODE);
-  const start = useStartQuickSearch((started) => {
+  const start = useStartQuickSearch(({ placeRegionId, ...started }) => {
     remember({ ...started, text: text.trim() });
+    // Se buscó en el lugar que nombró el texto: el mapa y «Dónde» lo muestran.
+    if (placeRegionId !== null) selectRegion(placeRegionId);
     openSearch(started.searchId);
   });
   const id = useId();
@@ -89,7 +93,8 @@ export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
       ) : (
         <p className="mt-1 text-[11px] text-slate-500">
           Sin guardar un concepto: la IA arma las búsquedas y descarta las notas que no tratan de lo
-          que escribiste. Usa el lugar y las fechas de abajo{regionId === null ? ' (México)' : ''}.
+          que escribiste. Si escribes un lugar («en Jalisco») se busca ahí; si no, en el de abajo
+          {regionId === null ? ' (México)' : ''}. Las fechas son las de abajo.
         </p>
       )}
     </form>

@@ -29,16 +29,18 @@ const STARTED = {
   estimate: {},
   concept: { id: 41, name: 'Robo de vehículos' },
   suggestion_cost_usd: 0.0001,
+  place_region: null,
 };
+const JALISCO = { id: 14, level: 'state', code: '14', name: 'Jalisco' };
 
 /** Responde según la ruta: países, la búsqueda rápida o el concepto guardado. */
-function stubApi() {
+function stubApi(started: object = STARTED) {
   const spy = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
     const body = url.includes('regions')
       ? { items: [MEXICO], next_cursor: null }
       : url.endsWith('/keep')
         ? { ...STARTED.concept, keywords: [], exclude_terms: [], color: '#00D2FF', is_active: true }
-        : STARTED;
+        : started;
     return Promise.resolve(
       new Response(JSON.stringify(body), {
         status: 200,
@@ -89,7 +91,28 @@ describe('QuickSearchBar', () => {
       days: 7,
       providers: ['google_news_rss'],
     });
+    // Sin lugar en el texto se queda la región elegida (México).
+    expect(useExplorerStore.getState().regionId).toBeNull();
     expect(useQuickSearchStore.getState().last).toMatchObject({ conceptId: 41, kept: false });
+  });
+
+  it('si el texto nombró un lugar, queda elegido en «Dónde»', async () => {
+    stubApi({ ...STARTED, place_region: JALISCO });
+    renderWith(<QuickSearchBar providers={undefined} busy={false} />);
+
+    fireEvent.change(screen.getByLabelText('Busca noticias como en Google'), {
+      target: { value: 'robo de autos con violencia en Jalisco' },
+    });
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: 'Búsqueda rápida' });
+    await waitFor(() => {
+      expect(button.disabled).toBe(false);
+    });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(useExplorerStore.getState().searchId).toBe('b01afb0d');
+    });
+    expect(useExplorerStore.getState().regionId).toBe(14);
   });
 
   it('sin texto o con otra búsqueda corriendo no se puede buscar', () => {

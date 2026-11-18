@@ -22,9 +22,10 @@ from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 from app.api.auth import CurrentUser
 from app.api.errors import ERROR_RESPONSES, error_responses
 from app.api.v1.articles import Articles
-from app.api.v1.concepts import Concepts, TermSuggester, get_actor
+from app.api.v1.concepts import Concepts, Regions, TermSuggester, get_actor
 from app.api.v1.schemas.articles import AggregatesOut, ArticlePageOut
 from app.api.v1.schemas.concepts import ConceptOut
+from app.api.v1.schemas.regions import RegionRefOut
 from app.api.v1.schemas.searches import (
     EstimateOut,
     QuickSearchIn,
@@ -172,6 +173,26 @@ async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) ->
     )
 
 
+def get_start_quick_search(
+    suggester: TermSuggester, concepts: Concepts, starter: Starter, regions: Regions
+) -> StartQuickSearch:
+    """Caso de uso de la búsqueda rápida con las piezas compartidas.
+
+    Args:
+        suggester: La IA que propone las frases.
+        concepts: Repositorio de conceptos.
+        starter: Lanzador de búsquedas.
+        regions: Catálogo, para el lugar que nombre el texto.
+
+    Returns:
+        El caso de uso.
+    """
+    return StartQuickSearch(suggester, concepts, starter, regions)
+
+
+QuickStarter = Annotated[StartQuickSearch, Depends(get_start_quick_search)]
+
+
 @router.post(
     "/quick",
     status_code=status.HTTP_202_ACCEPTED,
@@ -181,17 +202,17 @@ async def start_search(body: SearchIn, starter: Starter, actor: CurrentActor) ->
 )
 async def start_quick_search(
     body: QuickSearchIn,
-    suggester: TermSuggester,
-    concepts: Concepts,
-    starter: Starter,
+    quick: QuickStarter,
     actor: CurrentActor,
 ) -> QuickSearchStartedOut:
     """Como el buscador de Google (ADR-0110): escribe lo que buscas y listo.
 
     La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como
     en Google» con ellas; luego se lanza la búsqueda igual que en
-    ``POST /searches``, con los mismos topes. El concepto no sale en la lista
-    hasta guardarlo con ``POST /concepts/{id}/keep``.
+    ``POST /searches``, con los mismos topes. Si el texto nombra un lugar del
+    catálogo («en Jalisco»), se busca ahí en vez de en ``region_id`` y sale en
+    ``place_region``. El concepto no sale en la lista hasta guardarlo con
+    ``POST /concepts/{id}/keep``.
     """
     request = QuickSearchRequest(
         actor.user_id,
@@ -200,13 +221,19 @@ async def start_quick_search(
         body.window(mexico_city_today()),
         tuple(body.providers) if body.providers is not None else None,
     )
-    started = await StartQuickSearch(suggester, concepts, starter).execute(request, actor)
+    started = await quick.execute(request, actor)
+    place = started.place_region
     return QuickSearchStartedOut(
         search_id=str(started.search.search_id),
         status="pending",
         estimate=EstimateOut.from_estimate(started.search.estimate),
         concept=ConceptOut.from_domain(started.concept),
         suggestion_cost_usd=started.proposal.cost_usd,
+        place_region=(
+            RegionRefOut(id=place.id, level=place.level.value, code=place.code, name=place.name)
+            if place is not None
+            else None
+        ),
     )
 
 

@@ -13,31 +13,54 @@ from app.application.use_cases.quick_search import (
     QuickSearchRequest,
     StartQuickSearch,
     quick_name,
+    resolve_place,
 )
 from app.application.use_cases.start_search import StartSearch
 from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.domain.concept import NAME_MAX_LENGTH, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError, LLMNotConfiguredError
 from app.domain.queries import Provider
+from app.domain.region import RegionLevel
 from tests.unit.application.test_execute_queries import FakeLog
 from tests.unit.application.test_plan_search import OPENAI, WEEK, concept
 from tests.unit.application.test_run_search import Source
 from tests.unit.application.test_start_search import CAPS, Queue, Store
 from tests.unit.application.test_suggest_terms import ACTOR, PRICES, FakeSuggester, result
 from tests.unit.fake_concepts import FakeConceptRepository
-from tests.unit.fake_regions import IZTAPALAPA, FakeRegionRepository
+from tests.unit.fake_regions import (
+    ALL,
+    CDMX,
+    CUAUHTEMOC,
+    IZTAPALAPA,
+    MEXICO,
+    FakeRegionRepository,
+    make_region,
+)
 
 pytestmark = pytest.mark.anyio
 
 TEXT = "hackeos y filtraciones de bases de datos del gobierno"
 
 
+# Un Cuauhtémoc en otro estado, para el nombre repetido.
+CHIHUAHUA = make_region(
+    10, "Chihuahua", RegionLevel.STATE, parent_id=1, code="08", prefix="Entidad federativa"
+)
+CUAUHTEMOC_CHIH = make_region(11, "Cuauhtémoc", parent_id=10, code="08017")
+REGIONS = (*ALL, CHIHUAHUA, CUAUHTEMOC_CHIH)
+
+
 def quick(
-    repo: FakeConceptRepository, *, configured: bool = True
+    repo: FakeConceptRepository,
+    *,
+    configured: bool = True,
+    place: str | None = None,
+    place_state: str | None = None,
 ) -> tuple[StartQuickSearch, Store, Queue]:
+    regions = FakeRegionRepository(REGIONS)
     planner = PlanSearch(
         concepts=repo,
-        regions=FakeRegionRepository(),
+        regions=regions,
         # Solo el índice local: la prueba no depende de créditos.
         providers={Provider.LOCAL_INDEX: Source(Provider.LOCAL_INDEX, [])},
         log=FakeLog(),
@@ -47,9 +70,13 @@ def quick(
     )
     store, queue = Store(), Queue()
     suggester = SuggestConceptTerms(
-        FakeSuggester(result("filtran datos", "hackeo gobierno")), PRICES, repo
+        FakeSuggester(
+            result("filtran datos", "hackeo gobierno", place=place, place_state=place_state)
+        ),
+        PRICES,
+        repo,
     )
-    use = StartQuickSearch(suggester, repo, StartSearch(planner, store, queue, CAPS))
+    use = StartQuickSearch(suggester, repo, StartSearch(planner, store, queue, CAPS), regions)
     return use, store, queue
 
 
@@ -136,3 +163,52 @@ async def test_solo_se_guardan_las_busquedas_rapidas() -> None:
         await KeepQuickConcept(repo).execute(saved.id, ACTOR)
     with pytest.raises(ConceptNotFoundError):
         await KeepQuickConcept(repo).execute(999, ACTOR)
+
+
+async def test_busca_en_el_lugar_que_nombra_el_texto() -> None:
+    use, store, _ = quick(FakeConceptRepository(), place="Ciudad de México")
+
+    started = await use.execute(QuickSearchRequest("benji", TEXT, MEXICO.id, WEEK), ACTOR)
+
+    assert started.place_region == CDMX
+    [created] = store.created
+    assert created.region_id == CDMX.id
+
+
+async def test_sin_lugar_en_el_texto_usa_la_region_elegida() -> None:
+    use, store, _ = quick(FakeConceptRepository())
+
+    started = await use.execute(QuickSearchRequest("benji", TEXT, IZTAPALAPA.id, WEEK), ACTOR)
+
+    assert started.place_region is None
+    [created] = store.created
+    assert created.region_id == IZTAPALAPA.id
+
+
+async def test_un_lugar_que_no_esta_en_el_catalogo_usa_la_region_elegida() -> None:
+    use, store, _ = quick(FakeConceptRepository(), place="Narnia")
+
+    started = await use.execute(QuickSearchRequest("benji", TEXT, MEXICO.id, WEEK), ACTOR)
+
+    assert started.place_region is None
+    [created] = store.created
+    assert created.region_id == MEXICO.id
+
+
+async def test_el_nombre_repetido_se_decide_por_el_estado() -> None:
+    regions = FakeRegionRepository(REGIONS)
+
+    assert await resolve_place(regions, "Cuauhtémoc", "Chihuahua") == CUAUHTEMOC_CHIH
+    assert await resolve_place(regions, "cuauhtemoc", "Ciudad de México") == CUAUHTEMOC
+    # Sin estado, o con uno que no cuadra, el primero del catálogo.
+    assert await resolve_place(regions, "Cuauhtémoc", None) == CUAUHTEMOC
+    assert await resolve_place(regions, "Cuauhtémoc", "Sonora") == CUAUHTEMOC
+
+
+async def test_un_parecido_no_cuenta_como_lugar() -> None:
+    regions = FakeRegionRepository(REGIONS)
+
+    # "Iztapa" está dentro de "Iztapalapa", pero no es ese lugar.
+    assert await resolve_place(regions, "Iztapa", None) is None
+    assert await resolve_place(regions, None, "Jalisco") is None
+    assert await resolve_place(regions, "", None) is None

@@ -247,7 +247,7 @@ curl -s -X POST http://localhost:8080/api/v1/searches -H 'Content-Type: applicat
 curl -s -X POST http://localhost:8080/api/v1/searches/quick -H 'Content-Type: application/json' -d '{"text":"robo de autos con violencia en Jalisco","region_id":15,"days":7}'
 ```
 
-La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como en Google» con ellas. Luego se lanza la búsqueda con los mismos topes de `POST /searches`. Responde `202` con lo mismo que `POST /searches`, más `concept` (con `is_quick: true`) y `suggestion_cost_usd`.
+La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como en Google» con ellas. Luego se lanza la búsqueda con los mismos topes de `POST /searches`. La IA también dice qué lugar nombra el texto (prompt `terms_v2`): si está en el catálogo con ese nombre exacto, se busca ahí en vez de en `region_id` (con nombres repetidos gana el del estado que dio la IA). Responde `202` con lo mismo que `POST /searches`, más `concept` (con `is_quick: true`), `suggestion_cost_usd` y `place_region` (`{id, level, code, name}` del lugar del texto, o `null` si se buscó en `region_id`).
 
 El concepto oculto no sale en `GET /concepts`. `POST /concepts/{id}/keep` lo vuelve normal. Si ya hay otro con ese nombre responde `409`: cámbialo antes con `PATCH /concepts/{id}`.
 

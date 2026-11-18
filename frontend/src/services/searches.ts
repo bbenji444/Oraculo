@@ -306,6 +306,8 @@ export interface QuickSearchStarted {
   /** El concepto oculto que la sostiene: «Guardar como concepto» lo usa. */
   conceptId: number;
   conceptName: string;
+  /** El lugar que nombró el texto («en Jalisco») si se buscó ahí; `null` si se buscó en la región elegida. */
+  placeRegionId: number | null;
 }
 
 /**
@@ -326,7 +328,13 @@ export async function startQuickSearch(input: QuickSearchInput): Promise<QuickSe
   ) {
     throw badFormat();
   }
-  return { searchId: data.search_id, conceptId: data.concept.id, conceptName: data.concept.name };
+  const place = isRecord(data.place_region) ? data.place_region.id : null;
+  return {
+    searchId: data.search_id,
+    conceptId: data.concept.id,
+    conceptName: data.concept.name,
+    placeRegionId: typeof place === 'number' ? place : null,
+  };
 }
 
 /** Estado, avance y costo de una búsqueda. */

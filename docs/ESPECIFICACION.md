@@ -509,7 +509,7 @@ Los errores por noticia van a `processing_errors` y no detienen el resto. Si má
 ## 10. Enriquecimiento con LLM
 
 - **Modelo:** configurable. `LLM_PROVIDER` elige `openai` (por defecto, `gpt-6-luna`; ADR-0016) o `gemini` (`gemini-2.5-flash`). Ambos cumplen `LLMPort` y comparten prompt y validación.
-- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigentes: `enrich_v5.md`, que juzga los conceptos «como en Google» contra lo que escribió el analista, ADR-0109; `summary_v1.md` para el reporte; `entities_v1.md` para las entidades de un caso, §10.1; `terms_v1.md` para proponer las frases de un concepto «como en Google», ADR-0109). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
+- **Prompts:** se guardan versionados en `adapters/llm/prompts/` (vigentes: `enrich_v5.md`, que juzga los conceptos «como en Google» contra lo que escribió el analista, ADR-0109; `summary_v1.md` para el reporte; `entities_v1.md` para las entidades de un caso, §10.1; `terms_v2.md` para proponer las frases de un concepto «como en Google», ADR-0109, y el lugar que nombra el texto, ADR-0110). Cambiar el prompt implica subir la versión, y las notas leídas con otra versión se vuelven a leer.
 - **Salida:** JSON validado con Pydantic. Si no valida, se reintenta una vez con el error incluido; si vuelve a fallar, va a `processing_errors`.
 - **Caché:** por (`text_hash`, `prompt_version`, `concept_ids`).
 - **Costo (ADR-0015):** antes de gastar se estima y se muestra; tope de `LLM_MAX_ARTICLES_PER_SEARCH` (150) notas por búsqueda; las corridas automáticas usan `AUTOMATIC_LLM_MAX_ARTICLES` (250, ADR-0031) y cubren solo lo publicado desde la corrida anterior (23:00–07:00, 07:00–15:00, 15:00–23:00); se registran tokens y costo estimado por búsqueda.
@@ -693,7 +693,7 @@ Se escriben como pruebas unitarias con un catálogo de prueba.
 | POST | `/concepts/{id}/keep` | «Guardar como concepto» una búsqueda rápida: deja de estar oculto (ADR-0110) |
 | POST | `/searches/estimate` | Estimación de consultas y créditos |
 | POST | `/searches` | Crea búsqueda → `202 {search_id}` |
-| POST | `/searches/quick` | Búsqueda rápida con un texto libre: la IA propone las frases, se crea un concepto oculto «como en Google» y se lanza la búsqueda → `202` (ADR-0110) |
+| POST | `/searches/quick` | Búsqueda rápida con un texto libre: la IA propone las frases, se crea un concepto oculto «como en Google» y se lanza la búsqueda en el lugar que nombra el texto, si nombra uno, o en `region_id` → `202` (ADR-0110) |
 | GET | `/searches/{id}` | Estado y progreso |
 | GET | `/searches` | Historial (paginación por cursor) |
 | GET | `/searches/{id}/articles?cursor=&limit=&relevant=&in_region=&precision=&concept_id=` | Resultados (paginación por cursor). Por defecto solo las relevantes (`relevant=all` trae todas); `in_region` = `true`, `false` o `none` (sin ubicación) |
@@ -710,7 +710,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 
 ### 14.1 Pantallas
 
-1. **Explorar** (principal): globo + panel de búsqueda + resultados. Arriba de la consulta va la **búsqueda rápida** (ADR-0110): se escribe lo que se busca, como en Google, y se busca con el lugar, las fechas y las fuentes de la consulta (México si no se eligió lugar), sin guardar un concepto. Con sus resultados a la vista, «Guardar como concepto» la deja en Conceptos.
+1. **Explorar** (principal): globo + panel de búsqueda + resultados. Arriba de la consulta va la **búsqueda rápida** (ADR-0110): se escribe lo que se busca, como en Google, y se busca con las fechas y las fuentes de la consulta, sin guardar un concepto. Si el texto nombra un lugar del catálogo («en Jalisco») se busca ahí y queda elegido en «Dónde»; si no, en el lugar de la consulta (México si no se eligió). Con sus resultados a la vista, «Guardar como concepto» la deja en Conceptos.
 2. **Conceptos:** tabla + formulario + "Probar concepto". El formulario es de una sola pantalla (ADR-0110): basta con escribir «¿Qué noticias quieres seguir?» en palabras del analista. «Proponer frases con la IA» llena nombre, frases y exclusiones para revisarlos; si se guarda sin frases o sin nombre, la IA los propone al guardar. Los nuevos se buscan «como en Google» (ADR-0109); los exactos que ya existían se editan sin cambiar de modo.
 3. **Historial:** búsquedas anteriores, reabrir y comparar.
 

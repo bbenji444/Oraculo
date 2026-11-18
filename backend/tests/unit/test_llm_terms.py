@@ -55,6 +55,8 @@ async def test_openai_propone_con_su_esquema_estricto() -> None:
     assert result.name == "Hackeos a gobierno"
     assert result.phrases == ("filtran datos", "hackeo gobierno", "ciberataque dependencia")
     assert result.exclude_terms == ("curso",)
+    # Sin lugar en la respuesta (o una de terms_v1): None.
+    assert (result.place, result.place_state) == (None, None)
     assert (result.usage, result.model, result.prompt_version) == (
         LLMUsage(400, 90),
         "gpt-6-luna",
@@ -87,12 +89,13 @@ async def test_openai_dos_respuestas_invalidas_son_error_con_lo_gastado() -> Non
 
 
 async def test_gemini_propone_con_el_mismo_prompt_y_esquema() -> None:
-    models = FakeModels(reply(VALID, 380, 80))
+    models = FakeModels(reply(VALID | {"place": "Guadalajara", "place_state": "Jalisco"}, 380, 80))
     llm = GeminiEnricher(models, "gemini-2.5-flash")
 
     result = await llm.suggest_terms(REQUEST)
 
     assert result.phrases[0] == "filtran datos"
+    assert (result.place, result.place_state) == ("Guadalajara", "Jalisco")
     assert (result.usage, result.prompt_version) == (LLMUsage(380, 80), TERMS_PROMPT_VERSION)
     assert llm.terms_prompt_version == TERMS_PROMPT_VERSION
     call = models.calls[0]
@@ -119,3 +122,21 @@ def test_la_fabrica_de_frases_usa_la_ia_elegida_y_sus_precios() -> None:
     assert isinstance(gemini.suggester, GeminiEnricher)
     with pytest.raises(MissingLLMKeyError):
         build_term_suggester(settings())
+
+
+async def test_openai_devuelve_el_lugar_que_nombro_la_persona() -> None:
+    answer = VALID | {"place": "Jalisco", "place_state": None}
+    llm = enricher(httpx2.Response(200, json=api_reply(json.dumps(answer), 400, 90)), seen=[])
+
+    result = await llm.suggest_terms(REQUEST)
+
+    assert (result.place, result.place_state) == ("Jalisco", None)
+    await llm.aclose()
+
+
+def test_el_prompt_pide_el_lugar_y_su_estado() -> None:
+    prompt = build_terms_prompt(REQUEST)
+
+    assert "place:" in prompt
+    assert "place_state:" in prompt
+    assert '"Guadalajara" → "Jalisco"' in prompt

@@ -12,6 +12,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 from app.api.v1.schemas.concepts import ConceptOut, PlannedQueryOut
+from app.api.v1.schemas.regions import RegionRefOut
 from app.application.pagination import Page
 from app.application.ports.search_reads import SearchDetail
 from app.application.use_cases.plan_search import SearchEstimate
@@ -190,6 +191,13 @@ class QuickSearchStartedOut(BaseModel):
         description="Concepto oculto: «Guardar como concepto» con ``POST /concepts/{id}/keep``."
     )
     suggestion_cost_usd: float = Field(description="Lo que costó que la IA propusiera las frases.")
+    place_region: RegionRefOut | None = Field(
+        default=None,
+        description=(
+            "El lugar que nombró el texto («en Jalisco»), si se buscó ahí en vez de en "
+            "``region_id``; ``null`` si se buscó en la región elegida."
+        ),
+    )
 
 
 class SearchOut(BaseModel):

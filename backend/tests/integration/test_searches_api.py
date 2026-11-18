@@ -691,7 +691,9 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
         ("simulacro",),
         LLMUsage(1000, 250),
         "gpt-6-luna",
-        "terms_v1",
+        "terms_v2",
+        place="Iztapalapa",
+        place_state="Ciudad de México",
     )
     with make_client(settings, queue) as client:
         app = cast(FastAPI, client.app)
@@ -699,11 +701,12 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
         app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
             FakeSuggester(proposal), PRICES, repo
         )
-        text_ = "extorsión a comerciantes en la Ciudad de México"
+        text_ = "extorsión a comerciantes en Iztapalapa"
         response = client.post(
             f"{URL}/quick", json={"text": text_, "region_id": ids["cdmx"], "days": 7}
         )
         listed = client.get("/api/v1/concepts").json()["items"]
+        searched = client.get(f"{URL}/{response.json()['search_id']}").json()
         concept_id = response.json()["concept"]["id"]
         kept = client.post(f"/api/v1/concepts/{concept_id}/keep")
         listed_after = client.get("/api/v1/concepts").json()["items"]
@@ -715,6 +718,9 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
     assert data["concept"]["query_mode"] == "open"
     assert data["suggestion_cost_usd"] == pytest.approx(0.002)
     assert queue.sent == [UUID(data["search_id"])]
+    # El texto nombra Iztapalapa: se busca ahí y no en la CDMX elegida.
+    assert data["place_region"]["code"] == "09007"
+    assert searched["region_code"] == "09007"
     # Oculto en la lista hasta guardarlo.
     assert concept_id not in [c["id"] for c in listed]
     assert kept.status_code == 200

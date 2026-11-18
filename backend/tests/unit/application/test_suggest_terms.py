@@ -43,7 +43,7 @@ class FakeSuggester:
 
     @property
     def terms_prompt_version(self) -> str:
-        return "terms_v1"
+        return "terms_v2"
 
     async def aclose(self) -> None:
         return None
@@ -56,9 +56,21 @@ class FakeSuggester:
         return self.result
 
 
-def result(*phrases: str, excludes: tuple[str, ...] = ("curso",)) -> TermSuggestionResult:
+def result(
+    *phrases: str,
+    excludes: tuple[str, ...] = ("curso",),
+    place: str | None = None,
+    place_state: str | None = None,
+) -> TermSuggestionResult:
     return TermSuggestionResult(
-        "Hackeos a gobierno", phrases, excludes, LLMUsage(1000, 250), "gpt-6-luna", "terms_v1"
+        "Hackeos a gobierno",
+        phrases,
+        excludes,
+        LLMUsage(1000, 250),
+        "gpt-6-luna",
+        "terms_v2",
+        place=place,
+        place_state=place_state,
     )
 
 
@@ -82,7 +94,20 @@ async def test_propone_frases_limpias_con_su_costo_y_bitacora() -> None:
     assert entry.payload["descripcion"] == INTENT
     assert entry.payload["frases"] == ["filtran datos", "hackeo gobierno"]
     assert entry.payload["costo_usd"] == pytest.approx(0.002)
-    assert entry.payload["prompt"] == "terms_v1"
+    assert entry.payload["prompt"] == "terms_v2"
+    assert "lugar" not in entry.payload
+    assert (proposal.place, proposal.place_state) == (None, None)
+
+
+async def test_el_lugar_que_nombra_llega_limpio_y_queda_en_la_bitacora() -> None:
+    repo = FakeConceptRepository()
+    suggester = FakeSuggester(result("roban autos", place="  Guadalajara ", place_state="Jalisco"))
+
+    proposal = await SuggestConceptTerms(suggester, PRICES, repo).execute(INTENT, ACTOR)
+
+    assert (proposal.place, proposal.place_state) == ("Guadalajara", "Jalisco")
+    [(_, entry)] = repo.audit
+    assert entry.payload["lugar"] == "Guadalajara"
 
 
 async def test_descripcion_muy_corta_no_llama_a_la_ia() -> None:

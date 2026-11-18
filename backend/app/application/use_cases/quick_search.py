@@ -5,13 +5,15 @@ búsqueda rápida y lo pongas así como en el buscador de Google».
 
 ``StartQuickSearch``:
 
-1. le pide a la IA las frases de lo que escribió el analista
-   (``SuggestConceptTerms``, que valida el texto y deja la propuesta en la
-   bitácora);
-2. crea un concepto **oculto** «como en Google» con ese texto como lo que se
+1. le pide a la IA las frases de lo que escribió el analista y el lugar que
+   nombra («en Jalisco»), si nombra uno (``SuggestConceptTerms``, que valida
+   el texto y deja la propuesta en la bitácora);
+2. si nombra un lugar que está en el catálogo, se busca ahí; si no, en la
+   región que eligió en la consulta;
+3. crea un concepto **oculto** «como en Google» con ese texto como lo que se
    juzga y las frases de la IA. No sale en la lista de conceptos ni ocupa su
    nombre;
-3. lanza la búsqueda con ese concepto, la región y las fechas elegidas
+4. lanza la búsqueda con ese concepto, la región y las fechas elegidas
    (``StartSearch``, con sus mismos topes y revisiones).
 
 Se apoya en un concepto porque todo el pipeline (el juicio de la IA,
@@ -34,16 +36,24 @@ from app.application.audit import (
     concept_snapshot,
 )
 from app.application.ports.concepts import ConceptRepositoryPort
+from app.application.ports.regions import RegionRepositoryPort
 from app.application.use_cases.plan_search import SearchRequest
 from app.application.use_cases.start_search import StartedSearch, StartSearch
 from app.application.use_cases.suggest_terms import SuggestConceptTerms, TermProposal
 from app.domain.concept import NAME_MAX_LENGTH, Concept, ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
+from app.domain.names import normalize_name
 from app.domain.queries import DateWindow, Provider
+from app.domain.region import Region, RegionLevel
 
 # Color de las búsquedas rápidas en el mapa: el cian de la consola de Oráculo
 # (ADR-0108), para que no se confunda con los conceptos guardados.
 QUICK_COLOR = "#00D2FF"
+
+# Cuántas regiones del catálogo se revisan al buscar el lugar del texto: hay
+# nombres repetidos en varios estados ("San Pedro"), y con 10 caben el
+# municipio y las localidades homónimas más comunes.
+PLACE_CANDIDATES = 10
 
 
 def quick_name(proposed: str, text: str) -> str:
@@ -66,6 +76,51 @@ def quick_name(proposed: str, text: str) -> str:
         return name
     cut = name[:NAME_MAX_LENGTH]
     return cut.rsplit(" ", 1)[0] if " " in cut else cut
+
+
+def _named(region: Region, norm: str) -> bool:
+    """Si la región se llama exactamente así (por nombre o alias)."""
+    return region.name_norm == norm or norm in {normalize_name(a) for a in region.aliases}
+
+
+async def resolve_place(
+    regions: RegionRepositoryPort, place: str | None, state: str | None
+) -> Region | None:
+    """Busca en el catálogo el lugar que nombró el analista.
+
+    Solo acepta nombres exactos (o alias): un parecido («Jaliscos») no basta,
+    porque buscar en el lugar equivocado es peor que buscar en el elegido.
+    Si hay varios con el mismo nombre, gana el que está en el estado que dio
+    la IA; sin estado, el más general (el estado antes que una localidad).
+
+    Args:
+        regions: Catálogo de regiones.
+        place: Lugar que nombró el analista («Guadalajara»), o ``None``.
+        state: Estado de ese lugar («Jalisco»), o ``None``.
+
+    Returns:
+        La región, o ``None`` si no nombró lugar o no está en el catálogo.
+
+    Example:
+        >>> await resolve_place(regions, "Guadalajara", "Jalisco")
+        Region(code="14039", name="Guadalajara", ...)
+    """
+    if not place:
+        return None
+    norm = normalize_name(place)
+    found = [r for r in await regions.search(norm, PLACE_CANDIDATES) if _named(r, norm)]
+    if not found:
+        return None
+    if state:
+        state_norm = normalize_name(state)
+        for candidate in found:
+            chain = await regions.ancestors(candidate.id)
+            if any(
+                ref.level is RegionLevel.STATE and normalize_name(ref.name) == state_norm
+                for ref in chain
+            ):
+                return candidate
+    return found[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,11 +150,14 @@ class QuickSearchStarted:
         concept: El concepto oculto que se creó.
         proposal: Lo que propuso la IA y cuánto costó.
         search: La búsqueda lanzada y su costo estimado.
+        place_region: La región que nombró el texto, si se buscó ahí; ``None``
+            si se buscó en la región elegida.
     """
 
     concept: Concept
     proposal: TermProposal
     search: StartedSearch
+    place_region: Region | None = None
 
 
 class StartQuickSearch:
@@ -110,6 +168,7 @@ class StartQuickSearch:
         suggester: SuggestConceptTerms,
         concepts: ConceptRepositoryPort,
         starter: StartSearch,
+        regions: RegionRepositoryPort,
     ) -> None:
         """Recibe las piezas que ya existen para cada paso.
 
@@ -117,13 +176,20 @@ class StartQuickSearch:
             suggester: La IA que propone las frases.
             concepts: Repositorio de conceptos.
             starter: Lanzador de búsquedas.
+            regions: Catálogo, para el lugar que nombre el texto.
         """
         self._suggester = suggester
         self._concepts = concepts
         self._starter = starter
+        self._regions = regions
 
     async def execute(self, request: QuickSearchRequest, actor: Actor) -> QuickSearchStarted:
         """Propone las frases, crea el concepto oculto y lanza la búsqueda.
+
+        Si el texto nombra un lugar del catálogo («en Jalisco»), se busca ahí
+        aunque se haya elegido otro: lo escrito es lo más reciente que dijo
+        el analista. Benji (17/11/2026): «robo de autos con violencia en
+        Jalisco» buscaba en todo México.
 
         Args:
             request: Texto, región, fechas y fuentes.
@@ -153,16 +219,17 @@ class StartQuickSearch:
             actor, CONCEPT_CREATED, {"after": concept_snapshot(draft), "busqueda_rapida": True}
         )
         concept = await self._concepts.create(draft, actor.user_id, audit, quick=True)
+        place = await resolve_place(self._regions, proposal.place, proposal.place_state)
         search = await self._starter.execute(
             SearchRequest(
                 request.user_id,
                 (concept.id,),
-                request.region_id,
+                place.id if place is not None else request.region_id,
                 request.window,
                 request.providers,
             )
         )
-        return QuickSearchStarted(concept, proposal, search)
+        return QuickSearchStarted(concept, proposal, search, place)
 
 
 class KeepQuickConcept:

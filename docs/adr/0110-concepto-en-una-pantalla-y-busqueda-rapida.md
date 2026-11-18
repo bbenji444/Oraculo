@@ -29,8 +29,14 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
    - «Guardar como concepto» (`POST /concepts/{id}/keep`) lo vuelve normal. Si el nombre ya existe responde 409 y hay que cambiarlo antes.
 3. **D3 — Dónde se ve:**
    - Una barra «Busca noticias como en Google…» arriba de la consulta: en la consola del Centro de mando y en el panel del diseño clásico (`QuickSearchBar`).
-   - Usa el lugar, las fechas y las fuentes de la consulta. Sin lugar elegido, busca en México.
+   - Usa las fechas y las fuentes de la consulta, y su lugar si el texto no nombra otro (D4). Sin lugar elegido, busca en México.
    - Con los resultados a la vista sale «Guardar como concepto». Solo en la búsqueda rápida recién lanzada: no se recuerda entre visitas.
+4. **D4 — El lugar que nombra el texto manda** (Benji, 17/11/2026: «Antes, el lugar»):
+   - La misma llamada a la IA que propone las frases dice qué lugar nombra el texto y, si es un municipio o ciudad, su estado (prompt `terms_v2`, campos `place` y `place_state`). No cuesta una llamada más.
+   - `resolve_place` lo busca en el catálogo **solo por nombre o alias exacto**: un parecido no basta, porque buscar en el lugar equivocado es peor que buscar en el elegido. Con nombres repetidos («Cuauhtémoc» en CDMX y en Chihuahua) gana el del estado que dio la IA; sin estado, el más general.
+   - Si lo encuentra, se busca ahí aunque se haya elegido otro lugar (lo escrito es lo último que dijo el analista), y la respuesta lo trae en `place_region`. La pantalla lo deja elegido en «Dónde» para que el mapa y la consulta digan dónde se buscó.
+   - Si el texto no nombra lugar, solo dice «México» o el lugar no está en el catálogo, se busca en el lugar de la consulta.
+   - Las frases siguen sin lugar (ADR-0109): el lugar lo pone la región, como en cualquier búsqueda.
 
 ## Alternativas consideradas
 
@@ -43,6 +49,12 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
 - **Búsqueda rápida sin concepto (el texto viaja en la búsqueda):**
   - Pros: no deja conceptos ocultos en la base.
   - Contras: el juicio de la IA, `search_concepts`, `article_concepts`, los filtros y el historial se apoyan en conceptos. Habría que tocar todo el pipeline.
+- **Para el lugar (D4), buscar el texto palabra por palabra en el catálogo sin la IA:**
+  - Pros: gratis y sin cambiar el prompt.
+  - Contras: hay localidades llamadas «Robo», «Violencia» o «Autos» y municipios con nombres comunes; sin entender la frase se buscaría en lugares que nadie pidió. La IA ya se llama para las frases, así que el lugar sale en la misma respuesta.
+- **Para el lugar (D4), que el lugar elegido en «Dónde» gane sobre el del texto:**
+  - Pros: respeta lo que se eligió con el mapa.
+  - Contras: el lugar por defecto es México, que casi nunca se elige a propósito; fue justo el caso de «en Jalisco».
 - **Crear un concepto normal con un nombre único («Búsqueda rápida 1»):**
   - Pros: sin migración.
   - Contras: llenaría la lista de conceptos y «¿Qué rastrear?» de búsquedas de un solo uso.
@@ -58,5 +70,6 @@ Benji probó en la VM el formulario de ADR-0109 (17/11/2026):
 - **Primera búsqueda rápida real (17/11/2026):** «robo de autos con violencia en Jalisco», sin lugar elegido (México), 7 días, solo fuentes gratuitas.
   - La IA propuso «Robo violento de autos» con 8 frases («roban autos», «asaltan automovilistas»…), ninguna con el lugar.
   - 57 notas, 0 créditos, 0.018 USD de IA. Ninguna nombra Jalisco en el título, y solo 2 quedaron relevantes, de Chihuahua y de la CDMX.
-  - Conclusión: si el texto nombra un lugar, la búsqueda tiene que ir a ese lugar. Hoy hay que elegirlo en «Dónde». Queda como siguiente paso.
+  - Conclusión: si el texto nombra un lugar, la búsqueda tiene que ir a ese lugar. De ahí sale D4.
+- **El lugar del texto cambia la región elegida (D4):** si la IA entiende mal el lugar, se busca en otro sitio. Se ve porque «Dónde» cambia y la bitácora guarda el `lugar` de cada propuesta. Para buscar en otro lugar basta con no nombrarlo en el texto y elegirlo en «Dónde».
 - **Bajar la migración 0047** vuelve normales a los ocultos: si alguno repite el nombre de otro vigente, hay que renombrarlo o borrarlo antes.
