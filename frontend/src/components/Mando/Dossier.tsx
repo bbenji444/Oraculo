@@ -3,7 +3,8 @@
  * para que el globo quede a la izquierda con las notas.
  *
  * Dos paneles:
- * - **Resumen**, de vidrio y con color: título que se descifra, el PDF, cuatro
+ * - **Resumen**, de vidrio y con color: título que se descifra, «Ver reporte» y
+ *   «Descargar PDF» (ReportViewer, ADR-0111), cuatro
  *   cifras que corren (relevantes, estados, créditos y costo de la IA) y una
  *   barra con las categorías que más salen, cada una de su color. «▴» lo
  *   pliega a un renglón.
@@ -25,7 +26,6 @@ import { useMandoStore } from '../../store/mando';
 import { useTimelineStore } from '../../store/timeline';
 import { categoryColor } from '../Explore/categoryColor';
 import { Chronology } from '../Explore/Chronology';
-import { DownloadButtons } from '../Explore/Controls';
 import { formatRange, matchesListFilter, providersLabel } from '../Explore/format';
 import { ResultsList } from '../Explore/ResultsList';
 import { categoriesIn, statesIn } from '../Explore/timelineData';
@@ -34,6 +34,7 @@ import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
 import { FilterPopover } from './FilterPopover';
+import { ReportButtons } from './ReportViewer';
 import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
 import { Icon } from '../ui/Icon';
@@ -171,9 +172,6 @@ export function Dossier({
               <DecodeText text={title} />
             </h2>
           </div>
-          <div className="shrink-0">
-            <DownloadButtons searchId={search.search_id} compact />
-          </div>
           <button
             type="button"
             aria-expanded={summaryOpen}
@@ -198,6 +196,8 @@ export function Dossier({
             <Icon name="chevron_right" className="text-lg" />
           </button>
         </div>
+        {/* En su propio renglón: junto al título lo dejaban en tres letras. */}
+        <ReportButtons searchId={search.search_id} title={title} />
 
         {summaryOpen ? (
           <div className="mando-summary space-y-2">

@@ -3,6 +3,8 @@
  *
  * - `POST /searches/{id}/report?format=pdf|html`: el reporte. La primera vez
  *   el backend le pide el resumen ejecutivo a la IA (~0.001 USD).
+ * - `GET /searches/{id}/report/view`: el reporte para verlo en el monitor
+ *   (ventana «Ver reporte», ADR-0111).
  * - `GET /searches/{id}/export?format=csv|geojson`: las notas como datos.
  *
  * Solo pide los archivos; guardarlos o abrirlos es cosa de `useDownloads`.
@@ -33,4 +35,12 @@ export function fetchReport(searchId: string, format: ReportFormat): Promise<Api
  */
 export function fetchExport(searchId: string, format: ExportFormat): Promise<ApiFile> {
   return requestFile(searchPath(searchId, 'export', format));
+}
+
+/**
+ * Dirección de la vista del reporte en pantalla (ADR-0111), para el iframe de
+ * la ventana «Ver reporte». Es `GET`: la abre el navegador, no `fetch`.
+ */
+export function reportViewUrl(searchId: string): string {
+  return apiUrl(`searches/${encodeURIComponent(searchId)}/report/view`);
 }
