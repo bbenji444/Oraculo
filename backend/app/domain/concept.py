@@ -138,6 +138,21 @@ def _term_problems(field: str, term: str) -> list[Problem]:
     return problems
 
 
+def is_searchable_term(term: str) -> bool:
+    """Dice si un término cumple las reglas de una palabra clave o exclusión.
+
+    Sirve para filtrar lo que propone la IA (``term_suggestions``) con las
+    mismas reglas que el formulario, sin armar un error por cada término.
+
+    Args:
+        term: Término ya limpio (``clean_text``).
+
+    Returns:
+        ``True`` si se puede guardar tal cual.
+    """
+    return not _term_problems(KEYWORDS_FIELD, term)
+
+
 def _clean_terms(
     field: str, label: str, terms: tuple[str, ...]
 ) -> tuple[tuple[str, ...], list[Problem]]:

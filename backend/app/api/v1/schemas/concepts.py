@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.api.v1.schemas.regions import RegionDetailOut
 from app.application.pagination import Page
 from app.application.use_cases.concepts import ConceptInput, QueryPreview
+from app.application.use_cases.suggest_terms import TermProposal
 from app.domain.concept import Concept, ConceptChanges, QueryMode
 from app.domain.queries import SEARCH_LANGUAGE_LABEL, PlannedQuery
 from app.domain.query_dialects import DIALECTS
@@ -246,4 +247,42 @@ class QueryPreviewOut(BaseModel):
             queries=[PlannedQueryOut.from_domain(q) for q in preview.queries],
             total_queries=len(preview.queries),
             total_credits=preview.total_credits,
+        )
+
+
+class TermSuggestionIn(BaseModel):
+    """Lo que busca el analista, en sus palabras (ADR-0109)."""
+
+    description: str = Field(
+        max_length=_MAX_TEXT, examples=["hackeos y filtraciones de bases de datos del gobierno"]
+    )
+
+
+class TermSuggestionOut(BaseModel):
+    """Propuesta de la IA para llenar el formulario; todavía no se guarda nada."""
+
+    name: str = Field(description="Nombre propuesto; vacío si no sirvió.")
+    keywords: list[str] = Field(description="Frases tipo titular, de la mejor a la peor.")
+    exclude_terms: list[str]
+    query_mode: QueryMode = Field(description="Siempre ``open``: las frases son para eso.")
+    model: str
+    cost_usd: float = Field(description="Lo que costó la propuesta.")
+
+    @classmethod
+    def from_proposal(cls, proposal: TermProposal) -> "TermSuggestionOut":
+        """Convierte la propuesta del caso de uso.
+
+        Args:
+            proposal: Propuesta limpia.
+
+        Returns:
+            El esquema listo para serializar.
+        """
+        return cls(
+            name=proposal.terms.name,
+            keywords=list(proposal.terms.phrases),
+            exclude_terms=list(proposal.terms.exclude_terms),
+            query_mode=proposal.query_mode,
+            model=proposal.model,
+            cost_usd=proposal.cost_usd,
         )

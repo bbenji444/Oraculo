@@ -21,6 +21,8 @@ from app.api.v1.schemas.concepts import (
     ConceptPageOut,
     ConceptPatch,
     QueryPreviewOut,
+    TermSuggestionIn,
+    TermSuggestionOut,
 )
 from app.application.audit import Actor
 from app.application.ports.concepts import ConceptRepositoryPort
@@ -35,6 +37,8 @@ from app.application.use_cases.concepts import (
     UpdateConcept,
 )
 from app.application.use_cases.plan_search import PlanSearch
+from app.application.use_cases.suggest_terms import SuggestConceptTerms
+from app.domain.errors import LLMNotConfiguredError
 from app.domain.queries import Provider
 
 router = APIRouter(prefix="/concepts", tags=["conceptos"], responses=ERROR_RESPONSES)
@@ -115,6 +119,29 @@ def get_query_preview(
 QueryPreview = Annotated[PreviewConceptQueries, Depends(get_query_preview)]
 
 
+def get_term_suggester(request: Request) -> SuggestConceptTerms:
+    """Caso de uso que pide a la IA las frases de un concepto (ADR-0109).
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        El caso de uso que se armó al arrancar la API.
+
+    Raises:
+        LLMNotConfiguredError: Si falta la llave de la IA en ``.env``.
+    """
+    suggester: SuggestConceptTerms | None = request.app.state.term_suggester
+    if suggester is None:
+        raise LLMNotConfiguredError(
+            "La IA no está configurada en este servidor: escribe las frases a mano."
+        )
+    return suggester
+
+
+TermSuggester = Annotated[SuggestConceptTerms, Depends(get_term_suggester)]
+
+
 @router.get("", response_model=ConceptPageOut, summary="Lista de conceptos")
 async def list_concepts(
     concepts: Concepts,
@@ -141,6 +168,24 @@ async def create_concept(body: ConceptIn, concepts: Concepts, actor: CurrentActo
     """Valida, guarda y registra en la bitácora."""
     concept = await CreateConcept(concepts).execute(body.to_input(), actor)
     return ConceptOut.from_domain(concept)
+
+
+@router.post(
+    "/suggest",
+    response_model=TermSuggestionOut,
+    summary="La IA propone las frases de un concepto",
+    responses=error_responses(503),
+)
+async def suggest_terms(
+    body: TermSuggestionIn, use_case: TermSuggester, actor: CurrentActor
+) -> TermSuggestionOut:
+    """Nombre, frases tipo titular y exclusiones para «como en Google» (ADR-0109).
+
+    No guarda el concepto: la propuesta llena el formulario y el analista
+    decide. Cuesta una llamada a la IA (~0.001 USD), que queda en la bitácora.
+    """
+    proposal = await use_case.execute(body.description, actor)
+    return TermSuggestionOut.from_proposal(proposal)
 
 
 @router.post(

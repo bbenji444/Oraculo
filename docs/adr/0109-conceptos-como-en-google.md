@@ -46,8 +46,13 @@ Medición sin gastar créditos:
    - La API usa `exact` si no se dice otra cosa, para no cambiarle el comportamiento a quien ya la usa. El formulario manda `open` en los conceptos nuevos.
 3. **D1 — La IA propone las frases:**
    - El analista escribe en sus palabras lo que busca, en la descripción.
-   - La IA propone de 8 a 12 frases tipo titular, exclusiones y la categoría.
-   - El analista las revisa antes de guardar.
+   - La IA propone un nombre, de 8 a 12 frases tipo titular y hasta 6 exclusiones (prompt `terms_v1`, ruta `POST /concepts/suggest`).
+   - No propone categoría: un concepto no tiene campo de categoría (solo los temas lo tienen). La categoría de cada nota la pone la IA al buscar, y se ve en las secciones de resultados (D5).
+   - La propuesta no crea nada: el analista la revisa y la edita antes de guardar.
+   - Cada propuesta queda en la bitácora (`concept.terms_suggested`), con su costo, aunque no se guarde el concepto. Medido con gpt-6-luna: ~0.0001 USD por propuesta.
+   - Las frases son de 2 o 3 palabras, porque al buscar se les agrega el lugar. Medido el 17/11/2026 con 4 temas reales, en 7 días de Google News RSS:
+     - con frases de 2 a 4 palabras: 508 notas distintas, y 5 de 39 frases trajeron 0;
+     - con frases de 2 o 3 palabras: 641 notas distintas, y 2 de 40 frases trajeron 0.
    - Se llega desde Conceptos y con un botón en Explorar.
 4. **D4 — La IA juzga contra lo que se escribió:**
    - En los conceptos abiertos, la relevancia (prompt `enrich_v5`) se mide contra la descripción del analista. Las frases solo le sirven de pista.

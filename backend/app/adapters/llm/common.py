@@ -3,8 +3,9 @@
 Gemini y OpenAI reciben el mismo prompt versionado (``enrich_v4.md`` para
 enriquecer una nota, ``summary_v1.md`` para el resumen ejecutivo de un
 reporte, ``entities_v1.md`` para proponer las entidades de una nota de un
-caso) y su respuesta se valida con el mismo modelo de Pydantic
-(``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``). Así, cambiar de
+caso, ``terms_v1.md`` para proponer las frases de un concepto) y su
+respuesta se valida con el mismo modelo de Pydantic
+(``EnrichmentOut``, ``SummaryOut``, ``EntitiesOut``, ``TermsOut``). Así, cambiar de
 proveedor no cambia lo que se pide ni lo que se acepta.
 
 No hace: no llama a ninguna IA.
@@ -26,6 +27,7 @@ from app.application.ports.llm import (
     EntityExtractionRequest,
     SummaryNote,
     SummaryRequest,
+    TermSuggestionRequest,
 )
 from app.domain.authority import parse_authority
 from app.domain.enrichment import ConceptBrief, ConceptJudgement, Enrichment
@@ -354,3 +356,40 @@ def to_labels(
                 )
             )
     return tuple(labels)
+
+
+# Frases de un concepto «como en Google» (ADR-0109).
+TERMS_PROMPT_VERSION = "terms_v1"
+TERMS_PROMPT_PATH = Path(__file__).parent / "prompts" / f"{TERMS_PROMPT_VERSION}.md"
+# 12 frases cortas, 6 exclusiones y un nombre son ~150 tokens; 600 dejan
+# margen sin pagar respuestas desbocadas.
+TERMS_MAX_OUTPUT_TOKENS = 600
+
+
+class TermsOut(BaseModel):
+    """Esquema de la propuesta de frases (``terms_v1``).
+
+    Las listas no tienen tope aquí: el dominio recorta a ``OPEN_MAX_PHRASES``
+    y descarta lo que no se pueda buscar (``clean_suggestion``).
+    """
+
+    name: str
+    phrases: list[str]
+    exclude_terms: list[str]
+
+
+def build_terms_prompt(request: TermSuggestionRequest) -> str:
+    """Llena la plantilla ``terms_v1`` con lo que busca el analista.
+
+    Args:
+        request: Descripción y topes.
+
+    Returns:
+        El texto que se manda a la IA.
+    """
+    template = TERMS_PROMPT_PATH.read_text(encoding="utf-8")
+    return template.format(
+        intent=request.intent,
+        max_phrases=request.max_phrases,
+        max_exclusions=request.max_exclusions,
+    )

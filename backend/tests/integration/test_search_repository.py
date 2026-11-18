@@ -35,6 +35,7 @@ from app.application.use_cases.run_search import PipelineLimits, RunSearch
 from app.cli import buscar, reubicar
 from app.core.config import Settings
 from app.domain.authority import Authority
+from app.domain.concept import QueryMode
 from app.domain.enrichment import Enrichment, LLMUsage
 from app.domain.geocoding import Mention, MentionRole
 from app.domain.queries import Provider
@@ -602,6 +603,39 @@ async def test_la_subdivision_se_guarda_con_la_busqueda_y_se_lee_igual(
         (5,),
     )
     assert [(c.id, c.subdivision_ids) for c in detail.concepts] == [(concept_id, (5,))]
+    # Sin decirlo, la copia es de un concepto exacto (migración 0046).
+    assert loaded.query_mode is QueryMode.EXACT
+
+
+async def test_el_modo_como_en_google_se_copia_con_la_busqueda(
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    test_engine: AsyncEngine,
+    concept_id: int,
+) -> None:
+    # ADR-0109: con el modo copiado se puede rehacer la consulta tal como se mandó.
+    searches, _ = stores
+    async with test_engine.connect() as conn:
+        cdmx = (await conn.execute(text("SELECT id FROM regions WHERE code = '09'"))).scalar_one()
+    copied = SearchConcept(
+        concept_id, CONCEPT_NAME, "", ("filtran datos",), query_mode=QueryMode.OPEN
+    )
+    search_id = await searches.create(
+        NewSearch(
+            user_id="prueba",
+            region_id=cdmx,
+            date_from=date(2026, 11, 1),
+            date_to=date(2026, 11, 2),
+            concepts=(copied,),
+            queries_planned=1,
+            credits_estimated=0,
+            providers=(Provider.LOCAL_INDEX,),
+        )
+    )
+
+    stored = await searches.load(search_id)
+
+    assert stored is not None
+    assert stored.concepts[0].query_mode is QueryMode.OPEN
 
 
 async def _izta(

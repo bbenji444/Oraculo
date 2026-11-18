@@ -122,3 +122,14 @@ class ConceptRepositoryPort(Protocol):
             ``True`` si hay búsquedas que lo usaron.
         """
         ...
+
+    async def record_suggestion(self, audit: AuditEntry) -> None:
+        """Deja en la bitácora que la IA propuso frases (ADR-0109).
+
+        La propuesta no crea un concepto (el analista decide al guardar),
+        pero cuesta: queda quién la pidió, qué escribió y cuánto se gastó.
+
+        Args:
+            audit: Registro para la bitácora.
+        """
+        ...

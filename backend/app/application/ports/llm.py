@@ -1,4 +1,4 @@
-"""Puertos de la IA: enriquecer notas, resumir reportes y proponer entidades.
+"""Puertos de la IA: enriquecer notas, resumir reportes, proponer entidades y frases.
 
 ``LLMPort`` enriquece (§10), ``SummarizerPort`` resume (§15) y
 ``EntityExtractorPort`` propone las entidades de una nota de un caso (Fase
@@ -6,6 +6,8 @@
 elegidos con ``LLM_PROVIDER`` (ADR-0016). Son tres puertos porque los usan
 casos de uso distintos: el pipeline de búsqueda solo enriquece, el reporte
 solo resume y los casos de investigación solo extraen entidades.
+``TermSuggesterPort`` propone las frases de un concepto «como en Google»
+(ADR-0109).
 
 No hace: no decide qué notas se enriquecen ni guarda nada.
 """
@@ -442,6 +444,93 @@ class ClassifierPort(Protocol):
 
         Raises:
             ClassificationError: Si la respuesta no fue válida tras un reintento.
+            ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
+        """
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class TermSuggestionRequest:
+    """Lo que se le manda a la IA para que proponga las frases de un concepto.
+
+    Attributes:
+        intent: Lo que busca el analista, en sus palabras (ya validado).
+        max_phrases: Cuántas frases como máximo (``OPEN_MAX_PHRASES``).
+        max_exclusions: Cuántas exclusiones como máximo.
+    """
+
+    intent: str
+    max_phrases: int
+    max_exclusions: int
+
+
+@dataclass(frozen=True, slots=True)
+class TermSuggestionResult:
+    """Lo que propuso la IA, sin limpiar todavía (``clean_suggestion``).
+
+    Attributes:
+        name: Nombre para el concepto.
+        phrases: Frases tipo titular, de la mejor a la peor.
+        exclude_terms: Exclusiones.
+        usage: Tokens gastados (suma de intentos, si hubo reintento).
+        model: Modelo usado.
+        prompt_version: Versión del prompt (``terms_v1``).
+    """
+
+    name: str
+    phrases: tuple[str, ...]
+    exclude_terms: tuple[str, ...]
+    usage: LLMUsage
+    model: str
+    prompt_version: str
+
+
+class TermSuggestionError(RuntimeError):
+    """La IA no dio una propuesta válida tras reintentar.
+
+    Attributes:
+        usage: Tokens que se gastaron de todos modos.
+    """
+
+    def __init__(self, message: str, usage: LLMUsage) -> None:
+        """Guarda el mensaje y lo que se gastó.
+
+        Args:
+            message: Qué falló.
+            usage: Tokens gastados en los intentos.
+        """
+        super().__init__(message)
+        self.usage = usage
+
+
+class TermSuggesterPort(Protocol):
+    """La IA que propone las frases de un concepto «como en Google» (ADR-0109)."""
+
+    @property
+    def model(self) -> str:
+        """Modelo que se usa."""
+        ...
+
+    @property
+    def terms_prompt_version(self) -> str:
+        """Versión del prompt (se guarda en la bitácora de cada propuesta)."""
+        ...
+
+    async def aclose(self) -> None:
+        """Libera las conexiones al apagar la API."""
+        ...
+
+    async def suggest_terms(self, request: TermSuggestionRequest) -> TermSuggestionResult:
+        """Propone nombre, frases tipo titular y exclusiones.
+
+        Args:
+            request: Lo que busca el analista.
+
+        Returns:
+            La propuesta con su costo; el caso de uso la limpia antes de mostrarla.
+
+        Raises:
+            TermSuggestionError: Si la respuesta no fue válida tras un reintento.
             ProviderError: Si la IA no respondió (red, 429, 5xx, llave).
         """
         ...

@@ -30,7 +30,9 @@ from app.adapters.health.redis_probe import RedisHealthProbe
 from app.adapters.llm.factory import (
     MissingLLMKeyError,
     SummarizerSetup,
+    TermSuggesterSetup,
     build_summarizer,
+    build_term_suggester,
     llm_info,
 )
 from app.adapters.persistence.access_repository import PostgresAccessStore
@@ -71,6 +73,7 @@ from app.application.use_cases.entities import QueueExtraction
 from app.application.use_cases.login import PasswordLogin
 from app.application.use_cases.plan_search import PlanSearch
 from app.application.use_cases.reports import BuildReport, ExportSearch, LLMPrices
+from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.core.config import APP_VERSION, Settings, get_settings
 from app.core.logging import configure_logging
 from app.domain.deliveries import SOURCES
@@ -97,6 +100,40 @@ def _summarizer(settings: Settings) -> SummarizerSetup | None:
         return build_summarizer(settings)
     except MissingLLMKeyError:
         return None
+
+
+def _term_suggester(settings: Settings) -> TermSuggesterSetup | None:
+    # Sin la llave de la IA, el formulario sigue sirviendo a mano: la ruta
+    # de propuestas responde 503 con un aviso (ADR-0109).
+    try:
+        return build_term_suggester(settings)
+    except MissingLLMKeyError:
+        return None
+
+
+def _wire_term_suggester(app: FastAPI, settings: Settings) -> TermSuggesterSetup | None:
+    """Frases de un concepto «como en Google» que propone la IA (ADR-0109).
+
+    Args:
+        app: Aplicación (deja el caso de uso en ``app.state.term_suggester``).
+        settings: Configuración (``LLM_PROVIDER`` y su llave).
+
+    Returns:
+        La IA con sus precios, para cerrarla al apagar; ``None`` sin llave.
+    """
+    setup = _term_suggester(settings)
+    app.state.term_suggester = (
+        SuggestConceptTerms(
+            setup.suggester,
+            LLMPrices(
+                setup.provider, setup.price_input_per_million, setup.price_output_per_million
+            ),
+            app.state.concept_repository,
+        )
+        if setup
+        else None
+    )
+    return setup
 
 
 def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> None:
@@ -291,6 +328,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _utc_now,
         )
         app.state.report_documents = ReportRenderer()
+        suggester = _wire_term_suggester(app, settings)
         _wire_deliveries(app, settings, engine)
         _wire_access(app, settings, engine, redis_client)
         try:
@@ -298,6 +336,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             if summarizer:
                 await summarizer.summarizer.aclose()
+            if suggester:
+                await suggester.suggester.aclose()
             await redis_client.aclose()
             await engine.dispose()
 

@@ -26,6 +26,8 @@ from app.domain.concept import Concept, ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
 
 ENTITY_TYPE = "concept"
+# Una propuesta de frases todavía no es un concepto: su registro va con el id 0.
+SUGGESTION_ENTITY_ID = 0
 # Nombre del índice único de la migración 0005: identifica el choque de nombres.
 _NAME_UNIQUE_INDEX = "concepts_name_norm_active_key"
 _COLUMNS = """
@@ -253,3 +255,8 @@ class PostgresConceptRepository:
                 )
             ).scalar_one()
         return bool(used)
+
+    async def record_suggestion(self, audit: AuditEntry) -> None:
+        """Ver ``ConceptRepositoryPort.record_suggestion``."""
+        async with self._engine.begin() as conn:
+            await _write_audit(conn, SUGGESTION_ENTITY_ID, audit)

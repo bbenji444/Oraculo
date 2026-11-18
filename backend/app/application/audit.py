@@ -16,6 +16,8 @@ from app.domain.concept import ConceptDraft
 CONCEPT_CREATED = "concept.created"
 CONCEPT_UPDATED = "concept.updated"
 CONCEPT_DELETED = "concept.deleted"
+# La IA propuso las frases de un concepto (ADR-0109): no crea nada, pero cuesta.
+CONCEPT_TERMS_SUGGESTED = "concept.terms_suggested"
 SEARCH_FINISHED = "search.finished"
 # Notas de una búsqueda que se volvieron a pasar por la IA (gasto extra).
 SEARCH_REPROCESSED = "search.reprocessed"

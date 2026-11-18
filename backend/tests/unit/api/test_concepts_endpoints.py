@@ -12,11 +12,14 @@ from app.api.v1.concepts import (
     get_actor,
     get_concept_repository,
     get_preview_providers,
+    get_term_suggester,
 )
 from app.api.v1.regions import get_region_repository
 from app.application.audit import Actor
+from app.application.use_cases.suggest_terms import SuggestConceptTerms
 from app.domain.queries import Provider
 from app.main import create_app
+from tests.unit.application.test_suggest_terms import INTENT, PRICES, FakeSuggester, result
 from tests.unit.fake_concepts import FakeConceptRepository
 from tests.unit.fake_regions import IZTAPALAPA, FakeRegionRepository
 
@@ -237,3 +240,61 @@ def test_probar_como_en_google_manda_cada_frase_sola_a_google_news_rss(
         "filtran datos Iztapalapa when:7d",
         "hackeo gobierno Iztapalapa when:7d",
     ]
+
+
+# --- La IA propone las frases (ADR-0109) ---
+
+
+def test_proponer_frases_devuelve_la_propuesta_limpia(
+    client: TestClient, concepts: FakeConceptRepository
+) -> None:
+    suggester = FakeSuggester(
+        result("filtran datos", "Filtran datos", "hackeo gobierno", excludes=("curso",))
+    )
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
+        suggester, PRICES, concepts
+    )
+
+    response = client.post(f"{URL}/suggest", json={"description": INTENT})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "name": "Hackeos a gobierno",
+        "keywords": ["filtran datos", "hackeo gobierno"],
+        "exclude_terms": ["curso"],
+        "query_mode": "open",
+        "model": "gpt-6-luna",
+        "cost_usd": 0.002,
+    }
+    # No se guardó ningún concepto: solo la bitácora.
+    assert concepts.concepts == {}
+    assert [entry.action for _, entry in concepts.audit] == ["concept.terms_suggested"]
+
+
+def test_proponer_con_descripcion_corta_es_422_por_campo(
+    client: TestClient, concepts: FakeConceptRepository
+) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_term_suggester] = lambda: SuggestConceptTerms(
+        FakeSuggester(result("filtran datos")), PRICES, concepts
+    )
+
+    response = client.post(f"{URL}/suggest", json={"description": "robo"})
+
+    assert response.status_code == 422
+    problems = response.json()["error"]["details"]["problemas"]
+    assert [p["campo"] for p in problems] == ["description"]
+
+
+def test_proponer_sin_ia_configurada_es_503(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    app.state.term_suggester = None
+
+    response = client.post(f"{URL}/suggest", json={"description": INTENT})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "llm_not_configured"

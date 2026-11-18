@@ -1,4 +1,4 @@
-"""``LLMPort``, ``SummarizerPort`` y ``EntityExtractorPort`` con OpenAI por HTTP (ADR-0016).
+"""Los puertos de la IA (enriquecer, resumir, entidades y frases) con OpenAI por HTTP (ADR-0016).
 
 Confirmado en la documentación de OpenAI (17/10/2026):
 
@@ -38,14 +38,18 @@ from app.adapters.llm.common import (
     RETRY_NOTE,
     SUMMARY_MAX_OUTPUT_TOKENS,
     SUMMARY_PROMPT_VERSION,
+    TERMS_MAX_OUTPUT_TOKENS,
+    TERMS_PROMPT_VERSION,
     ClassificationOut,
     EnrichmentOut,
     EntitiesOut,
     SummaryOut,
+    TermsOut,
     build_classify_prompt,
     build_entities_prompt,
     build_prompt,
     build_summary_prompt,
+    build_terms_prompt,
     to_enrichment,
     to_labels,
     to_raw_proposals,
@@ -64,6 +68,9 @@ from app.application.ports.llm import (
     SummaryError,
     SummaryRequest,
     SummaryResult,
+    TermSuggestionError,
+    TermSuggestionRequest,
+    TermSuggestionResult,
 )
 from app.domain.authority import Authority
 from app.domain.enrichment import LLMUsage
@@ -216,6 +223,19 @@ ENTITIES_SCHEMA: dict[str, Any] = {
 }
 
 
+# Esquema estricto de la propuesta de frases (mismo contenido que TermsOut).
+TERMS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["name", "phrases", "exclude_terms"],
+    "properties": {
+        "name": {"type": "string"},
+        "phrases": {"type": "array", "items": {"type": "string"}},
+        "exclude_terms": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+
 def request_body(
     model: str,
     prompt: str,
@@ -321,6 +341,11 @@ class OpenAIEnricher:
     def entities_prompt_version(self) -> str:
         """Ver ``EntityExtractorPort.entities_prompt_version``."""
         return ENTITIES_PROMPT_VERSION
+
+    @property
+    def terms_prompt_version(self) -> str:
+        """Ver ``TermSuggesterPort.terms_prompt_version``."""
+        return TERMS_PROMPT_VERSION
 
     async def aclose(self) -> None:
         """Cierra las conexiones HTTP."""
@@ -431,6 +456,28 @@ class OpenAIEnricher:
             )
         return EntityExtractionResult(
             to_raw_proposals(out), usage, self._model, ENTITIES_PROMPT_VERSION
+        )
+
+    async def suggest_terms(self, request: TermSuggestionRequest) -> TermSuggestionResult:
+        """Ver ``TermSuggesterPort.suggest_terms``."""
+        out, usage, error = await self._complete(
+            build_terms_prompt(request),
+            TermsOut,
+            name="terms",
+            schema=TERMS_SCHEMA,
+            max_output_tokens=TERMS_MAX_OUTPUT_TOKENS,
+        )
+        if out is None:
+            raise TermSuggestionError(
+                f"OpenAI no dio una propuesta de frases válida tras reintentar: {error}", usage
+            )
+        return TermSuggestionResult(
+            out.name,
+            tuple(out.phrases),
+            tuple(out.exclude_terms),
+            usage,
+            self._model,
+            TERMS_PROMPT_VERSION,
         )
 
 

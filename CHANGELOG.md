@@ -12,6 +12,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - Cada concepto tiene un **modo de búsqueda**: «frases exactas» (como hasta hoy) o «como en Google».
   - Como en Google, cada frase (hasta 12) se manda sola y sin comillas a Google News RSS, escrita como titular. Medido: «roban auto Jalisco» trajo 19 notas; el grupo de frases exactas de robo de vehículo, 5.
   - Los conceptos que ya existían, incluida la FGR, siguen en frases exactas. Sin `query_mode`, la API crea conceptos exactos.
+  - **La IA propone las frases:** el analista escribe lo que busca en sus palabras y la IA propone un nombre, de 8 a 12 frases tipo titular y exclusiones. No guarda nada: el analista revisa antes. Ruta nueva `POST /api/v1/concepts/suggest`; cada propuesta queda en la bitácora (`concept.terms_suggested`) con su costo.
 
 - **Casos más claros y revisión en bloque (11/11/2026, ADR-0107).** Benji: «que haya cosas que te permitan seleccionar todo» y «que realmente haya alguna relación la cual nos pueda servir para algo».
   - El caso se divide en pestañas: **Panorama**, Entidades, Vínculos y Noticias. Cada pestaña dice cuánto falta revisar.
