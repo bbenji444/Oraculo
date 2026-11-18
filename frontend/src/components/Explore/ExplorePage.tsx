@@ -211,7 +211,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
       )}
       {/* Los paneles van debajo del encabezado; el universo y el globo, detrás
           de todo (también del encabezado, que es un tinte translúcido). */}
-      <div className="capa-paneles absolute inset-x-0 bottom-0 top-[var(--header-h)]">
+      <div className="capa-paneles absolute right-0 bottom-0 left-[var(--dock-w)] top-[var(--header-h)]">
         <CaseWall map={map} />
         <CasesOnGlobe map={map} />
 

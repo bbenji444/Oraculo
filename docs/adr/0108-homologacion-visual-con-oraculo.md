@@ -6,6 +6,7 @@
   - Material Icons.
 
   Puso una condición: **se conservan todas las secciones actuales**.
+
 - **Fase:** F12.
 
 ## Contexto
@@ -49,25 +50,27 @@ Cada paso va en su propio commit, para revertirlo solo:
    - constelación fuera de Explorar. El universo 3D ya no se monta en las demás pestañas.
 
    Para que las 7 pestañas quepan en una fila con la sesión completa: bajo 1536 px se juntan, bajo 1440 px se quita el texto «ORÁCULO» y bajo 1280 px se achican y se quita el nombre de la persona. Medido de 1024 a 1534 px. Bajo 1024 px se deslizan a lo ancho, como ya pasaba en celular.
+
 6. Iconos: Material Icons autoalojados.
+7. **Menú a la izquierda (17/11/2026, después de publicar los pasos 1 a 6).** El jefe de Benji pidió el dock vertical de Oráculo, que aquí estaba en «Alternativas» como parte del nivel completo. Las 7 secciones pasan a `HudDock`: barra vertical de 72 px a la izquierda, centrada bajo el encabezado, con icono y nombre corto debajo (Benji eligió que llevara nombre, no solo icono, para analistas sin capacitación). `--dock-w` reserva su espacio: las pantallas empiezan a la derecha y en Explorar se recorren los paneles; el globo sigue a pantalla completa. En celular se queda en el encabezado como fila deslizable: abajo chocaría con la consola de Explorar. Con el encabezado libre, «ORÁCULO» y el nombre de la persona se ven siempre (se quitaron los cortes por ancho del paso 5).
 
 **De Oráculo no se copia:**
 
-| Lo que hace Oráculo | Por qué no |
-|---|---|
-| `backdrop-filter` | El monitor lo evita para no frenar el globo (`hud.css`). |
-| Botones sin foco visible | Se conserva el foco para quien usa teclado. |
-| Celdas de tabla sin relleno | Es un descuido de su CSS. |
-| Constelación que anima aunque el sistema pida «reducir animaciones» | El monitor siempre respeta esa preferencia. |
+| Lo que hace Oráculo                                                 | Por qué no                                               |
+| ------------------------------------------------------------------- | -------------------------------------------------------- |
+| `backdrop-filter`                                                   | El monitor lo evita para no frenar el globo (`hud.css`). |
+| Botones sin foco visible                                            | Se conserva el foco para quien usa teclado.              |
+| Celdas de tabla sin relleno                                         | Es un descuido de su CSS.                                |
+| Constelación que anima aunque el sistema pida «reducir animaciones» | El monitor siempre respeta esa preferencia.              |
 
 ## Alternativas consideradas
 
-| Alternativa | Por qué no |
-|---|---|
-| Nivel ligero: solo letras, esquinas y botones | El encabezado y el fondo seguirían delatando que es otro sistema. |
-| Nivel completo: dock vertical en lugar de pestañas, animaciones de tubo y PDF tipo dossier | Cambia la costumbre de los analistas. Además, el lado izquierdo de Explorar ya tiene paneles sobre el globo. Queda para después. |
-| Copiar el CSS de Oráculo tal cual | Su stack es Django con CSS suelto y el del monitor es React con Tailwind. Se copia el molde, no la prenda. |
-| Componente por componente | Habría que tocar decenas de `.tsx` y quedarían piezas sin homologar. |
+| Alternativa                                                                                | Por qué no                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nivel ligero: solo letras, esquinas y botones                                              | El encabezado y el fondo seguirían delatando que es otro sistema.                                                                                                                                                 |
+| Nivel completo: dock vertical en lugar de pestañas, animaciones de tubo y PDF tipo dossier | Cambia la costumbre de los analistas. Además, el lado izquierdo de Explorar ya tiene paneles sobre el globo. Queda para después. El dock se hizo después (paso 7); las animaciones de tubo y el PDF siguen fuera. |
+| Copiar el CSS de Oráculo tal cual                                                          | Su stack es Django con CSS suelto y el del monitor es React con Tailwind. Se copia el molde, no la prenda.                                                                                                        |
+| Componente por componente                                                                  | Habría que tocar decenas de `.tsx` y quedarían piezas sin homologar.                                                                                                                                              |
 
 ## Consecuencias
 
