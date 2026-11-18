@@ -349,6 +349,7 @@ def test_concepto_sin_palabras_clave_es_error() -> None:
     class Empty:
         keywords: tuple[str, ...] = ()
         exclude_terms: tuple[str, ...] = ()
+        query_mode: QueryMode = QueryMode.EXACT
 
     with pytest.raises(ConceptValidationError):
         build_queries(Empty(), IZTAPALAPA, WEEK)
