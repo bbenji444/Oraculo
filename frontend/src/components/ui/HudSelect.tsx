@@ -31,6 +31,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import { matchTypeahead, type MenuPlacement, menuPlacement, moveIndex } from '../../ui/select';
+import { Icon } from './Icon';
 
 export interface HudSelectOption<T extends string | number> {
   value: T;
@@ -234,9 +235,7 @@ export function HudSelect<T extends string | number>({
         } ${className}`}
       >
         <span className="min-w-0 truncate">{selected?.label ?? ''}</span>
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="hud-select-chevron">
-          <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" />
-        </svg>
+        <Icon name="expand_more" className="hud-select-chevron" />
       </button>
       {open &&
         place &&
@@ -274,18 +273,7 @@ export function HudSelect<T extends string | number>({
                 }}
               >
                 <span className="min-w-0 truncate">{option.label}</span>
-                {index === selectedIndex && (
-                  <svg aria-hidden="true" viewBox="0 0 16 16" className="hud-menu-check">
-                    <path
-                      d="m3.5 8.5 3 3 6-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
+                {index === selectedIndex && <Icon name="check" className="hud-menu-check" />}
               </li>
             ))}
           </ul>,

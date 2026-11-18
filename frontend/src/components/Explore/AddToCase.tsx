@@ -17,6 +17,7 @@ import { useAddCaseArticle, useCasesForArticle, useCreateCase } from '../../hook
 import type { Case } from '../../services/cases';
 import { useExplorerStore } from '../../store/explorer';
 import { withLastFirst } from './caseOrder';
+import { Icon } from '../ui/Icon';
 
 /** "1 nota", "8 notas". */
 function notesLabel(count: number): string {
@@ -96,11 +97,17 @@ export function AddToCase({ articleId }: AddToCaseProps) {
           }}
           className="hud-btn hud-btn--sm"
         >
-          {last && !last.has_article ? '▾ Otro caso' : '+ Agregar al caso'}
+          {last && !last.has_article ? (
+            <>
+              <Icon name="expand_more" /> Otro caso
+            </>
+          ) : (
+            '+ Agregar al caso'
+          )}
         </button>
         {inCases.length > 0 && (
           <span className="text-[11px] text-emerald-200/90">
-            ✓ En{' '}
+            <Icon name="check" /> En{' '}
             {inCases.length === 1
               ? `«${inCases[0]?.name ?? ''}»`
               : `${String(inCases.length)} casos`}
@@ -130,7 +137,13 @@ export function AddToCase({ articleId }: AddToCaseProps) {
             >
               <span className="truncate">{item.name}</span>
               <span className="shrink-0 text-[11px]">
-                {item.has_article ? '✓ ya está' : notesLabel(item.article_count)}
+                {item.has_article ? (
+                  <>
+                    <Icon name="check" /> ya está
+                  </>
+                ) : (
+                  notesLabel(item.article_count)
+                )}
               </span>
             </button>
           ))}

@@ -59,6 +59,7 @@ import { Chronology } from './Chronology';
 import { applyTimeline } from './timelineData';
 import { useFinishNotice } from './useFinishNotice';
 import { useIdleSpin } from './useIdleSpin';
+import { Icon } from '../ui/Icon';
 
 // Lista vacía estable: un arreglo nuevo en cada render haría redibujar el globo.
 const NO_ARTICLES: Article[] = [];
@@ -209,7 +210,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
         />
       )}
       {/* Los paneles van debajo del encabezado; el universo y el globo, detrás
-          de todo (también del encabezado, que no tiene fondo). */}
+          de todo (también del encabezado, que es un tinte translúcido). */}
       <div className="capa-paneles absolute inset-x-0 bottom-0 top-[var(--header-h)]">
         <CaseWall map={map} />
         <CasesOnGlobe map={map} />
@@ -264,7 +265,8 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
                 }}
                 className="hud-btn hud-btn--sm absolute left-4 top-4 bg-[#050d12]/90"
               >
-                › Búsqueda y noticias{hasResults ? ` (${String(shown.length)})` : ''}
+                <Icon name="chevron_right" /> Búsqueda y noticias
+                {hasResults ? ` (${String(shown.length)})` : ''}
               </button>
             )}
 
@@ -290,7 +292,7 @@ export function ExplorePage({ active = true }: ExplorePageProps) {
             title="Quita los resultados del globo y deja listo para otra búsqueda (esta queda en Historial)"
             className="hud-btn hud-btn--sm absolute left-1/2 top-3 z-10 -translate-x-1/2 bg-[#050d12]/90"
           >
-            ✕ Limpiar globo
+            <Icon name="close" /> Limpiar globo
           </button>
         )}
 

@@ -36,6 +36,7 @@ import { SelectBox } from './SelectBox';
 import { bulkNotice, countLabel, selectionState, toggleKey, toggleKeys } from './selection';
 import { HudSegmented } from '../ui/HudSegmented';
 import { HudSelect } from '../ui/HudSelect';
+import { Icon } from '../ui/Icon';
 
 const STATES: { value: ReviewStatus; label: string }[] = [
   { value: 'suggested', label: 'Por revisar' },
@@ -145,7 +146,7 @@ export function CaseRelationships({ caseId, canEdit }: CaseRelationshipsProps) {
   }
 
   return (
-    <div className="hud-panel hud-spot hud-reveal overflow-hidden">
+    <div className="hud-panel hud-reveal overflow-hidden">
       <div className="hud-section-head">
         <h3 className="hud-section-title">Vínculos</h3>
         {canEdit && !drawing && confirmed.length >= 2 && (
@@ -320,9 +321,7 @@ function LinkGroup({ title, hint, open, onToggle, selectBox, children }: LinkGro
             onClick={onToggle}
             className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-sky-400"
           >
-            <span aria-hidden="true" className="text-sky-300">
-              {open ? '▾' : '▸'}
-            </span>
+            <Icon name={open ? 'expand_more' : 'chevron_right'} className="text-sky-300" />
             {heading}
           </button>
         ) : (

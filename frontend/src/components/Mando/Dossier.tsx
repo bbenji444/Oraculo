@@ -36,6 +36,7 @@ import { HudSegmented } from '../ui/HudSegmented';
 import { FilterPopover } from './FilterPopover';
 import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
+import { Icon } from '../ui/Icon';
 
 // Categorías en la barra: las que más salen; el resto no se distinguiría.
 const TOP_CATEGORIES = 5;
@@ -131,7 +132,7 @@ export function Dossier({
         title="Abrir el expediente de la consulta"
         className="hud-btn hud-btn--sm mando-edge-tab pointer-events-auto absolute right-0 top-1/2 -translate-y-1/2 bg-[#050d12]/90 px-2 py-4"
       >
-        ‹ Expediente · {shown.length}
+        <Icon name="chevron_left" /> Expediente · {shown.length}
       </button>
     );
   }
@@ -183,7 +184,7 @@ export function Dossier({
             aria-label={summaryOpen ? 'Plegar el resumen' : 'Desplegar el resumen'}
             className="hud-icon-btn size-7 text-xs"
           >
-            {summaryOpen ? '▴' : '▾'}
+            <Icon name={summaryOpen ? 'expand_less' : 'expand_more'} className="text-lg" />
           </button>
           <button
             type="button"
@@ -194,7 +195,7 @@ export function Dossier({
             aria-label="Ocultar el expediente"
             className="hud-icon-btn size-7 text-xs"
           >
-            ›
+            <Icon name="chevron_right" className="text-lg" />
           </button>
         </div>
 

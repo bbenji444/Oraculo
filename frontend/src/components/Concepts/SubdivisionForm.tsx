@@ -28,6 +28,7 @@ import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
 import { HudSwitch } from '../ui/HudSwitch';
+import { Icon } from '../ui/Icon';
 import { DeleteConfirm } from './DeleteConfirm';
 import { KeywordChips } from './KeywordChips';
 
@@ -176,7 +177,7 @@ export function SubdivisionForm({ category, topic, onClose, onCreated }: Subdivi
             <DecodeText text={category ? `Subdivisión «${category.name}»` : 'Nueva subdivisión'} />
           </h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
-            ×
+            <Icon name="close" className="text-lg" />
           </button>
         </div>
 

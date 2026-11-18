@@ -44,6 +44,7 @@ import {
   todayInMexico,
   WEEKDAYS,
 } from '../../ui/calendar';
+import { Icon } from './Icon';
 
 interface HudDatePickerProps {
   /** `AAAA-MM-DD`, o vacío si no hay fecha. */
@@ -220,10 +221,7 @@ export function HudDatePicker({
         <span className={chosen ? 'tabular-nums' : 'text-slate-500'}>
           {chosen ? shortDate(chosen) : 'dd/mm/aaaa'}
         </span>
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="hud-select-chevron">
-          <rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" />
-          <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" fill="none" stroke="currentColor" />
-        </svg>
+        <Icon name="calendar_today" className="hud-select-chevron" />
       </button>
       {open &&
         place &&
@@ -245,7 +243,7 @@ export function HudDatePicker({
                 aria-label="Mes anterior"
                 className="hud-icon-btn size-7 text-sm"
               >
-                ‹
+                <Icon name="chevron_left" className="text-lg" />
               </button>
               {/* key: el título nuevo entra con un destello al cambiar de mes. */}
               <p key={`${String(view.year)}-${String(view.month)}`} className="hud-calendar-title">
@@ -259,7 +257,7 @@ export function HudDatePicker({
                 aria-label="Mes siguiente"
                 className="hud-icon-btn size-7 text-sm"
               >
-                ›
+                <Icon name="chevron_right" className="text-lg" />
               </button>
             </div>
             <div className="hud-calendar-week" aria-hidden="true">

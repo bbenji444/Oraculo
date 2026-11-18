@@ -57,6 +57,7 @@ import {
   sourcesLabel,
   trackNames,
 } from './mission';
+import { Icon } from '../ui/Icon';
 
 type Launcher = ReturnType<typeof useSearchLauncher>;
 
@@ -358,7 +359,13 @@ function LaunchButton({ launcher }: { launcher: Launcher }) {
         }}
         className="hud-btn hud-btn--solid w-full px-5 py-2 text-[11px]"
       >
-        {busy ? 'Barrido en curso…' : 'Iniciar barrido ›'}
+        {busy ? (
+          'Barrido en curso…'
+        ) : (
+          <>
+            Iniciar barrido <Icon name="chevron_right" />
+          </>
+        )}
       </button>
       {shocks.map((id) => (
         <span key={id} aria-hidden="true" className="mando-shock" />
@@ -473,7 +480,7 @@ function MinimizeButton() {
       aria-label="Minimizar la consola"
       className="hud-icon-btn size-7 text-xs"
     >
-      ▾
+      <Icon name="expand_more" className="text-lg" />
     </button>
   );
 }
@@ -526,9 +533,9 @@ export function MissionDock({ active }: MissionDockProps) {
           onClick={() => {
             useMandoStore.getState().setDockMinimized(false);
           }}
-          className="hud-btn hud-btn--sm mando-dock bg-[#050d12]/90 px-4"
+          className="hud-btn hud-btn--sm mando-dock mando-pill bg-[#050d12]/90 px-4"
         >
-          ◈ Centro de mando{percent} ▴
+          <Icon name="radar" /> Centro de mando{percent} <Icon name="expand_less" />
         </button>
       </div>
     );
@@ -560,7 +567,7 @@ export function MissionDock({ active }: MissionDockProps) {
     return (
       <section
         aria-label="Centro de mando"
-        className={`${MANDO_GLASS} mando-dock flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
+        className={`${MANDO_GLASS} mando-dock mando-pill flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="hud-dot hud-dot--live" />

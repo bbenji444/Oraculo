@@ -9,10 +9,11 @@
  *   parte en piezas de 2048 px (`skyTiles`) que se suben a la tarjeta una por
  *   cuadro. Subirla entera de un golpe era la operación más larga de la página.
  * - Solo se dibuja cuando la cámara se mueve o cambia el tamaño, a 30 cuadros
- *   por segundo como máximo. Quieto, no gasta nada. Fuera de Explorar
- *   («drift») deriva solo, muy despacio, a 24 cuadros por segundo.
- * - Es uno solo para toda la aplicación (lo monta `App`), detrás de todas
- *   las pestañas: no hay una segunda copia que ocupe la tarjeta.
+ *   por segundo como máximo. Quieto, no gasta nada. En la pantalla de
+ *   entrada («drift») deriva solo, muy despacio, a 24 cuadros por segundo.
+ * - Es uno solo para toda la aplicación (lo monta `App`), detrás de Explorar:
+ *   no hay una segunda copia que ocupe la tarjeta. Las demás pestañas llevan
+ *   el fondo de Oráculo (`Constellation`, ADR-0108).
  * - Sin suavizado de bordes: a un cielo de estrellas no le sirve y cuesta
  *   memoria de video.
  * - Al salir de Explorar se suelta el contexto de la tarjeta de inmediato.

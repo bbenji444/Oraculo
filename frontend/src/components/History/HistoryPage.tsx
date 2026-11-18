@@ -36,6 +36,7 @@ import { type ChipTone, HudChip } from '../ui/HudChip';
 import { HudPanel } from '../ui/HudPanel';
 import { HudSwitch } from '../ui/HudSwitch';
 import { SectionHeading } from '../ui/SectionHeading';
+import { Icon } from '../ui/Icon';
 
 const STATUS_LABEL: Record<Search['status'], { text: string; tone: ChipTone; live?: boolean }> = {
   pending: { text: 'En cola', tone: 'slate' },
@@ -69,10 +70,7 @@ function SearchGlyph() {
       aria-hidden="true"
       className="grid size-10 flex-none place-items-center rounded-full border border-sky-400/30 text-sky-300"
     >
-      <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor">
-        <circle cx="9" cy="9" r="5.5" strokeWidth="1.6" />
-        <path d="m13.5 13.5 3.5 3.5" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
+      <Icon name="search" className="text-lg" />
     </span>
   );
 }

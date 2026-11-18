@@ -29,7 +29,7 @@ export function ConceptTable({
   togglingId,
 }: ConceptTableProps) {
   return (
-    <table className="w-full table-fixed text-left text-sm">
+    <table className="hud-table table-fixed text-sm">
       <caption className="sr-only">Conceptos de búsqueda</caption>
       <thead className="font-display text-[9.5px] tracking-[0.22em] text-sky-300/70 uppercase">
         <tr>

@@ -133,3 +133,4 @@ Benji pidió el fondo del universo también en Casos, Conceptos, Historial y Est
 - **En las demás pestañas** (modo «drift») deriva solo, muy despacio: una vuelta cada 10 minutos, con un vaivén suave de latitud (`driftView`), a 24 cuadros por segundo. Medido en Historial: unos 22 cuadros por segundo de 9 llamadas cada uno.
 - **Encima, el velo `.velo-universo`.** Oscurece las estrellas para leer, sobre todo en el centro, donde va el texto, y lleva dos auroras cian que se mueven en 38 y 46 s. Solo se animan con `transform`, sin `blur` (desenfocar una capa grande en cada cuadro le costaría a la tarjeta).
 - En Explorar el velo se desvanece en 0.7 s.
+- **Reemplazado el 17/11/2026 (ADR-0108).** Fuera de Explorar el fondo es la cuadrícula y la constelación de Oráculo core. El universo solo se monta al visitar Explorar, y el modo «drift» con su velo quedan en la pantalla de entrada.

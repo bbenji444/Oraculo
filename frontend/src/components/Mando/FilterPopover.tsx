@@ -29,6 +29,7 @@ import { HudSelect } from '../ui/HudSelect';
 import { HudSwitch } from '../ui/HudSwitch';
 import { CategoryFilter } from './CategoryFilter';
 import { activeFilters } from './mission';
+import { Icon } from '../ui/Icon';
 
 const LOCATIONS = [
   { value: 'all', label: 'Todas' },
@@ -88,9 +89,7 @@ export function FilterPopover({ articles }: FilterPopoverProps) {
         }}
         className={`hud-btn hud-btn--sm flex items-center gap-1.5 px-3 ${count > 0 ? 'border-sky-300/60 text-sky-100' : ''}`}
       >
-        <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5 fill-current">
-          <path d="M1.5 2.5h13l-5 6v4.5l-3 1.5v-6z" />
-        </svg>
+        <Icon name="filter_alt" />
         Filtro
         {count > 0 && <span className="mando-filter-count">{count}</span>}
       </button>
@@ -134,7 +133,7 @@ export function FilterPopover({ articles }: FilterPopoverProps) {
                     aria-label="Cerrar el filtro"
                     className="hud-icon-btn size-7 text-sm"
                   >
-                    ×
+                    <Icon name="close" className="text-lg" />
                   </button>
                 </div>
               </div>

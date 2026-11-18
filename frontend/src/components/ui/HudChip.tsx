@@ -1,7 +1,9 @@
 /**
  * Insignia de estado (27/10/2026, styles/hud.css): «abierto», «reservado»,
- * «terminada», una categoría… Con `live` lleva un punto con pulso de radar,
- * para lo que está vivo (una corrida en curso, un servicio funcionando).
+ * «terminada», una categoría… Es la etiqueta de Oráculo core (ADR-0108): una
+ * píldora del color de su estado. Con `live` lleva un punto con pulso de
+ * radar, para lo que está vivo (una corrida en curso, un servicio
+ * funcionando).
  *
  * No hace: no decide el color según el dato (lo elige quien la usa).
  */

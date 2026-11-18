@@ -17,6 +17,7 @@ import { HudButton } from '../ui/HudButton';
 import { HudSwitch } from '../ui/HudSwitch';
 import { RegionField } from './RegionField';
 import { addTime, DAYS, dailyRunsWith, toggleDay } from './schedule';
+import { Icon } from '../ui/Icon';
 
 interface ScheduleFormProps {
   initial: ScheduleInput;
@@ -161,7 +162,7 @@ export function ScheduleForm({
                 }}
                 className="text-slate-400 hover:text-rose-300"
               >
-                ×
+                <Icon name="close" />
               </button>
             </span>
           ))}

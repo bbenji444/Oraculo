@@ -11,6 +11,7 @@ import { useCaseArticles, useRemoveCaseArticle } from '../../hooks/useCases';
 import { formatDay, PRECISION_LABEL } from '../Explore/format';
 import { ExternalLink } from '../ExternalLink';
 import { HudButton } from '../ui/HudButton';
+import { Icon } from '../ui/Icon';
 
 interface CaseArticlesProps {
   caseId: string;
@@ -64,7 +65,7 @@ export function CaseArticles({ caseId, articleCount, canEdit }: CaseArticlesProp
               </div>
               <div className="flex shrink-0 gap-2">
                 <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
-                  Ver nota original ↗
+                  Ver nota original <Icon name="open_in_new" />
                 </ExternalLink>
                 {canEdit && (
                   <HudButton

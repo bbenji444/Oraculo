@@ -52,6 +52,8 @@ vi.mock('./components/Explore/ExploreGlobe', async () => {
   };
 });
 vi.mock('./components/Space/SpaceBackground', () => ({ SpaceBackground: () => null }));
+// jsdom no tiene lienzo 2D: el fondo de constelación no se dibuja en las pruebas.
+vi.mock('./components/Space/Constellation', () => ({ Constellation: () => null }));
 
 const SEARCH_ID = search.search_id;
 // Credenciales de la API falsa (no son reales).
@@ -269,7 +271,7 @@ describe('flujo principal (H1, Centro de mando)', () => {
     expect(within(figure('Créditos')).getByText('1')).toBeTruthy();
 
     // 4. Lanzar: se envía lo elegido y la consola muestra el barrido por etapas.
-    fireEvent.click(within(dock).getByRole('button', { name: 'Iniciar barrido ›' }));
+    fireEvent.click(within(dock).getByRole('button', { name: 'Iniciar barrido' }));
     expect(await screen.findByText('Resumiendo y clasificando con la IA')).toBeTruthy();
     expect(screen.getByRole('listitem', { current: 'step' }).textContent).toBe('IA');
     expect(startBodies).toEqual([expect.objectContaining({ region_id: 272, concept_ids: [3] })]);
@@ -335,7 +337,7 @@ describe('flujo principal (H1, Centro de mando)', () => {
       expect(saved).toEqual(['reporte-extorsion-jalisco-2026-10-17.pdf']);
     });
 
-    // 10. «›» oculta el expediente y una pestaña en el borde lo regresa.
+    // 10. La flecha oculta el expediente y una pestaña en el borde lo regresa.
     fireEvent.click(within(dossier).getByRole('button', { name: 'Ocultar el expediente' }));
     expect(screen.queryByRole('complementary', { name: 'Expediente de la consulta' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Expediente ·/ }));
@@ -453,9 +455,9 @@ describe('diseño de columna (?clasico, H1)', () => {
     expect(await screen.findByText(/18 notas · 1 crédito\(s\)/, {}, POLL_WAIT)).toBeTruthy();
     // Un aviso dice que ya terminó (la persona pudo irse a otra pestaña).
     expect(screen.getByRole('status').textContent).toContain('Búsqueda lista: 18 notas');
-    // La cronología reemplaza a la lista; «☰ Lista» la vuelve a mostrar.
+    // La cronología reemplaza a la lista; «Lista» la vuelve a mostrar.
     expect(await screen.findByRole('region', { name: 'Cronología' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '☰ Lista' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lista' }));
     const list = await screen.findByRole('region', { name: 'Noticias' });
     expect(screen.queryByText(/Top 5 estados/)).toBeNull();
     expect(screen.queryByText('Tipos de noticias')).toBeNull();

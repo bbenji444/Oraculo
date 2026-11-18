@@ -50,7 +50,7 @@ describe('la lista junta las notas del mismo hecho', () => {
     fireEvent.click(chevron);
 
     expect(chevron.getAttribute('aria-expanded')).toBe('true');
-    expect(chevron.textContent).toContain('▼');
+    expect(chevron.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('expand_more');
     expect(screen.getByText('Balacera en Iztapalapa deja dos muertos y un herido')).toBeTruthy();
     expect(screen.getByText('Detienen a dos por la balacera en Iztapalapa')).toBeTruthy();
   });
