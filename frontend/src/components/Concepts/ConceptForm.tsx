@@ -1,6 +1,11 @@
 /**
  * Formulario de un concepto: crear o editar, con "Probar concepto" debajo.
  *
+ * Un concepto nuevo empieza en dos pasos (ADR-0109): primero la persona
+ * escribe en sus palabras qué noticias quiere seguir y la IA propone las
+ * frases; luego revisa el formulario completo antes de guardar. Los nuevos
+ * quedan «como en Google»; el selector de modo permite cambiarlo.
+ *
  * Los errores del backend se muestran junto a su campo; un nombre repetido
  * (409) se muestra en el campo nombre. Borrar pide confirmación.
  *
@@ -9,26 +14,41 @@
  */
 import { useId, useState } from 'react';
 
-import { useCreateConcept, useDeleteConcept, useUpdateConcept } from '../../hooks/useConcepts';
+import {
+  useCreateConcept,
+  useDeleteConcept,
+  useSuggestTerms,
+  useUpdateConcept,
+} from '../../hooks/useConcepts';
 import { ApiError } from '../../services/http';
 import {
   type Concept,
   type ConceptInput,
   type FieldErrors,
+  type TermSuggestion,
   fieldErrors,
 } from '../../services/concepts';
+import { MODE_COPY, MODE_OPTIONS, applySuggestion } from './conceptDraft';
 import { DeleteConfirm } from './DeleteConfirm';
+import { IntentStep } from './IntentStep';
 import { KeywordChips } from './KeywordChips';
 import { QueryPreview } from './QueryPreview';
 import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
+import { HudSegmented } from '../ui/HudSegmented';
+import { formatUsd } from '../Explore/format';
 
 interface ConceptFormProps {
   /** Concepto a editar; sin él, se crea uno nuevo. */
   concept?: Concept;
   onSaved: (concept: Concept) => void;
   onClose: () => void;
+  /**
+   * Dentro de una ventana (Explorar): sin título ni «×» propios (los pone la
+   * ventana) y sin «Probar concepto».
+   */
+  embedded?: boolean;
 }
 
 // Colores que se distinguen bien entre sí sobre el mapa oscuro.
@@ -43,6 +63,7 @@ const PALETTE = [
   '#D35400',
 ];
 
+// Los conceptos nuevos se buscan «como en Google» (ADR-0109, D2).
 const EMPTY: ConceptInput = {
   name: '',
   description: '',
@@ -50,12 +71,13 @@ const EMPTY: ConceptInput = {
   exclude_terms: [],
   color: PALETTE[0] ?? '#2E86DE',
   is_active: true,
+  query_mode: 'open',
 };
 
 function toInput(concept: Concept | undefined): ConceptInput {
   if (!concept) return EMPTY;
-  const { name, description, keywords, exclude_terms, color, is_active } = concept;
-  return { name, description, keywords, exclude_terms, color, is_active };
+  const { name, description, keywords, exclude_terms, color, is_active, query_mode } = concept;
+  return { name, description, keywords, exclude_terms, color, is_active, query_mode };
 }
 
 function errorsFor(error: unknown): { fields: FieldErrors; general: string | null } {
@@ -67,18 +89,34 @@ function errorsFor(error: unknown): { fields: FieldErrors; general: string | nul
   return { fields: {}, general: error instanceof Error ? error.message : null };
 }
 
-export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
+export function ConceptForm({ concept, onSaved, onClose, embedded = false }: ConceptFormProps) {
   const [draft, setDraft] = useState<ConceptInput>(() => toInput(concept));
+  // Uno nuevo empieza preguntando qué se quiere seguir; uno guardado, con todo.
+  const [step, setStep] = useState<'intent' | 'details'>(concept ? 'details' : 'intent');
+  const [proposal, setProposal] = useState<TermSuggestion | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const create = useCreateConcept();
   const update = useUpdateConcept();
   const remove = useDeleteConcept();
+  const suggest = useSuggestTerms();
   const id = useId();
   const saving = create.isPending || update.isPending;
   const { fields, general } = errorsFor(concept ? update.error : create.error);
+  const suggestion = errorsFor(suggest.error);
+  const copy = MODE_COPY[draft.query_mode];
 
   function set<K extends keyof ConceptInput>(key: K, value: ConceptInput[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function propose() {
+    suggest.mutate(draft.description, {
+      onSuccess: (proposed) => {
+        setDraft((current) => applySuggestion(current, proposed));
+        setProposal(proposed);
+        setStep('details');
+      },
+    });
   }
 
   function save(event: React.FormEvent) {
@@ -91,21 +129,75 @@ export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
   }
 
   const inputClass = (invalid: boolean) => `hud-input ${invalid ? 'border-rose-500/70' : ''}`;
+  const title = concept ? `Editar «${concept.name}»` : 'Nuevo concepto';
+  // En una ventana, el título y el «×» los pone ella.
+  const labelling = embedded ? { 'aria-label': title } : { 'aria-labelledby': `${id}-title` };
+  const header = !embedded && (
+    <div className="flex items-center justify-between gap-3">
+      <h2
+        id={`${id}-title`}
+        className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase"
+      >
+        <DecodeText text={title} />
+      </h2>
+      <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
+        ×
+      </button>
+    </div>
+  );
+  const descriptionErrors = fields.description ?? suggestion.fields.description;
+
+  if (step === 'intent') {
+    return (
+      <Frame embedded={embedded}>
+        <section {...labelling} className="space-y-5">
+          {header}
+          <IntentStep
+            id={id}
+            value={draft.description}
+            onChange={(value) => {
+              set('description', value);
+            }}
+            onPropose={propose}
+            onSkip={() => {
+              setStep('details');
+            }}
+            pending={suggest.isPending}
+            errors={suggestion.fields.description}
+            error={suggestion.general}
+          />
+        </section>
+      </Frame>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <HudPanel className="hud-reveal p-5">
-        <form onSubmit={save} aria-labelledby={`${id}-title`} className="space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2
-              id={`${id}-title`}
-              className="font-display text-sm tracking-[0.16em] text-slate-50 uppercase"
+      <Frame embedded={embedded}>
+        <form onSubmit={save} {...labelling} className="space-y-5">
+          {header}
+
+          {proposal && (
+            <p
+              role="status"
+              className="rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-3 py-2 text-xs text-slate-200"
             >
-              <DecodeText text={concept ? `Editar «${concept.name}»` : 'Nuevo concepto'} />
-            </h2>
-            <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
-              ×
-            </button>
+              La IA propuso {proposal.keywords.length} frases ({formatUsd(proposal.cost_usd)}).
+              Quita las que no sirvan o agrega otras antes de guardar.
+            </p>
+          )}
+
+          <div>
+            <p className="hud-label">Cómo se busca</p>
+            <HudSegmented
+              options={MODE_OPTIONS}
+              value={draft.query_mode}
+              label="Cómo se busca"
+              onChange={(mode) => {
+                set('query_mode', mode);
+              }}
+            />
+            <p className="mt-1.5 text-xs text-slate-500">{copy.explanation}</p>
           </div>
 
           <div>
@@ -132,7 +224,10 @@ export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
 
           <div>
             <label htmlFor={`${id}-description`} className="hud-label">
-              Descripción <span className="font-normal text-slate-500">(opcional)</span>
+              {copy.descriptionLabel}{' '}
+              {draft.query_mode === 'exact' && (
+                <span className="font-normal text-slate-500">(opcional)</span>
+              )}
             </label>
             <textarea
               id={`${id}-description`}
@@ -142,18 +237,46 @@ export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
               onChange={(event) => {
                 set('description', event.target.value);
               }}
-              className={inputClass(fields.description !== undefined)}
+              className={inputClass(descriptionErrors !== undefined)}
             />
-            {fields.description?.map((message) => (
+            {copy.descriptionHint && (
+              <p className="mt-1 text-xs text-slate-500">{copy.descriptionHint}</p>
+            )}
+            {descriptionErrors?.map((message) => (
               <p key={message} className="mt-1 text-xs text-rose-300">
                 {message}
               </p>
             ))}
+            {draft.query_mode === 'open' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <HudButton
+                  size="sm"
+                  disabled={suggest.isPending || draft.description.trim() === ''}
+                  onClick={propose}
+                >
+                  {suggest.isPending
+                    ? 'La IA está pensando…'
+                    : draft.keywords.length > 0
+                      ? 'Volver a proponer frases'
+                      : 'Proponer frases con la IA'}
+                </HudButton>
+                {draft.keywords.length > 0 && (
+                  <span className="text-[11px] text-slate-500">
+                    Reemplaza las frases y exclusiones de abajo.
+                  </span>
+                )}
+              </div>
+            )}
+            {suggestion.general && (
+              <p role="alert" className="mt-1 text-xs text-rose-300">
+                {suggestion.general}
+              </p>
+            )}
           </div>
 
           <KeywordChips
-            label="Palabras clave"
-            hint="Una nota entra si menciona cualquiera. Enter o coma para agregar; puedes pegar una lista."
+            label={copy.keywordsLabel}
+            hint={copy.keywordsHint}
             tone="keyword"
             terms={draft.keywords}
             errors={fields.keywords}
@@ -267,9 +390,15 @@ export function ConceptForm({ concept, onSaved, onClose }: ConceptFormProps) {
             />
           )}
         </form>
-      </HudPanel>
+      </Frame>
 
-      <QueryPreview draft={draft} />
+      {!embedded && <QueryPreview draft={draft} />}
     </div>
   );
+}
+
+/** El panel del formulario; dentro de una ventana, la ventana ya es el panel. */
+function Frame({ embedded, children }: { embedded: boolean; children: React.ReactNode }) {
+  if (embedded) return <div>{children}</div>;
+  return <HudPanel className="hud-reveal p-5">{children}</HudPanel>;
 }

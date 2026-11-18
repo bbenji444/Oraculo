@@ -3,7 +3,8 @@
  *
  * Cada cambio (crear, editar, borrar) invalida la lista para que la tabla
  * se actualice sola. "Probar concepto" es una mutación: se ejecuta solo
- * cuando la persona presiona el botón, nunca al teclear.
+ * cuando la persona presiona el botón, nunca al teclear. La propuesta de
+ * frases de la IA, igual.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -14,6 +15,7 @@ import {
   deleteConcept,
   listConcepts,
   previewQueries,
+  suggestTerms,
   updateConcept,
 } from '../services/concepts';
 
@@ -62,4 +64,12 @@ export function useDeleteConcept() {
 /** "Probar concepto": arma las consultas sin gastar créditos. */
 export function useQueryPreview() {
   return useMutation({ mutationFn: previewQueries });
+}
+
+/**
+ * La IA propone las frases de un concepto (ADR-0109). Es una mutación porque
+ * cuesta: solo corre cuando la persona presiona «Proponer frases».
+ */
+export function useSuggestTerms() {
+  return useMutation({ mutationFn: suggestTerms });
 }

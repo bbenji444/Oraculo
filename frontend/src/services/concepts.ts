@@ -1,5 +1,6 @@
 /**
- * Servicio de conceptos: CRUD y "Probar concepto" (`/api/v1/concepts`).
+ * Servicio de conceptos: CRUD, "Probar concepto" y la propuesta de frases de
+ * la IA (`/api/v1/concepts`).
  *
  * Los componentes nunca llaman a fetch directamente (CLAUDE.md §6.2). Las
  * reglas (nombre único, palabras repetidas, caracteres prohibidos) las
@@ -10,9 +11,16 @@ import { apiUrl } from '../config/api';
 import { ApiError, badFormat, requestJson } from './http';
 import type { RegionDetail } from './regions';
 
+/**
+ * Cómo se busca un concepto (ADR-0109): `exact` manda cada frase entre
+ * comillas; `open` la manda sola y sin comillas, como en Google.
+ */
+export type QueryMode = 'exact' | 'open';
+
 export interface Concept {
   id: number;
   name: string;
+  /** En un concepto `open`, lo que el analista busca en sus palabras. */
   description: string;
   keywords: string[];
   exclude_terms: string[];
@@ -20,6 +28,9 @@ export interface Concept {
   color: string;
   /** Si aparece en el panel de búsqueda. */
   is_active: boolean;
+  query_mode: QueryMode;
+  /** «frases exactas» o «como en Google». */
+  query_mode_label: string;
   /**
    * Si es el tema general de una subdivisión (ADR-0038): el id de esa
    * subdivisión en `/categories`; `null` en los demás, como la FGR.
@@ -38,6 +49,19 @@ export interface ConceptInput {
   exclude_terms: string[];
   color: string;
   is_active: boolean;
+  query_mode: QueryMode;
+}
+
+/** Lo que la IA propone a partir de lo que el analista escribió (ADR-0109). */
+export interface TermSuggestion {
+  name: string;
+  /** Frases tipo titular, de la que más notas traería a la que menos. */
+  keywords: string[];
+  exclude_terms: string[];
+  query_mode: QueryMode;
+  model: string;
+  /** Lo que costó la propuesta, en dólares. */
+  cost_usd: number;
 }
 
 /** Campos que cambian en una edición; los que faltan no cambian. */
@@ -86,13 +110,24 @@ function isConcept(value: unknown): value is Concept {
 
 function asConcept(body: unknown): Concept {
   if (!isConcept(body)) throw badFormat();
-  return withCategory(body);
+  return withDefaults(body);
 }
 
-/** Las respuestas de antes del 02/11/2026 no traen `category_id`: no son temas. */
-function withCategory(concept: Concept): Concept {
-  const raw = concept as Omit<Concept, 'category_id'> & { category_id?: number | null };
-  return { ...raw, category_id: raw.category_id ?? null };
+type RawConcept = Omit<Concept, 'category_id' | 'query_mode' | 'query_mode_label'> &
+  Partial<Pick<Concept, 'category_id' | 'query_mode' | 'query_mode_label'>>;
+
+/**
+ * Las respuestas de antes del 02/11/2026 no traen `category_id` (no son
+ * temas), y las de antes del 17/11/2026 no traen el modo (son exactos).
+ */
+function withDefaults(concept: Concept): Concept {
+  const raw = concept as RawConcept;
+  return {
+    ...raw,
+    category_id: raw.category_id ?? null,
+    query_mode: raw.query_mode ?? 'exact',
+    query_mode_label: raw.query_mode_label ?? 'frases exactas',
+  };
 }
 
 /**
@@ -112,7 +147,7 @@ export async function listConcepts(signal?: AbortSignal): Promise<Concept[]> {
       signal,
     })) as { items?: unknown; next_cursor?: unknown } | null;
     if (!Array.isArray(body?.items) || !body.items.every(isConcept)) throw badFormat();
-    all.push(...body.items.map(withCategory));
+    all.push(...body.items.map(withDefaults));
     cursor = typeof body.next_cursor === 'string' ? body.next_cursor : null;
   } while (cursor);
   return all;
@@ -151,6 +186,39 @@ export async function updateConcept(id: number, patch: ConceptPatch): Promise<Co
  */
 export async function deleteConcept(id: number): Promise<void> {
   await requestJson(apiUrl(`concepts/${String(id)}`), { method: 'DELETE' });
+}
+
+function isSuggestion(value: unknown): value is TermSuggestion {
+  if (typeof value !== 'object' || value === null) return false;
+  const s = value as Record<string, unknown>;
+  return (
+    typeof s.name === 'string' &&
+    Array.isArray(s.keywords) &&
+    Array.isArray(s.exclude_terms) &&
+    (s.query_mode === 'open' || s.query_mode === 'exact') &&
+    typeof s.cost_usd === 'number'
+  );
+}
+
+/**
+ * La IA propone nombre, frases y exclusiones a partir de lo que se escribió.
+ *
+ * No guarda el concepto: la persona revisa la propuesta antes. Cada petición
+ * cuesta unos 0.0001 USD y queda en la bitácora (ADR-0109).
+ *
+ * @param description Lo que la persona quiere seguir, en sus palabras.
+ * @returns La propuesta.
+ * @throws {ApiError} `invalid_concept` si el texto es muy corto (campo
+ *   `description`), `empty_suggestion`, `term_suggestion_failed` o
+ *   `llm_not_configured`.
+ */
+export async function suggestTerms(description: string): Promise<TermSuggestion> {
+  const body = await requestJson(apiUrl('concepts/suggest'), {
+    method: 'POST',
+    body: { description },
+  });
+  if (!isSuggestion(body)) throw badFormat();
+  return body;
 }
 
 /**

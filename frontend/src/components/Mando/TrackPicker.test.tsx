@@ -19,6 +19,8 @@ function concept(id: number, name: string, categoryId: number | null, color: str
     color,
     is_active: true,
     category_id: categoryId,
+    query_mode: 'exact',
+    query_mode_label: 'frases exactas',
     created_by: 'semilla',
     created_at: '2026-11-02T18:00:00Z',
     updated_at: '2026-11-02T18:00:00Z',

@@ -709,7 +709,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.1 Pantallas
 
 1. **Explorar** (principal): globo + panel de búsqueda + resultados.
-2. **Conceptos:** tabla + formulario + "Probar concepto".
+2. **Conceptos:** tabla + formulario + "Probar concepto". Un concepto nuevo se crea en dos pasos (ADR-0109): primero «¿Qué noticias quieres seguir?» en palabras del analista; después la IA propone nombre, frases y exclusiones, y el analista las revisa antes de guardar. También se pueden escribir a mano («Prefiero escribirlas yo»).
 3. **Historial:** búsquedas anteriores, reabrir y comparar.
 
 ### 14.2 Comportamiento del globo
@@ -754,7 +754,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.3 Panel de búsqueda
 
 - Región seleccionada.
-- Conceptos (chips multiselección, solo activos).
+- Conceptos (chips multiselección, solo activos). En el diseño clásico, «+ Nuevo concepto» abre el mismo formulario de dos pasos en una ventana y deja elegido el concepto al guardarlo (solo superusuarios).
 - Rango de fechas: hoy, 7 días, 30 días o personalizado.
 - Estimación ("3 consultas · ~1 crédito").
 - Botón **Buscar**.
