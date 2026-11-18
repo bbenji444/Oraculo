@@ -15,6 +15,7 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import type { Article } from '../../services/searches';
 import { type ListFilter, useExplorerStore } from '../../store/explorer';
 import { useTimelineStore } from '../../store/timeline';
+import { Icon } from '../ui/Icon';
 import { type CategorySection, containsArticle, sectionsByCategory } from './categorySections';
 import { matchesListFilter, newsCount } from './format';
 import { type StoryGroup, groupByStory } from './stories';
@@ -218,9 +219,7 @@ function CategoryHeader({ section, open, dense, onToggle }: CategoryHeaderProps)
         dense ? 'text-[10px]' : 'text-[11px]'
       }`}
     >
-      <span aria-hidden="true" className="w-2 text-slate-500">
-        {open ? '▾' : '▸'}
-      </span>
+      <Icon name={open ? 'expand_more' : 'chevron_right'} className="text-slate-500" />
       <span
         aria-hidden="true"
         className="size-2 shrink-0 rounded-full"
