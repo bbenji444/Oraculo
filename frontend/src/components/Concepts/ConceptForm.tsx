@@ -37,6 +37,7 @@ import { DecodeText } from '../ui/DecodeText';
 import { HudButton } from '../ui/HudButton';
 import { HudPanel } from '../ui/HudPanel';
 import { HudSegmented } from '../ui/HudSegmented';
+import { Icon } from '../ui/Icon';
 import { formatUsd } from '../Explore/format';
 
 interface ConceptFormProps {
@@ -141,7 +142,7 @@ export function ConceptForm({ concept, onSaved, onClose, embedded = false }: Con
         <DecodeText text={title} />
       </h2>
       <button type="button" onClick={onClose} aria-label="Cerrar" className="hud-icon-btn">
-        ×
+        <Icon name="close" className="text-lg" />
       </button>
     </div>
   );

@@ -660,7 +660,7 @@ Las escrituras piden editor o dueño con el caso abierto.
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
-- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url}`, la dirección del sistema principal de Oráculo para el botón «← Oráculo» (`ORACULO_URL`; sin valor, no hay botón).
+- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url}`, la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
 

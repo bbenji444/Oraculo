@@ -135,25 +135,23 @@ export function HistoryPanel({ isSuperuser }: { isSuperuser: boolean }) {
       )}
       {items.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-slate-400">
+          <table className="hud-table text-sm">
+            <thead>
               <tr>
-                <th className="py-2 pr-3 font-normal">Cuándo</th>
-                <th className="py-2 pr-3 font-normal">Para</th>
-                <th className="py-2 pr-3 font-normal">Qué</th>
-                <th className="py-2 pr-3 font-normal">Estado</th>
-                <th className="py-2 font-normal" />
+                <th>Cuándo</th>
+                <th>Para</th>
+                <th>Qué</th>
+                <th>Estado</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {items.map((d) => {
                 const status = DELIVERY_STATUS[d.status];
                 return (
-                  <tr key={d.id} className="border-t border-sky-400/10 align-top">
-                    <td className="py-2 pr-3 whitespace-nowrap text-slate-300">
-                      {whenLabel(d.created_at)}
-                    </td>
-                    <td className="py-2 pr-3">
+                  <tr key={d.id} className="align-top">
+                    <td className="whitespace-nowrap text-slate-300">{whenLabel(d.created_at)}</td>
+                    <td>
                       <span className="block text-slate-100">
                         {d.recipient_name ?? '—'}
                         {isSuperuser && d.owner ? (
@@ -164,14 +162,14 @@ export function HistoryPanel({ isSuperuser }: { isSuperuser: boolean }) {
                         {d.channel === 'email' ? 'Correo' : 'WhatsApp'} · {d.destination}
                       </span>
                     </td>
-                    <td className="py-2 pr-3">
+                    <td>
                       <span className="block text-slate-200">{d.subject}</span>
                       <span className="block text-xs text-slate-500">
                         {d.attachment_name ?? 'sin adjunto'}
                         {d.is_test ? ' · prueba' : ''}
                       </span>
                     </td>
-                    <td className="py-2 pr-3">
+                    <td>
                       <HudChip tone={status.tone} dot live={d.status === 'sending'}>
                         {status.label}
                       </HudChip>
@@ -184,7 +182,7 @@ export function HistoryPanel({ isSuperuser }: { isSuperuser: boolean }) {
                         </span>
                       )}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="text-right">
                       {(d.status === 'failed' || d.status === 'skipped') && (
                         <HudButton
                           size="sm"

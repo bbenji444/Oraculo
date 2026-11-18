@@ -11,6 +11,7 @@
 import { useId, useState } from 'react';
 
 import { addTerms, termWarning } from './terms';
+import { Icon } from '../ui/Icon';
 
 interface KeywordChipsProps {
   label: string;
@@ -69,7 +70,7 @@ export function KeywordChips({ label, hint, terms, onChange, errors, tone }: Key
                 }}
                 className="ml-0.5 rounded text-slate-400 hover:text-slate-100 focus-visible:outline-2 focus-visible:outline-sky-400"
               >
-                ×
+                <Icon name="close" />
               </button>
             </span>
           );

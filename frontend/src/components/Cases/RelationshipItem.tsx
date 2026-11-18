@@ -18,6 +18,7 @@ import { formatDay } from '../Explore/format';
 import { confidencePercent, relationshipPhrase } from './labels';
 import { SelectBox } from './SelectBox';
 import { ExternalLink } from '../ExternalLink';
+import { Icon } from '../ui/Icon';
 
 // Botones chicos de la consola táctica (ADR-0036): confirmar en verde, descartar en rojo.
 const BUTTON = 'hud-btn hud-btn--sm';
@@ -143,7 +144,7 @@ export function RelationshipItem({
           {relationship.shared_articles.map((a) => (
             <li key={a.article_id}>
               <ExternalLink href={a.url} className="text-sky-300 hover:underline">
-                {a.title} ↗
+                {a.title} <Icon name="open_in_new" />
               </ExternalLink>
               {a.published_at && (
                 <span className="text-slate-400"> · {formatDay(a.published_at)}</span>

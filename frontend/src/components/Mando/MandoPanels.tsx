@@ -28,6 +28,7 @@ import { GlobeControls, MyCasesToggle, PrecisionLegend } from '../Explore/Contro
 import { PHONE_QUERY } from '../Explore/ui';
 import { Dossier } from './Dossier';
 import { MissionDock } from './MissionDock';
+import { Icon } from '../ui/Icon';
 
 // Márgenes de la consola: su distancia al borde de abajo y lo que se deja
 // libre entre ella y el globo, en píxeles (bottom-4 de Tailwind = 16 px).
@@ -183,26 +184,7 @@ function PhoneGlobeMenu() {
         }}
         className="globo-menu-boton pointer-events-auto"
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="18"
-          height="18"
-          aria-hidden="true"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        >
-          {open ? (
-            <path d="M6 6l12 12M18 6 6 18" />
-          ) : (
-            <>
-              <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-              <circle cx="16" cy="7" r="2" />
-              <circle cx="10" cy="17" r="2" />
-            </>
-          )}
-        </svg>
+        <Icon name={open ? 'close' : 'tune'} className="text-lg" />
       </button>
       {open && (
         <div className="globo-menu pointer-events-auto flex max-w-[calc(100vw-1.5rem)] flex-col items-start gap-2">

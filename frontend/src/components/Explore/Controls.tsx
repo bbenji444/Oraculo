@@ -12,6 +12,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { EarthToggle } from '../GeoExplorer/EarthToggle';
 import type { FinishNotice } from './format';
 import { SMALL_BUTTON } from './ui';
+import { Icon } from '../ui/Icon';
 
 /**
  * Interruptor «Mis casos» (9.6, D9): mis casos abiertos como marcadores ámbar
@@ -187,7 +188,9 @@ export function FinishToast({
       {notice && (
         <div className="hud-panel hud-reveal pointer-events-auto flex items-center gap-3 px-4 py-2.5 text-sm text-slate-100">
           <span aria-hidden="true" className={NOTICE_TONE[notice.tone]}>
-            {notice.tone === 'ok' ? '✓' : notice.tone === 'warn' ? '⚠' : '✕'}
+            <Icon
+              name={notice.tone === 'ok' ? 'check' : notice.tone === 'warn' ? 'warning' : 'close'}
+            />
           </span>
           {notice.text}
           <button
@@ -196,7 +199,7 @@ export function FinishToast({
             aria-label="Cerrar aviso"
             className="hud-icon-btn size-7"
           >
-            ×
+            <Icon name="close" className="text-lg" />
           </button>
         </div>
       )}

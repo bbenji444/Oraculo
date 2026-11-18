@@ -26,6 +26,7 @@ import { LEGAL_STATUS_OPTIONS, mergeAction } from './labels';
 import { SelectBox } from './SelectBox';
 import { ExternalLink } from '../ExternalLink';
 import { HudSelect } from '../ui/HudSelect';
+import { Icon } from '../ui/Icon';
 
 interface EntityCardProps {
   entity: Entity;
@@ -240,7 +241,7 @@ export function EntityCard({
               </blockquote>
               <p className="mt-0.5 text-slate-400">
                 <ExternalLink href={m.article_url} className="text-sky-300 hover:underline">
-                  {m.article_title} ↗
+                  {m.article_title} <Icon name="open_in_new" />
                 </ExternalLink>
                 {m.source_name && ` · ${m.source_name}`}
                 {m.published_at && ` · ${formatDay(m.published_at)}`}

@@ -13,6 +13,7 @@
 import type { Article } from '../../services/searches';
 import { formatDay } from './format';
 import { GLASS } from './ui';
+import { Icon } from '../ui/Icon';
 
 interface NewsStackProps {
   articles: Article[];
@@ -61,7 +62,7 @@ export function NewsStack({
             aria-label="Cerrar lista"
             className="hud-icon-btn size-7"
           >
-            ×
+            <Icon name="close" className="text-lg" />
           </button>
         </div>
       </div>

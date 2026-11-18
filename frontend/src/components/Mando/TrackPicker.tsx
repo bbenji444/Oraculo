@@ -41,6 +41,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { NewConceptButton } from '../Concepts/NewConceptButton';
 import { hexToRgb } from '../Explore/categoryColor';
 import { GLASS } from '../Explore/ui';
+import { Icon } from '../ui/Icon';
 import { trackSummary } from './trackSummary';
 
 interface TrackPickerProps {
@@ -226,7 +227,7 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
             aria-label="Cerrar"
             className="hud-icon-btn size-7 text-sm"
           >
-            ×
+            <Icon name="close" />
           </button>
         </div>
 

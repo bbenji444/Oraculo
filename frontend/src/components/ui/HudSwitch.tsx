@@ -1,6 +1,7 @@
 /**
- * Interruptor encendido/apagado (27/10/2026): el punto viaja y se enciende
- * con luz cian (styles/hud.css, `.hud-switch`).
+ * Interruptor encendido/apagado (27/10/2026): la perilla viaja y se enciende
+ * en cian, como el interruptor de Oráculo core (styles/hud.css,
+ * `.hud-switch`; ADR-0108).
  *
  * No hace: no guarda el estado (lo recibe y avisa con `onChange`).
  */

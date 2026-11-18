@@ -21,6 +21,7 @@ import {
   providersLabel,
 } from './format';
 import { ExternalLink } from '../ExternalLink';
+import { Icon } from '../ui/Icon';
 
 interface NewsCardProps {
   article: Article;
@@ -44,9 +45,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
             aria-label="Cerrar ficha"
             className="hud-icon-btn -mt-1 -mr-1 size-8 shrink-0"
           >
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 fill-current">
-              <path d="m10 8.94 4.47-4.47 1.06 1.06L11.06 10l4.47 4.47-1.06 1.06L10 11.06l-4.47 4.47-1.06-1.06L8.94 10 4.47 5.53l1.06-1.06L10 8.94Z" />
-            </svg>
+            <Icon name="close" className="text-lg" />
           </button>
         )}
       </div>
@@ -129,7 +128,7 @@ export function NewsCard({ article, colors, onClose }: NewsCardProps) {
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-[11px] text-slate-500">{providersLabel(article.providers)}</span>
         <ExternalLink href={article.url} className="hud-btn hud-btn--sm">
-          Ver nota original ↗
+          Ver nota original <Icon name="open_in_new" />
         </ExternalLink>
       </div>
       <AddToCase articleId={article.article_id} />

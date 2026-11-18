@@ -20,6 +20,7 @@ import { relationshipPhrase } from '../Cases/labels';
 import { formatDay } from './format';
 import { GLASS } from './ui';
 import { ExternalLink } from '../ExternalLink';
+import { Icon } from '../ui/Icon';
 
 interface WallPanelProps {
   caseId: string;
@@ -48,7 +49,7 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
           aria-label="Cerrar ficha"
           className="hud-icon-btn size-8"
         >
-          ✕
+          <Icon name="close" className="text-lg" />
         </button>
       </div>
       {node.type === 'person' && (
@@ -116,7 +117,7 @@ export function WallPanel({ caseId, node, graph, onClose }: WallPanelProps) {
           <li key={m.id} className="text-xs">
             <blockquote className="text-slate-200">«{m.evidence_span}»</blockquote>
             <ExternalLink href={m.article_url} className="text-sky-300 hover:underline">
-              {m.source_name ?? m.article_title} ↗
+              {m.source_name ?? m.article_title} <Icon name="open_in_new" />
             </ExternalLink>
             {m.published_at && (
               <span className="text-slate-500"> · {formatDay(m.published_at)}</span>

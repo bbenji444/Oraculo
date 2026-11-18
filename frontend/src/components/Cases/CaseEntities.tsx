@@ -46,6 +46,7 @@ import {
   toggleKeys,
 } from './selection';
 import { HudSegmented } from '../ui/HudSegmented';
+import { Icon } from '../ui/Icon';
 
 const STATES: { value: ReviewStatus; label: string }[] = [
   { value: 'suggested', label: 'Por revisar' },
@@ -167,7 +168,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
   }
 
   return (
-    <div className="hud-panel hud-spot hud-reveal overflow-hidden">
+    <div className="hud-panel hud-reveal overflow-hidden">
       <div className="hud-section-head">
         <h3 className="hud-section-title">Entidades</h3>
         {analysis && (
@@ -393,9 +394,7 @@ function EntityGroupSection({
           onClick={onToggle}
           className="flex items-center gap-2 font-display text-[11px] tracking-[0.16em] text-sky-100 uppercase focus-visible:outline-2 focus-visible:outline-sky-400"
         >
-          <span aria-hidden="true" className="text-sky-300">
-            {open ? '▾' : '▸'}
-          </span>
+          <Icon name={open ? 'expand_more' : 'chevron_right'} className="text-sky-300" />
           {group.label} · {group.items.length}
         </button>
         {group.inEvent > 0 && (

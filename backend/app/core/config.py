@@ -241,9 +241,9 @@ class Settings(BaseSettings):
     # BrowserWork (ADR-0028): servicio del jefe de Benji que busca en Bing y en
     # Google 2 con un Chrome real. Sin dirección no se ofrece. No lleva llave.
     browserwork_base_url: str | None = None
-    # Dirección del sistema principal de Oráculo (09/11/2026): el encabezado
-    # del monitor muestra un botón «Oráculo» para regresar. Sin dirección, no
-    # hay botón. No es secreta: el navegador la abre directamente.
+    # Dirección del sistema principal de Oráculo (09/11/2026): el logo de
+    # Oráculo del encabezado del monitor regresa ahí (ADR-0108). Sin dirección,
+    # el logo no es un enlace. No es secreta: el navegador la abre directamente.
     oraculo_url: str | None = None
     # 1 página (unas 10 notas por motor): su navegador atiende una búsqueda a
     # la vez para todos sus usuarios, así que se pide lo mínimo.

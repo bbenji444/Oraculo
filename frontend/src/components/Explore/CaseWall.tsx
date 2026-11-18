@@ -45,6 +45,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { GLASS } from './ui';
 import { WallPanel } from './WallPanel';
 import { ExternalLink } from '../ExternalLink';
+import { Icon } from '../ui/Icon';
 
 interface CaseWallProps {
   map: MapLibreMap | null;
@@ -319,7 +320,7 @@ export function CaseWall({ map }: CaseWallProps) {
             Colores
           </button>
           <button type="button" onClick={close} className="hud-btn hud-btn--sm">
-            ✕ Salir del muro
+            <Icon name="close" /> Salir del muro
           </button>
         </div>
       </div>
@@ -389,7 +390,7 @@ export function CaseWall({ map }: CaseWallProps) {
           </p>
           <div className="mt-2 flex gap-3 text-xs">
             <ExternalLink href={note.url} className="text-sky-300 hover:underline">
-              Ver nota original ↗
+              Ver nota original <Icon name="open_in_new" />
             </ExternalLink>
             <button
               type="button"
