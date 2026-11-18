@@ -7,11 +7,14 @@
  *   «Descargar PDF» (ReportViewer, ADR-0111), cuatro
  *   cifras que corren (relevantes, estados, créditos y costo de la IA) y una
  *   barra con las categorías que más salen, cada una de su color. «▴» lo
- *   pliega a un renglón.
+ *   pliega a un renglón. Si Google web no pudo buscar, un aviso discreto lo
+ *   dice (ADR-0115).
  * - **Noticias**: arriba las pestañas «Cronología | Noticias», en el mismo
  *   lugar para las dos vistas; abajo la cronología o la lista, compactas, para
  *   que quepan muchas (Benji, 28/10/2026: «quiero que en el listado de
- *   noticias se vean muchas más noticias»).
+ *   noticias se vean muchas más noticias»). Debajo de esas pestañas, las de
+ *   plataforma («Todo · Noticias · Facebook…», ADR-0117) y un botón
+ *   discreto «Ver las N que descartó la IA», que las muestra con su marca.
  *
  * «›» oculta todo el expediente (el globo se recentra) y una pestaña en el
  * borde lo vuelve a abrir.
@@ -27,13 +30,17 @@ import { useTimelineStore } from '../../store/timeline';
 import { categoryColor } from '../Explore/categoryColor';
 import { Chronology } from '../Explore/Chronology';
 import { formatRange, matchesListFilter, providersLabel } from '../Explore/format';
+import { discardedCount, isShown } from '../Explore/relevance';
 import { ResultsList } from '../Explore/ResultsList';
-import { categoriesIn, statesIn } from '../Explore/timelineData';
+import { SearchNotices } from '../Explore/SearchNotices';
+import { DiscardedToggle } from '../Explore/StandingNote';
+import { categoriesIn, platformFacet, statesIn } from '../Explore/timelineData';
 import { GLASS } from '../Explore/ui';
 import { CountUp } from '../ui/CountUp';
 import { DecodeText } from '../ui/DecodeText';
 import { HudSegmented } from '../ui/HudSegmented';
 import { FilterPopover } from './FilterPopover';
+import { PlatformTabs } from './PlatformTabs';
 import { ReportButtons } from './ReportViewer';
 import { windowLabel } from './mission';
 import { MANDO_GLASS } from './ui';
@@ -116,6 +123,9 @@ export function Dossier({
   const setSummaryOpen = useMandoStore((s) => s.setSummaryOpen);
   const listOpen = useTimelineStore((s) => s.listOpen);
   const setListOpen = useTimelineStore((s) => s.setListOpen);
+  const range = useTimelineStore((s) => s.range);
+  const categoryIds = useTimelineStore((s) => s.categoryIds);
+  const stateCode = useTimelineStore((s) => s.stateCode);
   const listFilter = useExplorerStore((s) => s.listFilter);
 
   // Cada consulta abre su cronología desplegada.
@@ -142,6 +152,18 @@ export function Dossier({
   // El filtro de ubicación de «Filtro» vale para la cronología y la lista.
   const located = relevant.filter((a) => matchesListFilter(a, listFilter));
   const listed = shown.filter((a) => matchesListFilter(a, listFilter));
+  // Las pestañas de plataforma cuentan con todos los filtros menos el suyo:
+  // cada una dice cuántas notas quedarían al tocarla (ADR-0117). La sección
+  // «Plataforma» de «Filtro» cuenta con las mismas, para no dar dos números.
+  const forPlatforms = platformFacet(relevant, {
+    filters: { range, categoryIds, stateCode },
+    listFilter,
+  });
+  // Las que descartó la IA solo salen con su botón (ADR-0117).
+  const discarded = discardedCount(articles);
+  // «Relevantes» cuenta solo esas entre las que se ven: con «No relevantes» o
+  // con las descartadas encendidas, el número no se infla (revisión 18/11).
+  const relevantShown = shown.filter((a) => isShown(a, false)).length;
   const categories = categoriesIn(relevant).slice(0, TOP_CATEGORIES);
   const view: DossierView = listOpen ? 'list' : 'chrono';
   const title = `${search.concepts.map((c) => c.name).join(', ')} · ${search.region_name}`;
@@ -198,11 +220,13 @@ export function Dossier({
         </div>
         {/* En su propio renglón: junto al título lo dejaban en tres letras. */}
         <ReportButtons searchId={search.search_id} title={title} />
+        {/* Si Google web no pudo buscar, se dice aquí también al terminar (ADR-0115). */}
+        <SearchNotices search={search} />
 
         {summaryOpen ? (
           <div className="mando-summary space-y-2">
             <dl className="grid grid-cols-4 gap-1.5">
-              <Kpi label="Relevantes" value={shown.length} tone="cyan" order={0} />
+              <Kpi label="Relevantes" value={relevantShown} tone="cyan" order={0} />
               <Kpi label="Estados" value={states.length} tone="green" order={1} />
               <Kpi label="Créditos" value={search.credits_used} tone="violet" order={2} />
               <Kpi label="IA USD" value={search.llm_cost_usd} tone="sky" order={3} format={usd} />
@@ -258,7 +282,7 @@ export function Dossier({
         ) : (
           // Plegado: las cifras en un renglón, para no perderlas de vista.
           <p className="text-[11px] text-slate-300">
-            <span className="text-sky-300">{shown.length}</span> relevantes ·{' '}
+            <span className="text-sky-300">{relevantShown}</span> relevantes ·{' '}
             <span className="text-emerald-300">{states.length}</span> estados ·{' '}
             {search.credits_used} créditos · IA {usd(search.llm_cost_usd)} USD
           </p>
@@ -280,12 +304,17 @@ export function Dossier({
             }}
             label="Vista del expediente"
           />
+          {/* Fraccionado por plataforma, como Google: «Todo · Noticias · Facebook…». */}
+          <PlatformTabs articles={forPlatforms} />
           {/* Cuántas se ven y el botón «Filtro»: los mismos para las dos vistas. */}
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-slate-400">
-              <span className="text-slate-200">{listed.length}</span> de {articles.length} notas
-            </p>
-            <FilterPopover articles={relevant} />
+            <div className="min-w-0">
+              <p className="text-[11px] text-slate-400">
+                <span className="text-slate-200">{listed.length}</span> de {articles.length} notas
+              </p>
+              <DiscardedToggle count={discarded} className="truncate text-[10px]" />
+            </div>
+            <FilterPopover articles={relevant} platformArticles={forPlatforms} />
           </div>
         </div>
         <div className="flex min-h-0 flex-1 flex-col">

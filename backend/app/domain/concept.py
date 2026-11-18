@@ -14,6 +14,10 @@ aplican igual al crear, al editar y al probar un borrador:
 - Modo de búsqueda (ADR-0109): ``exact`` busca cada frase tal cual, entre
   comillas y unidas con OR (como siempre); ``open`` manda cada frase sola y
   sin comillas, como se escribe en Google, y admite hasta 12 frases.
+- Términos obligatorios (ADR-0113): los nombres propios que escribió el
+  analista en una búsqueda rápida («Eternal»). Los pone el sistema, no el
+  formulario, y una edición los conserva. Hasta 5, con las reglas de una
+  palabra clave.
 
 Si algo falla se informan **todos** los problemas a la vez, cada uno con su
 campo, para que la persona corrija el formulario de una sola pasada.
@@ -50,9 +54,14 @@ _OPERATOR_WORDS = frozenset({"OR", "AND"})
 
 KEYWORDS_FIELD = "keywords"
 EXCLUDE_FIELD = "exclude_terms"
+REQUIRED_FIELD = "required_terms"
 # En modo abierto cada frase es una consulta a Google News: 12 por concepto
 # caben en el tope de consultas gratuitas con dos conceptos (ADR-0109).
 OPEN_MAX_PHRASES = 12
+# Términos obligatorios (ADR-0113): una búsqueda rápida nombra uno o dos
+# sujetos («LockBit», «Pemex»); 5 dejan margen sin que palabras comunes
+# marcadas como nombres vuelvan obligatorio medio texto.
+MAX_REQUIRED_TERMS = 5
 
 
 class QueryMode(StrEnum):
@@ -105,9 +114,19 @@ def clean_text(value: str) -> str:
     return " ".join(value.split())
 
 
-def _term_problems(field: str, term: str) -> list[Problem]:
+def _term_problems(field: str, term: str, max_words: int | None = None) -> list[Problem]:
+    """Lo que no cumple un término; con ``max_words``, el tope es de palabras, no de caracteres."""
     problems = []
-    if not TERM_MIN_LENGTH <= len(term) <= TERM_MAX_LENGTH:
+    if max_words is not None:
+        if len(term) < TERM_MIN_LENGTH or len(term.split()) > max_words:
+            problems.append(
+                Problem(
+                    field,
+                    f'"{term}": el texto debe tener al menos {TERM_MIN_LENGTH} caracteres y '
+                    f"hasta {max_words} palabras.",
+                )
+            )
+    elif not TERM_MIN_LENGTH <= len(term) <= TERM_MAX_LENGTH:
         problems.append(
             Problem(
                 field,
@@ -138,7 +157,7 @@ def _term_problems(field: str, term: str) -> list[Problem]:
     return problems
 
 
-def is_searchable_term(term: str) -> bool:
+def is_searchable_term(term: str, *, max_words: int | None = None) -> bool:
     """Dice si un término cumple las reglas de una palabra clave o exclusión.
 
     Sirve para filtrar lo que propone la IA (``term_suggestions``) con las
@@ -146,24 +165,31 @@ def is_searchable_term(term: str) -> bool:
 
     Args:
         term: Término ya limpio (``clean_text``).
+        max_words: Solo para el literal de la búsqueda rápida (ADR-0113): el
+            tope es de palabras (el de Google) en lugar de
+            ``TERM_MAX_LENGTH`` caracteres. ``None`` en todo lo demás.
 
     Returns:
         ``True`` si se puede guardar tal cual.
     """
-    return not _term_problems(KEYWORDS_FIELD, term)
+    return not _term_problems(KEYWORDS_FIELD, term, max_words)
 
 
 def _clean_terms(
-    field: str, label: str, terms: tuple[str, ...]
+    field: str, label: str, terms: tuple[str, ...], first_max_words: int | None = None
 ) -> tuple[tuple[str, ...], list[Problem]]:
-    """Limpia una lista de términos y reporta vacíos, repetidos y caracteres prohibidos."""
+    """Limpia una lista de términos y reporta vacíos, repetidos y caracteres prohibidos.
+
+    Con ``first_max_words``, el primero es el literal de una búsqueda rápida y
+    su tope es de palabras (``ConceptDraft.validated``).
+    """
     cleaned = tuple(t for t in (clean_text(raw) for raw in terms) if t)
     problems: list[Problem] = []
     if len(cleaned) > MAX_TERMS:
         problems.append(Problem(field, f"Máximo {MAX_TERMS} {label}."))
     seen: set[str] = set()
-    for term in cleaned:
-        problems.extend(_term_problems(field, term))
+    for index, term in enumerate(cleaned):
+        problems.extend(_term_problems(field, term, first_max_words if index == 0 else None))
         norm = normalize_name(term)
         if norm in seen:
             problems.append(
@@ -188,6 +214,9 @@ class ConceptDraft:
         color: Color en ``#RRGGBB`` (mayúsculas).
         is_active: Si aparece en el panel de búsqueda.
         query_mode: Cómo se mandan las palabras clave (ADR-0109).
+        required_terms: Nombres propios que escribió el analista en una
+            búsqueda rápida («Eternal», ADR-0113): una nota que no trate de
+            ellos no le sirve. Vacío en los demás conceptos.
     """
 
     name: str
@@ -197,6 +226,7 @@ class ConceptDraft:
     color: str
     is_active: bool
     query_mode: QueryMode = QueryMode.EXACT
+    required_terms: tuple[str, ...] = ()
 
     @property
     def name_norm(self) -> str:
@@ -214,6 +244,8 @@ class ConceptDraft:
         color: str,
         is_active: bool = True,
         query_mode: QueryMode = QueryMode.EXACT,
+        required_terms: tuple[str, ...] = (),
+        literal_max_words: int | None = None,
     ) -> "ConceptDraft":
         """Limpia y valida los datos de un concepto.
 
@@ -225,6 +257,13 @@ class ConceptDraft:
             color: Color en hexadecimal (``#2e86de`` o ``#2E86DE``).
             is_active: Si aparece en el panel de búsqueda.
             query_mode: Frases exactas (por defecto) o «como en Google».
+            required_terms: Nombres propios de la búsqueda rápida (ADR-0113);
+                los pone el sistema, no el formulario.
+            literal_max_words: Solo en la búsqueda rápida (revisión del
+                18/11/2026, hallazgo 7): la primera palabra clave es el texto
+                del analista tal cual y su tope es este número de palabras (el
+                de Google), no ``TERM_MAX_LENGTH`` caracteres. El formulario
+                no lo pasa: editar después ese concepto pide acortarla.
 
         Returns:
             El borrador limpio: espacios colapsados, términos vacíos
@@ -255,7 +294,9 @@ class ConceptDraft:
                     f"La descripción admite hasta {DESCRIPTION_MAX_LENGTH} caracteres.",
                 )
             )
-        clean_keywords, keyword_problems = _clean_terms(KEYWORDS_FIELD, "palabras clave", keywords)
+        clean_keywords, keyword_problems = _clean_terms(
+            KEYWORDS_FIELD, "palabras clave", keywords, literal_max_words
+        )
         problems.extend(keyword_problems)
         if not clean_keywords:
             problems.append(Problem(KEYWORDS_FIELD, "Agrega al menos una palabra clave."))
@@ -278,6 +319,14 @@ class ConceptDraft:
                         f'"{term}" está como palabra clave y como exclusión; se anularían.',
                     )
                 )
+        clean_required, required_problems = _clean_terms(
+            REQUIRED_FIELD, "términos obligatorios", required_terms
+        )
+        problems.extend(required_problems)
+        if len(clean_required) > MAX_REQUIRED_TERMS:
+            problems.append(
+                Problem(REQUIRED_FIELD, f"Máximo {MAX_REQUIRED_TERMS} términos obligatorios.")
+            )
         clean_color = color.strip().upper()
         if not _COLOR.match(clean_color):
             problems.append(
@@ -296,6 +345,7 @@ class ConceptDraft:
             color=clean_color,
             is_active=is_active,
             query_mode=query_mode,
+            required_terms=clean_required,
         )
 
 
@@ -326,6 +376,8 @@ class ConceptChanges:
 
         Se valida el resultado completo, no solo lo que cambió: por ejemplo,
         una exclusión nueva puede chocar con una palabra clave que no cambió.
+        Los términos obligatorios (ADR-0113) no se editan desde el formulario:
+        se conservan tal cual para que una edición no los borre sin querer.
 
         Args:
             current: Datos actuales del concepto.
@@ -346,6 +398,7 @@ class ConceptChanges:
             color=current.color if self.color is None else self.color,
             is_active=current.is_active if self.is_active is None else self.is_active,
             query_mode=current.query_mode if self.query_mode is None else self.query_mode,
+            required_terms=current.required_terms,
         )
 
 
@@ -388,3 +441,8 @@ class Concept:
     def query_mode(self) -> QueryMode:
         """Modo de búsqueda (atajo para ``build_queries``)."""
         return self.data.query_mode
+
+    @property
+    def required_terms(self) -> tuple[str, ...]:
+        """Nombres propios de la búsqueda rápida (ADR-0113)."""
+        return self.data.required_terms

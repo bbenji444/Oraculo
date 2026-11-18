@@ -4,6 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Search } from '../../services/searches';
+import { useQuickSearchStore } from '../../store/quickSearch';
 import { MissionProgress } from './MissionProgress';
 import { ScanOverlay } from './ScanOverlay';
 
@@ -75,6 +76,35 @@ describe('MissionProgress', () => {
       'listitem',
     );
     expect(nodes.every((node) => node.dataset.state === 'done')).toBe(true);
+  });
+
+  it('dice si Google web no pudo buscar: el aviso del worker y el del lanzamiento (ADR-0115)', () => {
+    const LAUNCH = 'Sin créditos de Google web: se buscó en noticias';
+    const WORKER = 'Google web no respondió: se buscó con las demás fuentes';
+    useQuickSearchStore.getState().remember({
+      searchId: 's1',
+      conceptId: 41,
+      conceptName: 'Hacker Eternal',
+      text: 'hacker eternal',
+      notice: LAUNCH,
+    });
+    const { rerender } = render(<MissionProgress search={search()} />);
+    const notices = screen.getByRole('list', { name: 'Avisos de la búsqueda' });
+    expect(within(notices).getByText(LAUNCH)).toBeTruthy();
+
+    rerender(
+      <MissionProgress search={search({ progress: { stage: 'enrich', notice: WORKER } })} />,
+    );
+    expect(
+      within(screen.getByRole('list', { name: 'Avisos de la búsqueda' }))
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([LAUNCH, WORKER]);
+
+    // Otra búsqueda sin aviso: no queda el de la anterior.
+    rerender(<MissionProgress search={search({ search_id: 's2' })} />);
+    expect(screen.queryByRole('list', { name: 'Avisos de la búsqueda' })).toBeNull();
+    useQuickSearchStore.setState({ last: null });
   });
 });
 

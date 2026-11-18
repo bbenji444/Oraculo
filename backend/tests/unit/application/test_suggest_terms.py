@@ -1,4 +1,4 @@
-"""Propuesta de frases con la IA simulada: limpieza, costo y bitácora (ADR-0109)."""
+"""Propuesta de frases con la IA simulada: limpieza, costo y bitácora (ADR-0109, ADR-0113)."""
 
 from dataclasses import dataclass, field
 
@@ -43,7 +43,7 @@ class FakeSuggester:
 
     @property
     def terms_prompt_version(self) -> str:
-        return "terms_v2"
+        return "terms_v3"
 
     async def aclose(self) -> None:
         return None
@@ -61,16 +61,19 @@ def result(
     excludes: tuple[str, ...] = ("curso",),
     place: str | None = None,
     place_state: str | None = None,
+    name: str = "Hackeos a gobierno",
+    entities: tuple[str, ...] = (),
 ) -> TermSuggestionResult:
     return TermSuggestionResult(
-        "Hackeos a gobierno",
+        name,
         phrases,
         excludes,
         LLMUsage(1000, 250),
         "gpt-6-luna",
-        "terms_v2",
+        "terms_v3",
         place=place,
         place_state=place_state,
+        entities=entities,
     )
 
 
@@ -94,8 +97,9 @@ async def test_propone_frases_limpias_con_su_costo_y_bitacora() -> None:
     assert entry.payload["descripcion"] == INTENT
     assert entry.payload["frases"] == ["filtran datos", "hackeo gobierno"]
     assert entry.payload["costo_usd"] == pytest.approx(0.002)
-    assert entry.payload["prompt"] == "terms_v2"
+    assert entry.payload["prompt"] == "terms_v3"
     assert "lugar" not in entry.payload
+    assert "entidades" not in entry.payload
     assert (proposal.place, proposal.place_state) == (None, None)
 
 
@@ -150,3 +154,58 @@ async def test_sin_frases_utiles_tambien_queda_en_la_bitacora() -> None:
 
     [(_, entry)] = repo.audit
     assert entry.payload["error"] == "sin frases útiles"
+
+
+async def test_los_nombres_propios_se_validan_contra_el_texto_y_quedan_en_la_bitacora() -> None:
+    # ADR-0113: la IA dice «Hackeo» (no está en el texto) y «ETERNAL» (sí, con
+    # otra grafía); solo queda «eternal», y las frases sin él se descartan.
+    repo = FakeConceptRepository()
+    suggester = FakeSuggester(
+        result(
+            "hackean sistemas",
+            "Eternal filtra datos",
+            "hackeo Eternal",
+            entities=("Hackeo", "ETERNAL"),
+        )
+    )
+
+    proposal = await SuggestConceptTerms(suggester, PRICES, repo).execute("hacker eternal", ACTOR)
+
+    assert proposal.terms.entities == ("eternal",)
+    assert proposal.terms.phrases == ("Eternal filtra datos", "hackeo Eternal")
+    [(_, entry)] = repo.audit
+    assert entry.payload["entidades"] == ["eternal"]
+
+
+async def test_sin_frases_con_el_nombre_la_busqueda_rapida_sigue() -> None:
+    repo = FakeConceptRepository()
+    suggester = FakeSuggester(result("hackean sistemas", entities=("Eternal",)))
+    use = SuggestConceptTerms(suggester, PRICES, repo)
+
+    with pytest.raises(EmptySuggestionError):
+        await use.execute("hacker eternal", ACTOR)
+    proposal = await use.execute("hacker eternal", ACTOR, require_phrases=False)
+
+    assert (proposal.terms.phrases, proposal.terms.entities) == ((), ("eternal",))
+
+
+async def test_el_lugar_que_dio_la_ia_no_queda_como_entidad() -> None:
+    # Revisión del 18/11/2026 (hallazgo 3): con «Jalisco» como entidad, todas
+    # las frases de la IA se tiraban (ninguna lleva «Jalisco»).
+    repo = FakeConceptRepository()
+    suggester = FakeSuggester(
+        result(
+            "roban autos con violencia",
+            "robo de vehículos",
+            place="Zapopan",
+            place_state="Jalisco",
+            entities=("Jalisco", "Zapopan"),
+        )
+    )
+
+    proposal = await SuggestConceptTerms(suggester, PRICES, repo).execute(
+        "robo de autos con violencia en Zapopan, Jalisco", ACTOR
+    )
+
+    assert proposal.terms.entities == ()
+    assert proposal.terms.phrases == ("roban autos con violencia", "robo de vehículos")

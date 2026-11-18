@@ -16,7 +16,7 @@ from app.application.audit import CONCEPT_CREATED, CONCEPT_TERMS_SUGGESTED, Acto
 from app.application.pagination import NameCursor
 from app.application.use_cases.concepts import DeleteConcept
 from app.core.config import Settings
-from app.domain.concept import ConceptDraft, QueryMode
+from app.domain.concept import ConceptChanges, ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
 from app.domain.queries import CountryFilter
 from app.domain.region import RegionLevel
@@ -328,6 +328,31 @@ async def test_el_modo_abierto_se_guarda_y_se_lee(repo: PostgresConceptRepositor
     assert loaded is not None and loaded.query_mode is QueryMode.OPEN
     changed = await repo.update(created.id, draft("Hackeos", keywords=("filtran datos",)), AUDIT)
     assert changed.query_mode is QueryMode.EXACT
+
+
+async def test_los_terminos_obligatorios_se_guardan_y_una_edicion_los_conserva(
+    repo: PostgresConceptRepository,
+) -> None:
+    # ADR-0113: los nombres propios de la búsqueda rápida («Eternal»).
+    created = await repo.create(
+        draft(
+            "hacker eternal",
+            keywords=("hacker eternal",),
+            query_mode=QueryMode.OPEN,
+            required_terms=("eternal",),
+        ),
+        "prueba",
+        AUDIT,
+        quick=True,
+    )
+    plain = await repo.create(draft("Secuestro"), "prueba", AUDIT)
+
+    loaded = await repo.get(created.id)
+    assert loaded is not None and loaded.required_terms == ("eternal",)
+    assert plain.required_terms == ()
+    edited = ConceptChanges(color="#000000").apply_to(loaded.data)
+    changed = await repo.update(created.id, edited, AUDIT)
+    assert changed.required_terms == ("eternal",)
 
 
 async def test_la_propuesta_de_la_ia_queda_en_la_bitacora_sin_crear_concepto(

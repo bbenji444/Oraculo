@@ -49,6 +49,9 @@ class SearchConcept:
         category_ids: Subdivisiones elegidas para este concepto.
         query_mode: Modo de búsqueda copiado (ADR-0109): con él se puede
             rehacer la consulta tal como se mandó.
+        required_terms: Nombres propios copiados de la búsqueda rápida
+            («Eternal», ADR-0113): el juicio de la IA los tiene a mano para
+            exigir que la nota trate de ellos. Vacío en los demás conceptos.
     """
 
     concept_id: int
@@ -59,6 +62,7 @@ class SearchConcept:
     topic_terms: tuple[str, ...] = ()
     category_ids: tuple[int, ...] = ()
     query_mode: QueryMode = QueryMode.EXACT
+    required_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -245,6 +249,10 @@ class StoredArticle:
         published_at: Fecha de publicación con la que se guardó la primera vez
             (no cambia aunque un proveedor la mande otra vez con otra fecha).
         event_date: Fecha de lo que informa, según la IA, si ya se leyó.
+        extraction_status: Cómo se obtuvo su texto la última vez (``ok``,
+            ``fallback`` o ``pending``), si se sabe. Una nota con link de
+            Google News casi siempre queda en ``fallback``; si llega el link
+            del medio se vuelve a leer (ADR-0115).
     """
 
     article_id: int
@@ -253,6 +261,7 @@ class StoredArticle:
     primary_code: str | None = None
     published_at: datetime | None = None
     event_date: date | None = None
+    extraction_status: str | None = None
 
     def reusable_for(self, prompt_version: str, concept_ids: frozenset[int]) -> bool:
         """Dice si su enriquecimiento sirve para esta búsqueda (caché de §10).
@@ -441,6 +450,43 @@ class StoredText:
     source_domain: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class StoredOrigin:
+    """Lo que queda guardado de cómo llegó una nota a una búsqueda (ADR-0114).
+
+    Attributes:
+        article_id: Nota.
+        title: Título.
+        snippet: Fragmento guardado, si hay.
+        providers: Proveedores que la trajeron en esta búsqueda
+            (``search_results.provider``), el de mejor posición primero.
+    """
+
+    article_id: int
+    title: str
+    snippet: str | None
+    providers: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SearchProvenance:
+    """La procedencia guardada de las notas de una búsqueda, para volver a juzgarlas.
+
+    No se guarda qué consulta trajo cada nota ni, en Google web, de qué
+    sección salió (orgánico o carrusel): ``ReprocessSearch`` la rearma con
+    el proveedor de cada nota y el texto de las consultas de ese proveedor
+    (revisión del 18/11/2026, hallazgo 5).
+
+    Attributes:
+        notes: Notas de la búsqueda, las mejor puestas por el buscador primero.
+        query_texts: Texto de las consultas que respondieron, por proveedor
+            (``provider_queries.query_text`` con ``status = 'ok'``).
+    """
+
+    notes: tuple[StoredOrigin, ...]
+    query_texts: Mapping[str, tuple[str, ...]]
+
+
 class ReprocessStorePort(RelocationStorePort, Protocol):
     """Lo necesario para volver a pasar por la IA las notas de una búsqueda."""
 
@@ -452,6 +498,17 @@ class ReprocessStorePort(RelocationStorePort, Protocol):
 
         Returns:
             Las que no han pasado la retención de ``article_texts``.
+        """
+        ...
+
+    async def search_provenance(self, search_id: UUID) -> SearchProvenance:
+        """Lo que queda guardado de cómo llegaron las notas de una búsqueda.
+
+        Args:
+            search_id: Búsqueda.
+
+        Returns:
+            Sus notas con sus proveedores y el texto de sus consultas.
         """
         ...
 

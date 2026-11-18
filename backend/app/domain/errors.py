@@ -113,6 +113,16 @@ class ProviderAuthError(ProviderError):
     code = "provider_auth_error"
 
 
+class ProviderNoCreditsError(ProviderError):
+    """La cuenta del proveedor de pago se quedó sin créditos: reintentar no sirve.
+
+    SearchApi (ADR-0115): la búsqueda sigue con las demás fuentes y el
+    analista ve un aviso en vez de una búsqueda «parcial».
+    """
+
+    code = "provider_no_credits"
+
+
 class ProviderRateLimitError(ProviderError):
     """El proveedor pide ir más despacio (429): se reintenta con espera."""
 

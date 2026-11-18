@@ -154,12 +154,21 @@ curl -s -X POST http://localhost:8080/api/v1/categories -H 'Content-Type: applic
 ```json
 {
   "items": [
-    { "id": "google_news_rss", "label": "Google News RSS", "paid": false, "slow": false, "configured": true, "default_on": true },
-    { "id": "indice_local", "label": "Índice local (GDELT + medios)", "paid": false, "slow": false, "configured": true, "default_on": true },
-    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "slow": false, "configured": true, "default_on": false }
+    { "id": "google_news_rss", "label": "Google News RSS", "paid": false, "slow": false, "configured": true, "default_on": true, "quick_default_on": true, "credits_remaining": null },
+    { "id": "indice_local", "label": "Índice local (GDELT + medios)", "paid": false, "slow": false, "configured": true, "default_on": true, "quick_default_on": true, "credits_remaining": null },
+    { "id": "searchapi", "label": "SearchApi (Google News)", "paid": true, "slow": false, "configured": true, "default_on": false, "quick_default_on": false, "credits_remaining": 46 },
+    { "id": "searchapi_web", "label": "Google web", "paid": true, "slow": false, "configured": true, "default_on": false, "quick_default_on": true, "credits_remaining": 46 }
   ]
 }
 ```
+
+(Forma; el ejemplo no se ejecutó contra la cuenta real.)
+
+`searchapi_web` (ADR-0115) es la búsqueda web normal de Google, con la misma llave y los mismos créditos que `searchapi`: trae publicaciones de Facebook, X, YouTube e Instagram y sitios que no son de noticias. Manda **una** consulta por concepto (su primera palabra clave tal cual, más el lugar si la región es un estado o municipio) y 1 página (`SEARCHAPI_WEB_MAX_PAGES`). Va encendida por defecto solo en la búsqueda rápida (`QUICK_DEFAULT_SOURCES`, `quick_default_on: true`) y **solo si hay créditos**; en la manual se enciende con su switch (`default_on: false`) y las corridas automáticas no la usan.
+
+`quick_default_on` dice si la fuente va encendida en la búsqueda rápida mientras el analista no toque los switches; `default_on`, lo mismo para la manual. Una de pago sale en `false` en los dos si no le quedan créditos.
+
+`credits_remaining` (solo lectura, solo en las de pago configuradas; `null` en las gratuitas) dice cuántos créditos se pueden gastar: el menor entre el saldo real de la cuenta de SearchApi (`GET https://www.searchapi.io/api/v1/me`, que no gasta créditos y se guarda 5 minutos) y lo que deja el tope mensual (`SEARCHAPI_MONTHLY_CREDIT_LIMIT`). Si el saldo no se puede leer, o `SEARCHAPI_BALANCE_CHECK=false`, solo cuenta el tope. Con 0, la fuente de pago sale con `default_on: false`.
 
 ## Estimar una búsqueda (no gasta)
 
@@ -170,7 +179,7 @@ curl -s -X POST http://localhost:8080/api/v1/categories -H 'Content-Type: applic
 | `concept_ids` | Conceptos (al menos uno, activos, sin repetir) |
 | `category_ids` | Subdivisiones (opcional, ADR-0038): a los conceptos que no son tema general, como la FGR, se les exige **además** una palabra del tema de cada subdivisión («FGR · Homicidio»), en el título o el resumen de la nota; en el cuerpo no cuenta. Sin un concepto así, o con una subdivisión sin tema activo, responde `422` |
 | `region_id` | Región (de `/regions`) |
-| `days` | Últimos N días (1 a 90; por defecto 7) |
+| `days` | Últimos N días (1 a 90; por defecto 7). Con más de 3 días se busca igual que en la vista previa: `when:Nd` en Google News RSS y `time_period` en SearchApi (7 o 30 días). Con 1 a 3 días se busca con fechas fijas, una consulta por día (ADR-0113) |
 | `date_from` y `date_to` | Rango fijo, en lugar de `days`; deben ir los dos |
 | `providers` | Fuentes encendidas (`id` de `/sources`). Sin mandar, las de por defecto (`MANUAL_DEFAULT_SOURCES`). Una lista vacía o una fuente sin configurar responde `422` (F12.2, ADR-0027) |
 
@@ -227,7 +236,7 @@ Respuesta (forma; este ejemplo no se ejecutó para no gastar):
 
 Antes de crear nada revisa que se pueda correr. Si algo falla, **no se crea la búsqueda ni se gasta**:
 
-- `409 credit_limit_reached`: pasaría el tope mensual de créditos;
+- `409 credit_limit_reached`: pasaría el tope mensual de créditos, o la cuenta de SearchApi no tiene saldo para las consultas de pago (el mensaje dice «no tiene saldo» y `details.saldo_de_la_cuenta` trae el saldo). La estimación lo marca con `over_limit: true`;
 - `503 llm_not_configured`: falta la llave de la IA en `.env`;
 - `422`: los datos no son válidos. Ejemplo real, con solo una de las dos fechas:
 
@@ -247,7 +256,25 @@ curl -s -X POST http://localhost:8080/api/v1/searches -H 'Content-Type: applicat
 curl -s -X POST http://localhost:8080/api/v1/searches/quick -H 'Content-Type: application/json' -d '{"text":"robo de autos con violencia en Jalisco","region_id":15,"days":7}'
 ```
 
-La IA propone las frases (~0.0001 USD) y se crea un concepto oculto «como en Google» con ellas. Luego se lanza la búsqueda con los mismos topes de `POST /searches`. La IA también dice qué lugar nombra el texto (prompt `terms_v2`): si está en el catálogo con ese nombre exacto, se busca ahí en vez de en `region_id` (con nombres repetidos gana el del estado que dio la IA). Responde `202` con lo mismo que `POST /searches`, más `concept` (con `is_quick: true`), `suggestion_cost_usd` y `place_region` (`{id, level, code, name}` del lugar del texto, o `null` si se buscó en `region_id`).
+Se busca **lo que escribió el analista, tal cual** (ADR-0113). Al texto solo se le quitan el lugar que se buscará («en Jalisco»), «en todo el mundo», las frases de tiempo («en los últimos 7 días») y las comillas u operadores. Se respetan las mayúsculas, los acentos y el orden. Eso es el «literal».
+
+- El literal es el nombre del concepto oculto y su primera palabra clave. «Hacker Eternal» se busca como «Hacker Eternal».
+- La IA propone frases extra (~0.0001 USD, prompt `terms_v3`), que van después del literal, sin repetir y hasta 12 en total. La IA no le pone nombre a la búsqueda rápida.
+- Si el texto nombra a alguien o algo (un grupo, una marca, unas siglas), la IA lo marca en `entities`. El código solo acepta los que están escritos igual en el texto y tira las frases de la IA que no los llevan. Un lugar no cuenta («Jalisco», «CDMX» o cualquier nombre o alias del lugar resuelto): ya va en la región.
+- Esos nombres quedan en `concept.required_terms`, de solo lectura. Antes de la IA, una nota que no los nombra en el título o el fragmento solo sigue si la trajo un buscador de texto completo (Google News, SearchApi o un resultado orgánico de Google web) con una consulta que los llevaba; entonces va «por confirmar» y la IA solo la acepta si coincide con lo que dicen de ese nombre las demás notas de la búsqueda. Las demás se quedan fuera sin pagar a la IA (ADR-0114).
+- `text` lleva al menos 2 letras o números: basta un nombre («Pemex», «LockBit», «IA»). El literal puede tener hasta 32 palabras (el tope de Google), siempre que quepa con el lugar, las exclusiones y las fechas en la consulta de cada fuente; si no, se buscan solo las frases de la IA.
+- Si no queda nada que buscar, responde `422`.
+
+Luego se lanza la búsqueda con los mismos topes de `POST /searches`. La IA también dice qué lugar nombra el texto: si está en el catálogo con ese nombre exacto, se busca ahí en vez de en `region_id` (con nombres repetidos gana el del estado que dio la IA). Responde `202` con lo mismo que `POST /searches`, más:
+
+- `concept`, con `is_quick: true` y `required_terms`;
+- `suggestion_cost_usd`;
+- `place_region`: `{id, level, code, name}` del lugar del texto, o `null` si se buscó en `region_id`;
+- `notice`.
+
+Sin `providers`, la búsqueda rápida usa `QUICK_DEFAULT_SOURCES` (Google News RSS, índice local y Google web, ADR-0115). Si Google web no alcanza los créditos del mes (`SEARCHAPI_MONTHLY_CREDIT_LIMIT`, que es de toda la cuenta de SearchApi) o el saldo real de la cuenta, **no** responde `409`: se lanza sin Google web y `notice` dice «Sin créditos de Google web: se buscó en noticias». `notice` es `null` cuando no hubo que quitar nada.
+
+Si SearchApi responde sin saldo (402 o 429, `# VERIFICAR`) o rechaza la llave (401/403) **a media búsqueda**, no se reintenta y la búsqueda sigue con las demás fuentes. Si alguna respondió, **no** queda `partial` por eso: `progress.notice` dice «Google web no pudo buscar: sin créditos de SearchApi» (o «…: SearchApi rechazó la llave»). Vale igual para las búsquedas manuales. `provider_queries` guarda el error real.
 
 El concepto oculto no sale en `GET /concepts`. `POST /concepts/{id}/keep` lo vuelve normal. Si ya hay otro con ese nombre responde `409`: cámbialo antes con `PATCH /concepts/{id}`.
 
@@ -289,7 +316,16 @@ curl -s http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082d
 }
 ```
 
+`progress.notice` (texto, opcional; ADR-0115) aparece cuando Google web no pudo buscar porque la cuenta de SearchApi no tiene saldo o rechazó la llave: «Google web no pudo buscar: sin créditos de SearchApi». Está durante la búsqueda (desde que terminan las consultas) y después. Sin aviso, el campo no viene.
+
 `fallback` cuenta las notas que se procesaron solo con título y fragmento, porque el medio no dejó leer el texto. `llm_cost_usd` incluye lo gastado al reprocesar con `make reubicar --con-ia`.
+
+En las búsquedas con un concepto «como en Google» o una búsqueda rápida, `progress` trae además (ADR-0114):
+
+- `off_core`: notas distintas que se tiraron **antes de la IA** porque no hablan de lo pedido (no nombran la entidad obligatoria y no llegaron por un buscador de texto completo con ella, o no tienen ninguna palabra del tema). No se guardan ni se pagan. Una nota que también trajo un concepto exacto de la misma búsqueda se queda y no cuenta.
+- `off_core_samples`: hasta 5 títulos de esas notas, para revisar a ojo qué se tiró.
+
+Los conceptos exactos y el monitor FGR no llevan estos campos. `make revisar-relevancia ARGS="--busqueda <id>"` los muestra junto con la banda de cada nota, sin escribir nada.
 
 ## Historial
 
@@ -349,7 +385,8 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
           "name": "Extorsión",
           "is_relevant": true,
           "relevance_score": 1.0,
-          "relevance_reason": "La nota aborda el aumento de las denuncias por extorsión en Morelos y menciona expresamente el cobro de piso como práctica criminal."
+          "relevance_reason": "La nota aborda el aumento de las denuncias por extorsión en Morelos y menciona expresamente el cobro de piso como práctica criminal.",
+          "relevance_band": "relevant"
         }
       ],
       "primary_location": {
@@ -366,6 +403,7 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
       },
       "in_region": false,
       "providers": ["indice_local"],
+      "platform": "news",
       "story_id": null,
       "category": { "id": 11, "name": "Extorsión", "color": null, "symbol": null },
       "category_raw": "cobro de piso",
@@ -376,9 +414,24 @@ curl -s 'http://localhost:8080/api/v1/searches/b01afb0d-e78b-4257-8a14-5d2e98082
 }
 ```
 
+`concepts[].relevance_band` (ADR-0114) es la **banda** del juicio. Se calcula al leer, con la relevancia final (ya con la regla «FGR federal» y el umbral de 0.6), el puntaje y el modo del concepto; no se guarda. En los conceptos «como en Google» y la búsqueda rápida:
+
+| Valor | Qué es | Cuándo |
+|---|---|---|
+| `relevant` | Relevante | `is_relevant` y `relevance_score` ≥ 0.8 |
+| `unconfirmed` | Relevante «por confirmar»: muy probable, falta leer la nota completa | `is_relevant` y 0.6 a 0.79 |
+| `related` | No relevante, pero del mismo tema («cercana»): otra entidad, una alerta genérica, lo nombra de pasada | no relevante y ≥ 0.3 |
+| `unrelated` | No tiene nada que ver («ajena») | no relevante y < 0.3 |
+
+Ahí la IA puntúa con estas bandas (`enrich_v6`). Una nota que llegó por un buscador de texto completo con la entidad pedida, pero cuyo título no la nombra, sale `unconfirmed` (0.65 a 0.75) solo si el título coincide con lo que dicen de la entidad las otras notas de la búsqueda; si no, sale `related` (0.35 a 0.5). Su `relevance_reason` lo dice.
+
+En los conceptos exactos (el monitor FGR, los temas) la IA no usa esas bandas: un relevante es `relevant` y un no relevante es `related`, aunque tenga 0. Nunca salen `unconfirmed` ni `unrelated`. Una nota que la regla «FGR federal» deja fuera con 0.9 sale `related`.
+
 `category` (F12.4, ADR-0029) es el **delito** del que trata la nota, de las categorías de `GET /categories`; `null` si todavía no se clasifica. `category_raw` es la etiqueta libre que propuso la IA. No confundir con `event_type`, que es lo que hizo la autoridad (detención, cateo).
 
 `authority` (F12.5, ADR-0030) es **quién actúa** en el hecho según la IA: `fgr` (la FGR federal), `fgr_mencion` (la FGR solo se nombra), `estatal` (una fiscalía estatal), `otra` u `sin_dato`; `null` si todavía no se clasifica. En los conceptos con la regla «FGR federal» (el concepto «Fiscalia General de la Republica»), `concepts[].is_relevant` ya lo toma en cuenta: una nota `fgr_mencion`, `estatal` u `otra` sale no relevante, con una razón fija en `relevance_reason`. El filtro de relevantes, la vista previa, el CSV y el PDF usan la misma regla.
+
+`platform` (ADR-0115) dice **dónde se publicó** la nota: `news` (un medio de noticias), `facebook`, `x`, `youtube`, `instagram`, `tiktok`, `reddit`, `telegram` o `web` (otros sitios). Se calcula al leer con el dominio del medio, el link y quién la encontró: un dominio de red social gana; si no, es `news` si la encontró una fuente de noticias (Google News, Google News RSS, GDELT o el índice local), y `web` si solo la trajo Google web (también una noticia destacada que no trajo nadie más). `source_name` es el medio limpio («Milenio»), sin marcas. Las publicaciones de redes no se descargan: su resumen sale del título y el fragmento (`extraction_status: fallback`).
 
 `story_id` (F12.1c, ADR-0026) agrupa las notas del **mismo hecho** publicadas por varios medios: es el id de la primera nota de la historia y es igual en todas sus notas. `null` = la nota está sola. El monitor junta en una tarjeta las notas visibles con el mismo `story_id` («▸ +N medios»).
 
@@ -527,11 +580,11 @@ content-disposition: attachment; filename="reporte-extorsion-jalisco-2026-10-17.
 ```
 
 ```text
-titulo,medio,publicada,lugar,precision,dentro_de_la_region,latitud,longitud,conceptos,resumen_automatico,proveedores,link
-"Morelos en llamas y Sheinbaum pide ""un mes para consulta"", escribe Salvador García Soto",eluniversal.com.mx,17/10/2026 06:32,Municipio Cuernavaca,Municipio,no,18.9331479002984,-99.25995256354925,…
+titulo,medio,plataforma,publicada,lugar,precision,dentro_de_la_region,latitud,longitud,conceptos,resumen_automatico,proveedores,link
+"Morelos en llamas y Sheinbaum pide ""un mes para consulta"", escribe Salvador García Soto",eluniversal.com.mx,Noticias,17/10/2026 06:32,Municipio Cuernavaca,Municipio,no,18.9331479002984,-99.25995256354925,…
 ```
 
-- **CSV:** va en UTF-8 con BOM, para que Excel muestre la Ñ al abrirlo con doble clic. Las fechas van en hora de la Ciudad de México. Si un título empieza con `=`, `+`, `-` o `@`, se le antepone un apóstrofo para que Excel no lo tome por fórmula.
+- **CSV:** va en UTF-8 con BOM, para que Excel muestre la Ñ al abrirlo con doble clic. `plataforma` es `platform` en español (Noticias, Facebook, X, YouTube, Instagram, TikTok, Reddit, Telegram u Otros sitios). Las fechas van en hora de la Ciudad de México. Si un título empieza con `=`, `+`, `-` o `@`, se le antepone un apóstrofo para que Excel no lo tome por fórmula.
 - **GeoJSON** (`application/geo+json`): un punto por nota ubicada, con las coordenadas en orden `[longitud, latitud]`. En el ejemplo son 12 puntos: las 14 notas menos las 2 sin ubicación. El objeto `busqueda` dice la región, los conceptos y el periodo.
 
 ## Casos de investigación
@@ -675,6 +728,8 @@ Las escrituras piden editor o dueño con el caso abierto.
 - **`/app-config`:** configuración pública de la pantalla: `{oraculo_url}`, la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
+  - Cada concepto trae `required_terms`: los nombres propios que la nota tiene que mencionar («Eternal»), de solo lectura. Hoy solo los llena la búsqueda rápida (ADR-0113). En los demás conceptos es `[]`.
+  - `POST` y `PATCH` no los reciben, y editar un concepto no los borra.
 
 Las rutas temporales `/local-index/*` se retiraron en la Fase 6: el índice local se consulta como un proveedor más dentro de cada búsqueda.
 

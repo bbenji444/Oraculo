@@ -1,5 +1,6 @@
 """Comando make probar-proveedor con repositorios y proveedor falsos (sin red)."""
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 
@@ -67,7 +68,7 @@ class FakeLog:
         self.records.append((entry, actor))
         return len(self.records)
 
-    async def credits_used_since(self, provider: str, since: datetime) -> int:
+    async def credits_used_since(self, providers: Sequence[str], since: datetime) -> int:
         return 0
 
     async def runs_of(self, provider: str, query_text: str) -> list[QueryRun]:

@@ -34,6 +34,8 @@ const RANGES = [
 
 const PROVIDER_TONE: Record<PlannedQuery['provider'], ChipTone> = {
   searchapi: 'cyan',
+  // Google web (ADR-0117): otro tono que SearchApi noticias, aunque sea la misma cuenta.
+  searchapi_web: 'rose',
   google_news_rss: 'green',
   gdelt: 'violet',
   indice_local: 'amber',

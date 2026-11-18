@@ -45,10 +45,16 @@ class Source:
 # sitios oficiales y Google 2 links rotos por un error de BrowserWork. Para
 # volver a ofrecerlo, agrega aquí Provider.BROWSERWORK_BING y
 # Provider.BROWSERWORK_GOOGLE2 cuando BrowserWork esté corregido.
+#
+# Google web (SearchApi, motor ``google``, ADR-0115) es de pago, como SearchApi
+# Google News, y comparte con él la cuenta de créditos. Solo la búsqueda
+# rápida lo enciende por defecto, si hay saldo (``QUICK_DEFAULT_SOURCES``); en
+# la manual va con su switch y las corridas automáticas no lo usan.
 _SWITCHES = (
     Provider.GOOGLE_NEWS_RSS,
     Provider.LOCAL_INDEX,
     Provider.SEARCHAPI,
+    Provider.SEARCHAPI_WEB,
 )
 # Abren un Chrome real en el servidor de BrowserWork: tardan minutos, no segundos.
 _SLOW = frozenset({Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2})

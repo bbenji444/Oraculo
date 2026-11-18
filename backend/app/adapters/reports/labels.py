@@ -30,6 +30,7 @@ PROVIDER_LABEL = {
     "indice_local": "Índice local (GDELT y medios mexicanos)",
     "gdelt": "GDELT",
     "google_news_rss": "Google News RSS",
+    "searchapi_web": "Google web (SearchApi)",
 }
 # Proveedores con datos de GDELT: piden citar "The GDELT Project" (§8).
 GDELT_PROVIDERS = frozenset({"indice_local", "gdelt"})

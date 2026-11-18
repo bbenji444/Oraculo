@@ -50,6 +50,11 @@ export interface ExplorerState {
   listFilter: ListFilter;
   /** Interruptor "No relevantes": vale para la lista y el globo a la vez. */
   showIrrelevant: boolean;
+  /**
+   * «Ver las N que descartó la IA» (ADR-0117): las ajenas, que ni el
+   * interruptor de no relevantes muestra. También vale para lista y globo.
+   */
+  showDiscarded: boolean;
   /** Panel izquierdo visible; se oculta para ver el globo completo. */
   panelOpen: boolean;
   /**
@@ -67,6 +72,14 @@ export interface ExplorerState {
    * tocado ninguna: entonces valen las de por defecto del servidor.
    */
   sources: string[] | null;
+  /**
+   * Si `sources` lo eligió el analista moviendo un switch. Al reabrir una
+   * búsqueda, `sources` toma las de esa búsqueda (para ajustarla) pero esto
+   * queda en falso: la búsqueda rápida usa entonces las de por defecto de
+   * `/sources`, con Google web (ADR-0115). Antes, reabrir una búsqueda vieja
+   * le quitaba Google web a la rápida sin que nadie tocara nada.
+   */
+  sourcesChosen: boolean;
   /** Caso cuyo muro se ve en el globo (9.6); `null` = Explorar normal. */
   wallCaseId: string | null;
   /** Entidad elegida en el muro: la cámara la orbita y el panel la muestra. */
@@ -110,6 +123,7 @@ export interface ExplorerState {
   selectArticle: (articleId: number | null) => void;
   setListFilter: (filter: ListFilter) => void;
   setShowIrrelevant: (showIrrelevant: boolean) => void;
+  setShowDiscarded: (showDiscarded: boolean) => void;
   setPanelOpen: (panelOpen: boolean) => void;
   setSearchCollapsed: (searchCollapsed: boolean) => void;
   setEarth: (earth: EarthMode) => void;
@@ -239,6 +253,7 @@ export const useExplorerStore = create<ExplorerState>()(
       articleRequest: 0,
       listFilter: 'all',
       showIrrelevant: false,
+      showDiscarded: false,
       panelOpen: true,
       searchCollapsed: false,
       earth: 'night',
@@ -248,6 +263,7 @@ export const useExplorerStore = create<ExplorerState>()(
       spinning: !prefersReducedMotion(),
       lastCaseId: null,
       sources: null,
+      sourcesChosen: false,
       wallCaseId: null,
       wallNodeId: null,
       constellation: false,
@@ -283,7 +299,13 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       openSearch: (searchId) => {
         // Otra búsqueda: se olvidan la nota elegida y los filtros de la lista.
-        set({ searchId, articleId: null, listFilter: 'all', showIrrelevant: false });
+        set({
+          searchId,
+          articleId: null,
+          listFilter: 'all',
+          showIrrelevant: false,
+          showDiscarded: false,
+        });
       },
       restoreSearch: ({
         searchId,
@@ -301,10 +323,14 @@ export const useExplorerStore = create<ExplorerState>()(
           subdivisionIds,
           range: { kind: 'custom', from: dateFrom, to: dateTo },
           // Editar una búsqueda reabierta parte de sus fuentes (si las guardó).
+          // `sourcesChosen` no se toca: si el analista ya eligió (por ejemplo,
+          // apagó Google web), reabrir del historial no borra su decisión, y
+          // la búsqueda rápida usa lo que muestran los switches.
           ...(providers && providers.length > 0 ? { sources: providers } : {}),
           articleId: null,
           listFilter: 'all',
           showIrrelevant: false,
+          showDiscarded: false,
           spinning: false,
         });
       },
@@ -320,6 +346,9 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       setShowIrrelevant: (showIrrelevant) => {
         set({ showIrrelevant });
+      },
+      setShowDiscarded: (showDiscarded) => {
+        set({ showDiscarded });
       },
       setPanelOpen: (panelOpen) => {
         set({ panelOpen });
@@ -340,7 +369,7 @@ export const useExplorerStore = create<ExplorerState>()(
         set({ lastCaseId });
       },
       setSources: (sources) => {
-        set({ sources });
+        set({ sources, sourcesChosen: true });
       },
       openWall: (wallCaseId) => {
         // El muro ocupa el globo: se quita la nota elegida y se detiene el giro.
@@ -370,6 +399,7 @@ export const useExplorerStore = create<ExplorerState>()(
           articleId: null,
           listFilter: 'all',
           showIrrelevant: false,
+          showDiscarded: false,
           wallCaseId: null,
           wallNodeId: null,
           constellation: false,
@@ -407,7 +437,10 @@ export const useExplorerStore = create<ExplorerState>()(
         earth: state.earth,
         lastCaseId: state.lastCaseId,
         // Las fuentes que prefiere el analista se recuerdan entre visitas.
+        // Lo guardado antes del 18/11/2026 no trae `sourcesChosen`: queda en
+        // falso y la búsqueda rápida usa las de por defecto, con Google web.
         sources: state.sources,
+        sourcesChosen: state.sourcesChosen,
         // La búsqueda abierta y su consulta también (Benji, 10/11/2026): si sale
         // a otro módulo de Oráculo mientras corre, al volver la ve en la etapa
         // en que va. La búsqueda sigue en el servidor aunque se cierre la página.

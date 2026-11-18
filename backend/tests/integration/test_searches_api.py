@@ -40,6 +40,10 @@ pytestmark = pytest.mark.integration
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 URL = "/api/v1/searches"
 CONCEPT_NAME = "Prueba API búsquedas"
+# Concepto que deja la prueba de la búsqueda rápida (ADR-0113: lo escrito sin
+# el lugar) y que guarda con «keep»: no empieza con «Prueba API», así que se
+# borra aparte; si no, la segunda corrida responde 409 por nombre repetido.
+QUICK_CONCEPT_NAME = "extorsión a comerciantes"
 
 
 class FakeQueue:
@@ -55,7 +59,10 @@ def _clean(engine: Engine) -> None:
         conn.execute(text("DELETE FROM searches"))
         conn.execute(text("DELETE FROM articles"))
         conn.execute(text("DELETE FROM audit_log WHERE entity_type = 'search'"))
-        conn.execute(text("DELETE FROM concepts WHERE name LIKE 'Prueba API%'"))
+        conn.execute(
+            text("DELETE FROM concepts WHERE name LIKE 'Prueba API%' OR name = :quick"),
+            {"quick": QUICK_CONCEPT_NAME},
+        )
 
 
 @pytest.fixture(scope="module")
@@ -491,14 +498,15 @@ def test_mapa_de_calor_errores(client: TestClient, filled: tuple[str, dict[str, 
     assert (bad.status_code, bad.json()["error"]["code"]) == (422, "invalid_request")
 
 
-def test_las_fuentes_para_los_switches(client: TestClient) -> None:
+def test_las_fuentes_para_los_switches(client: TestClient, settings: Settings) -> None:
     # F12.2 (ADR-0027): orden de pantalla, costo y si están configuradas.
     response = client.get("/api/v1/sources")
 
     assert response.status_code == 200
     items = {i["id"]: i for i in response.json()["items"]}
-    # BrowserWork está oculto hasta que corrija sus links (ADR-0028).
-    assert list(items) == ["google_news_rss", "indice_local", "searchapi"]
+    # BrowserWork está oculto hasta que corrija sus links (ADR-0028). Google
+    # web (ADR-0115) es el cuarto switch.
+    assert list(items) == ["google_news_rss", "indice_local", "searchapi", "searchapi_web"]
     assert items["searchapi"]["paid"] is True
     assert items["indice_local"] == {
         "id": "indice_local",
@@ -507,7 +515,14 @@ def test_las_fuentes_para_los_switches(client: TestClient) -> None:
         "slow": False,
         "configured": True,
         "default_on": True,
+        "quick_default_on": True,
+        "credits_remaining": None,
     }
+    # Revisión del 18/11/2026: las de pago dicen cuánto queda. Las pruebas no
+    # leen el saldo real (SEARCHAPI_BALANCE_CHECK=false): cuenta el tope local.
+    limit = settings.searchapi_monthly_credit_limit
+    assert items["searchapi_web"]["credits_remaining"] == items["searchapi"]["credits_remaining"]
+    assert 0 <= items["searchapi_web"]["credits_remaining"] <= limit
 
 
 def test_estimar_solo_con_las_fuentes_elegidas(client: TestClient, ids: dict[str, int]) -> None:
@@ -541,19 +556,53 @@ def test_la_busqueda_lanzada_dice_con_que_fuentes_se_hizo(
     assert detail.json()["providers"] == ["indice_local"]
 
 
-def test_por_defecto_searchapi_va_apagado_y_no_gasta(
+def test_por_defecto_google_web_solo_va_en_la_busqueda_rapida(
     settings: Settings, engine: Engine, queue: FakeQueue, ids: dict[str, int]
 ) -> None:
     # Decisión del 25/10/2026 (ADR-0027): 27 de 30 notas de SearchApi ya venían en el RSS.
+    # ADR-0115: Google web va encendido en la búsqueda rápida si hay créditos
+    # (1 por búsqueda); en la manual, con su switch, porque manda una consulta
+    # por concepto.
+    defaults = Settings()
     with make_client(
-        settings, queue, manual_default_sources=Settings().manual_default_sources
+        settings,
+        queue,
+        manual_default_sources=defaults.manual_default_sources,
+        quick_default_sources=defaults.quick_default_sources,
     ) as c:
-        sources = {i["id"]: i["default_on"] for i in c.get("/api/v1/sources").json()["items"]}
+        items = c.get("/api/v1/sources").json()["items"]
         estimate = c.post(f"{URL}/estimate", json=body(ids)).json()
 
-    assert sources == {"google_news_rss": True, "indice_local": True, "searchapi": False}
-    assert estimate["providers"] == ["google_news_rss", "indice_local"]
+    switches = {i["id"]: (i["default_on"], i["quick_default_on"]) for i in items}
+    assert switches == {
+        "google_news_rss": (True, True),
+        "indice_local": (True, True),
+        "searchapi": (False, False),
+        "searchapi_web": (False, True),
+    }
+    assert sorted(estimate["providers"]) == ["google_news_rss", "indice_local"]
     assert estimate["credits"] == 0
+
+
+def test_sin_creditos_en_el_tope_google_web_va_apagado(
+    settings: Settings, engine: Engine, queue: FakeQueue
+) -> None:
+    # Sin saldo que leer (las pruebas no salen a internet), manda el tope local.
+    with make_client(
+        settings,
+        queue,
+        quick_default_sources=Settings().quick_default_sources,
+        searchapi_monthly_credit_limit=0,
+    ) as c:
+        items = {i["id"]: i for i in c.get("/api/v1/sources").json()["items"]}
+
+    web = items["searchapi_web"]
+    assert (web["default_on"], web["quick_default_on"], web["credits_remaining"]) == (
+        False,
+        False,
+        0,
+    )
+    assert items["searchapi_web"]["configured"] is True
 
 
 def test_el_catalogo_de_categorias(client: TestClient) -> None:
@@ -691,7 +740,7 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
         ("simulacro",),
         LLMUsage(1000, 250),
         "gpt-6-luna",
-        "terms_v2",
+        "terms_v3",
         place="Iztapalapa",
         place_state="Ciudad de México",
     )
@@ -716,6 +765,14 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
     assert data["concept"]["is_quick"] is True
     assert data["concept"]["description"] == text_
     assert data["concept"]["query_mode"] == "open"
+    # ADR-0113: lo escrito, sin el lugar, es el nombre y la primera frase.
+    assert data["concept"]["name"] == "extorsión a comerciantes"
+    assert data["concept"]["keywords"] == [
+        "extorsión a comerciantes",
+        "cobro de piso",
+        "extorsión comerciantes",
+    ]
+    assert data["concept"]["required_terms"] == []
     assert data["suggestion_cost_usd"] == pytest.approx(0.002)
     assert queue.sent == [UUID(data["search_id"])]
     # El texto nombra Iztapalapa: se busca ahí y no en la CDMX elegida.

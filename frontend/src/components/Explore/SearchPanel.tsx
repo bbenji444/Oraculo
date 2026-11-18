@@ -27,6 +27,7 @@ import { HudDatePicker } from '../ui/HudDatePicker';
 import { DownloadButtons } from './Controls';
 import { formatRange, formatUsd, stageProgress } from './format';
 import { RegionPicker } from './RegionPicker';
+import { SearchNotices } from './SearchNotices';
 import { SourceSwitches } from './SourceSwitches';
 import { GLASS, PANEL_TITLE, SMALL_BUTTON } from './ui';
 import { KeepQuickSearch, QuickSearchBar } from './QuickSearchBar';
@@ -183,6 +184,8 @@ function Progress({ searchId }: { searchId: string }) {
         </p>
       )}
       {search.error_summary && <p className="text-[11px] text-amber-200">{search.error_summary}</p>}
+      {/* Google web sin créditos o con la cuenta caída (ADR-0115). */}
+      <SearchNotices search={search} />
     </div>
   );
 }
@@ -272,6 +275,7 @@ function SearchSummary({ searchId, onEdit }: { searchId: string; onEdit: () => v
           ‹ Volver
         </button>
       </div>
+      <SearchNotices search={search} />
       <KeepQuickSearch searchId={searchId} />
       <DownloadButtons searchId={searchId} />
     </section>
@@ -287,6 +291,7 @@ export function SearchPanel() {
     sources,
     setSources,
     providers,
+    quickProviders,
     noSources,
     running,
     busy,
@@ -338,7 +343,7 @@ export function SearchPanel() {
         </div>
       </div>
       {/* ADR-0110: buscar como en Google sin elegir ni guardar un concepto. */}
-      <QuickSearchBar providers={providers} busy={busy} />
+      <QuickSearchBar providers={quickProviders} busy={busy} />
       <RegionPicker />
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">

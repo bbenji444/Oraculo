@@ -54,6 +54,7 @@ from app.adapters.persistence.relationships_repository import PostgresRelationsh
 from app.adapters.persistence.reports_repository import PostgresReportStore
 from app.adapters.persistence.schedule_repository import PostgresScheduleStore
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
+from app.adapters.providers.searchapi_account import build_searchapi_balance
 from app.adapters.queue.celery_queue import CeleryEntityQueue, CelerySearchQueue
 from app.adapters.reports.render import ReportRenderer
 from app.adapters.reports.static_map import PostgisStaticMap
@@ -159,6 +160,26 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
     )
     app.state.automatic_runs_enabled = settings.automatic_runs_enabled
     app.state.app_config = AppConfigOut(oraculo_url=settings.oraculo_url)
+
+
+def _wire_search_planner(app: FastAPI, settings: Settings, engine: AsyncEngine) -> None:
+    """Planeación de búsquedas y fuentes por defecto de la manual y la rápida (ADR-0115)."""
+    app.state.search_planner = PlanSearch(
+        concepts=app.state.concept_repository,
+        regions=app.state.region_repository,
+        providers=build_providers(settings, engine),
+        log=PostgresProviderQueryLog(engine),
+        llm=llm_info(settings),
+        llm_max_articles=settings.llm_max_articles_per_search,
+        credits_limit=settings.searchapi_monthly_credit_limit,
+        default_sources=parse_sources(settings.manual_default_sources),
+        quick_default_sources=parse_sources(settings.quick_default_sources),
+        # Saldo real de SearchApi (GET /me, ADR-0115): Google web solo sale
+        # encendido y solo se lanza si la cuenta tiene saldo.
+        balance=build_searchapi_balance(settings),
+    )
+    # La búsqueda rápida tiene sus propias fuentes por defecto (QUICK_DEFAULT_SOURCES).
+    app.state.quick_default_sources = parse_sources(settings.quick_default_sources)
 
 
 # Pimienta del modo dev cuando el .env no trae una: las llaves que se creen en
@@ -281,17 +302,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             info.provider, info.price_input_per_million, info.price_output_per_million
         )
         # Búsquedas (F5): la misma planeación que make buscar y la cola del worker.
-        concepts = app.state.concept_repository
-        app.state.search_planner = PlanSearch(
-            concepts=concepts,
-            regions=app.state.region_repository,
-            providers=build_providers(settings, engine),
-            log=PostgresProviderQueryLog(engine),
-            llm=llm_info(settings),
-            llm_max_articles=settings.llm_max_articles_per_search,
-            credits_limit=settings.searchapi_monthly_credit_limit,
-            default_sources=parse_sources(settings.manual_default_sources),
-        )
+        _wire_search_planner(app, settings, engine)
         app.state.search_store = PostgresSearchStore(engine)
         # Catálogo de categorías de noticias (F12.4, ADR-0029).
         app.state.category_store = PostgresCategoryStore(engine)

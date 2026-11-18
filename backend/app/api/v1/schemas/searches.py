@@ -198,6 +198,14 @@ class QuickSearchStartedOut(BaseModel):
             "``region_id``; ``null`` si se buscó en la región elegida."
         ),
     )
+    notice: str | None = Field(
+        default=None,
+        examples=["Sin créditos de Google web: se buscó en noticias"],
+        description=(
+            "Aviso para el analista si se buscó con menos fuentes de las pedidas (Google "
+            "web sin créditos, ADR-0115); ``null`` si no hay."
+        ),
+    )
 
 
 class SearchOut(BaseModel):

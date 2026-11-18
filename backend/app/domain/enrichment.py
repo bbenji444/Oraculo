@@ -44,6 +44,8 @@ class ConceptBrief:
             (ADR-0109).
         keywords: Palabras clave (en un concepto abierto, las frases).
         query_mode: Cómo se buscó el concepto.
+        required_terms: Nombres propios que escribió el analista en una
+            búsqueda rápida («Eternal», ADR-0113); vacío en los demás.
     """
 
     concept_id: int
@@ -51,6 +53,7 @@ class ConceptBrief:
     description: str
     keywords: tuple[str, ...]
     query_mode: QueryMode = QueryMode.EXACT
+    required_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

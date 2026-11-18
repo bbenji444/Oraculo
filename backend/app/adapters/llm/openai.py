@@ -227,7 +227,7 @@ ENTITIES_SCHEMA: dict[str, Any] = {
 TERMS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["name", "phrases", "exclude_terms", "place", "place_state"],
+    "required": ["name", "phrases", "exclude_terms", "place", "place_state", "entities"],
     "properties": {
         "name": {"type": "string"},
         "phrases": {"type": "array", "items": {"type": "string"}},
@@ -235,6 +235,8 @@ TERMS_SCHEMA: dict[str, Any] = {
         # En modo estricto todo campo es obligatorio: "sin lugar" va como null.
         "place": {"type": ["string", "null"]},
         "place_state": {"type": ["string", "null"]},
+        # terms_v3 (ADR-0113): sin nombres propios va la lista vacía.
+        "entities": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -483,6 +485,7 @@ class OpenAIEnricher:
             TERMS_PROMPT_VERSION,
             place=out.place,
             place_state=out.place_state,
+            entities=tuple(out.entities),
         )
 
 

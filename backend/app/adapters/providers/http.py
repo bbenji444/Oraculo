@@ -5,7 +5,9 @@ Reúne en un solo lugar lo que la especificación §8 pide a cada adaptador:
 1. **Tiempo máximo explícito** por petición.
 2. **Reintentos con espera creciente** (1 s, 2 s, 4 s...) solo ante errores
    que pueden pasar solos: 429, 5xx, red caída o tiempo agotado.
-3. **Sin reintento** ante llave rechazada (401/403) ni ante otros 4xx.
+3. **Sin reintento** ante llave rechazada (401/403), ante otros 4xx ni ante
+   los códigos que el proveedor usa para «sin créditos» (``no_credit_statuses``;
+   SearchApi, ADR-0115), aunque uno de ellos sea 429.
 4. **Traducción a excepciones de dominio** (``ProviderError`` y familia).
 5. **Límite de peticiones simultáneas** y, si el proveedor lo pide, una
    **pausa mínima entre peticiones** (GDELT).
@@ -36,6 +38,7 @@ from app.core.config import APP_VERSION
 from app.domain.errors import (
     ProviderAuthError,
     ProviderError,
+    ProviderNoCreditsError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderUnavailableError,
@@ -119,6 +122,8 @@ class ProviderHttpClient:
         headers: Mapping[str, str] | None = None,
         transport: httpx2.AsyncBaseTransport | None = None,
         sleep: Sleep = asyncio.sleep,
+        follow_redirects: bool = True,
+        no_credit_statuses: frozenset[int] = frozenset(),
     ) -> None:
         """Configura el cliente.
 
@@ -138,8 +143,17 @@ class ProviderHttpClient:
             transport: Transporte de ``httpx2``; las pruebas pasan un
                 ``MockTransport`` con respuestas grabadas.
             sleep: Función de espera; las pruebas la reemplazan para no esperar.
+            follow_redirects: Si sigue las redirecciones (3xx). Con ``False`` la
+                respuesta 3xx se entrega tal cual y su ``Location`` dice a dónde
+                lleva: así se leen los links ``google.com/goto`` de Google web
+                sin descargar la página del medio (ADR-0115).
+            no_credit_statuses: Códigos con que el proveedor dice «sin
+                créditos»: se vuelven ``ProviderNoCreditsError`` y no se
+                reintentan (reintentar solo retrasa la búsqueda). Vacío para
+                los proveedores gratuitos.
         """
         self._name = provider.value if isinstance(provider, Provider) else provider
+        self._no_credit_statuses = no_credit_statuses
         self._max_attempts = max_attempts
         self._min_interval = min_interval_seconds
         self._wait = build_wait(rate_limit_wait_seconds)
@@ -151,7 +165,7 @@ class ProviderHttpClient:
             timeout=httpx2.Timeout(timeout_seconds),
             headers={"User-Agent": USER_AGENT, **dict(headers or {})},
             transport=transport,
-            follow_redirects=True,
+            follow_redirects=follow_redirects,
         )
 
     def _log_retry(self, state: RetryCallState) -> None:
@@ -187,6 +201,12 @@ class ProviderHttpClient:
             return None
         body = response.text[:ERROR_BODY_CHARS]
         name = self._name
+        if status in self._no_credit_statuses:
+            return ProviderNoCreditsError(
+                f"{name} no tiene créditos (HTTP {status}): {body}",
+                provider=name,
+                http_status=status,
+            )
         if status in _AUTH_STATUSES:
             return ProviderAuthError(
                 f"{name} rechazó la llave (HTTP {status}). Revisa la configuración.",

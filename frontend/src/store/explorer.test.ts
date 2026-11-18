@@ -45,6 +45,52 @@ describe('cuerpo de la búsqueda', () => {
     expect(useExplorerStore.getState().sources).toEqual(['google_news_rss']);
   });
 
+  it('solo cuentan como elegidas las fuentes que movió el analista (ADR-0115)', () => {
+    expect(useExplorerStore.getState().sourcesChosen).toBe(false);
+    useExplorerStore.getState().setSources(['google_news_rss', 'searchapi_web']);
+    expect(useExplorerStore.getState().sourcesChosen).toBe(true);
+
+    // Reabrir una búsqueda trae sus fuentes para ajustarla y no borra que el
+    // analista ya eligió (revisión del 18/11/2026: antes volvía Google web).
+    useExplorerStore.getState().restoreSearch({
+      searchId: 'b1',
+      regionId: 272,
+      conceptIds: [3],
+      dateFrom: '2026-10-23',
+      dateTo: '2026-10-24',
+      providers: ['google_news_rss', 'indice_local'],
+    });
+    expect(useExplorerStore.getState().sources).toEqual(['google_news_rss', 'indice_local']);
+    expect(useExplorerStore.getState().sourcesChosen).toBe(true);
+  });
+
+  it('reabrir una búsqueda sin haber elegido no cuenta como elección', () => {
+    useExplorerStore.setState({ sources: null, sourcesChosen: false });
+
+    useExplorerStore.getState().restoreSearch({
+      searchId: 'b2',
+      regionId: 272,
+      conceptIds: [3],
+      dateFrom: '2026-10-23',
+      dateTo: '2026-10-24',
+      providers: ['google_news_rss', 'indice_local'],
+    });
+
+    expect(useExplorerStore.getState().sourcesChosen).toBe(false);
+  });
+
+  it('lo guardado antes del 18/11/2026 no trae la marca: no cuenta como elegido', () => {
+    const merge = useExplorerStore.persist.getOptions().merge;
+    const merged = merge?.(
+      { sources: ['google_news_rss', 'indice_local'] },
+      useExplorerStore.getState(),
+    );
+    expect(merged).toMatchObject({
+      sources: ['google_news_rss', 'indice_local'],
+      sourcesChosen: false,
+    });
+  });
+
   it('personalizado necesita las dos fechas', () => {
     const custom = { kind: 'custom' as const, from: '2026-10-01', to: '2026-10-07' };
 
@@ -102,6 +148,7 @@ describe('store de Explorar', () => {
     store.selectArticle(11);
     store.setListFilter('false');
     store.setShowIrrelevant(true);
+    store.setShowDiscarded(true);
     store.openSearch('abc');
 
     expect(useExplorerStore.getState()).toMatchObject({
@@ -109,7 +156,18 @@ describe('store de Explorar', () => {
       articleId: null,
       listFilter: 'all',
       showIrrelevant: false,
+      showDiscarded: false,
     });
+  });
+
+  it('las que descartó la IA se ven y se ocultan, y se olvidan al limpiar el globo', () => {
+    const store = useExplorerStore.getState();
+    store.setShowDiscarded(true);
+    expect(useExplorerStore.getState().showDiscarded).toBe(true);
+    // No son lo mismo que «Incluir las no relevantes» (ADR-0117).
+    expect(useExplorerStore.getState().showIrrelevant).toBe(false);
+    store.clearGlobe();
+    expect(useExplorerStore.getState().showDiscarded).toBe(false);
   });
 
   it('el panel se oculta y se muestra, y no se recuerda entre visitas', () => {
@@ -125,6 +183,7 @@ describe('store de Explorar', () => {
       earth: state.earth,
       lastCaseId: state.lastCaseId,
       sources: state.sources,
+      sourcesChosen: state.sourcesChosen,
       searchId: state.searchId,
       regionId: state.regionId,
       conceptIds: state.conceptIds,

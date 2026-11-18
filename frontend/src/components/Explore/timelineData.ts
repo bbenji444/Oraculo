@@ -1,7 +1,8 @@
 /**
  * Línea del tiempo de Explorar (F12.7, plan F12 §4.6): ordena las notas de la
  * búsqueda por fecha y hora, las junta en tramos (por hora o por día) para
- * ver los picos, y filtra por tramo, estado y categoría.
+ * ver los picos, y filtra por tramo, estado, categoría y plataforma
+ * (ADR-0117).
  *
  * Dos fechas, con dos usos:
  * - **Las barras y el tramo** usan cuándo se **publicó** cada nota: muestran
@@ -17,7 +18,9 @@
  * No hace: no dibuja ni pide datos; solo calcula (lo usa `Timeline.tsx`).
  */
 import { hasMapPoint } from '../../map/newsLayers';
-import type { Article } from '../../services/searches';
+import type { Article, Platform } from '../../services/searches';
+import { matchesListFilter } from './format';
+import { platformOf } from './platforms';
 
 /** Diferencia de la CDMX con UTC, en milisegundos (sin horario de verano). */
 const MEXICO_CITY_OFFSET_MS = -6 * 60 * 60 * 1000;
@@ -109,9 +112,21 @@ export interface TimelineFilters {
   categoryIds: readonly number[];
   /** Clave INEGI del estado (`08`). */
   stateCode: string | null;
+  /**
+   * Plataformas elegidas (ADR-0117): «solo Facebook» con las pestañas del
+   * expediente, o varias con «Filtro»; vacía = todas. Es obligatoria para que
+   * TypeScript marque cada lugar que filtra: el globo, la lista y la
+   * cronología tienen que mostrar las mismas notas.
+   */
+  platforms: readonly Platform[];
 }
 
-export const NO_FILTERS: TimelineFilters = { range: null, categoryIds: [], stateCode: null };
+export const NO_FILTERS: TimelineFilters = {
+  range: null,
+  categoryIds: [],
+  stateCode: null,
+  platforms: [],
+};
 
 /**
  * Cuándo ocurrió una nota: la fecha del hecho si la hay, si no la de publicación.
@@ -206,15 +221,22 @@ export function stateCodeOf(article: Pick<Article, 'primary_location'>): string 
   return state in STATE_NAMES ? state : null;
 }
 
-/** Aplica los filtros de la línea del tiempo (los mismos para el globo y la lista). */
+/**
+ * Aplica los filtros de la línea del tiempo (los mismos para el globo y la lista).
+ *
+ * @param articles Notas a filtrar.
+ * @param filters Tramo, categorías, estado y plataformas elegidos.
+ * @returns Las que pasan todos los filtros, en el mismo orden.
+ */
 export function applyTimeline(articles: readonly Article[], filters: TimelineFilters): Article[] {
-  const { range, categoryIds, stateCode } = filters;
-  if (!range && categoryIds.length === 0 && stateCode === null) {
+  const { range, categoryIds, stateCode, platforms } = filters;
+  if (!range && categoryIds.length === 0 && stateCode === null && platforms.length === 0) {
     return [...articles];
   }
   return articles.filter((article) => {
     if (categoryIds.length > 0 && !categoryIds.includes(article.category?.id ?? -1)) return false;
     if (stateCode !== null && stateCodeOf(article) !== stateCode) return false;
+    if (platforms.length > 0 && !platforms.includes(platformOf(article))) return false;
     if (range) {
       // El tramo es de publicación, igual que las barras.
       const at = publishedAt(article);
@@ -222,6 +244,32 @@ export function applyTimeline(articles: readonly Article[], filters: TimelineFil
     }
     return true;
   });
+}
+
+/** Con qué se cuentan las pestañas de plataforma (`platformFacet`). */
+export interface PlatformFacetInput {
+  /** Tramo, categorías y estado de la cronología; la plataforma no cuenta. */
+  filters: Omit<TimelineFilters, 'platforms'>;
+  /** Pestaña de ubicación de la lista (`all` si no aplica). */
+  listFilter: 'all' | 'true' | 'false' | 'none';
+}
+
+/**
+ * Las notas con las que se cuentan las plataformas: todos los filtros que se
+ * ven puestos menos el de plataforma (conteo facetado, ADR-0117). Así cada
+ * pestaña dice cuántas notas quedarían al tocarla, y la ventana «Filtro» y
+ * las pestañas dicen el mismo número (revisión del 18/11/2026: con una
+ * categoría elegida, la pestaña decía «Facebook 1» y la ventana «Facebook 3»).
+ *
+ * @param articles Notas visibles (relevantes, o con las no relevantes).
+ * @param input Filtros de la cronología y la pestaña de ubicación.
+ * @returns Las notas que pasan esos filtros, en el mismo orden.
+ * @example platformFacet(notas, { filters: { range: null, categoryIds: [6], stateCode: null }, listFilter: 'all' })
+ */
+export function platformFacet(articles: readonly Article[], input: PlatformFacetInput): Article[] {
+  return applyTimeline(articles, { ...input.filters, platforms: [] }).filter((article) =>
+    matchesListFilter(article, input.listFilter),
+  );
 }
 
 /** Las notas en orden cronológico según la base elegida (las sin fecha al final). */

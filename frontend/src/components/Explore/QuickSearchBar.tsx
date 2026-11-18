@@ -9,6 +9,9 @@
  *
  * Lo usan la consola del Centro de mando y el panel del diseño clásico.
  *
+ * Si va con Google web (ADR-0115), lo dice debajo: es lo que trae Facebook, X
+ * y YouTube y cuesta 1 crédito de SearchApi por búsqueda.
+ *
  * No hace: no estima el costo antes (la IA de las frases cuesta ~0.0001 USD y
  * la búsqueda usa los mismos topes que una normal).
  */
@@ -23,6 +26,8 @@ import { Icon } from '../ui/Icon';
 
 // El país del catálogo (INEGI + Natural Earth): región por defecto.
 const MEXICO_CODE = 'MEX';
+// `id` de Google web en /sources (ADR-0115).
+const WEB_SOURCE = 'searchapi_web';
 
 interface QuickSearchBarProps {
   /** Fuentes encendidas (`useSearchLauncher`); `undefined` mientras cargan. */
@@ -48,6 +53,7 @@ export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
   const id = useId();
   const input = quickSearchInput(text, { regionId, range }, mexico?.id ?? null, providers);
   const disabled = busy || start.isPending || input === null;
+  const withWeb = providers?.includes(WEB_SOURCE) ?? false;
 
   return (
     <form
@@ -95,6 +101,7 @@ export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
           Sin guardar un concepto: la IA arma las búsquedas y descarta las notas que no tratan de lo
           que escribiste. Si escribes un lugar («en Jalisco») se busca ahí; si no, en el de abajo
           {regionId === null ? ' (México)' : ''}. Las fechas son las de abajo.
+          {withWeb && ' Incluye Google web (Facebook, X, YouTube y otros sitios): 1 crédito.'}
         </p>
       )}
     </form>

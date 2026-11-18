@@ -187,7 +187,7 @@ def test_prompt_v2_pide_el_municipio_de_colonias_y_calles() -> None:
     # Sin él, "Polanco" no se podía ubicar dentro de la CDMX (ADR-0020).
     prompt = build_prompt(REQUEST)
 
-    assert PROMPT_VERSION == "enrich_v5"
+    assert PROMPT_VERSION == "enrich_v6"
     assert "municipality_hint" in prompt
     assert "Día de Muertos" in prompt
 
@@ -222,7 +222,8 @@ def test_un_concepto_abierto_se_juzga_contra_lo_que_escribio_el_analista() -> No
     assert "Las frases de búsqueda solo son pista" in prompt
     # Medido el 17/11/2026: con solo el título y la regla del hecho concreto,
     # descartaba notas del tema («Ciberataques bancarios aumentan 70% en México»).
-    assert "no exijas un hecho concreto" in prompt
+    # enrich_v6 (ADR-0114) lo conserva, con mayúscula al inicio de la regla.
+    assert "No exijas un hecho concreto" in prompt
     assert "Tener poco texto no es motivo para descartar" in prompt
 
 

@@ -123,6 +123,15 @@ class ConceptOut(BaseModel):
             "se guarda con ``POST /concepts/{id}/keep``."
         ),
     )
+    required_terms: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Solo lectura (ADR-0113): nombres propios que escribió el analista en una "
+            "búsqueda rápida («Eternal»); la nota tiene que tratar de ellos. Vacío en los "
+            "demás conceptos. Editar el concepto no los cambia."
+        ),
+        examples=[["Eternal"]],
+    )
 
     @classmethod
     def from_domain(cls, concept: Concept) -> "ConceptOut":
@@ -150,6 +159,7 @@ class ConceptOut(BaseModel):
             updated_at=concept.updated_at,
             category_id=concept.category_id,
             is_quick=concept.is_quick,
+            required_terms=list(data.required_terms),
         )
 
 

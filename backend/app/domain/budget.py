@@ -14,7 +14,9 @@ Tres topes, todos para no gastar ni saturar a nadie por error:
   de enviar nada.
 - **Por mes:** ``SEARCHAPI_MONTHLY_CREDIT_LIMIT`` créditos de SearchApi. El
   mes es el calendario de la Ciudad de México. Si una consulta haría pasar
-  el tope, esa consulta se salta (los proveedores gratuitos siguen).
+  el tope, esa consulta se salta (los proveedores gratuitos siguen). Google
+  News y Google web usan la misma cuenta de SearchApi (``credit_account``,
+  ADR-0115): el tope y lo gastado en el mes son de los dos juntos.
 
 No hace: no consulta la base; recibe los créditos ya gastados.
 """
@@ -25,7 +27,57 @@ from datetime import UTC, datetime, tzinfo
 
 from app.domain.errors import InvalidRequestError
 from app.domain.queries import Provider
-from app.domain.query_dialects import DIALECTS, FREE
+from app.domain.query_dialects import DIALECTS, FREE, SEARCHAPI_ACCOUNT
+
+# Nombre de cada cuenta de créditos para los mensajes (ADR-0115).
+ACCOUNT_LABELS = {SEARCHAPI_ACCOUNT: "SearchApi (noticias + web)"}
+
+# Aviso cuando Google web no alcanza créditos (tope del mes o SearchApi sin
+# saldo): la búsqueda sigue con las fuentes de noticias (ADR-0115). Lo usan la
+# búsqueda rápida y sus pruebas, para que diga siempre lo mismo.
+NO_WEB_CREDITS_NOTICE = "Sin créditos de Google web: se buscó en noticias"
+
+
+def credit_account(provider: Provider) -> str:
+    """Cuenta de créditos que gasta un proveedor.
+
+    Args:
+        provider: Proveedor.
+
+    Returns:
+        La cuenta compartida (``searchapi`` para Google News y Google web) o,
+        si no comparte, el nombre del propio proveedor.
+    """
+    return DIALECTS[provider].credit_account or provider.value
+
+
+def account_providers(provider: Provider) -> tuple[Provider, ...]:
+    """Proveedores que gastan la misma cuenta que ``provider``, en su orden.
+
+    Args:
+        provider: Proveedor.
+
+    Returns:
+        Todos los que comparten su cuenta, incluido él.
+
+    Example:
+        >>> account_providers(Provider.SEARCHAPI)
+        (<Provider.SEARCHAPI: 'searchapi'>, <Provider.SEARCHAPI_WEB: 'searchapi_web'>)
+    """
+    account = credit_account(provider)
+    return tuple(p for p in Provider if credit_account(p) == account)
+
+
+def account_label(provider: Provider) -> str:
+    """Nombre en pantalla de la cuenta de créditos de un proveedor.
+
+    Args:
+        provider: Proveedor.
+
+    Returns:
+        «SearchApi (noticias + web)», o el nombre del dialecto si no comparte.
+    """
+    return ACCOUNT_LABELS.get(credit_account(provider), DIALECTS[provider].label)
 
 
 class QueryBudgetExceededError(InvalidRequestError):

@@ -44,7 +44,7 @@ from app.cli.probar_proveedor import (
 )
 from app.core.config import Settings, get_settings
 from app.domain.articles import RawArticle
-from app.domain.budget import MonthlyCredits, month_start
+from app.domain.budget import MonthlyCredits, account_providers, month_start
 from app.domain.dedupe import DedupedArticle, dedupe
 from app.domain.queries import Provider
 from app.geodata.consola import configure_cli_logging, heading
@@ -178,8 +178,10 @@ async def run(args: argparse.Namespace, settings: Settings, ask: Callable[[str],
             show_plan(plan)
         planned_credits = sum(plan.credits for plan in plans)
         log = PostgresProviderQueryLog(engine)
+        # Toda la cuenta de SearchApi: Google News y Google web comparten tope (ADR-0115).
         used = await log.credits_used_since(
-            Provider.SEARCHAPI.value, month_start(datetime.now(UTC), MEXICO_CITY)
+            [p.value for p in account_providers(Provider.SEARCHAPI)],
+            month_start(datetime.now(UTC), MEXICO_CITY),
         )
         limit = settings.searchapi_monthly_credit_limit
         logger.info(f"Hasta {planned_credits} crédito(s) · este mes van {used} de {limit}")

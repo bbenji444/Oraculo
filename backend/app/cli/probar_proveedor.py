@@ -51,7 +51,7 @@ from app.application.ports.provider_log import ProviderQueryLogPort, ProviderQue
 from app.application.ports.providers import NewsProviderPort, ProviderResponse
 from app.application.ports.regions import RegionRepositoryPort
 from app.core.config import Settings, get_settings
-from app.domain.budget import MonthlyCredits, month_start
+from app.domain.budget import MonthlyCredits, account_providers, month_start
 from app.domain.concept import Concept
 from app.domain.errors import ProviderError
 from app.domain.names import normalize_name
@@ -69,6 +69,7 @@ EXAMPLES = 5
 REDACTED = "REDACTADO"
 _EXTENSION = {
     Provider.SEARCHAPI: "json",
+    Provider.SEARCHAPI_WEB: "json",
     Provider.GDELT: "json",
     Provider.GOOGLE_NEWS_RSS: "xml",
     Provider.BROWSERWORK_BING: "json",
@@ -78,6 +79,7 @@ _MS_PER_SECOND = 1000
 # Por qué un proveedor no se puede consultar.
 NOT_CONFIGURED = {
     Provider.SEARCHAPI: "SearchApi no está configurado: falta SEARCHAPI_API_KEY en .env.",
+    Provider.SEARCHAPI_WEB: "Google web no está configurado: falta SEARCHAPI_API_KEY en .env.",
     Provider.GOOGLE_NEWS_RSS: DISABLED_MESSAGE,
     Provider.GDELT: GDELT_DISABLED_MESSAGE,
     # El índice local siempre está disponible; se deja por completitud.
@@ -414,8 +416,11 @@ async def run(args: argparse.Namespace, settings: Settings, ask: Callable[[str],
         show_plan(plan)
         log = PostgresProviderQueryLog(engine)
         if plan.credits:
+            # Toda la cuenta del proveedor: SearchApi Google News y Google web
+            # comparten créditos y tope (ADR-0115).
             used = await log.credits_used_since(
-                plan.query.provider.value, month_start(datetime.now(UTC), MEXICO_CITY)
+                [p.value for p in account_providers(plan.query.provider)],
+                month_start(datetime.now(UTC), MEXICO_CITY),
             )
             limit = settings.searchapi_monthly_credit_limit
             logger.info(f"Créditos de este mes: {used} de {limit}")

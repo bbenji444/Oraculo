@@ -7,6 +7,9 @@ los filtros que van **dentro** del texto y los límites de largo:
 
 - **SearchApi** (Google News): solo el texto base. País, idioma y fechas
   van como parámetros (``gl``, ``hl``, ``time_period``) en el adaptador (F3).
+- **Google web** (SearchApi, motor ``google``, ADR-0115): una sola consulta
+  por concepto, con lo que escribió el analista tal cual y el lugar
+  (``literal_only``). Las fechas van como parámetros, como en SearchApi.
 - **Google News RSS**: el texto base más el rango de fechas como operador
   (``when:7d``, o ``after:``/``before:`` con fechas fijas). Es gratis, así
   que no pasa por la caché, y se parte por palabra clave y por día porque
@@ -43,6 +46,9 @@ GDELT_MAX_CHARS = 400
 # Google News RSS son gratuitos.
 SEARCHAPI_CREDITS_PER_QUERY = 1
 FREE = 0
+# Cuenta de créditos de SearchApi: la misma llave paga Google News y Google web
+# (ADR-0115), así que los dos motores comparten SEARCHAPI_MONTHLY_CREDIT_LIMIT.
+SEARCHAPI_ACCOUNT = "searchapi"
 # Google News RSS devuelve a lo más 100 notas por consulta. Medido el
 # 27/10/2026 con la ventana de dos días de la corrida FGR: «("Fiscalía General
 # de la República" OR FGR)» llegó justo a 100; partida por palabra clave y por
@@ -231,6 +237,16 @@ class QueryDialect:
         external: Si es un buscador de afuera. Los gratuitos de afuera
             cuentan para ``MAX_FREE_QUERIES_PER_SEARCH``; el índice local es
             nuestra base y no cuenta (ADR-0109).
+        credit_account: Cuenta de créditos que gasta, si es de pago. Dos
+            proveedores con la misma cuenta comparten el tope mensual
+            (SearchApi noticias y web, ADR-0115); ``None`` = la suya propia.
+        trusts_window: Si el buscador ya filtró por fecha del lado del
+            servidor. En una búsqueda manual, una nota suya **sin fecha** se
+            queda (Google web casi nunca da fecha, ADR-0115); la de los demás
+            se descarta porque no se sabe si cae en el periodo.
+        literal_only: Una sola consulta por concepto: la primera palabra
+            clave tal cual (lo que escribió el analista) más el lugar, sin
+            subdivisión ni exclusiones. «Como buscar en Google» (ADR-0115).
     """
 
     provider: Provider
@@ -245,6 +261,9 @@ class QueryDialect:
         Callable[[Sequence[str], QueryPlace, Sequence[str], DateWindow, Sequence[str]], str] | None
     ) = None
     external: bool = True
+    credit_account: str | None = None
+    trusts_window: bool = False
+    literal_only: bool = False
 
     def render(  # noqa: PLR0913 — las partes de una consulta, más «exact» solo por nombre (*)
         self,
@@ -304,6 +323,22 @@ DIALECTS: dict[Provider, QueryDialect] = {
         GOOGLE_MAX_WORDS,
         None,
         _no_suffix,
+        credit_account=SEARCHAPI_ACCOUNT,
+    ),
+    # Búsqueda web normal de Google por SearchApi (ADR-0115). País, idioma y
+    # fechas van como parámetros (``gl``, ``hl``, ``time_period``), así que no
+    # lleva sufijo. Cada página cuesta lo mismo que en Google News. La caché
+    # de 6 h ahorra créditos cuando se repite la misma búsqueda.
+    Provider.SEARCHAPI_WEB: QueryDialect(
+        Provider.SEARCHAPI_WEB,
+        "Google web",
+        SEARCHAPI_CREDITS_PER_QUERY,
+        GOOGLE_MAX_WORDS,
+        None,
+        _no_suffix,
+        credit_account=SEARCHAPI_ACCOUNT,
+        trusts_window=True,
+        literal_only=True,
     ),
     Provider.GOOGLE_NEWS_RSS: QueryDialect(
         Provider.GOOGLE_NEWS_RSS,

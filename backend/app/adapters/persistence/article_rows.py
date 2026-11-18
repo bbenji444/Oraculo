@@ -31,6 +31,7 @@ from app.domain.authority import (
     effective_relevance,
     parse_authority,
 )
+from app.domain.concept import QueryMode
 
 ARTICLE_COLUMNS = """
     a.id, a.title, a.source_name, a.source_domain, a.url_canonical, a.published_at,
@@ -56,10 +57,13 @@ PRIMARY_COLUMNS = """
 """
 # Juicios de la IA en todas las búsquedas donde salió la nota, con el nombre
 # actual de cada concepto (fuera de una búsqueda concreta). Llevan la regla
-# del concepto para aplicar la de «FGR federal» al armarlos (ADR-0030).
+# del concepto para aplicar la de «FGR federal» al armarlos (ADR-0030) y su
+# modo, que decide las bandas de relevancia (ADR-0114). El orden de las
+# columnas es el que lee ``judgement_view``.
 ALL_JUDGEMENTS = """
     COALESCE((SELECT json_agg(json_build_array(ac.concept_id, c.name,
-        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule)
+        ac.is_relevant, ac.relevance_score, ac.relevance_reason, c.relevance_rule,
+        c.query_mode)
         ORDER BY ac.concept_id)
         FROM article_concepts ac JOIN concepts c ON c.id = ac.concept_id
         WHERE ac.article_id = a.id), '[]')
@@ -173,13 +177,15 @@ def judgement_view(value: Sequence[Any], authority: Authority | None) -> Judgeme
     """Un juicio leído del JSON de los juicios, con la regla de su concepto aplicada.
 
     Args:
-        value: ``[concept_id, nombre, relevante, puntaje, razón, regla]``.
+        value: ``[concept_id, nombre, relevante, puntaje, razón, regla, modo]``
+            (``ALL_JUDGEMENTS`` o los juicios de una búsqueda).
         authority: Quién actúa en la nota.
 
     Returns:
-        El juicio con la relevancia final (ADR-0030).
+        El juicio con la relevancia final (ADR-0030) y el modo de su concepto,
+        que decide su banda (ADR-0114).
     """
-    concept_id, name, relevant, score, reason, rule = value
+    concept_id, name, relevant, score, reason, rule, mode = value
     relevant, reason = effective_relevance(
         relevant,
         reason,
@@ -187,7 +193,7 @@ def judgement_view(value: Sequence[Any], authority: Authority | None) -> Judgeme
         authority,
         float(score) if score is not None else None,
     )
-    return JudgementView(concept_id, name, relevant, float(score), reason)
+    return JudgementView(concept_id, name, relevant, float(score), reason, QueryMode(mode))
 
 
 def category_view(value: Mapping[str, Any] | None) -> CategoryView | None:

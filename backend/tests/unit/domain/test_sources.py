@@ -14,8 +14,12 @@ def test_catalogo_ordenado_y_sin_gdelt() -> None:
         Provider.GOOGLE_NEWS_RSS,
         Provider.LOCAL_INDEX,
         Provider.SEARCHAPI,
+        Provider.SEARCHAPI_WEB,
     ]
-    assert [s.provider for s in SOURCES if s.paid] == [Provider.SEARCHAPI]
+    # Google web (ADR-0115) gasta los mismos créditos de SearchApi.
+    assert [s.provider for s in SOURCES if s.paid] == [Provider.SEARCHAPI, Provider.SEARCHAPI_WEB]
+    web = source_of(Provider.SEARCHAPI_WEB)
+    assert web is not None and web.label == "Google web"
 
 
 @pytest.mark.parametrize("provider", [Provider.BROWSERWORK_BING, Provider.BROWSERWORK_GOOGLE2])

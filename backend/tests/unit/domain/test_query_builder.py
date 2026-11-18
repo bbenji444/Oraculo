@@ -14,7 +14,7 @@ from app.domain.queries import (
     QueryPlace,
     place_for,
 )
-from app.domain.query_builder import build_queries
+from app.domain.query_builder import build_queries, manual_window
 from app.domain.query_dialects import DIALECTS, GOOGLE_MAX_WORDS, gdelt_country
 from app.domain.region import RegionLevel
 
@@ -85,8 +85,9 @@ def test_una_consulta_por_proveedor_con_pais_idioma_fechas_y_creditos() -> None:
     assert {q.language for q in queries} == {"es"}
     assert {q.country for q in queries} == {MEXICO}
     assert {q.window for q in queries} == {WEEK}
-    # Solo SearchApi cuesta; RSS, GDELT, el índice y BrowserWork son gratis.
-    assert [q.estimated_credits for q in queries] == [1, 0, 0, 0, 0, 0]
+    # Solo SearchApi cuesta (Google News y Google web, ADR-0115); RSS, GDELT,
+    # el índice y BrowserWork son gratis.
+    assert [q.estimated_credits for q in queries] == [1, 1, 0, 0, 0, 0, 0]
     assert queries[0].keywords == CIBERSEGURIDAD.keywords
 
 
@@ -610,3 +611,74 @@ def test_modo_exacto_no_cambia_en_google_news_rss() -> None:
         '"roban auto" Jalisco when:7d',
         '"robo de vehículo" Jalisco when:7d',
     ]
+
+
+# --- Búsqueda rápida literal (ADR-0113) ---
+
+WORLD = place_for(facts(RegionLevel.WORLD, "Mundo", country=CountryFilter.world("Mundo")))
+ETERNAL = ConceptDraft.validated(
+    name="hacker eternal",
+    description="hacker eternal",
+    keywords=("hacker eternal", "hackeo Eternal", "Eternal filtra datos"),
+    exclude_terms=(),
+    color="#00D2FF",
+    query_mode=QueryMode.OPEN,
+    required_terms=("eternal",),
+)
+
+
+def test_abierto_el_literal_va_solo_y_sin_comillas_en_google_news_rss() -> None:
+    # Benji, 18/11/2026: Google trae notas de «hacker eternal»; la IA lo volvía
+    # «Hackeo Eternal». El texto tal cual es su propia consulta, como en Google.
+    queries = build_queries(ETERNAL, WORLD, WEEK, [Provider.GOOGLE_NEWS_RSS])
+
+    assert queries[0].text == "hacker eternal when:7d"
+    assert queries[0].keywords == ("hacker eternal",)
+    assert [q.text for q in queries[1:]] == [
+        "hackeo Eternal when:7d",
+        "Eternal filtra datos when:7d",
+    ]
+
+
+def test_abierto_el_literal_va_primero_en_el_grupo_de_searchapi() -> None:
+    [query] = build_queries(ETERNAL, WORLD, WEEK, [Provider.SEARCHAPI])
+
+    assert query.text == '("hacker eternal" OR "hackeo Eternal" OR "Eternal filtra datos")'
+    assert query.keywords[0] == "hacker eternal"
+
+
+@pytest.mark.parametrize("days", [7, 30])
+def test_busqueda_manual_que_termina_hoy_vuelve_a_ser_ultimos_n_dias(days: int) -> None:
+    # searches guarda solo las fechas: sin esto, «últimos 7 días» salía como
+    # after:/before:, que Google News RSS no respeta.
+    window = manual_window(TODAY - timedelta(days=days - 1), TODAY, TODAY)
+
+    assert window == DateWindow.last_days(days, TODAY)
+    [query] = build_queries(
+        ConceptDraft.validated(
+            name="Eternal",
+            description="",
+            keywords=("hacker eternal",),
+            exclude_terms=(),
+            color="#000000",
+            query_mode=QueryMode.OPEN,
+        ),
+        WORLD,
+        window,
+        [Provider.GOOGLE_NEWS_RSS],
+    )
+    assert query.text == f"hacker eternal when:{days}d"
+
+
+@pytest.mark.parametrize(
+    ("date_from", "date_to"),
+    [
+        # Un rango que no termina hoy sigue fijo.
+        (date(2026, 10, 1), date(2026, 10, 7)),
+        # «Hoy» y las ventanas cortas que se parten por día, también.
+        (TODAY, TODAY),
+        (TODAY - timedelta(days=2), TODAY),
+    ],
+)
+def test_las_demas_ventanas_manuales_se_quedan_fijas(date_from: date, date_to: date) -> None:
+    assert manual_window(date_from, date_to, TODAY) == DateWindow.between(date_from, date_to)

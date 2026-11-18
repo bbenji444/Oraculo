@@ -68,6 +68,8 @@ async def test_crear_guarda_y_registra_en_la_bitacora(repo: FakeConceptRepositor
         "color": "#2E86DE",
         "is_active": True,
         "query_mode": "exact",
+        # ADR-0113: los nombres propios de una búsqueda rápida; vacío aquí.
+        "required_terms": [],
     }
 
 
@@ -252,7 +254,8 @@ async def test_probar_concepto_guardado_en_iztapalapa(repo: FakeConceptRepositor
         '(ciberataque OR hackeo OR ransomware OR "filtración de datos" OR phishing) '
         "Iztapalapa -curso -webinar -diplomado"
     )
-    assert preview.total_credits == 1
+    # SearchApi Google News y Google web (ADR-0115): 1 crédito cada uno.
+    assert preview.total_credits == 2
 
 
 @pytest.mark.anyio
@@ -260,7 +263,8 @@ async def test_probar_borrador_no_guarda_nada(repo: FakeConceptRepository) -> No
     preview = await preview_use_case(repo).for_draft(concept_input(), CDMX.id, 30)
 
     assert '("Ciudad de México" OR CDMX)' in preview.queries[0].text
-    assert preview.queries[1].text.endswith("when:30d")
+    [rss] = [q for q in preview.queries if q.provider is Provider.GOOGLE_NEWS_RSS]
+    assert rss.text.endswith("when:30d")
     assert repo.concepts == {}
     assert repo.audit == []
 

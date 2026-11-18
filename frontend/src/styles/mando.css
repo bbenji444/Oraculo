@@ -1779,3 +1779,201 @@
     transition: none;
   }
 }
+
+/* ─── Plataformas y bandas de relevancia (ADR-0117) ─────────────────────
+   Bloque propio, al final del archivo, para no chocar con otros cambios. */
+
+/* Pestañas «Todo · Noticias · Facebook…» del expediente (PlatformTabs),
+   como las de Google. En escritorio bajan a otro renglón si no caben (con
+   el mouse no hay cómo deslizar una fila sin barra); en celular se deslizan
+   de lado (abajo). Cada pestaña lleva el color de su marca en --cat
+   («r g b», platforms.ts). */
+.platform-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.platform-tab {
+  --cat: 148 163 184;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.6rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid rgb(var(--cat) / 0.32);
+  border-radius: 999px;
+  background: rgb(var(--cat) / 0.06);
+  color: rgb(203 213 225);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition:
+    background-color 0.2s var(--hud-ease),
+    border-color 0.2s var(--hud-ease),
+    box-shadow 0.2s var(--hud-ease),
+    color 0.2s var(--hud-ease);
+}
+.platform-tab:hover,
+.platform-tab:focus-visible {
+  border-color: rgb(var(--cat) / 0.7);
+  background: rgb(var(--cat) / 0.14);
+  color: #fff;
+  outline: none;
+}
+.platform-tab:focus-visible {
+  box-shadow: 0 0 0 2px rgb(0 210 255 / 0.6);
+}
+.platform-tab[aria-pressed='true'] {
+  border-color: rgb(var(--cat));
+  background: rgb(var(--cat) / 0.24);
+  box-shadow: 0 0 12px -4px rgb(var(--cat) / 0.9);
+  color: #fff;
+}
+.platform-tab-icon {
+  color: rgb(var(--cat));
+}
+.platform-tab-count {
+  color: rgb(var(--cat) / 0.95);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+/* La letra de iconos no trae el logo de X: su nombre en negritas hace de
+   dibujo (en las pestañas, en «Filtro» y en la marca de cada nota). */
+.platform-letter {
+  font-family: var(--font-sans);
+  font-weight: 800;
+}
+/* Celular: un solo renglón que se desliza con el dedo, pestañas de al menos
+   32 px de alto y un desvanecido a la derecha que avisa que hay más. El
+   relleno de la derecha deja la última pestaña fuera del desvanecido al
+   llegar al final. */
+@media (max-width: 639px) {
+  .platform-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-right: 1.5rem;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  }
+  .platform-tab {
+    min-height: 2rem;
+    padding-inline: 0.75rem;
+    font-size: 12px;
+  }
+}
+
+/* Marca de la plataforma de una nota (PlatformMark): «f Facebook», «X»… solo
+   en redes y otros sitios; las noticias de medios no la llevan. */
+.platform-mark {
+  --cat: 148 163 184;
+  display: inline-flex;
+  max-width: 9rem;
+  flex: none;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.3rem;
+  border: 1px solid rgb(var(--cat) / 0.42);
+  border-radius: 4px;
+  background: rgb(var(--cat) / 0.1);
+  color: rgb(226 232 240);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.platform-mark .hud-icon {
+  color: rgb(var(--cat));
+}
+.platform-mark--card {
+  padding: 0.05rem 0.4rem;
+  font-size: 11px;
+}
+
+/* «Por confirmar», «Cercana» y «Sin revisar» (StandingNote), y la razón de
+   la IA en letra chica. Ámbar la que es relevante pero dudosa; gris las que
+   no lo son. */
+.standing-badge {
+  display: inline-block;
+  flex: none;
+  padding: 0 0.3rem;
+  border: 1px solid rgb(252 211 77 / 0.45);
+  border-radius: 4px;
+  color: rgb(253 230 138);
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.standing-badge[data-standing='related'] {
+  border-color: rgb(148 163 184 / 0.45);
+  color: rgb(203 213 225);
+}
+.standing-badge[data-standing='unjudged'] {
+  border-style: dashed;
+  border-color: rgb(148 163 184 / 0.4);
+  color: rgb(148 163 184);
+}
+/* «Descartada por la IA»: rosa tenue, para que se note que la IA la quitó
+   y que hay que revisarla (ADR-0117). */
+.standing-badge[data-standing='unrelated'] {
+  border-color: rgb(253 164 175 / 0.4);
+  color: rgb(254 205 211);
+}
+/* «Ver las N que descartó la IA»: un link discreto bajo el conteo, no un
+   botón con borde, para que no compita con las noticias. */
+.discarded-toggle {
+  display: block;
+  max-width: 100%;
+  color: rgb(148 163 184);
+  text-align: left;
+  text-decoration: underline dotted rgb(148 163 184 / 0.5);
+  text-underline-offset: 2px;
+  transition: color 0.2s var(--hud-ease);
+}
+.discarded-toggle:hover,
+.discarded-toggle[aria-pressed='true'] {
+  color: rgb(186 230 253);
+}
+.discarded-toggle:focus-visible {
+  outline: 2px solid rgb(56 189 248);
+  outline-offset: 2px;
+}
+/* Celular: más alto para el dedo (al menos 32 px como las pestañas). */
+@media (max-width: 639px) {
+  .discarded-toggle {
+    min-height: 2rem;
+  }
+}
+
+/* Avisos de la búsqueda (SearchNotices, ADR-0115): «Sin créditos de Google
+   web: se buscó en noticias». Ámbar tenue y en letra chica: informan, no
+   asustan. */
+.search-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  color: rgb(253 230 138 / 0.9);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.search-notice-icon {
+  flex: none;
+  margin-top: 0.05rem;
+  color: rgb(252 211 77 / 0.8);
+  font-size: 12px;
+}
+.standing-reason {
+  color: rgb(148 163 184);
+  font-size: 10px;
+  line-height: 1.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-tab,
+  .discarded-toggle {
+    transition: none;
+  }
+}

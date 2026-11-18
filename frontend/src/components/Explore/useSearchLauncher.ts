@@ -12,7 +12,7 @@ import { useConcepts } from '../../hooks/useConcepts';
 import { useEstimate, useSearch, useStartSearch } from '../../hooks/useSearches';
 import { useSources } from '../../hooks/useSources';
 import { isFinished } from '../../services/searches';
-import { chosenSources } from '../../services/sources';
+import { chosenSources, quickDefaultSources } from '../../services/sources';
 import { searchInput, useExplorerStore } from '../../store/explorer';
 
 /**
@@ -20,6 +20,9 @@ import { searchInput, useExplorerStore } from '../../store/explorer';
  * - `input`: cuerpo de la búsqueda, o `null` si falta región, concepto o fuente;
  * - `estimate`, `start`, `sources`: las consultas de TanStack Query;
  * - `providers`: fuentes encendidas (o `undefined` mientras cargan);
+ * - `quickProviders`: las de la búsqueda rápida: las mismas si el analista
+ *   movió algún switch; si no, las de `quick_default_on` de `/sources`, con
+ *   Google web si hay créditos (ADR-0115);
  * - `noSources`: si se apagaron todas;
  * - `busy`: si ya hay una búsqueda en curso;
  * - `blocked`: si el botón debe apagarse (falta algo, se pasa del tope o no
@@ -33,11 +36,19 @@ export function useSearchLauncher() {
   const searchId = useExplorerStore((s) => s.searchId);
   const openSearch = useExplorerStore((s) => s.openSearch);
   const storedSources = useExplorerStore((s) => s.sources);
+  const sourcesChosen = useExplorerStore((s) => s.sourcesChosen);
   const setSources = useExplorerStore((s) => s.setSources);
   const sources = useSources();
   // Sin la lista de fuentes (cargando o con error), se manda sin `providers`
   // y el servidor usa las de por defecto (F12.2).
   const providers = sources.data ? chosenSources(sources.data, storedSources) : undefined;
+  // La búsqueda rápida tiene sus propias de por defecto (con Google web): la
+  // manual no lo enciende solo porque gasta un crédito por concepto.
+  const quickProviders = sources.data
+    ? sourcesChosen
+      ? chosenSources(sources.data, storedSources)
+      : quickDefaultSources(sources.data)
+    : undefined;
   const noSources = providers?.length === 0;
   // Las subdivisiones van con la FGR (un concepto que no es tema general);
   // si se quitó, no se mandan (ADR-0038).
@@ -63,6 +74,7 @@ export function useSearchLauncher() {
     sources,
     setSources,
     providers,
+    quickProviders,
     noSources,
     running,
     busy,

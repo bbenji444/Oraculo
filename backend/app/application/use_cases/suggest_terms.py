@@ -3,13 +3,17 @@
 El analista escribe en sus palabras lo que busca. ``SuggestConceptTerms``:
 
 1. valida la descripción (``validated_intent``);
-2. le pide a la IA nombre, frases tipo titular y exclusiones;
-3. las limpia con las reglas del concepto (``clean_suggestion``);
+2. le pide a la IA nombre, frases tipo titular, exclusiones y los nombres
+   propios que escribió la persona (``terms_v3``, ADR-0113);
+3. deja solo los nombres propios que están tal cual en el texto
+   (``literal_entities``) y que no son el lugar que nombró
+   (``without_places``), y limpia las frases con las reglas del concepto
+   (``clean_suggestion``): sin un nombre propio, la frase no sirve;
 4. deja en la bitácora quién la pidió, qué escribió, qué se propuso y
    cuánto costó (``concept.terms_suggested``), aunque la IA falle.
 
-Lo usa ``POST /api/v1/concepts/suggest``: la propuesta llena el formulario y
-el analista la revisa antes de guardar.
+Lo usan ``POST /api/v1/concepts/suggest`` (la propuesta llena el formulario y
+el analista la revisa antes de guardar) y la búsqueda rápida.
 
 No hace: no guarda el concepto ni busca noticias.
 """
@@ -33,7 +37,9 @@ from app.domain.term_suggestions import (
     EmptySuggestionError,
     SuggestedTerms,
     clean_suggestion,
+    literal_entities,
     validated_intent,
+    without_places,
 )
 
 # Lo que se muestra del costo: 0.000123 USD se lee mejor que 1.23e-04.
@@ -57,13 +63,16 @@ class TermProposal:
     """Propuesta lista para el formulario.
 
     Attributes:
-        terms: Nombre, frases y exclusiones ya limpios.
+        terms: Nombre, frases, exclusiones y nombres propios ya limpios.
         query_mode: Siempre «como en Google»: las frases se pensaron para eso.
         model: Modelo que las propuso.
         cost_usd: Lo que costó la propuesta.
         place: Lugar que nombró el analista («Jalisco»), o ``None``; lo usa
             la búsqueda rápida (ADR-0110).
         place_state: Estado de ese lugar si es un municipio o ciudad.
+        raw: Lo que respondió la IA, antes de limpiar. La búsqueda rápida
+            vuelve a limpiar las frases si una entidad resulta ser el lugar
+            del catálogo (un alias como «CDMX», ``without_places``).
     """
 
     terms: SuggestedTerms
@@ -72,6 +81,7 @@ class TermProposal:
     cost_usd: float
     place: str | None = None
     place_state: str | None = None
+    raw: TermSuggestionResult | None = None
 
 
 class SuggestConceptTerms:
@@ -117,12 +127,18 @@ class SuggestConceptTerms:
             AuditEntry(actor, CONCEPT_TERMS_SUGGESTED, payload | details)
         )
 
-    async def execute(self, description: str, actor: Actor) -> TermProposal:
+    async def execute(
+        self, description: str, actor: Actor, *, require_phrases: bool = True, quick: bool = False
+    ) -> TermProposal:
         """Pide la propuesta y la limpia.
 
         Args:
             description: Lo que busca el analista, en sus palabras.
             actor: Quién la pide (para la bitácora).
+            require_phrases: ``False`` en la búsqueda rápida: si ninguna frase
+                de la IA sirve, se busca el texto literal (ADR-0113).
+            quick: ``True`` en la búsqueda rápida: basta un nombre («Pemex»)
+                (``validated_intent``, revisión del 18/11/2026).
 
         Returns:
             La propuesta limpia con su costo.
@@ -130,9 +146,10 @@ class SuggestConceptTerms:
         Raises:
             ConceptValidationError: Si la descripción es muy corta o muy larga.
             TermSuggestionFailedError: Si la IA no respondió o respondió mal.
-            EmptySuggestionError: Si no quedó ninguna frase que se pueda buscar.
+            EmptySuggestionError: Si no quedó ninguna frase que se pueda buscar
+                y ``require_phrases`` es ``True``.
         """
-        intent = validated_intent(description)
+        intent = validated_intent(description, quick=quick)
         request = TermSuggestionRequest(intent, OPEN_MAX_PHRASES, MAX_SUGGESTED_EXCLUSIONS)
         try:
             result: TermSuggestionResult = await self._suggester.suggest_terms(request)
@@ -146,8 +163,19 @@ class SuggestConceptTerms:
                 "La IA no respondió. Intenta de nuevo en un momento.",
                 {"detalle": error.message},
             ) from error
+        # Revisión del 18/11/2026 (hallazgo 3): el lugar no es nombre propio;
+        # ya va aparte, en la región de la búsqueda.
+        entities = without_places(
+            literal_entities(intent, result.entities), (result.place, result.place_state)
+        )
         try:
-            terms = clean_suggestion(result.name, result.phrases, result.exclude_terms)
+            terms = clean_suggestion(
+                result.name,
+                result.phrases,
+                result.exclude_terms,
+                entities=entities,
+                require_phrases=require_phrases,
+            )
         except EmptySuggestionError:
             # Sin frases útiles también se pagó: queda en la bitácora.
             await self._record(actor, intent, result.usage, {"error": "sin frases útiles"})
@@ -157,6 +185,8 @@ class SuggestConceptTerms:
             "frases": list(terms.phrases),
             "exclusiones": list(terms.exclude_terms),
         }
+        if terms.entities:
+            details["entidades"] = list(terms.entities)
         if place is not None:
             details["lugar"] = place
         await self._record(actor, intent, result.usage, details)
@@ -167,4 +197,5 @@ class SuggestConceptTerms:
             self._cost(result.usage),
             place,
             _clean_place(result.place_state),
+            result,
         )

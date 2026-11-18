@@ -9,6 +9,8 @@
  * «▸ +N medios» (ADR-0026); debajo de las pestañas se dice en cuántas.
  * Si hay notas de más de una categoría, las tarjetas van en secciones
  * plegables por categoría con su conteo (ADR-0109, D5).
+ * "No relevantes" suma solo las cercanas; las que descartó la IA (ajenas)
+ * salen con el botón discreto «Ver las N que descartó la IA» (ADR-0117).
  */
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 
@@ -18,6 +20,7 @@ import { useTimelineStore } from '../../store/timeline';
 import { Icon } from '../ui/Icon';
 import { type CategorySection, containsArticle, sectionsByCategory } from './categorySections';
 import { matchesListFilter, newsCount } from './format';
+import { DiscardedToggle } from './StandingNote';
 import { type StoryGroup, groupByStory } from './stories';
 import { StoryCard } from './StoryCard';
 import { GLASS, PANEL_TITLE } from './ui';
@@ -46,9 +49,21 @@ interface ResultsListProps {
    * más noticias (Benji, 28/10/2026).
    */
   variant?: 'column' | 'dossier';
+  /**
+   * Cuántas descartó la IA (ADR-0117): el diseño de columna pone debajo del
+   * encabezado el botón que las muestra. En el expediente lo pone el propio
+   * expediente.
+   */
+  discarded?: number;
 }
 
-export function ResultsList({ articles, total, colors, variant = 'column' }: ResultsListProps) {
+export function ResultsList({
+  articles,
+  total,
+  colors,
+  variant = 'column',
+  discarded = 0,
+}: ResultsListProps) {
   const dossier = variant === 'dossier';
   const filter = useExplorerStore((s) => s.listFilter);
   const setFilter = useExplorerStore((s) => s.setListFilter);
@@ -129,6 +144,7 @@ export function ResultsList({ articles, total, colors, variant = 'column' }: Res
               No relevantes
             </label>
           </div>
+          <DiscardedToggle count={discarded} className="mt-1 self-start text-[10.5px]" />
           <div
             className="hud-seg mt-3"
             role="tablist"

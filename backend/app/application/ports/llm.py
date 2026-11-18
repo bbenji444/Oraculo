@@ -18,6 +18,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.authority import Authority
+from app.domain.core_terms import QueryOrigin
 from app.domain.enrichment import ConceptBrief, Enrichment, LLMUsage
 from app.domain.entity_extraction import RawProposal
 
@@ -32,12 +33,28 @@ class EnrichmentRequest:
         published_at: Fecha de publicación, si se conoce (ayuda con
             "ayer", "el lunes").
         concepts: Conceptos de la búsqueda.
+        region: Dónde se busca («Mundo», «Jalisco», «México»), si se sabe.
+            En los conceptos abiertos la IA no descarta por lugar: eso lo
+            hace el sistema con la región (``enrich_v6``, ADR-0114).
+        origins: Consultas y buscadores que trajeron la nota (procedencia);
+            vacío si no se sabe (al volver a juzgar texto guardado).
+        unconfirmed_terms: Términos obligatorios que el título y el
+            fragmento no nombran; la nota pasó el filtro porque un buscador
+            de texto completo la trajo con ellos (ADR-0114).
+        entity_context: Lo que dicen de esos términos otras notas de la
+            misma búsqueda que sí los nombran (``CoreMatcher.entity_context``):
+            con él, el juez marca «por confirmar» solo si el título coincide
+            con un hecho concreto de la entidad. Vacío si no hay.
     """
 
     title: str
     text: str
     published_at: datetime | None
     concepts: Sequence[ConceptBrief]
+    region: str | None = None
+    origins: Sequence[QueryOrigin] = ()
+    unconfirmed_terms: tuple[str, ...] = ()
+    entity_context: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -474,9 +491,13 @@ class TermSuggestionResult:
         exclude_terms: Exclusiones.
         usage: Tokens gastados (suma de intentos, si hubo reintento).
         model: Modelo usado.
-        prompt_version: Versión del prompt (``terms_v2``).
+        prompt_version: Versión del prompt (``terms_v3``).
         place: Lugar que nombró la persona («Jalisco»), o ``None``.
         place_state: Estado de ese lugar si es un municipio o ciudad, o ``None``.
+        entities: Nombres propios, alias, grupos, empresas, marcas, cuentas o
+            siglas que escribió la persona, según la IA (``terms_v3``,
+            ADR-0113). Sin validar: ``literal_entities`` deja solo los que
+            están tal cual en el texto.
     """
 
     name: str
@@ -487,6 +508,7 @@ class TermSuggestionResult:
     prompt_version: str
     place: str | None = None
     place_state: str | None = None
+    entities: tuple[str, ...] = ()
 
 
 class TermSuggestionError(RuntimeError):

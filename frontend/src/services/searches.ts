@@ -68,6 +68,12 @@ export interface SearchProgress {
   out_of_region?: number;
   unlocated?: number;
   skipped_by_cap?: number;
+  /**
+   * Aviso del worker para el analista si Google web no pudo buscar (sin
+   * créditos o error de la cuenta de SearchApi, ADR-0115): la búsqueda siguió
+   * con las demás fuentes. Falta si no hubo nada que avisar.
+   */
+  notice?: string;
 }
 
 export interface Search {
@@ -113,13 +119,34 @@ export interface Search {
   window_end?: string | null;
 }
 
+/**
+ * Qué tan de cerca toca la nota lo que se buscó (ADR-0117), según el puntaje
+ * de la IA: `relevant` (0.8 o más), `unconfirmed` (relevante «por
+ * confirmar», 0.6 a 0.79), `related` («cercana»: mismo tema, otra entidad o
+ * lugar, o de pasada; 0.3 a 0.59) y `unrelated` («ajena»: nada que ver).
+ */
+export type RelevanceBand = 'relevant' | 'unconfirmed' | 'related' | 'unrelated';
+
 export interface Judgement {
   concept_id: number;
   name: string;
+  /** La relevancia final, con el umbral y la regla FGR ya aplicados (ADR-0030). */
   is_relevant: boolean;
   relevance_score: number;
   relevance_reason: string | null;
+  /**
+   * La banda que calcula el servidor (ADR-0117). Falta en respuestas de antes
+   * del 18/11/2026: la pantalla la deduce del puntaje (`Explore/relevance.ts`).
+   */
+  relevance_band?: RelevanceBand;
 }
+
+/**
+ * Dónde se publicó la nota (ADR-0117): un medio de noticias, una red social
+ * o cualquier otro sitio web. Los valores son los mismos que manda la API.
+ */
+export type Platform =
+  'news' | 'facebook' | 'x' | 'youtube' | 'instagram' | 'tiktok' | 'reddit' | 'telegram' | 'web';
 
 export type Precision = 'country' | 'state' | 'municipality' | 'locality' | 'unknown';
 
@@ -152,6 +179,12 @@ export interface Article {
   primary_location: ArticleLocation | null;
   in_region: boolean | null;
   providers: string[];
+  /**
+   * Dónde se publicó (ADR-0117): Facebook, X, YouTube… o `news` si es de un
+   * medio. Falta en respuestas de antes del 18/11/2026: entonces se toma
+   * como noticia (`Explore/platforms.ts`).
+   */
+  platform?: Platform;
   /**
    * Historia: id de la primera nota del mismo hecho en varios medios
    * (ADR-0026); `null` o ausente si la nota está sola.
@@ -308,6 +341,36 @@ export interface QuickSearchStarted {
   conceptName: string;
   /** El lugar que nombró el texto («en Jalisco») si se buscó ahí; `null` si se buscó en la región elegida. */
   placeRegionId: number | null;
+  /**
+   * Aviso si se buscó con menos fuentes de las pedidas («Sin créditos de
+   * Google web: se buscó en noticias», ADR-0115); `null` si no hubo.
+   */
+  notice: string | null;
+}
+
+/** Quita espacios y deja `null` si el aviso viene vacío o no es texto. */
+function noticeText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+/**
+ * Los avisos que hay que mostrarle al analista de una búsqueda: el que dio
+ * la búsqueda rápida al lanzarse (si es esta misma búsqueda) y el que deja el
+ * worker en su avance, sin repetir el mismo texto (ADR-0115).
+ *
+ * @param search La búsqueda, con su avance.
+ * @param launched Lo que respondió el lanzamiento de la búsqueda rápida, si se conoce.
+ * @returns Los avisos, primero el del lanzamiento; vacío si no hay.
+ * @example searchNotices(busqueda, { searchId: busqueda.search_id, notice: 'Sin créditos…' })
+ * // ['Sin créditos…']
+ */
+export function searchNotices(
+  search: Pick<Search, 'search_id' | 'progress'>,
+  launched: { searchId: string; notice: string | null } | null,
+): string[] {
+  const fromLaunch = launched?.searchId === search.search_id ? noticeText(launched.notice) : null;
+  const fromWorker = noticeText(search.progress.notice);
+  return [...new Set([fromLaunch, fromWorker].filter((n): n is string => n !== null))];
 }
 
 /**
@@ -334,6 +397,7 @@ export async function startQuickSearch(input: QuickSearchInput): Promise<QuickSe
     conceptId: data.concept.id,
     conceptName: data.concept.name,
     placeRegionId: typeof place === 'number' ? place : null,
+    notice: noticeText(data.notice),
   };
 }
 

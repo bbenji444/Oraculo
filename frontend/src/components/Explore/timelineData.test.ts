@@ -10,6 +10,7 @@ import {
   chronological,
   NO_FILTERS,
   noteMoment,
+  platformFacet,
   stateCodeOf,
   statesIn,
   storyItems,
@@ -139,12 +140,70 @@ describe('filtros', () => {
       applyTimeline(notes, { ...NO_FILTERS, categoryIds: [6] }).map((a) => a.article_id),
     ).toEqual([2, 3]);
     expect(
-      applyTimeline(notes, { range: null, categoryIds: [6], stateCode: '08' }).map(
+      applyTimeline(notes, { range: null, categoryIds: [6], stateCode: '08', platforms: [] }).map(
         (a) => a.article_id,
       ),
     ).toEqual([3]);
     const range = [Date.parse('2026-10-25T21:00:00Z'), Date.parse('2026-10-25T22:00:00Z')] as const;
     expect(applyTimeline(notes, { ...NO_FILTERS, range }).map((a) => a.article_id)).toEqual([1]);
+  });
+
+  it('filtra por plataforma (ADR-0117); sin el dato, la nota cuenta como noticia', () => {
+    const mixed = [
+      ...notes,
+      note(5, '2026-10-26T03:00:00Z', { platform: 'facebook', category: ARMAS }),
+      note(6, '2026-10-26T04:00:00Z', { platform: 'x' }),
+      note(7, '2026-10-26T05:00:00Z', { platform: 'news' }),
+    ];
+    const ids = (filters: Partial<typeof NO_FILTERS>) =>
+      applyTimeline(mixed, { ...NO_FILTERS, ...filters }).map((a) => a.article_id);
+
+    expect(ids({ platforms: ['facebook'] })).toEqual([5]);
+    expect(ids({ platforms: ['facebook', 'x'] })).toEqual([5, 6]);
+    // Las notas 1 a 4 no traen plataforma (respuestas de antes): son noticias.
+    expect(ids({ platforms: ['news'] })).toEqual([1, 2, 3, 4, 7]);
+    // Se combina con los demás filtros.
+    expect(ids({ platforms: ['facebook'], categoryIds: [7] })).toEqual([]);
+    expect(ids({ platforms: ['facebook'], categoryIds: [6] })).toEqual([5]);
+    expect(ids({ platforms: [] })).toHaveLength(mixed.length);
+  });
+
+  it('el conteo de plataformas es facetado: bajan con la categoría y la ubicación (revisión del 18/11/2026)', () => {
+    const mixed = [
+      ...notes,
+      { ...note(5, '2026-10-26T03:00:00Z', { platform: 'facebook', category: ARMAS }) },
+      { ...note(6, '2026-10-26T04:00:00Z', { platform: 'facebook' }), in_region: false },
+      { ...note(7, '2026-10-26T05:00:00Z', { platform: 'x', category: ARMAS }), in_region: null },
+    ];
+    const count = (facet: Article[], platform: string) =>
+      facet.filter((a) => (a.platform ?? 'news') === platform).length;
+    const all = platformFacet(mixed, {
+      filters: { range: null, categoryIds: [], stateCode: null },
+      listFilter: 'all',
+    });
+    expect([count(all, 'news'), count(all, 'facebook'), count(all, 'x')]).toEqual([4, 2, 1]);
+
+    // Con una categoría: Facebook baja de 2 a 1 y coincide con lo que se vería.
+    const armas = platformFacet(mixed, {
+      filters: { range: null, categoryIds: [6], stateCode: null },
+      listFilter: 'all',
+    });
+    expect([count(armas, 'news'), count(armas, 'facebook'), count(armas, 'x')]).toEqual([2, 1, 1]);
+    const facebookArmas = applyTimeline(mixed, {
+      ...NO_FILTERS,
+      categoryIds: [6],
+      platforms: ['facebook'],
+    });
+    expect(count(armas, 'facebook')).toBe(facebookArmas.length);
+
+    // Con «Dentro de zona»: se van la de fuera y la sin lugar.
+    const inside = platformFacet(mixed, {
+      filters: { range: null, categoryIds: [], stateCode: null },
+      listFilter: 'true',
+    });
+    expect([count(inside, 'news'), count(inside, 'facebook'), count(inside, 'x')]).toEqual([
+      4, 1, 0,
+    ]);
   });
 
   it('cuenta estados y categorías de más a menos', () => {

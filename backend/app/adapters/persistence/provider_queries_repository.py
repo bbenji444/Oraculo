@@ -9,6 +9,7 @@ No hace: no decide presupuesto ni guarda las notas (eso llega en F4).
 """
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import text
@@ -104,17 +105,20 @@ class PostgresProviderQueryLog:
             )
             return [QueryRun(r.created_at, r.status, r.results_count) for r in rows]
 
-    async def credits_used_since(self, provider: str, since: datetime) -> int:
+    async def credits_used_since(self, providers: Sequence[str], since: datetime) -> int:
         """Ver ``ProviderQueryLogPort.credits_used_since``.
 
-        Usa el índice (``provider``, ``created_at``) de la migración 0007.
+        Usa el índice (``provider``, ``created_at``) de la migración 0007
+        (``= ANY`` con una lista corta lo usa igual que ``=``).
         """
+        # Un texto también es una secuencia de letras: se toma como un solo nombre.
+        names = [providers] if isinstance(providers, str) else list(providers)
         async with self._engine.connect() as conn:
             total = await conn.execute(
                 text(
                     "SELECT COALESCE(sum(cost_credits), 0) FROM provider_queries "
-                    "WHERE provider = :provider AND created_at >= :since"
+                    "WHERE provider = ANY(:providers) AND created_at >= :since"
                 ),
-                {"provider": provider, "since": since},
+                {"providers": names, "since": since},
             )
             return int(total.scalar_one())

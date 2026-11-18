@@ -157,3 +157,64 @@ async def test_la_nota_guardada_conserva_su_fecha_aunque_vuelva_con_otra(
 
     assert again.article_id == first.article_id
     assert again.published_at == first.published_at == NOON
+
+
+# --- Revisión del 18/11/2026 (hallazgo 8): el medio guardado no se pisa ---
+
+
+def _stored_name(engine: Engine) -> list[tuple[str, str | None]]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT url_canonical, source_name FROM articles WHERE url_canonical IN (:a, :b)"),
+            {"a": GOOGLE, "b": MEDIO},
+        ).all()
+    return [(r.url_canonical, r.source_name) for r in rows]
+
+
+async def _improve_link(store: PostgresArticleStore, later: RawArticle) -> None:
+    """La misma nota llega con el link del medio y se reconoce por título."""
+    found = dedupe([later], title_similarity)
+    [candidates] = await store.known_like(found)
+    match = match_known(found[0], candidates, title_similarity)
+    found[0].known_id = match.article_id if match else None
+    await store.upsert(found)
+
+
+async def test_cambiar_al_link_del_medio_no_pisa_el_nombre_que_ya_tenia(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    # Antes, el UPDATE ponía el nombre de la nota nueva: «Noticias · Medio»
+    # de Google web reemplazaba el «Medio de prueba» del RSS.
+    store = PostgresArticleStore(test_engine)
+    await store.upsert(dedupe([raw(GOOGLE, Provider.GOOGLE_NEWS_RSS)], title_similarity))
+    web = RawArticle.create(
+        provider=Provider.SEARCHAPI_WEB,
+        provider_rank=1,
+        url=MEDIO,
+        title=TITLE,
+        published_at=NOON,
+        source_name="Noticias · Medio de prueba",
+        source_domain="duplicados.mx",
+    )
+
+    await _improve_link(store, web)
+
+    assert _stored_name(sync_engine) == [(MEDIO, "Medio de prueba")]
+
+
+async def test_si_no_tenia_nombre_toma_el_de_la_nota_nueva(
+    sync_engine: Engine, test_engine: AsyncEngine
+) -> None:
+    store = PostgresArticleStore(test_engine)
+    nameless = RawArticle.create(
+        provider=Provider.GOOGLE_NEWS_RSS,
+        provider_rank=1,
+        url=GOOGLE,
+        title=TITLE,
+        published_at=NOON,
+    )
+    await store.upsert(dedupe([nameless], title_similarity))
+
+    await _improve_link(store, raw(MEDIO, Provider.SEARCHAPI))
+
+    assert _stored_name(sync_engine) == [(MEDIO, "Medio de prueba")]

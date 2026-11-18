@@ -67,7 +67,12 @@ export interface TermSuggestion {
 /** Campos que cambian en una edición; los que faltan no cambian. */
 export type ConceptPatch = Partial<ConceptInput>;
 
-export type Provider = 'searchapi' | 'google_news_rss' | 'gdelt' | 'indice_local';
+/**
+ * Fuentes que pueden salir en el plan de consultas. `searchapi_web` es la
+ * búsqueda web de Google por SearchApi («Google web»): trae publicaciones de
+ * redes sociales y otros sitios, no solo de medios (ADR-0117).
+ */
+export type Provider = 'searchapi' | 'searchapi_web' | 'google_news_rss' | 'gdelt' | 'indice_local';
 
 export interface PlannedQuery {
   provider: Provider;

@@ -1,0 +1,14 @@
+{
+  "proveedor": "searchapi_web",
+  "texto": "hacker eternal",
+  "parametros": {
+    "engine": "google",
+    "q": "hacker eternal",
+    "gl": "mx",
+    "hl": "es",
+    "nfpr": "1",
+    "time_period": "last_week"
+  },
+  "http_status": 200,
+  "grabado": "2026-11-18T19:02:36+00:00"
+}

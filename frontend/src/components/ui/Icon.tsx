@@ -17,7 +17,13 @@
  * Los iconos que usa el monitor. Van en una lista cerrada para que un error
  * de dedo no deje una palabra suelta en pantalla («chevron_rigth»). Para
  * agregar uno, se busca su nombre en https://fonts.google.com/icons (estilo
- * «Material Icons»).
+ * «Material Icons») y se revisa que la letra autoalojada lo traiga.
+ *
+ * Los de las plataformas (ADR-0117: facebook, tiktok, reddit, telegram,
+ * newspaper, smart_display, photo_camera, language) se revisaron el
+ * 18/11/2026 leyendo las ligaduras de `material-icons-v145.woff2` con
+ * fontTools. La letra no trae X, YouTube ni Instagram: X va como letra y los
+ * otros dos con un dibujo parecido (`Explore/platforms.ts`).
  */
 export type IconName =
   | 'account_circle'
@@ -32,23 +38,31 @@ export type IconName =
   | 'dark_mode'
   | 'expand_less'
   | 'expand_more'
+  | 'facebook'
   | 'filter_alt'
   | 'folder_shared'
   | 'history'
   | 'key'
   | 'label'
+  | 'language'
   | 'light_mode'
   | 'list'
   | 'manage_accounts'
   | 'monitor_heart'
+  | 'newspaper'
   | 'open_in_new'
   | 'palette'
+  | 'photo_camera'
   | 'power_settings_new'
   | 'public'
   | 'radar'
+  | 'reddit'
   | 'science'
   | 'search'
   | 'send'
+  | 'smart_display'
+  | 'telegram'
+  | 'tiktok'
   | 'tune'
   | 'warning';
 
