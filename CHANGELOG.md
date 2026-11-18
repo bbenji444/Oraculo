@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Ver el reporte sin descargarlo (17/11/2026, ADR-0111).** Pedido del jefe de Benji: «no quiere tener que descargar un archivo cada vez que quiera ver un reporte».
+  - En el expediente, debajo del título: **«Ver reporte»** y **«Descargar PDF»**.
+  - «Ver reporte» abre el mismo reporte que el PDF en una ventana grande del monitor, con más cosas: índice a la izquierda que marca dónde vas, secciones que se pliegan, buscador de noticias por título, medio o estado, la cifra exacta al pasar el mouse por barras, dona, línea del tiempo y mapa, y los links de las notas en otra pestaña.
+  - Se cierra con «×», con Esc o con un clic afuera, y desde ahí también se baja el PDF.
+  - Ruta nueva `GET /api/v1/searches/{id}/report/view`, con su propia política de seguridad. nginx tiene un bloque solo para ella (`encabezados-reporte.conf`).
+  - Cuesta lo mismo que el PDF: el resumen de la IA se paga una vez por búsqueda.
+
 - **Conceptos «como en Google» (17/11/2026, ADR-0109, migración 0046).** Benji: «no me da toda la cantidad de resultados de calidad como si yo buscara la noticia de manera normal en Google».
   - Cada concepto tiene un **modo de búsqueda**: «frases exactas» (como hasta hoy) o «como en Google».
   - Como en Google, cada frase (hasta 12) se manda sola y sin comillas a Google News RSS, escrita como titular. Medido: «roban auto Jalisco» trajo 19 notas; el grupo de frases exactas de robo de vehículo, 5.

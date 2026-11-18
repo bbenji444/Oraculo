@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from './http';
-import { fetchExport, fetchReport } from './reports';
+import { fetchExport, fetchReport, reportViewUrl } from './reports';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -68,5 +68,12 @@ describe('reportes y datos', () => {
     );
 
     await expect(fetchExport('b01a', 'geojson')).rejects.toMatchObject({ code: 'network_error' });
+  });
+});
+
+describe('vista del reporte en pantalla', () => {
+  it('es la dirección GET que abre el iframe, con el id escapado', () => {
+    expect(reportViewUrl('b01a')).toBe('/api/v1/searches/b01a/report/view');
+    expect(reportViewUrl('a/b')).toBe('/api/v1/searches/a%2Fb/report/view');
   });
 });

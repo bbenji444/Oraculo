@@ -182,6 +182,18 @@ class ReportDocumentsPort(Protocol):
         """
         ...
 
+    def html_view(self, data: "ReportData", nonce: str) -> str:
+        """El reporte para verlo en el monitor, con índice, filtros y ayudas (ADR-0111).
+
+        Args:
+            data: Lo que lleva el reporte.
+            nonce: Valor único de la respuesta; solo corre el script que lo lleva.
+
+        Returns:
+            El HTML completo, con sus fuentes, estilo y script incrustados.
+        """
+        ...
+
     def pdf(self, data: "ReportData") -> bytes:
         """El reporte en PDF. Es lento: quien lo llame debe usar un hilo aparte.
 

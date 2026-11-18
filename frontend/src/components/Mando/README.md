@@ -15,7 +15,8 @@ http://localhost:8080/?clasico#/explorar
 | `TrackPicker.tsx`     | La ventana «¿Qué rastrear?» al centro: la FGR con sus subdivisiones y los temas generales (ADR-0038).                   |
 | `MissionProgress.tsx` | Mientras se busca: el riel de etapas, el porcentaje, el cronómetro y la bitácora.                                       |
 | `ScanOverlay.tsx`     | El radar sobre el globo y el letrero «BARRIDO COMPLETO».                                                                |
-| `Dossier.tsx`         | El expediente: las cifras, las categorías, la cronología o la lista, y las descargas.                                   |
+| `Dossier.tsx`         | El expediente: las cifras, las categorías, la cronología o la lista, y el reporte.                                      |
+| `ReportViewer.tsx`    | «Ver reporte» y «Descargar PDF», y la ventana donde se lee el reporte sin descargarlo (ADR-0111).                       |
 | `mission.ts`          | La lógica pura: los textos de la frase, el horario de las corridas automáticas, las consultas recientes y la bitácora.  |
 
 ## Dónde viven las demás piezas

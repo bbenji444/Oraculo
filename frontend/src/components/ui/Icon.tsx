@@ -27,6 +27,8 @@ export type IconName =
   | 'chevron_left'
   | 'chevron_right'
   | 'close'
+  | 'description'
+  | 'download'
   | 'dark_mode'
   | 'expand_less'
   | 'expand_more'

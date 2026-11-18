@@ -305,12 +305,13 @@ describe('flujo principal (H1, Centro de mando)', () => {
       expect(screen.getByTestId('globo').dataset.notas).toBe(String(relevant.length));
     });
 
-    // 7. El resumen se pliega aparte para dar todo el alto a la lista; el PDF
-    //    sigue a la mano junto a las pestañas.
+    // 7. El resumen se pliega aparte para dar todo el alto a la lista; el
+    //    reporte sigue a la mano junto a las pestañas.
     expect(within(dossier).getByText('Estados')).toBeTruthy();
     fireEvent.click(within(dossier).getByRole('button', { name: 'Plegar el resumen' }));
     expect(within(dossier).queryByText('Estados')).toBeNull();
-    expect(within(dossier).getByRole('button', { name: 'Reporte (PDF)' })).toBeTruthy();
+    expect(within(dossier).getByRole('button', { name: 'Ver reporte' })).toBeTruthy();
+    expect(within(dossier).getByRole('button', { name: 'Descargar PDF' })).toBeTruthy();
     expect(within(dossier).getByRole('region', { name: 'Noticias' })).toBe(list);
     fireEvent.click(within(dossier).getByRole('button', { name: 'Desplegar el resumen' }));
 
@@ -325,19 +326,31 @@ describe('flujo principal (H1, Centro de mando)', () => {
     expect(original.getAttribute('href')).toBe(note.url);
     expect(original.getAttribute('target')).toBe('_blank');
 
-    // 9. Reporte en PDF desde el expediente.
+    // 9. «Ver reporte» lo abre en una ventana, sin descargar nada (ADR-0111):
+    //    la API lo arma en un iframe con sandbox. Esc la cierra.
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Ver reporte' }));
+    const reportWindow = screen.getByRole('dialog', { name: 'Reporte' });
+    const frame = within(reportWindow).getByTitle(/^Reporte: /);
+    expect(frame.getAttribute('src')).toBe(`/api/v1/searches/${SEARCH_ID}/report/view`);
+    expect(frame.getAttribute('sandbox')).not.toMatch(/allow-forms|allow-top-navigation/);
+    expect(within(reportWindow).getByRole('button', { name: 'Descargar PDF' })).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Reporte' })).toBeNull();
+    expect(reportRequests).toEqual([]);
+
+    // 10. Reporte en PDF desde el expediente.
     const saved: string[] = [];
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement,
     ) {
       saved.push(this.download);
     });
-    fireEvent.click(within(dossier).getByRole('button', { name: 'Reporte (PDF)' }));
+    fireEvent.click(within(dossier).getByRole('button', { name: 'Descargar PDF' }));
     await waitFor(() => {
       expect(saved).toEqual(['reporte-extorsion-jalisco-2026-10-17.pdf']);
     });
 
-    // 10. La flecha oculta el expediente y una pestaña en el borde lo regresa.
+    // 11. La flecha oculta el expediente y una pestaña en el borde lo regresa.
     fireEvent.click(within(dossier).getByRole('button', { name: 'Ocultar el expediente' }));
     expect(screen.queryByRole('complementary', { name: 'Expediente de la consulta' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Expediente ·/ }));
