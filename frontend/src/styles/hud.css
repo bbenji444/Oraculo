@@ -2,15 +2,19 @@
  * Sistema visual «consola táctica» (27/10/2026).
  *
  * El jefe de Benji vio la interfaz «genérica, sin animación» («un Tsuru, no un
- * Tesla»). Estas clases dan a todo el monitor el mismo lenguaje: paneles con
- * esquinas de mira, un borde de luz que sigue al mouse, botones con destello,
- * insignias con pulso, campos con haz de enfoque y entradas escalonadas.
+ * Tesla»). Estas clases dan a todo el monitor el mismo lenguaje: paneles,
+ * botones con destello, insignias con pulso, campos con haz de enfoque y
+ * entradas escalonadas.
+ *
+ * Desde el 17/11/2026 toman la forma de la «consola HUD» de Oráculo core, el
+ * sistema principal, para que al pasar de su Hub al monitor se sienta el mismo
+ * sistema (ADR-0108). Los nombres de las clases no cambian.
  *
  * Reglas para no castigar la tarjeta Intel integrada (el globo ya la usa):
  * - solo se anima `transform`, `opacity` y sombras pequeñas; nada de
  *   `backdrop-filter` ni filtros de desenfoque;
- * - lo que sigue al mouse son dos variables CSS (--mx, --my) que pone un solo
- *   oyente de toda la página (src/ui/spotlight.ts);
+ * - la onda del clic en los botones sale de dos variables CSS (--mx, --my) que
+ *   pone un solo oyente de toda la página (src/ui/spotlight.ts);
  * - con «reducir animaciones» del sistema, todo queda quieto.
  *
  * Quién lo usa: los componentes de src/components/ui/. No hace: no define
@@ -28,122 +32,60 @@
   --hud-amber: #ffb020;
   --hud-rose: #ff3333;
   --hud-violet: #9b8cff;
-  --hud-panel: linear-gradient(180deg, rgb(10 24 32 / 0.86), rgb(4 10 14 / 0.92));
+  /* Superficie de consola de Oráculo (--jarvis-surface): la de lo que flota
+     sobre la página, como su dock y sus chips (ADR-0108). */
+  --hud-panel: rgb(0 14 22 / 0.88);
   --hud-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --hud-corner: 12px;
+  /* Corchetes de esquina de .jarvis-card en Oráculo: 20 px de lado, 2 px. */
+  --hud-corner: 20px;
+  --hud-corner-width: 2px;
 }
 
 /* --- Panel ------------------------------------------------------------------ */
 
-/* Caja base de todo el monitor: fondo de vidrio oscuro (sin desenfoque), borde
-   fino y esquinas de mira que crecen al pasar el mouse. */
+/* Caja base de todo el monitor, como la tarjeta de Oráculo (.jarvis-card):
+   superficie de consola sin desenfoque, esquinas casi rectas y los dos
+   corchetes que dicen «esto es una tarjeta del sistema». El anillo cian al
+   16 % es el de las piezas flotantes de Oráculo; aquí va como borde porque los
+   paneles flotan sobre el globo. */
 .hud-panel {
   position: relative;
   isolation: isolate;
-  border: 1px solid var(--hud-cyan-line);
-  border-radius: 14px;
+  border: 1px solid rgb(0 210 255 / 0.16);
+  border-radius: 4px;
   background: var(--hud-panel);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 18px 40px -24px rgb(0 0 0 / 0.9);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
   transition:
-    border-color 0.35s var(--hud-ease),
-    box-shadow 0.35s var(--hud-ease),
-    transform 0.35s var(--hud-ease);
+    border-color 0.2s var(--hud-ease),
+    background-color 0.2s var(--hud-ease);
 }
 
-/* Las cuatro esquinas de mira, dibujadas con gradientes en una sola capa. */
+/* Corchetes arriba a la izquierda y abajo a la derecha, siempre encendidos
+   como en Oráculo (no crecen ni se apagan). */
 .hud-panel::after {
   content: '';
   position: absolute;
   inset: -1px;
   z-index: 2;
-  border-radius: inherit;
   pointer-events: none;
   --c: var(--hud-corner);
+  --w: var(--hud-corner-width);
   background:
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top left / var(--c) 1.5px,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top left / 1.5px var(--c),
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top right / var(--c) 1.5px,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top right / 1.5px var(--c),
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom left / var(--c) 1.5px,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom left / 1.5px var(--c),
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom right / var(--c) 1.5px,
-    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom right / 1.5px var(--c);
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top left / var(--c) var(--w),
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) top left / var(--w) var(--c),
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom right / var(--c) var(--w),
+    linear-gradient(var(--hud-cyan), var(--hud-cyan)) bottom right / var(--w) var(--c);
   background-repeat: no-repeat;
-  opacity: 0.45;
-  transition: opacity 0.35s var(--hud-ease);
 }
 
-.hud-panel:hover::after,
-.hud-panel:focus-within::after {
-  opacity: 1;
-}
-
-/* Panel que reacciona: se eleva un poco y su borde se enciende. */
+/* Panel que se abre: el borde se enciende y la superficie toma un tinte cian,
+   como el renglón de una tabla de Oráculo al pasar el mouse. Sin elevarse. */
 .hud-panel--interactive {
   cursor: pointer;
 }
 .hud-panel--interactive:hover {
-  transform: translateY(-2px);
-  border-color: rgb(0 210 255 / 0.4);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 0 1px rgb(0 210 255 / 0.08),
-    0 22px 46px -22px rgb(0 210 255 / 0.28);
-}
-
-/* --- Luz que sigue al mouse ---------------------------------------------------- */
-
-/* Un halo suave dentro y un tramo de borde encendido donde está el cursor.
-   --mx y --my los pone src/ui/spotlight.ts en el elemento .hud-spot. */
-.hud-spot {
-  --mx: 50%;
-  --my: 50%;
-}
-.hud-spot::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(
-    360px circle at var(--mx) var(--my),
-    rgb(0 210 255 / 0.16),
-    transparent 62%
-  );
-  opacity: 0;
-  transition: opacity 0.4s var(--hud-ease);
-}
-.hud-spot:hover::before {
-  opacity: 1;
-}
-
-/* El borde de luz: un anillo de 1 px enmascarado que solo se ve cerca del mouse. */
-.hud-spot > .hud-spot-ring {
-  position: absolute;
-  inset: -1px;
-  z-index: 3;
-  border-radius: inherit;
-  padding: 1.5px;
-  pointer-events: none;
-  background: radial-gradient(
-    220px circle at var(--mx) var(--my),
-    rgb(126 233 255 / 1),
-    rgb(0 210 255 / 0.3) 45%,
-    transparent 70%
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.35s var(--hud-ease);
-}
-.hud-spot:hover > .hud-spot-ring {
-  opacity: 1;
+  border-color: rgb(0 210 255 / 0.45);
+  background: linear-gradient(rgb(0 210 255 / 0.06), rgb(0 210 255 / 0.06)), var(--hud-panel);
 }
 
 /* --- Botones ------------------------------------------------------------------- */

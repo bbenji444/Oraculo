@@ -77,7 +77,7 @@ const SCROLL_MARGIN_PX = 36;
 /** Vidrio homologado con OSINT (`--vidrio`, `--borde`, desenfoque de 14 px). */
 // Panel de la consola táctica (ADR-0036). Sin backdrop-blur: desenfocar el
 // globo de atrás cada cuadro costaba en la tarjeta integrada.
-const GLASS_OSINT = 'hud-panel hud-spot bg-[#050505]/90';
+const GLASS_OSINT = 'hud-panel bg-[#050505]/90';
 const PILL =
   'rounded-full border border-sky-400/15 bg-white/[0.03] px-2.5 py-1 text-[11px] text-slate-200 transition-all duration-300 hover:-translate-y-px hover:border-sky-400/50 hover:shadow-[0_0_12px_rgb(0_210_255/0.25)] focus-visible:outline-2 focus-visible:outline-sky-400';
 

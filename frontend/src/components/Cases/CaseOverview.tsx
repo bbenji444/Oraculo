@@ -47,7 +47,7 @@ export function CaseOverview({ caseId, canEdit, onNavigate }: CaseOverviewProps)
   const groups = groupByType(confirmed);
 
   return (
-    <div className="hud-panel hud-spot hud-reveal overflow-hidden">
+    <div className="hud-panel hud-reveal overflow-hidden">
       <div className="hud-section-head">
         <h3 className="hud-section-title">Panorama</h3>
         {confirmed.length > 0 && (

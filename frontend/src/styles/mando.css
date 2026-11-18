@@ -8,15 +8,31 @@
  * de `backdrop-filter`; con «reducir animaciones» del sistema, todo queda
  * quieto.
  *
- * Quién lo usa: src/components/Mando/. No hace: no cambia el diseño 2; estas
- * clases solo aparecen con `?mando` en la URL.
+ * Desde el 17/11/2026 sus esquinas y lo que flota toman la forma de Oráculo
+ * core (ADR-0108).
+ *
+ * Quién lo usa: src/components/Mando/, el diseño principal de Explorar. No
+ * hace: no cambia el diseño de columnas, que se abre con `?clasico`.
  */
 
 /* --- Centro de mando -------------------------------------------------------- */
 
 .mando-dock {
-  border-radius: 18px;
+  border-radius: 4px;
   animation: mando-rise 0.9s var(--hud-ease) both;
+}
+
+/* Lo que flota en un solo renglón (la barra «Consulta activa» y el botón del
+   Centro de mando minimizado) es una píldora, como el dock y los chips de
+   Oráculo core (ADR-0108). Sin corchetes: no caben en una orilla redonda. En
+   el celular la barra se parte en renglones y vuelve a ser panel. */
+@media (min-width: 640px) {
+  .mando-pill {
+    border-radius: 30px;
+  }
+  .mando-pill.hud-panel::after {
+    display: none;
+  }
 }
 
 /* Vidrio: translúcido para que se vea el globo detrás, con un brillo en la
@@ -366,7 +382,7 @@
   overflow: hidden;
   padding: 0.22rem 0.2rem 0.24rem;
   border: 1px solid rgb(var(--tone) / 0.22);
-  border-radius: 8px;
+  border-radius: 4px;
   background: linear-gradient(180deg, rgb(var(--tone) / 0.14), rgb(var(--tone) / 0.02) 80%);
   transition:
     border-color 0.3s var(--hud-ease),
@@ -825,7 +841,7 @@
   overflow: hidden;
   padding: 0.38rem 0.6rem 0.36rem;
   border: 1px solid rgb(var(--tone) / 0.3);
-  border-radius: 12px;
+  border-radius: 4px;
   background:
     linear-gradient(160deg, rgb(var(--tone) / 0.2), rgb(var(--tone) / 0.03) 70%),
     rgb(255 255 255 / 0.02);
@@ -1002,7 +1018,7 @@
 .mando-cat--card {
   min-height: 2.7rem;
   max-width: none;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 0.4rem 0.6rem;
   text-align: left;
 }
@@ -1335,7 +1351,7 @@
 .hoja-celular__cuerpo {
   border: 1px solid var(--hud-cyan-line);
   border-bottom: 0;
-  border-radius: 18px 18px 0 0;
+  border-radius: 4px 4px 0 0;
   /* Un poco transparente: se adivina el globo detrás (Benji, 11/11/2026). */
   background: linear-gradient(180deg, rgb(7 23 35 / 0.84), rgb(4 11 18 / 0.9));
   backdrop-filter: blur(10px);
@@ -1412,7 +1428,7 @@
 .globo-menu {
   padding: 0.6rem;
   border: 1px solid var(--hud-cyan-line);
-  border-radius: 14px;
+  border-radius: 4px;
   background: rgb(5 13 18 / 0.92);
   box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
   animation: hud-rise 0.25s var(--hud-ease) both;

@@ -14,7 +14,7 @@
  * mapa claro de calles, al 60 % quedaba gris y el texto secundario medía
  * 1.6 : 1 de contraste (prueba operativa del 20/10/2026; se pide 4.5 : 1).
  */
-export const GLASS = 'hud-panel hud-spot [[data-earth=day]_&]:bg-slate-950/90';
+export const GLASS = 'hud-panel [[data-earth=day]_&]:bg-slate-950/90';
 
 /** Título de panel. */
 export const PANEL_TITLE =

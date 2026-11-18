@@ -167,7 +167,7 @@ export function CaseEntities({ caseId, canEdit }: CaseEntitiesProps) {
   }
 
   return (
-    <div className="hud-panel hud-spot hud-reveal overflow-hidden">
+    <div className="hud-panel hud-reveal overflow-hidden">
       <div className="hud-section-head">
         <h3 className="hud-section-title">Entidades</h3>
         {analysis && (

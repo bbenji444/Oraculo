@@ -52,7 +52,7 @@ export function CaseForm({ editing, onSaved, onCancel }: CaseFormProps) {
     <form
       onSubmit={save}
       aria-labelledby={`${id}-title`}
-      className="hud-panel hud-spot hud-reveal space-y-5 p-5"
+      className="hud-panel hud-reveal space-y-5 p-5"
     >
       <h2
         id={`${id}-title`}

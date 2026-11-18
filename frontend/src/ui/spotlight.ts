@@ -1,16 +1,20 @@
 /**
- * La luz que sigue al mouse en paneles y botones (27/10/2026, styles/hud.css).
+ * El punto de donde sale la onda del clic en los botones (27/10/2026,
+ * styles/hud.css).
  *
- * Un solo oyente para toda la página: al mover el mouse sobre un `.hud-spot`
- * o un `.hud-btn`, pone en ese elemento las variables CSS `--mx` y `--my` (la
- * posición del cursor dentro de él). El CSS dibuja con ellas el halo, el borde
- * encendido y la onda del clic. Así no hay un oyente por componente ni se
- * vuelve a dibujar React: solo cambia una variable, una vez por cuadro.
+ * Un solo oyente para toda la página: al mover el mouse sobre un `.hud-btn`,
+ * pone en ese elemento las variables CSS `--mx` y `--my` (la posición del
+ * cursor dentro de él). El CSS dibuja con ellas la onda del clic. Así no hay un
+ * oyente por componente ni se vuelve a dibujar React: solo cambia una variable,
+ * una vez por cuadro.
+ *
+ * Hasta el 17/11/2026 también encendía un halo en los paneles. Se quitó al
+ * darles la forma de las tarjetas de Oráculo core, que no lo tienen (ADR-0108).
  *
  * No hace: no dibuja nada ni decide estilos.
  */
 
-const TARGETS = '.hud-spot, .hud-btn';
+const TARGETS = '.hud-btn';
 
 /** Posición del punto dentro de un rectángulo, en píxeles. */
 export function pointIn(

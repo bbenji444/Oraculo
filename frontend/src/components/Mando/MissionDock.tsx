@@ -526,7 +526,7 @@ export function MissionDock({ active }: MissionDockProps) {
           onClick={() => {
             useMandoStore.getState().setDockMinimized(false);
           }}
-          className="hud-btn hud-btn--sm mando-dock bg-[#050d12]/90 px-4"
+          className="hud-btn hud-btn--sm mando-dock mando-pill bg-[#050d12]/90 px-4"
         >
           ◈ Centro de mando{percent} ▴
         </button>
@@ -560,7 +560,7 @@ export function MissionDock({ active }: MissionDockProps) {
     return (
       <section
         aria-label="Centro de mando"
-        className={`${MANDO_GLASS} mando-dock flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
+        className={`${MANDO_GLASS} mando-dock mando-pill flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2`}
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="hud-dot hud-dot--live" />
