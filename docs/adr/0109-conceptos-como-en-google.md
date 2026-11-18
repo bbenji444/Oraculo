@@ -85,5 +85,7 @@ Medición sin gastar créditos:
 - **Lo que se gana:** un concepto nuevo se escribe como se busca en Google y trae las notas escritas como titular, que son las que antes se perdían.
 - **Más peticiones a Google News RSS:** hasta 12 por concepto en lugar de 4. No es un servicio oficial y puede frenar las peticiones. Se contiene con el tope por búsqueda y los reintentos del adaptador; si falla, la búsqueda queda parcial.
 - **Más notas que leer:** con más notas, el tope de 150 de la IA se alcanza antes y algunas notas pueden quedar sin juicio. Se mide en la primera búsqueda real.
+- **Las notas ya leídas se vuelven a leer una vez:** `enrich_v5` es otra versión del prompt, así que una nota leída con `enrich_v4` se paga de nuevo si vuelve a salir en una búsqueda (§10). Ya pasó con cada versión anterior. El costo sigue dentro del tope de 150 notas por búsqueda. En las corridas FGR la ventana es de unas horas, así que se espera que se repitan pocas notas.
+- **Google News RSS frena si se le pide mucho seguido:** el 17/11/2026, tras ~90 consultas en unos minutos, respondió 429 («demasiadas peticiones»). Una búsqueda con dos conceptos abiertos son 24, de 2 en 2. Se vigila con el tope propio de las consultas gratuitas (D3).
 - **Cambia la especificación §7.2:** ya no es siempre una consulta por proveedor y concepto.
 - **El índice local** sigue buscando cada frase seguida, igual que antes.

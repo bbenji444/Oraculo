@@ -1,6 +1,7 @@
 """Adaptador de Gemini con un modelo falso: sin red ni gasto (§10)."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -12,6 +13,7 @@ from google.genai import types
 from app.adapters.llm.common import PROMPT_VERSION, EnrichmentOut, build_prompt, to_enrichment
 from app.adapters.llm.gemini import GeminiEnricher, build_gemini
 from app.application.ports.llm import EnrichmentError, EnrichmentRequest
+from app.domain.concept import QueryMode
 from app.domain.enrichment import MAX_TEXT_CHARS, ConceptBrief, LLMUsage, text_for_llm
 from app.domain.errors import (
     ProviderAuthError,
@@ -185,9 +187,49 @@ def test_prompt_v2_pide_el_municipio_de_colonias_y_calles() -> None:
     # Sin él, "Polanco" no se podía ubicar dentro de la CDMX (ADR-0020).
     prompt = build_prompt(REQUEST)
 
-    assert PROMPT_VERSION == "enrich_v4"
+    assert PROMPT_VERSION == "enrich_v5"
     assert "municipality_hint" in prompt
     assert "Día de Muertos" in prompt
+
+
+def test_un_concepto_exacto_se_presenta_como_antes() -> None:
+    # ADR-0109 (D4): la FGR y los temas no cambian de criterio con enrich_v5.
+    prompt = build_prompt(REQUEST)
+
+    assert (
+        "- concept_id 3: Extorsión. Cobro de piso y amenazas "
+        "(palabras clave: extorsión, cobro de piso)"
+    ) in prompt
+
+
+def test_un_concepto_abierto_se_juzga_contra_lo_que_escribio_el_analista() -> None:
+    hackeos = ConceptBrief(
+        8,
+        "Hackeos a gobierno",
+        "hackeos y filtraciones de bases de datos del gobierno mexicano",
+        ("filtran datos", "ciberataque gobierno"),
+        QueryMode.OPEN,
+    )
+
+    prompt = build_prompt(replace(REQUEST, concepts=[hackeos]))
+
+    assert (
+        "- concept_id 8: Hackeos a gobierno. Lo que busca el analista: hackeos y "
+        "filtraciones de bases de datos del gobierno mexicano (frases de búsqueda, "
+        "solo como pista: filtran datos, ciberataque gobierno)"
+    ) in prompt
+    # La regla que le dice a la IA qué hacer con ese texto.
+    assert "Las frases de búsqueda solo son pista" in prompt
+
+
+def test_un_concepto_abierto_sin_descripcion_se_presenta_como_exacto() -> None:
+    # Sin lo que escribió el analista no hay contra qué juzgar.
+    bare = ConceptBrief(8, "Hackeos", "", ("filtran datos",), QueryMode.OPEN)
+
+    prompt = build_prompt(replace(REQUEST, concepts=[bare]))
+
+    assert "- concept_id 8: Hackeos.  (palabras clave: filtran datos)" in prompt
+    assert "Lo que busca el analista:" not in prompt
 
 
 def test_el_municipio_que_sugiere_la_ia_llega_a_la_mencion() -> None:

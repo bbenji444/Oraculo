@@ -192,7 +192,8 @@ class ReprocessSearch:
         if searched is None:
             raise NotFoundError(f"No existe la región {search.region_code} en el catálogo.")
         briefs = [
-            ConceptBrief(c.concept_id, c.name, c.description, c.keywords) for c in search.concepts
+            ConceptBrief(c.concept_id, c.name, c.description, c.keywords, c.query_mode)
+            for c in search.concepts
         ]
         before = {
             m.article_id: m.primary_code for m in await self._store.search_mentions(search_id)

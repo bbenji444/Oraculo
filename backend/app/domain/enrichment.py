@@ -17,6 +17,7 @@ No hace: no llama a la IA ni valida JSON (eso es el adaptador).
 from dataclasses import dataclass
 from datetime import date
 
+from app.domain.concept import QueryMode
 from app.domain.geocoding import Mention
 
 # Caracteres del texto que se mandan a la IA: ~1,500 tokens en español. Una
@@ -38,14 +39,18 @@ class ConceptBrief:
     Attributes:
         concept_id: Id del concepto.
         name: Nombre ("Extorsión").
-        description: Qué cubre.
-        keywords: Palabras clave.
+        description: Qué cubre. En un concepto «como en Google» es lo que el
+            analista escribió en sus palabras, y la IA juzga contra eso
+            (ADR-0109).
+        keywords: Palabras clave (en un concepto abierto, las frases).
+        query_mode: Cómo se buscó el concepto.
     """
 
     concept_id: int
     name: str
     description: str
     keywords: tuple[str, ...]
+    query_mode: QueryMode = QueryMode.EXACT
 
 
 @dataclass(frozen=True, slots=True)

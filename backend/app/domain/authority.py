@@ -81,7 +81,7 @@ def parse_authority(value: str | None) -> Authority | None:
 
 # Confianza mínima para que un «sí es relevante» de la IA cuente (Benji,
 # 11/11/2026: «sé mucho más estricto»). Por debajo, la IA misma dice que el
-# tema es secundario o dudoso (enrich_v4 pide menos de 0.6 en ese caso).
+# tema es secundario o dudoso (enrich_v4 y enrich_v5 piden menos de 0.6 en ese caso).
 MIN_RELEVANCE_SCORE = 0.6
 LOW_CONFIDENCE_REASON = "La IA no está segura de que sea el asunto principal de la nota."
 
