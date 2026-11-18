@@ -87,7 +87,15 @@ Medición sin gastar créditos:
 
 - **Lo que se gana:** un concepto nuevo se escribe como se busca en Google y trae las notas escritas como titular, que son las que antes se perdían.
 - **Más peticiones a Google News RSS:** hasta 12 por concepto en lugar de 4. No es un servicio oficial y puede frenar las peticiones. Se contiene con el tope por búsqueda y los reintentos del adaptador; si falla, la búsqueda queda parcial.
-- **Más notas que leer:** con más notas, el tope de 150 de la IA se alcanza antes y algunas notas pueden quedar sin juicio. Se mide en la primera búsqueda real.
+- **Más notas que leer:** con más notas, el tope de 150 de la IA se alcanza antes y algunas notas pueden quedar sin juicio.
+- **Primera búsqueda real (17/11/2026):**
+  - Concepto abierto «Hackeos y filtraciones» («hackeos y filtraciones de bases de datos de gobiernos, bancos y empresas en México»), 10 frases propuestas por la IA, México, 7 días, solo fuentes gratuitas.
+  - Resultado: **197 notas** (antes, 38 con el concepto exacto), 0 créditos, 0.041 USD de IA. La IA clasificó 89 como «Ciberdelitos».
+  - Solo **5 fueron relevantes para el concepto** (antes, 4), y 4 de ellas en México. 47 notas quedaron sin leer por el tope de 150.
+  - Por qué tan pocas:
+    - La mayoría de las notas del tema son de otros países (Bolivia, Argentina, España): la IA las descarta bien, porque el analista pidió «en México».
+    - 149 de 150 se leyeron solo con título y fragmento: los links de Google News RSS no dejan bajar el texto completo. Con tan poco, la IA rechaza notas mexicanas que hablan del tema sin un hecho concreto, como «Ciberataques bancarios aumentan 70% en México».
+  - Se encuentran más notas del tema, pero la IA todavía filtra de más. Cómo seguir lo decide Benji (ver el cierre de la tarea).
 - **Las notas ya leídas se vuelven a leer una vez:** `enrich_v5` es otra versión del prompt, así que una nota leída con `enrich_v4` se paga de nuevo si vuelve a salir en una búsqueda (§10). Ya pasó con cada versión anterior. El costo sigue dentro del tope de 150 notas por búsqueda. En las corridas FGR la ventana es de unas horas, así que se espera que se repitan pocas notas.
 - **Google News RSS frena si se le pide mucho seguido:** el 17/11/2026, tras ~90 consultas en unos minutos, respondió 429 («demasiadas peticiones»). Una búsqueda con dos conceptos abiertos son 24, de 2 en 2. Se vigila con el tope propio de las consultas gratuitas (D3).
 - **Cambia la especificación §7.2:** ya no es siempre una consulta por proveedor y concepto.
