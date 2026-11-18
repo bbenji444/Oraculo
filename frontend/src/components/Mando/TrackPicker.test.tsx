@@ -55,6 +55,8 @@ vi.mock('../../hooks/useConcepts', () => ({
 vi.mock('../../hooks/useCategories', () => ({
   useCategories: () => ({ data: CATEGORIES }),
 }));
+// Se prueba aparte (NewConceptButton.test.tsx): necesita la sesión y la API.
+vi.mock('../Concepts/NewConceptButton', () => ({ NewConceptButton: () => null }));
 
 const initial = useExplorerStore.getState();
 

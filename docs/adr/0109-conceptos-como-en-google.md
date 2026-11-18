@@ -54,7 +54,7 @@ Medición sin gastar créditos:
      - con frases de 2 a 4 palabras: 508 notas distintas, y 5 de 39 frases trajeron 0;
      - con frases de 2 o 3 palabras: 641 notas distintas, y 2 de 40 frases trajeron 0.
    - El formulario va en dos pasos: «¿Qué noticias quieres seguir?» y luego las frases propuestas, ya editables. Se puede saltar la IA («Prefiero escribirlas yo»). Lo escrito en el primer paso queda como la descripción, que es contra lo que se juzga (D4).
-   - Se llega desde Conceptos y, en el diseño clásico de Explorar, con «+ Nuevo concepto» junto a los conceptos: abre el formulario en una ventana y deja elegido el concepto al guardarlo. En el Centro de mando los conceptos se eligen en el selector del rediseño, que se coordina aparte.
+   - Se llega desde Conceptos y con «+ Nuevo concepto» en Explorar: junto a los conceptos en el diseño clásico, y al pie de «¿Qué rastrear?» en el Centro de mando. Abre el formulario en una ventana y deja elegido el concepto al guardarlo. Esc cierra solo esa ventana. En «¿Qué rastrear?» el concepto nuevo sale en «1 · ¿Relacionados con quién?», porque no es tema de un delito.
 4. **D4 — La IA juzga contra lo que se escribió:**
    - En los conceptos abiertos, la relevancia (prompt `enrich_v5`) se mide contra la descripción del analista. Las frases solo le sirven de pista.
    - Los conceptos exactos se le presentan a la IA igual que antes.

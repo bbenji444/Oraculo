@@ -754,7 +754,7 @@ Errores con formato uniforme: `{ "error": { "code": "...", "message": "...", "de
 ### 14.3 Panel de búsqueda
 
 - Región seleccionada.
-- Conceptos (chips multiselección, solo activos). En el diseño clásico, «+ Nuevo concepto» abre el mismo formulario de dos pasos en una ventana y deja elegido el concepto al guardarlo (solo superusuarios).
+- Conceptos (chips multiselección, solo activos). «+ Nuevo concepto» (junto a los conceptos en el diseño clásico, al pie de «¿Qué rastrear?» en el Centro de mando) abre el mismo formulario de dos pasos en una ventana y deja elegido el concepto al guardarlo (solo superusuarios).
 - Rango de fechas: hoy, 7 días, 30 días o personalizado.
 - Estimación ("3 consultas · ~1 crédito").
 - Botón **Buscar**.

@@ -18,7 +18,8 @@
  *   homicidios, aparezca o no la FGR). «Todos» no aplica: buscar todos los
  *   delitos de todo el país sin nadie sería enorme.
  *
- * Abajo, una frase dice en palabras qué va a traer la búsqueda.
+ * Abajo, una frase dice en palabras qué va a traer la búsqueda, y «+ Nuevo
+ * concepto» crea uno con la IA (ADR-0109) que queda elegido en la parte 1.
  *
  * Se cierra con «Listo», con Esc o con un clic en el fondo oscuro.
  *
@@ -37,6 +38,7 @@ import { useConcepts } from '../../hooks/useConcepts';
 import type { Category } from '../../services/categories';
 import type { Concept } from '../../services/concepts';
 import { useExplorerStore } from '../../store/explorer';
+import { NewConceptButton } from '../Concepts/NewConceptButton';
 import { hexToRgb } from '../Explore/categoryColor';
 import { GLASS } from '../Explore/ui';
 import { trackSummary } from './trackSummary';
@@ -326,6 +328,8 @@ export function TrackPicker({ onClose }: TrackPickerProps) {
           >
             Editar subdivisiones y palabras clave
           </a>
+          {/* El concepto nuevo no es tema de un delito: sale arriba, ya elegido. */}
+          <NewConceptButton className="hud-btn hud-btn--sm" onCreated={toggleBase} />
           <button
             type="button"
             onClick={onClose}
