@@ -185,3 +185,55 @@ def test_la_ip_de_la_bitacora_solo_acepta_ips_validas(
     scope: dict[str, Any] = {"type": "http", "client": (host, 50000) if host else None}
 
     assert client_ip(Request(scope)) == expected
+
+
+# --- Modo «como en Google» (ADR-0109) ---
+
+OPEN_BODY: dict[str, Any] = {
+    "name": "Hackeos",
+    "description": "Hackeos y filtraciones de bases de datos en México",
+    "keywords": ["filtran datos", "hackeo gobierno"],
+    "color": "#2e86de",
+    "query_mode": "open",
+}
+
+
+def test_sin_query_mode_la_api_crea_un_concepto_exacto(client: TestClient) -> None:
+    # Quien ya usa la API sigue igual; el formulario manda «open».
+    body = client.post(URL, json=BODY).json()
+
+    assert (body["query_mode"], body["query_mode_label"]) == ("exact", "frases exactas")
+
+
+def test_crear_un_concepto_como_en_google(client: TestClient) -> None:
+    body = client.post(URL, json=OPEN_BODY).json()
+
+    assert (body["query_mode"], body["query_mode_label"]) == ("open", "como en Google")
+
+
+def test_cambiar_el_modo_con_patch(client: TestClient) -> None:
+    created = client.post(URL, json=BODY).json()
+
+    response = client.patch(f"{URL}/{created['id']}", json={"query_mode": "open"})
+
+    assert response.json()["query_mode"] == "open"
+
+
+def test_modo_desconocido_es_422(client: TestClient) -> None:
+    response = client.post(URL, json={**OPEN_BODY, "query_mode": "libre"})
+
+    assert response.status_code == 422
+
+
+def test_probar_como_en_google_manda_cada_frase_sola_a_google_news_rss(
+    client: TestClient,
+) -> None:
+    body = client.post(
+        f"{URL}/preview", params={"region_id": IZTAPALAPA.id, "days": 7}, json=OPEN_BODY
+    ).json()
+
+    rss = [q["text"] for q in body["queries"] if q["provider"] == "google_news_rss"]
+    assert rss == [
+        "filtran datos Iztapalapa when:7d",
+        "hackeo gobierno Iztapalapa when:7d",
+    ]

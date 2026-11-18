@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.application.audit import AuditEntry
 from app.application.pagination import NameCursor
-from app.domain.concept import Concept, ConceptDraft
+from app.domain.concept import Concept, ConceptDraft, QueryMode
 from app.domain.errors import ConceptNameTakenError, ConceptNotFoundError
 
 ENTITY_TYPE = "concept"
@@ -30,7 +30,7 @@ ENTITY_TYPE = "concept"
 _NAME_UNIQUE_INDEX = "concepts_name_norm_active_key"
 _COLUMNS = """
     c.id, c.name, c.description, c.keywords, c.exclude_terms, c.color, c.is_active,
-    c.created_by, c.created_at, c.updated_at, c.category_id
+    c.created_by, c.created_at, c.updated_at, c.category_id, c.query_mode
 """
 
 
@@ -44,6 +44,7 @@ def _to_concept(row: RowMapping) -> Concept:
         exclude_terms=tuple(row["exclude_terms"]),
         color=row["color"],
         is_active=row["is_active"],
+        query_mode=QueryMode(row["query_mode"]),
     )
     return Concept(
         row["id"],
@@ -64,6 +65,7 @@ def _values(data: ConceptDraft) -> dict[str, Any]:
         "exclude_terms": list(data.exclude_terms),
         "color": data.color,
         "is_active": data.is_active,
+        "query_mode": data.query_mode.value,
     }
 
 
@@ -166,9 +168,9 @@ class PostgresConceptRepository:
                             text(
                                 f"""
                                 INSERT INTO concepts AS c (name, name_norm, description, keywords,
-                                    exclude_terms, color, is_active, created_by)
+                                    exclude_terms, color, is_active, query_mode, created_by)
                                 VALUES (:name, :name_norm, :description, :keywords,
-                                    :exclude_terms, :color, :is_active, :created_by)
+                                    :exclude_terms, :color, :is_active, :query_mode, :created_by)
                                 RETURNING {_COLUMNS}
                                 """  # noqa: S608 — fragmentos SQL constantes del módulo
                             ),
@@ -199,7 +201,7 @@ class PostgresConceptRepository:
                                 UPDATE concepts AS c SET name = :name, name_norm = :name_norm,
                                     description = :description, keywords = :keywords,
                                     exclude_terms = :exclude_terms, color = :color,
-                                    is_active = :is_active
+                                    is_active = :is_active, query_mode = :query_mode
                                 WHERE c.id = :id AND c.deleted_at IS NULL
                                 RETURNING {_COLUMNS}
                                 """  # noqa: S608 — fragmentos SQL constantes del módulo

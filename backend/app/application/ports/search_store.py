@@ -22,6 +22,7 @@ from uuid import UUID
 
 from app.application.audit import Actor
 from app.application.ports.llm import EnrichmentResult
+from app.domain.concept import QueryMode
 from app.domain.dedupe import DedupedArticle, KnownArticle
 from app.domain.enrichment import LLMUsage
 from app.domain.extraction import ProcessingText
@@ -46,6 +47,8 @@ class SearchConcept:
         topic_terms: Palabras de las subdivisiones elegidas, copiadas: cada
             nota debe traer también una («FGR + Homicidio», 02/11/2026).
         category_ids: Subdivisiones elegidas para este concepto.
+        query_mode: Modo de búsqueda copiado (ADR-0109): con él se puede
+            rehacer la consulta tal como se mandó.
     """
 
     concept_id: int
@@ -55,6 +58,7 @@ class SearchConcept:
     exclude_terms: tuple[str, ...] = ()
     topic_terms: tuple[str, ...] = ()
     category_ids: tuple[int, ...] = ()
+    query_mode: QueryMode = QueryMode.EXACT
 
 
 @dataclass(frozen=True, slots=True)

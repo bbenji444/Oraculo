@@ -11,6 +11,9 @@ aplican igual al crear, al editar y al probar un borrador:
 - Ninguna exclusión puede ser también palabra clave: se anularían.
 - Sin caracteres que los buscadores interpretan como órdenes (ADR-0009).
 - Color ``#RRGGBB``; descripción de hasta 500 caracteres.
+- Modo de búsqueda (ADR-0109): ``exact`` busca cada frase tal cual, entre
+  comillas y unidas con OR (como siempre); ``open`` manda cada frase sola y
+  sin comillas, como se escribe en Google, y admite hasta 12 frases.
 
 Si algo falla se informan **todos** los problemas a la vez, cada uno con su
 campo, para que la persona corrija el formulario de una sola pasada.
@@ -22,6 +25,7 @@ No hace: no sabe de base de datos ni de HTTP; no arma consultas (eso es
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from app.domain.errors import ConceptValidationError
 from app.domain.names import normalize_name
@@ -46,6 +50,34 @@ _OPERATOR_WORDS = frozenset({"OR", "AND"})
 
 KEYWORDS_FIELD = "keywords"
 EXCLUDE_FIELD = "exclude_terms"
+# En modo abierto cada frase es una consulta a Google News: 12 por concepto
+# caben en el tope de consultas gratuitas con dos conceptos (ADR-0109).
+OPEN_MAX_PHRASES = 12
+
+
+class QueryMode(StrEnum):
+    """Cómo se mandan las palabras clave a los buscadores (ADR-0109).
+
+    Medido el 17/11/2026 en Google News RSS: «"bases de datos hackeadas"» con
+    comillas trajo 0 notas y sin comillas 10; «roban auto Jalisco» trajo 19
+    y el grupo de frases exactas de robo de vehículo, 5.
+    """
+
+    EXACT = "exact"
+    """Frases exactas, entre comillas y unidas con OR (como hasta el 17/11)."""
+    OPEN = "open"
+    """Cada frase sola y sin comillas, como se escribe en Google."""
+
+    @property
+    def label(self) -> str:
+        """Nombre para mostrar."""
+        return _QUERY_MODE_LABELS[self]
+
+
+_QUERY_MODE_LABELS = {
+    QueryMode.EXACT: "frases exactas",
+    QueryMode.OPEN: "como en Google",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +172,7 @@ class ConceptDraft:
         exclude_terms: Palabras o frases que descartan una nota.
         color: Color en ``#RRGGBB`` (mayúsculas).
         is_active: Si aparece en el panel de búsqueda.
+        query_mode: Cómo se mandan las palabras clave (ADR-0109).
     """
 
     name: str
@@ -148,6 +181,7 @@ class ConceptDraft:
     exclude_terms: tuple[str, ...]
     color: str
     is_active: bool
+    query_mode: QueryMode = QueryMode.EXACT
 
     @property
     def name_norm(self) -> str:
@@ -164,6 +198,7 @@ class ConceptDraft:
         exclude_terms: tuple[str, ...],
         color: str,
         is_active: bool = True,
+        query_mode: QueryMode = QueryMode.EXACT,
     ) -> "ConceptDraft":
         """Limpia y valida los datos de un concepto.
 
@@ -174,6 +209,7 @@ class ConceptDraft:
             exclude_terms: Términos de exclusión.
             color: Color en hexadecimal (``#2e86de`` o ``#2E86DE``).
             is_active: Si aparece en el panel de búsqueda.
+            query_mode: Frases exactas (por defecto) o «como en Google».
 
         Returns:
             El borrador limpio: espacios colapsados, términos vacíos
@@ -208,6 +244,14 @@ class ConceptDraft:
         problems.extend(keyword_problems)
         if not clean_keywords:
             problems.append(Problem(KEYWORDS_FIELD, "Agrega al menos una palabra clave."))
+        if query_mode is QueryMode.OPEN and len(clean_keywords) > OPEN_MAX_PHRASES:
+            problems.append(
+                Problem(
+                    KEYWORDS_FIELD,
+                    f"Como en Google caben hasta {OPEN_MAX_PHRASES} frases: cada frase es "
+                    "una búsqueda. Quita las que traigan menos notas.",
+                )
+            )
         clean_excludes, exclude_problems = _clean_terms(EXCLUDE_FIELD, "exclusiones", exclude_terms)
         problems.extend(exclude_problems)
         keyword_norms = {normalize_name(k) for k in clean_keywords}
@@ -236,6 +280,7 @@ class ConceptDraft:
             exclude_terms=clean_excludes,
             color=clean_color,
             is_active=is_active,
+            query_mode=query_mode,
         )
 
 
@@ -250,6 +295,7 @@ class ConceptChanges:
         exclude_terms: Lista completa nueva de exclusiones.
         color: Color nuevo.
         is_active: Activar o desactivar.
+        query_mode: Modo de búsqueda nuevo.
     """
 
     name: str | None = None
@@ -258,6 +304,7 @@ class ConceptChanges:
     exclude_terms: tuple[str, ...] | None = None
     color: str | None = None
     is_active: bool | None = None
+    query_mode: QueryMode | None = None
 
     def apply_to(self, current: ConceptDraft) -> ConceptDraft:
         """Combina los cambios con el concepto actual y vuelve a validar todo.
@@ -283,6 +330,7 @@ class ConceptChanges:
             ),
             color=current.color if self.color is None else self.color,
             is_active=current.is_active if self.is_active is None else self.is_active,
+            query_mode=current.query_mode if self.query_mode is None else self.query_mode,
         )
 
 
@@ -317,3 +365,8 @@ class Concept:
     def exclude_terms(self) -> tuple[str, ...]:
         """Exclusiones (atajo para ``build_queries``)."""
         return self.data.exclude_terms
+
+    @property
+    def query_mode(self) -> QueryMode:
+        """Modo de búsqueda (atajo para ``build_queries``)."""
+        return self.data.query_mode

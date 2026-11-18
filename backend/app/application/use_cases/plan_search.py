@@ -251,6 +251,7 @@ class PlanSearch:
                     else data.exclude_terms,
                     topic_terms if with_topic else (),
                     tuple(category_ids) if with_topic else (),
+                    data.query_mode,
                 )
             )
         if category_ids and not any(c.category_ids for c in found):

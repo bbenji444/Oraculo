@@ -72,4 +72,5 @@ def concept_snapshot(data: ConceptDraft) -> dict[str, object]:
         "exclude_terms": list(data.exclude_terms),
         "color": data.color,
         "is_active": data.is_active,
+        "query_mode": data.query_mode.value,
     }

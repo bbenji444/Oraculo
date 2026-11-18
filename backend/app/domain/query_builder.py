@@ -14,6 +14,10 @@ RSS, 100) se parte por palabra clave y, en ventanas cortas, por día, sin
 pasar de ``QueryDialect.split_up_to`` consultas. Con OR las palabras
 compiten por las mismas 100 notas y la sigla «FGR» tapaba al nombre completo.
 
+En modo «como en Google» (ADR-0109) ese proveedor recibe cada frase sola y
+sin comillas, nunca juntas con OR: así se escriben los titulares y así
+rinden. Los demás proveedores juntan las frases como siempre, con comillas.
+
 Con subdivisión (02/11/2026, «FGR + Homicidio»), cada consulta lleva un
 segundo grupo con las palabras del tema, que también deben aparecer. Si ese
 grupo no cabe en el límite del proveedor, se parte en varios y cada parte
@@ -27,6 +31,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Protocol
 
+from app.domain.concept import OPEN_MAX_PHRASES, QueryMode
 from app.domain.errors import ConceptValidationError, QueryTooLongError
 from app.domain.queries import (
     SEARCH_LANGUAGE,
@@ -53,6 +58,11 @@ class ConceptTerms(Protocol):
     @property
     def exclude_terms(self) -> tuple[str, ...]:
         """Exclusiones."""
+        ...
+
+    @property
+    def query_mode(self) -> QueryMode:
+        """Frases exactas o «como en Google» (ADR-0109)."""
         ...
 
 
@@ -152,6 +162,10 @@ def _plan(
     completa. Con tope (``split_up_to``) se prueba, en este orden, lo que más
     notas trae sin pasarse: cada palabra cada día, cada grupo cada día, cada
     palabra con la ventana completa y, al final, los grupos.
+
+    En modo abierto (ADR-0109) las frases nunca se juntan con OR en un
+    proveedor con tope: cada frase va sola, por día si caben en
+    ``OPEN_MAX_PHRASES`` consultas y, si no, con la ventana completa.
     """
     chunks = _split_keywords(dialect, concept, place, window, topic)
     limit = dialect.split_up_to
@@ -159,6 +173,9 @@ def _plan(
         return [(chunk, window) for chunk in chunks]
     singles = [(keyword,) for keyword in concept.keywords]
     days = _days(window)
+    if concept.query_mode is QueryMode.OPEN:
+        spans = days if len(singles) * len(days) <= OPEN_MAX_PHRASES else [window]
+        return [(single, span) for single in singles for span in spans]
     for groups, spans in ((singles, days), (chunks, days), (singles, [window])):
         if len(groups) * len(spans) <= limit:
             return [(g, span) for g in groups for span in spans]
@@ -200,11 +217,16 @@ def build_queries(
             {"problemas": [{"campo": "keywords", "mensaje": "Agrega al menos una palabra clave."}]},
         )
     topic = tuple(dict.fromkeys(topic_terms))
+    is_open = concept.query_mode is QueryMode.OPEN
     queries = []
     for provider in providers:
         dialect = DIALECTS[provider]
         for topic_chunk in _split_topic(dialect, concept, place, window, topic):
             for chunk, span in _plan(dialect, concept, place, window, topic_chunk):
+                # Sin comillas solo la frase que va sola: Google lee
+                # «(roban auto OR robo de vehículo)» como roban Y (auto O
+                # robo) Y de Y vehículo, así que al juntar frases se conservan.
+                exact = not is_open or len(chunk) > 1
                 queries.append(
                     PlannedQuery(
                         provider=provider,
@@ -212,7 +234,9 @@ def build_queries(
                         # ventana completa porque con ella el adaptador
                         # descarta lo de fuera (Google News RSS no siempre
                         # respeta after:/before:).
-                        text=dialect.render(chunk, place, concept.exclude_terms, span, topic_chunk),
+                        text=dialect.render(
+                            chunk, place, concept.exclude_terms, span, topic_chunk, exact=exact
+                        ),
                         keywords=chunk,
                         country=place.country,
                         language=SEARCH_LANGUAGE,

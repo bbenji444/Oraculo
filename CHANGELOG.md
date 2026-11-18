@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **Conceptos «como en Google» (17/11/2026, ADR-0109, migración 0046).** Benji: «no me da toda la cantidad de resultados de calidad como si yo buscara la noticia de manera normal en Google».
+  - Cada concepto tiene un **modo de búsqueda**: «frases exactas» (como hasta hoy) o «como en Google».
+  - Como en Google, cada frase (hasta 12) se manda sola y sin comillas a Google News RSS, escrita como titular. Medido: «roban auto Jalisco» trajo 19 notas; el grupo de frases exactas de robo de vehículo, 5.
+  - Los conceptos que ya existían, incluida la FGR, siguen en frases exactas. Sin `query_mode`, la API crea conceptos exactos.
+
 - **Casos más claros y revisión en bloque (11/11/2026, ADR-0107).** Benji: «que haya cosas que te permitan seleccionar todo» y «que realmente haya alguna relación la cual nos pueda servir para algo».
   - El caso se divide en pestañas: **Panorama**, Entidades, Vínculos y Noticias. Cada pestaña dice cuánto falta revisar.
   - **Panorama:** quién está en el caso, por tipo, y con quién se relaciona cada uno y por qué («participan en el mismo hecho en 2 notas»).

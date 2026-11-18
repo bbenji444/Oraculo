@@ -65,6 +65,26 @@ def test_valores_por_defecto(conn: Connection) -> None:
     assert tuple(row) == ("", [], True, None)
 
 
+def test_sin_decir_el_modo_el_concepto_queda_exacto(conn: Connection) -> None:
+    # Migración 0046 (ADR-0109): lo que ya existía se sigue buscando igual.
+    concept_id = insert(conn)
+
+    mode = conn.execute(
+        text("SELECT query_mode FROM concepts WHERE id = :id"), {"id": concept_id}
+    ).scalar_one()
+
+    assert mode == "exact"
+
+
+def test_modo_desconocido_se_rechaza(conn: Connection) -> None:
+    concept_id = insert(conn)
+
+    with pytest.raises(IntegrityError, match="concepts_query_mode_check"):
+        conn.execute(
+            text("UPDATE concepts SET query_mode = 'libre' WHERE id = :id"), {"id": concept_id}
+        )
+
+
 def test_nombre_repetido_entre_vigentes_se_rechaza(conn: Connection) -> None:
     insert(conn)
 

@@ -61,6 +61,7 @@ from app.application.ports.search_store import (
     StoredText,
 )
 from app.domain.aggregates import NoteLocation
+from app.domain.concept import QueryMode
 from app.domain.dedupe import (
     GOOGLE_NEWS_HOST,
     NEAR_DUPLICATE_WINDOW,
@@ -156,8 +157,8 @@ class PostgresSearchStore:
                 await conn.execute(
                     text(
                         "INSERT INTO search_concepts (search_id, concept_id, concept_name, "
-                        "keywords, exclude_terms, topic_terms, category_ids) "
-                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats)"
+                        "keywords, exclude_terms, topic_terms, category_ids, query_mode) "
+                        "VALUES (:s, :c, :name, :kw, :ex, :topic, :cats, :mode)"
                     ),
                     {
                         "s": search_id,
@@ -167,6 +168,7 @@ class PostgresSearchStore:
                         "ex": list(concept.exclude_terms),
                         "topic": list(concept.topic_terms),
                         "cats": list(concept.category_ids),
+                        "mode": concept.query_mode.value,
                     },
                 )
         return search_id
@@ -196,7 +198,7 @@ class PostgresSearchStore:
                     await conn.execute(
                         text(
                             "SELECT sc.concept_id, sc.concept_name, c.description, sc.keywords, "
-                            "sc.exclude_terms, sc.topic_terms, sc.category_ids "
+                            "sc.exclude_terms, sc.topic_terms, sc.category_ids, sc.query_mode "
                             "FROM search_concepts sc "
                             "JOIN concepts c ON c.id = sc.concept_id "
                             "WHERE sc.search_id = :id ORDER BY sc.concept_id"
@@ -224,6 +226,7 @@ class PostgresSearchStore:
                     tuple(c["exclude_terms"]),
                     tuple(c["topic_terms"]),
                     tuple(c["category_ids"]),
+                    QueryMode(c["query_mode"]),
                 )
                 for c in concepts
             ),

@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.api.v1.schemas.regions import RegionDetailOut
 from app.application.pagination import Page
 from app.application.use_cases.concepts import ConceptInput, QueryPreview
-from app.domain.concept import Concept, ConceptChanges
+from app.domain.concept import Concept, ConceptChanges, QueryMode
 from app.domain.queries import SEARCH_LANGUAGE_LABEL, PlannedQuery
 from app.domain.query_dialects import DIALECTS
 
@@ -35,6 +35,15 @@ class ConceptIn(BaseModel):
     exclude_terms: list[str] = Field(default_factory=list, max_length=_MAX_ITEMS)
     color: str = Field(max_length=_MAX_TEXT, examples=["#2E86DE"])
     is_active: bool = True
+    # Por defecto exacto: quien ya usa la API sigue igual. El formulario
+    # manda «open» en los conceptos nuevos (ADR-0109).
+    query_mode: QueryMode = Field(
+        default=QueryMode.EXACT,
+        description=(
+            "``exact``: frases exactas unidas con OR. ``open``: cada frase sola y sin "
+            "comillas, como en Google (hasta 12 frases)."
+        ),
+    )
 
     def to_input(self) -> ConceptInput:
         """Convierte al dato que reciben los casos de uso.
@@ -49,6 +58,7 @@ class ConceptIn(BaseModel):
             exclude_terms=tuple(self.exclude_terms),
             color=self.color,
             is_active=self.is_active,
+            query_mode=self.query_mode,
         )
 
 
@@ -64,6 +74,7 @@ class ConceptPatch(BaseModel):
     exclude_terms: list[str] | None = Field(default=None, max_length=_MAX_ITEMS)
     color: str | None = Field(default=None, max_length=_MAX_TEXT)
     is_active: bool | None = None
+    query_mode: QueryMode | None = None
 
     def to_changes(self) -> ConceptChanges:
         """Convierte a los cambios del dominio.
@@ -78,6 +89,7 @@ class ConceptPatch(BaseModel):
             exclude_terms=tuple(self.exclude_terms) if self.exclude_terms is not None else None,
             color=self.color,
             is_active=self.is_active,
+            query_mode=self.query_mode,
         )
 
 
@@ -91,6 +103,8 @@ class ConceptOut(BaseModel):
     exclude_terms: list[str]
     color: str = Field(description="#RRGGBB")
     is_active: bool = Field(description="Si aparece en el panel de búsqueda.")
+    query_mode: QueryMode
+    query_mode_label: str = Field(examples=["como en Google"])
     created_by: str
     created_at: datetime
     updated_at: datetime
@@ -121,6 +135,8 @@ class ConceptOut(BaseModel):
             exclude_terms=list(data.exclude_terms),
             color=data.color,
             is_active=data.is_active,
+            query_mode=data.query_mode,
+            query_mode_label=data.query_mode.label,
             created_by=concept.created_by,
             created_at=concept.created_at,
             updated_at=concept.updated_at,
