@@ -50,6 +50,7 @@ import { type ChronologyRow, groupThemes, type ThemeBlock } from './themes';
 import { PANEL_TITLE } from './ui';
 import { ExternalLink } from '../ExternalLink';
 import { HudSelect } from '../ui/HudSelect';
+import { Icon } from '../ui/Icon';
 
 const MEXICO_CITY = 'America/Mexico_City';
 const HOUR = new Intl.DateTimeFormat('es-MX', {
@@ -324,7 +325,8 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
                       href={note.url}
                       className="text-sky-300 hover:text-sky-100 hover:underline"
                     >
-                      {note.source_name ?? note.source_domain ?? 'Medio sin nombre'} ↗
+                      {note.source_name ?? note.source_domain ?? 'Medio sin nombre'}{' '}
+                      <Icon name="open_in_new" />
                     </ExternalLink>
                     {note.title !== article.title && (
                       <span
@@ -390,7 +392,10 @@ function ThemeEntry({ block, selectedId, selectedRef, onSelect }: ThemeEntryProp
           <span className="flex items-baseline gap-1.5 text-[12.5px] leading-snug text-slate-100">
             <span className="font-display text-[9px] tracking-wider text-amber-200/90">TEMA</span>
             <span className="font-semibold">{block.label}</span>
-            <span className="ml-auto text-[11px] text-slate-400">{open ? '▾' : '▸'}</span>
+            <Icon
+              name={open ? 'expand_more' : 'chevron_right'}
+              className="ml-auto text-sm text-slate-400"
+            />
           </span>
           <span className="mt-0.5 block text-[10.5px] text-slate-400">
             {block.items.length} hechos · {block.notes} notas · {span}
@@ -501,7 +506,9 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
         className={`${GLASS_OSINT} w-full px-3 py-1.5 text-left text-xs text-slate-100 hover:border-sky-400/40 focus-visible:outline-2 focus-visible:outline-sky-400`}
       >
         <span className={PANEL_TITLE}>Cronología</span>{' '}
-        <span className="text-slate-400">· {items.length} hechos ‹</span>
+        <span className="text-slate-400">
+          · {items.length} hechos <Icon name="chevron_left" />
+        </span>
       </button>
     );
   }
@@ -531,7 +538,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               title="Ocultar la cronología"
               className="hud-icon-btn ml-auto size-7 text-sm"
             >
-              ›
+              <Icon name="chevron_right" className="text-lg" />
             </button>
           </div>
           {timeline.buckets.length > 0 && (
@@ -577,7 +584,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
             />
             {filtered && (
               <button type="button" onClick={clear} className={`${PILL} text-sky-300`}>
-                ✕ Quitar
+                <Icon name="close" /> Quitar
               </button>
             )}
             <button
@@ -589,7 +596,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               title="Mostrar u ocultar la lista de noticias del panel izquierdo"
               className={`${PILL} ${listOpen ? 'border-sky-400/50 text-sky-200' : ''}`}
             >
-              ☰ Lista
+              <Icon name="list" /> Lista
             </button>
           </div>
         </div>

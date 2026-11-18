@@ -21,6 +21,7 @@ import { useNewApiKey, useShowApiKey } from '../../hooks/useAccess';
 import type { AccessUser } from '../../services/access';
 import { copyText } from '../../ui/copyText';
 import { HudButton } from '../ui/HudButton';
+import { Icon } from '../ui/Icon';
 
 // Cuánto se queda el aviso «Copiada».
 const COPIED_MS = 2000;
@@ -79,7 +80,13 @@ export function ApiKeyRow({ user }: { user: AccessUser }) {
               void copy();
             }}
           >
-            {copied ? 'Copiada ✓' : 'Copiar'}
+            {copied ? (
+              <>
+                Copiada <Icon name="check" />
+              </>
+            ) : (
+              'Copiar'
+            )}
           </HudButton>
         </>
       )}

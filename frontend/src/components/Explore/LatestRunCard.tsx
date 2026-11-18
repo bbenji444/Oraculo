@@ -13,6 +13,7 @@ import { subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { automaticRunLabel, latestRun } from './format';
 import { GLASS } from './ui';
+import { Icon } from '../ui/Icon';
 
 export function LatestRunCard() {
   const history = useSearchHistory();
@@ -48,7 +49,7 @@ export function LatestRunCard() {
         <span className="text-[11px] text-slate-400">
           {run.results_count} notas · {run.credits_used} créditos ·{' '}
           <span className="text-sky-300 transition-colors group-hover:text-sky-100">
-            Abrir en el globo ›
+            Abrir en el globo <Icon name="chevron_right" />
           </span>
         </span>
       </span>

@@ -21,6 +21,7 @@ import { useExplorerStore } from '../../store/explorer';
 import { SearchBox } from '../GeoExplorer/SearchBox';
 import { chainOf } from './regionChain';
 import { HudSelect } from '../ui/HudSelect';
+import { Icon } from '../ui/Icon';
 
 interface LevelSelectProps {
   label: string;
@@ -97,9 +98,7 @@ export function RegionPicker() {
               >
                 {ancestor.name}
               </button>
-              <span aria-hidden="true" className="text-slate-600">
-                ›
-              </span>
+              <Icon name="chevron_right" className="text-slate-600" />
             </span>
           ))}
           <span className="font-medium text-slate-100">{detail.display_name}</span>

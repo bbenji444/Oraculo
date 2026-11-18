@@ -17,6 +17,7 @@ Son las piezas visuales que comparten todas las pantallas del monitor. Los estil
 | `Sparkline`      | Tendencia junto a una cifra                                             | Se dibuja de izquierda a derecha                                               |
 | `SectionHeading` | Encabezado de cada pantalla                                             | El título se descifra al aparecer                                              |
 | `Heartbeat`      | Latido de un servicio (Estado del sistema)                              | Un pulso de luz recorre la línea; plana y roja si falla                        |
+| `Icon`           | Iconos de Material Icons, los de Oráculo (`<Icon name="close" />`)      | Nada; toma el color y el tamaño del texto de al lado                           |
 
 **Reglas:**
 
@@ -31,4 +32,5 @@ Son las piezas visuales que comparten todas las pantallas del monitor. Los estil
   - `.hud-reveal` para la entrada escalonada;
   - `.hud-radar` para las corridas automáticas;
   - `.hud-empty` para el aviso «elige un elemento».
+- **Iconos con `Icon`, no con caracteres** (× › ▾ ✓ ↗) **ni SVG sueltos.** Los nombres permitidos están en `IconName`; para agregar uno se busca en https://fonts.google.com/icons.
 - **Con utilidades de Tailwind se ajusta cualquier pieza:** `hud.css` está en la capa `components`.

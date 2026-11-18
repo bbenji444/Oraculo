@@ -65,6 +65,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - La sesión es una píldora como la de Oráculo, con el botón rojo de «Salir». En pantallas medianas se ocultan «ORÁCULO» y el nombre de la persona para que quepan todas las pestañas.
     - Abajo al centro, fuera de Explorar, el chip «Estado del sistema» con un piloto verde, ámbar o rojo según `/health`. Lleva a la pestaña Estado del sistema.
     - Fuera de Explorar el fondo es la cuadrícula y la constelación de Oráculo en lugar de las estrellas. Con «reducir animaciones» queda quieta, y se detiene si la pestaña del navegador está oculta. Explorar conserva el globo y su universo, que ya no se carga en las demás pestañas.
+  - **Iconos de Oráculo (Material Icons):** cerrar, flechas, desplegar, palomitas, «abre en otra pestaña», filtro, calendario, búsqueda y la sesión usan los mismos iconos que Oráculo, en lugar de caracteres (× › ▾ ✓ ↗) y dibujos sueltos. La letra va dentro del monitor, no se descarga de internet.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;

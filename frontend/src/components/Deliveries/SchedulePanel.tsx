@@ -23,6 +23,7 @@ import { HudPanel } from '../ui/HudPanel';
 import { HudSwitch } from '../ui/HudSwitch';
 import { whenLabel } from './labels';
 import { DAYS, daysLabel, scheduleProblem, sortTimes, weeklyCost, WORKDAYS } from './schedule';
+import { Icon } from '../ui/Icon';
 
 const SOURCE = 'monitor.corrida_fgr';
 // Hora que propone el campo «Agregar hora» al abrir la pantalla.
@@ -122,7 +123,7 @@ function ScheduleEditor({ schedule }: { schedule: Schedule }) {
                   }}
                   className="text-slate-300 hover:text-rose-300 disabled:opacity-30"
                 >
-                  ×
+                  <Icon name="close" />
                 </button>
               </span>
             );

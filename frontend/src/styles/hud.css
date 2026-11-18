@@ -196,6 +196,35 @@
   opacity: 0.4;
 }
 
+/* --- Iconos -------------------------------------------------------------------- */
+
+/* Material Icons (ui/Icon.tsx, ADR-0108): la letra dibuja el nombre del icono
+   con una ligadura. El nombre sale de data-icon y no del texto de la página,
+   para que no aparezca al copiar ni al buscar. No hereda las MAYÚSCULAS ni el
+   espaciado de los botones y etiquetas: con cualquiera de los dos la ligadura
+   no se forma y se leería «CLOSE». Mide 1.25 veces el texto de al lado. */
+.hud-icon {
+  display: inline-block;
+  flex: none;
+  font-family: 'Material Icons';
+  font-size: 1.25em;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  direction: ltr;
+  vertical-align: -0.25em;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+.hud-icon::before {
+  content: attr(data-icon);
+}
+
 /* --- Insignias ----------------------------------------------------------------- */
 
 /* Etiqueta de estado como la de Oráculo core (.jarvis-badge, ADR-0108):
@@ -622,9 +651,7 @@
   font-size: 0.78rem;
 }
 .hud-select-chevron {
-  width: 0.9rem;
-  height: 0.9rem;
-  flex: none;
+  font-size: 1.15rem;
   color: rgb(0 210 255 / 0.7);
   transition:
     transform 0.35s var(--hud-ease),
@@ -850,9 +877,7 @@
   color: #9aeeff;
 }
 .hud-menu-check {
-  width: 0.95rem;
-  height: 0.95rem;
-  flex: none;
+  font-size: 1rem;
   color: var(--hud-cyan);
 }
 

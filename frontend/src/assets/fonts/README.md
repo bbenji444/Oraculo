@@ -2,14 +2,28 @@
 
 Van autoalojadas: la interfaz no descarga nada de internet (`src/styles/index.css`).
 
-| Fuente                    | Dónde se usa                                                                                 |
-| ------------------------- | -------------------------------------------------------------------------------------------- |
-| **Exo 2** (500, 600, 700) | Títulos, botones, etiquetas y cifras (`--font-display`)                                      |
-| **Inter** (400 a 700)     | El texto (`--font-sans`)                                                                     |
-| **Orbitron** (400, 700)   | Solo el logo (`--font-brand`), como marca de Oráculo; se tomó de OSINT Oráculo el 26/10/2026 |
-| **Roboto** (300 a 700)    | Respaldo de Inter; también viene de OSINT Oráculo                                            |
+| Fuente                    | Dónde se usa                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| **Orbitron** (400, 700)   | Títulos, botones, etiquetas y cifras (`--font-display`), como Oráculo core       |
+| **Roboto** (300 a 700)    | El texto (`--font-sans`), como Oráculo core                                      |
+| **Material Icons**        | Los iconos (`components/ui/Icon.tsx`), los mismos de Oráculo core (ADR-0108)     |
+| **Exo 2** (500, 600, 700) | Ya no se usa: de 30/10 a 17/11/2026 fue la letra de títulos; queda para regresar |
+| **Inter** (400 a 700)     | Ya no se usa: de 30/10 a 17/11/2026 fue la letra del texto; queda para regresar  |
 
-Benji pidió el 30/10/2026 «algo que se vea más moderno pero tampoco tan exagerado». Orbitron en todos los botones y etiquetas se veía demasiado cargado; Exo 2 conserva el aire técnico con menos peso. El PDF usa la misma pareja.
+Orbitron y Roboto se tomaron de OSINT Oráculo el 26/10/2026. Desde el 17/11/2026 son las letras de toda la interfaz, como en Oráculo core (ADR-0037 y ADR-0108). El 30/10/2026 Benji había pedido «algo que se vea más moderno pero tampoco tan exagerado» y se usaron Exo 2 e Inter; siguen cargadas por si se quiere regresar.
+
+## Material Icons
+
+La letra de iconos de Google que usa Oráculo core. Oráculo la carga de Google Fonts; aquí va autoalojada para no descargar nada de internet. Es la versión 145, descargada el 17/11/2026 de la dirección que da `https://fonts.googleapis.com/icon?family=Material+Icons`:
+
+`https://fonts.gstatic.com/s/materialicons/v145/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2`
+
+Licencia Apache 2.0 (`LICENSE-MaterialIcons.txt`, del repositorio `google/material-design-icons`; sin las líneas en blanco del final). La letra completa pesa 125 KB y se descarga una vez; el navegador la guarda.
+
+| Archivo                     | SHA-256                                                            |
+| --------------------------- | ------------------------------------------------------------------ |
+| `material-icons-v145.woff2` | `8265f64786397d6b832d1ca0aafdf149ad84e72759fffa9f7272e91a0fb015d1` |
+| `LICENSE-MaterialIcons.txt` | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` |
 
 ## Exo 2 e Inter
 

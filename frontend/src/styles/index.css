@@ -100,6 +100,16 @@
   font-display: swap;
   src: url('../assets/fonts/inter-latin-700-normal.woff2') format('woff2');
 }
+/* Iconos de Material Icons (ADR-0108; los usa ui/Icon.tsx). Oráculo los carga
+   de Google; aquí van autoalojados. `block`: mientras llega la letra no se ve
+   el nombre del icono («close») en su lugar. */
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../assets/fonts/material-icons-v145.woff2') format('woff2');
+}
 @font-face {
   font-family: 'Roboto';
   font-style: normal;

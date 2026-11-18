@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { GLASS } from '../Explore/ui';
+import { Icon } from '../ui/Icon';
 
 interface ModalProps {
   title: string;
@@ -56,7 +57,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
             aria-label="Cerrar"
             className="hud-icon-btn size-7 text-sm"
           >
-            ×
+            <Icon name="close" className="text-lg" />
           </button>
         </div>
         {children}

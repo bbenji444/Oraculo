@@ -15,6 +15,7 @@ import type { Article } from '../../services/searches';
 import { CategoryTag } from './CategoryTag';
 import { formatDay, isCoarse, PRECISION_LABEL, providersLabel } from './format';
 import { moreOutletsLabel, type StoryGroup } from './stories';
+import { Icon } from '../ui/Icon';
 
 /** Color del punto de una nota sin concepto relevante (gris de la paleta). */
 const NO_CONCEPT_COLOR = '#64748B';
@@ -213,7 +214,8 @@ export function StoryCard({
             onClick={toggle}
             className="mt-0.5 ml-7 rounded-md px-1.5 py-0.5 text-[11px] text-sky-300/90 transition-colors hover:bg-white/5 hover:text-sky-200 focus-visible:outline-2 focus-visible:outline-sky-400"
           >
-            <span aria-hidden="true">{expanded ? '▼' : '▸'}</span> {moreOutletsLabel(others.length)}
+            <Icon name={expanded ? 'expand_more' : 'chevron_right'} />{' '}
+            {moreOutletsLabel(others.length)}
           </button>
           {expanded && (
             <ul

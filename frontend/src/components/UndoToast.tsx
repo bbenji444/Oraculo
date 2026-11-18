@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 
 import { HudButton } from './ui/HudButton';
+import { Icon } from './ui/Icon';
 
 // Tiempo para alcanzar a deshacer sin que el aviso estorbe.
 export const UNDO_TOAST_MS = 8000;
@@ -45,7 +46,7 @@ export function UndoToast({ message, onUndo, onClose, busy = false }: UndoToastP
           onClick={onClose}
           className="hud-icon-btn size-8"
         >
-          ✕
+          <Icon name="close" className="text-lg" />
         </button>
         {/* Cuánto tiempo queda para deshacer: la barra se vacía en UNDO_TOAST_MS. */}
         <span

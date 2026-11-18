@@ -15,6 +15,7 @@ import { useId, useState } from 'react';
 import { useRegionSearch, useRegionsByLevel } from '../../hooks/useRegions';
 import type { Region } from '../../services/regions';
 import { LEVEL_LABEL, stateOf } from './labels';
+import { Icon } from '../ui/Icon';
 
 interface SearchBoxProps {
   onSelect: (region: Region) => void;
@@ -59,9 +60,7 @@ export function SearchBox({ onSelect }: SearchBoxProps) {
         Buscar estado, municipio o localidad
       </label>
       <div className="hud-field shadow-lg shadow-black/30">
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 shrink-0 fill-sky-300/70">
-          <path d="M8.5 3a5.5 5.5 0 0 1 4.38 8.82l3.65 3.65-1.06 1.06-3.65-3.65A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
-        </svg>
+        <Icon name="search" className="text-sky-300/70" />
         <input
           id={`${listId}-input`}
           role="combobox"
