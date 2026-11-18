@@ -14,12 +14,19 @@
  * «Accesos» (#/accesos) son de superusuarios. La sesión (nombre, «Mi
  * contraseña» y «Salir») va en una cápsula del encabezado (`UserCapsule`).
  *
+ * Forma de Oráculo core (ADR-0108): a la izquierda su logo, «ORÁCULO» y la
+ * etiqueta «NOTICIAS» (el logo regresa al Hub de Oráculo); al centro las
+ * pestañas; a la derecha la sesión. Fuera de Explorar, el fondo es la
+ * cuadrícula y la constelación de Oráculo, y abajo al centro va el chip
+ * «Estado del sistema».
+ *
  * Con `?laboratorio` en la URL aparece además "Laboratorio" (#/laboratorio):
  * el laboratorio del muro de la Fase 9.1 (ADR-0102). Se carga aparte, solo al
  * abrirlo, para no pesar en Explorar.
  */
 import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
+import oraculoIcon from './assets/brand/oraculo-icon.svg';
 import { AccessPage } from './components/Access/AccessPage';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { UserCapsule } from './components/Auth/UserCapsule';
@@ -27,10 +34,12 @@ import { CasesPage } from './components/Cases/CasesPage';
 import { ConceptsPage } from './components/Concepts/ConceptsPage';
 import { ExplorePage } from './components/Explore/ExplorePage';
 import { GraphicsBoundary } from './components/Explore/GraphicsBoundary';
+import { Constellation } from './components/Space/Constellation';
 import { SpaceBackground } from './components/Space/SpaceBackground';
 import { DesignPreview } from './components/DesignPreview/DesignPreview';
 import { HistoryPage } from './components/History/HistoryPage';
 import { DeliveriesPage } from './components/Deliveries/DeliveriesPage';
+import { StatusChip } from './components/SystemStatus/StatusChip';
 import { SystemStatusPanel } from './components/SystemStatus/SystemStatusPanel';
 import { HudTabs } from './components/ui/HudTabs';
 import { useAppConfig } from './hooks/useAppConfig';
@@ -94,37 +103,37 @@ function Screen({ tab }: { tab: Tab }) {
 }
 
 /**
- * El globo de la marca: un aro, el ecuador, dos paralelos y un meridiano que
- * se angosta y se ensancha (`marca-meridiano`) para que parezca que gira.
+ * La marca de Oráculo core (ADR-0108): su logo, «ORÁCULO» y la etiqueta
+ * «NOTICIAS» con el nombre del módulo. Si el servidor tiene ORACULO_URL, el
+ * logo regresa al Hub de Oráculo (Benji, 09/11/2026; antes era el botón
+ * «← Oráculo»).
  */
-function BrandGlobe() {
-  return (
-    <span className="marca-simbolo" aria-hidden="true">
-      <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor">
-        <circle cx="16" cy="16" r="13" strokeWidth="1.8" />
-        <path d="M3 16h26M5.5 9h21M5.5 23h21" strokeWidth="1.2" opacity="0.7" />
-        <ellipse className="marca-meridiano" cx="16" cy="16" rx="6" ry="13" strokeWidth="1.6" />
-      </svg>
-    </span>
-  );
-}
-
-/**
- * Botón para regresar al sistema principal de Oráculo (Benji, 09/11/2026).
- * Solo aparece si el servidor tiene ORACULO_URL.
- */
-function OraculoLink() {
+function OraculoBrand() {
   const url = safeOraculoUrl(useAppConfig().data?.oraculo_url);
-  if (!url) return null;
+  const logo = (
+    <>
+      <span className="oraculo-icon-box" aria-hidden="true">
+        <img src={oraculoIcon} alt="" width="50" height="50" />
+      </span>
+      <span className="oraculo-logo-text">Oráculo</span>
+    </>
+  );
   return (
-    <a
-      href={url}
-      className="hud-btn hud-btn--sm shrink-0 whitespace-nowrap bg-[#050d12]/85"
-      title="Regresar al sistema principal de Oráculo"
-      aria-label="Regresar a Oráculo"
-    >
-      ←<span className="hidden sm:inline"> Oráculo</span>
-    </a>
+    <div className="flex min-w-0 items-center gap-3">
+      {url ? (
+        <a
+          href={url}
+          className="oraculo-logo"
+          aria-label="Regresar a Oráculo"
+          title="Regresar al sistema principal de Oráculo"
+        >
+          {logo}
+        </a>
+      ) : (
+        <span className="oraculo-logo">{logo}</span>
+      )}
+      <h1 className="hud-chip">Noticias</h1>
+    </div>
   );
 }
 
@@ -185,57 +194,45 @@ function Monitor({ me }: { me: Me }) {
     };
   }, [me]);
 
+  const outsideExplore = tab !== 'explorar';
   return (
     <div className="relative h-dvh font-sans text-slate-100">
-      {/* El universo detrás de todas las pestañas (Benji, 26/10/2026). En
-          Explorar sigue al globo; en las demás deriva solo, muy despacio. Si
-          la tarjeta de video falla, queda el fondo negro del cuerpo. */}
-      <GraphicsBoundary fallback={null}>
-        <SpaceBackground mode={tab === 'explorar' ? 'camera' : 'drift'} />
-      </GraphicsBoundary>
-      {/* Fuera de Explorar, un velo oscuro con aurora cian para que el texto
-          se lea sobre las estrellas (ver .velo-universo). */}
+      {/* En Explorar, el universo que sigue al globo. Se monta al visitarla y
+          se queda, como el globo; fuera de ella no se ve ni dibuja. Si la
+          tarjeta de video falla, queda el fondo negro del cuerpo. */}
+      {exploreVisited && (
+        <GraphicsBoundary fallback={null}>
+          <SpaceBackground mode="camera" />
+        </GraphicsBoundary>
+      )}
+      {/* Fuera de Explorar, el fondo de Oráculo (ADR-0108): la cuadrícula
+          (ver .fondo-oraculo) y la constelación, que solo se monta ahí. */}
       <div
         aria-hidden="true"
-        className={`velo-universo pointer-events-none absolute inset-0 transition-opacity duration-700 ${
-          tab === 'explorar' ? 'opacity-0' : 'opacity-100'
+        className={`fondo-oraculo pointer-events-none absolute inset-0 transition-opacity duration-700 ${
+          outsideExplore ? 'opacity-100' : 'opacity-0'
         }`}
-      />
-      {/* Encabezado sin fondo y centrado, sobre las estrellas (Benji, 26/10/2026):
-          la marca de OSINT Oráculo y las pestañas en un solo grupo al centro.
-          En celular (Benji, 11/11/2026) son dos renglones: arriba la marca con
-          «Oráculo» y la sesión; abajo las pestañas, que se deslizan. El orden
-          lo dan las clases order-*, sin repetir componentes. */}
-      <header className="encabezado pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center justify-center px-3 sm:px-4">
-        <div className="pointer-events-auto flex w-full min-w-0 max-w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:gap-7">
-          {/* Celular: este renglón junta la marca con «Oráculo» y la sesión.
-              En pantallas anchas desaparece (sm:contents) y cada pieza toma
-              su lugar en la fila con su order-*. */}
+      >
+        {outsideExplore && <Constellation />}
+      </div>
+      {/* El encabezado de Oráculo: la marca a la izquierda, las pestañas al
+          centro y la sesión a la derecha. No atrapa clics fuera de sus piezas
+          (en Explorar el globo sigue detrás). En celular (Benji, 11/11/2026)
+          son dos renglones: arriba la marca y la sesión; abajo las pestañas,
+          que se deslizan. El orden lo dan las clases order-*. */}
+      <header className="encabezado pointer-events-none absolute inset-x-0 top-0 z-30 flex h-[var(--header-h)] items-center px-3 sm:px-5">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-5">
+          {/* Celular: este renglón junta la marca y la sesión. En pantallas
+              anchas desaparece (sm:contents) y cada pieza toma su lugar. */}
           <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:contents">
-            <a
-              href="#/explorar"
-              className="marca-signal min-w-0 shrink rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400 sm:order-1"
-            >
-              <BrandGlobe />
-              <span className="flex min-w-0 flex-col items-start">
-                <h1 className="marca-nombre">Monitor de Noticias</h1>
-                <span className="marca-linea">
-                  <span className="marca-linea-texto">Oráculo · Noticias geolocalizadas</span>
-                  <span className="marca-scan" aria-hidden="true" />
-                </span>
-              </span>
-            </a>
-            <div className="flex shrink-0 items-center gap-2 sm:order-4 sm:gap-7">
-              <OraculoLink />
+            <div className="pointer-events-auto min-w-0 shrink sm:order-1">
+              <OraculoBrand />
+            </div>
+            <div className="pointer-events-auto shrink-0 sm:order-3">
               <UserCapsule me={me} />
             </div>
           </div>
-          {/* Separador vertical que se desvanece arriba y abajo. */}
-          <span
-            aria-hidden="true"
-            className="hidden h-8 w-px bg-gradient-to-b from-transparent via-sky-400/45 to-transparent sm:order-2 sm:block"
-          />
-          <div className="w-full min-w-0 sm:order-3 sm:w-auto">
+          <div className="flex w-full min-w-0 justify-center *:pointer-events-auto sm:order-2 sm:flex-1">
             <HudTabs tabs={tabs} active={tab} label="Secciones" />
           </div>
         </div>
@@ -245,7 +242,7 @@ function Monitor({ me }: { me: Me }) {
           contenido no pase por detrás del texto al desplazarse. */}
       <main
         className={`absolute inset-x-0 bottom-0 overflow-auto ${
-          tab === 'explorar' ? 'top-0' : 'top-[var(--header-h)]'
+          outsideExplore ? 'top-[var(--header-h)] pb-16' : 'top-0'
         }`}
       >
         {exploreVisited && (
@@ -255,6 +252,8 @@ function Monitor({ me }: { me: Me }) {
         )}
         <Screen tab={tab} />
       </main>
+      {/* El pie de Oráculo; en Explorar esa franja es de «Consulta activa». */}
+      {outsideExplore && <StatusChip linkToStatus={allowed.includes('estado')} />}
     </div>
   );
 }

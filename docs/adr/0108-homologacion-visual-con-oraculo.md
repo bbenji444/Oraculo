@@ -44,9 +44,11 @@ Cada paso va en su propio commit, para revertirlo solo:
 3. Botones, etiquetas, campos, interruptores, pestañas y títulos, como `.jarvis-btn`, `.jarvis-badge`, `.jarvis-input`, `.jarvis-switch` y `.jarvis-page-title`.
 4. Ventanas, como `.jarvis-modal-card`, y tablas, como `.jarvis-data-table`.
 5. Encabezado, pie y fondo:
-   - logo de Oráculo + «ORÁCULO · NOTICIAS»;
-   - chip de usuario y chip de estado;
-   - constelación fuera de Explorar.
+   - logo de Oráculo + «ORÁCULO · NOTICIAS». El logo regresa al Hub (reemplaza el botón «← Oráculo»);
+   - chip de usuario y chip de estado. El de estado va abajo al centro, menos en Explorar, donde esa franja es de «Consulta activa»;
+   - constelación fuera de Explorar. El universo 3D ya no se monta en las demás pestañas.
+
+   Para que las 7 pestañas quepan en una fila con la sesión completa: bajo 1536 px se juntan, bajo 1440 px se quita el texto «ORÁCULO» y bajo 1280 px se achican y se quita el nombre de la persona. Medido de 1024 a 1534 px. Bajo 1024 px se deslizan a lo ancho, como ya pasaba en celular.
 6. Iconos: Material Icons autoalojados.
 
 **De Oráculo no se copia:**

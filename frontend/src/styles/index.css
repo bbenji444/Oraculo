@@ -266,223 +266,99 @@ select optgroup {
   }
 }
 
-/* --- Encabezado (26/10/2026) ---------------------------------------------
-   Sin fondo y centrado, sobre las estrellas. La marca es la «marca-signal»
-   de OSINT Oráculo (resultados.css): Orbitron con un destello cian que la
-   recorre, una línea pequeña con barrido de radar abajo y un pulso en el
-   símbolo; aquí el símbolo es el globo, que además gira. */
+/* --- Encabezado (ADR-0108) ------------------------------------------------
+   El de Oráculo core: una franja oscura que se aclara hacia la derecha, con
+   una línea cian abajo que se desvanece. Sin desenfoque (ADR-0036): sobre el
+   globo, el tinte basta para leer. */
 :root {
-  /* Alto del encabezado: Explorar dibuja el globo debajo y corre sus paneles. */
+  /* Alto del encabezado: Explorar dibuja el globo debajo y corre sus paneles.
+     En celular son dos renglones (ExploreGlobe usa estos 6.25rem). */
   --header-h: 6.25rem;
 }
 @media (min-width: 640px) {
   :root {
-    --header-h: 4.5rem;
+    /* El --header-h de Oráculo. */
+    --header-h: 62px;
   }
 }
 
-.marca-signal {
-  display: flex;
+.encabezado {
+  border-width: 0 0 1px;
+  border-style: solid;
+  border-image: linear-gradient(
+      90deg,
+      rgb(0 210 255 / 0.35),
+      rgb(0 210 255 / 0.08) 60%,
+      transparent
+    )
+    1;
+  background: linear-gradient(to right, rgb(5 5 5 / 0.6), rgb(0 210 255 / 0.06));
+  box-shadow: 0 4px 32px rgb(0 0 0 / 0.35);
+}
+
+/* La marca: el logo de Oráculo en su círculo y «ORÁCULO» (.oraculo-logo). */
+.oraculo-logo {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  user-select: none;
-  animation: marca-entra 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.marca-simbolo {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  color: #00d2ff;
-  filter: drop-shadow(0 0 8px rgb(0 210 255 / 0.55));
-}
-/* El aro que late hacia afuera, como el punto de OSINT. */
-.marca-simbolo::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  border: 1px solid rgb(0 210 255 / 0.45);
-  animation: marca-ping 2.4s ease-out infinite;
-}
-/* El meridiano se angosta y se ensancha: parece que el globo gira. */
-.marca-meridiano {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: marca-giro 6s linear infinite;
-}
-/* Letrero de neón (Benji, 02/11/2026: «ponle luz neón a las letras»): el
-   tubo blanco con halo cian en capas. Al cargar se enciende parpadeando y
-   luego respira apenas. Solo se anima la opacidad. */
-.marca-nombre {
-  font: 700 15px/1 var(--font-brand);
-  letter-spacing: 0.22em;
+  gap: 10px;
+  border-radius: 4px;
+  color: var(--color-slate-100);
+  font: 400 1.3rem/1 var(--font-brand);
+  letter-spacing: 4px;
+  text-shadow: 0 0 12px rgb(0 210 255 / 0.35);
   text-transform: uppercase;
-  color: #effeff;
-  text-shadow:
-    0 0 1px #fff,
-    0 0 4px rgb(255 255 255 / 0.85),
-    0 0 9px rgb(0 210 255 / 0.95),
-    0 0 18px rgb(0 210 255 / 0.75),
-    0 0 34px rgb(0 210 255 / 0.45);
-  animation:
-    neon-encendido 1.6s steps(1) 0.3s both,
-    neon-respira 5s ease-in-out 2s infinite;
-}
-.marca-linea {
-  position: relative;
-  display: block;
-  margin-top: 5px;
-  padding-bottom: 3px;
-  overflow: hidden;
-}
-.marca-linea-texto {
-  display: block;
-  font: 600 9px/1 var(--font-display);
-  letter-spacing: 0.36em;
-  text-transform: uppercase;
-  color: rgb(150 225 240 / 0.85);
-  /* Brillo suave: el subtítulo acompaña al letrero sin competir. */
-  text-shadow:
-    0 0 6px rgb(0 210 255 / 0.45),
-    0 0 14px rgb(0 210 255 / 0.2);
   white-space: nowrap;
-  transition:
-    color 0.35s,
-    letter-spacing 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
 }
-.marca-scan {
-  position: absolute;
-  inset: auto 0 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(0 210 255 / 0.15) 20%,
-    rgb(0 210 255 / 0.95) 50%,
-    rgb(0 210 255 / 0.15) 80%,
-    transparent 100%
-  );
-  background-size: 55% 100%;
-  background-repeat: no-repeat;
-  animation: marca-scan 2.8s linear infinite;
-  opacity: 0.85;
+a.oraculo-logo:focus-visible {
+  outline: 2px solid #00d2ff;
+  outline-offset: 4px;
 }
-/* En celular (Benji, 11/11/2026): la marca en un renglón con «Oráculo» y la
-   sesión; el subtítulo no cabe y se quita. */
-@media (max-width: 639px) {
-  .marca-signal {
-    gap: 8px;
-  }
-  .marca-simbolo {
-    width: 24px;
-    height: 24px;
-  }
-  .marca-simbolo svg {
-    width: 20px;
-    height: 20px;
-  }
-  .marca-nombre {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .marca-linea {
+.oraculo-icon-box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: rgb(0 210 255 / 0.08);
+  box-shadow:
+    0 0 0 1px rgb(0 210 255 / 0.3),
+    0 0 12px rgb(0 210 255 / 0.22);
+  transition: box-shadow 0.25s;
+}
+/* El logo es más grande que su círculo, como en Oráculo. */
+.oraculo-icon-box img {
+  width: 50px;
+  height: 50px;
+  max-width: none;
+  filter: drop-shadow(0 0 4px rgb(0 210 255 / 0.8));
+}
+a.oraculo-logo:hover .oraculo-icon-box {
+  box-shadow:
+    0 0 0 1px rgb(0 210 255 / 0.6),
+    0 0 20px rgb(0 210 255 / 0.4);
+}
+/* Bajo 1440 px «ORÁCULO» se quita para que quepan las 7 pestañas (ver
+   .user-capsule en hud.css): quedan el logo y la etiqueta «NOTICIAS». */
+@media (max-width: 1439px) {
+  .oraculo-logo-text {
     display: none;
   }
 }
-.marca-signal:hover .marca-linea-texto {
-  color: #00d2ff;
-  letter-spacing: 0.42em;
-}
-.marca-signal:hover .marca-nombre {
-  animation-duration: 2.2s;
-}
-@keyframes marca-entra {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
+@media (max-width: 639px) {
+  .oraculo-icon-box {
+    width: 32px;
+    height: 32px;
   }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-/* El tubo de neón se enciende con un par de parpadeos, como en la calle. */
-@keyframes neon-encendido {
-  0% {
-    opacity: 0.15;
-  }
-  12% {
-    opacity: 1;
-  }
-  18% {
-    opacity: 0.35;
-  }
-  26% {
-    opacity: 1;
-  }
-  34% {
-    opacity: 0.6;
-  }
-  40%,
-  100% {
-    opacity: 1;
-  }
-}
-/* Respira apenas, con un titubeo corto de vez en cuando. */
-@keyframes neon-respira {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  45% {
-    opacity: 0.86;
-  }
-  47% {
-    opacity: 0.7;
-  }
-  49% {
-    opacity: 0.92;
-  }
-}
-@keyframes marca-scan {
-  from {
-    background-position: -40% 0;
-  }
-  to {
-    background-position: 140% 0;
-  }
-}
-@keyframes marca-ping {
-  0% {
-    transform: scale(0.85);
-    opacity: 0.7;
-  }
-  70%,
-  100% {
-    transform: scale(1.7);
-    opacity: 0;
-  }
-}
-@keyframes marca-giro {
-  0% {
-    transform: scaleX(1);
-  }
-  50% {
-    transform: scaleX(-1);
-  }
-  100% {
-    transform: scaleX(1);
+  .oraculo-icon-box img {
+    width: 40px;
+    height: 40px;
   }
 }
 
-/* Las pestañas se deslizan si no caben, pero sin la barra gris de Windows
-   (en un encabezado sin fondo se veía como un parche). */
+/* Las pestañas se deslizan si no caben, pero sin la barra gris de Windows. */
 .sin-barra {
   scrollbar-width: none;
 }
@@ -492,16 +368,19 @@ select optgroup {
 
 /* Las pestañas del encabezado están en hud.css (.hud-tabs, HudTabs). */
 
-/* Sin el destello, el nombre se queda blanco (el texto no es transparente). */
-@media (prefers-reduced-motion: reduce) {
-  .marca-nombre {
-    animation: none;
-  }
-  .marca-scan,
-  .marca-meridiano,
-  .marca-simbolo::after {
-    animation: none;
-  }
+/* Fondo de Oráculo fuera de Explorar (body de su global.css): negro, un
+   resplandor cian apenas visible al centro y una cuadrícula de 50 px. Encima
+   va la constelación (Constellation). */
+.fondo-oraculo {
+  background-color: #050505;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgb(0 210 255 / 0.03) 0%, transparent 60%),
+    linear-gradient(rgb(0 255 255 / 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 255 255 / 0.02) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    50px 50px,
+    50px 50px;
 }
 
 /* Los controles del globo (acercar, alejar, brújula) bajan al hueco del
@@ -510,7 +389,7 @@ select optgroup {
   top: var(--header-h);
 }
 
-/* Velo sobre el universo en Casos, Conceptos, Historial y Estado: oscurece las
+/* Velo sobre el universo de la pantalla de entrada: oscurece las
    estrellas lo justo para leer (más en el centro, donde va el texto) y deja
    una aurora cian que se mueve muy despacio. Solo se mueven capas con
    `transform`: lo hace la tarjeta sin volver a dibujar la página. */

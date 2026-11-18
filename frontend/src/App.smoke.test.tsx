@@ -52,6 +52,8 @@ vi.mock('./components/Explore/ExploreGlobe', async () => {
   };
 });
 vi.mock('./components/Space/SpaceBackground', () => ({ SpaceBackground: () => null }));
+// jsdom no tiene lienzo 2D: el fondo de constelación no se dibuja en las pruebas.
+vi.mock('./components/Space/Constellation', () => ({ Constellation: () => null }));
 
 const SEARCH_ID = search.search_id;
 // Credenciales de la API falsa (no son reales).

@@ -1317,103 +1317,92 @@
 
 /* ── Cápsula de la sesión en el encabezado (Benji, 11/11/2026) ──────────────
    Persona + nombre, la llave de «Mi contraseña» y el botón de apagado, en una
-   sola pieza redondeada como la barra de Oráculo. */
+   píldora como el .jarvis-user-chip de Oráculo core (ADR-0108): fondo de sus
+   tarjetas, anillo cian al 16 % y separadores de 1 px. Sin desenfoque
+   (ADR-0036). */
 .user-capsule {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 2px;
-  height: 40px;
-  padding: 0 4px 0 6px;
-  border: 1px solid var(--hud-cyan-line);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgb(8 22 38 / 0.82), rgb(3 10 20 / 0.82));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 0 18px rgb(0 210 255 / 0.08);
-  backdrop-filter: blur(8px);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 30px;
+  background: var(--hud-panel);
+  box-shadow: 0 0 0 1px rgb(0 210 255 / 0.16);
 }
 
 .user-capsule__who {
   display: inline-flex;
   min-width: 0;
+  height: 34px;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 0 2px;
+  padding: 0 12px;
 }
 
 .user-capsule__avatar {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
   color: var(--hud-cyan);
-  background: var(--hud-cyan-soft);
-  box-shadow: 0 0 10px rgb(0 210 255 / 0.25);
 }
 
 .user-capsule__name {
   max-width: 9rem;
   overflow: hidden;
-  font: 600 11px/1 var(--font-display);
-  letter-spacing: 0.16em;
+  color: var(--hud-ink);
+  font: 400 0.62rem/1 var(--font-display);
+  letter-spacing: 2px;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-  color: rgb(226 232 240);
 }
 
 .user-capsule__divider {
   width: 1px;
-  height: 20px;
-  background: linear-gradient(180deg, transparent, rgb(0 210 255 / 0.35), transparent);
+  height: 18px;
+  background: rgb(0 210 255 / 0.22);
 }
 
 .user-capsule__action,
 .user-capsule__power {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   cursor: pointer;
   transition:
     color 0.2s,
     background 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s;
+    box-shadow 0.2s;
 }
 
 .user-capsule__action {
-  margin: 0 4px;
   color: var(--hud-cyan);
 }
 
 .user-capsule__action:hover {
-  background: var(--hud-cyan-soft);
-  box-shadow: 0 0 12px rgb(0 210 255 / 0.35);
+  background: rgb(0 210 255 / 0.1);
 }
 
+/* Salir en rojo, como el botón de apagado de Oráculo. */
 .user-capsule__power {
-  margin-left: 4px;
-  border: 1px solid rgb(244 63 94 / 0.45);
-  color: rgb(251 113 133);
-  background: rgb(127 29 29 / 0.45);
-  box-shadow: 0 0 12px rgb(244 63 94 / 0.25);
+  color: var(--hud-rose);
+  background: rgb(255 51 51 / 0.1);
+  box-shadow: 0 0 0 1px rgb(255 51 51 / 0.3);
 }
 
 .user-capsule__power:hover {
-  color: rgb(255 228 230);
-  background: rgb(190 18 60 / 0.7);
-  box-shadow: 0 0 18px rgb(244 63 94 / 0.55);
-  transform: scale(1.05);
+  color: color-mix(in srgb, var(--hud-rose) 60%, #fff);
+  background: rgb(255 51 51 / 0.22);
+  box-shadow:
+    0 0 0 1px rgb(255 51 51 / 0.7),
+    0 0 12px rgb(255 51 51 / 0.35);
 }
 
 .user-capsule__power:disabled {
   cursor: wait;
   opacity: 0.6;
-  transform: none;
 }
 
 .user-capsule__action:focus-visible,
@@ -1422,33 +1411,46 @@
   outline-offset: 2px;
 }
 
-/* En celular la cápsula es solo íconos: el nombre se ve al tocar la persona
-   (title) y la sesión cabe junto a la marca. */
-@media (max-width: 639px) {
-  .user-capsule {
-    height: 36px;
-    padding: 0 3px;
+/* Que las 7 pestañas quepan en una fila junto a la marca y la sesión (medido
+   con la sesión de Benji): bajo 1536 px se juntan un poco; bajo 1440 px se
+   quita «ORÁCULO» (index.css); bajo 1280 px se achican y se quita el nombre
+   de la persona, que se sigue viendo al pasar el mouse (title). Bajo 1024 px
+   ya no caben y se deslizan a lo ancho. */
+@media (max-width: 1535px) {
+  .encabezado .hud-tab {
+    padding-inline: 0.6rem;
   }
-  .user-capsule__who {
-    padding: 0 2px;
-  }
+}
+@media (max-width: 1279px) {
   .user-capsule__name {
     display: none;
+  }
+  .user-capsule__who {
+    padding: 0 8px;
+  }
+  .encabezado .hud-tab {
+    padding-inline: 0.5rem;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+}
+
+@media (max-width: 639px) {
+  .user-capsule {
+    gap: 2px;
   }
   .user-capsule__action,
   .user-capsule__power {
     width: 30px;
     height: 30px;
   }
-  .user-capsule__action {
-    margin: 0 2px;
-  }
-  .user-capsule__power {
-    margin-left: 2px;
+  .user-capsule__who {
+    height: 30px;
   }
   /* Pestañas: deslizables a lo ancho, un poco más compactas. */
   .encabezado .hud-tab {
     padding: 0.65rem 0.7rem;
+    font-size: 11px;
     letter-spacing: 0.16em;
   }
 }
@@ -1458,7 +1460,59 @@
   .user-capsule__power {
     transition: none;
   }
-  .user-capsule__power:hover {
-    transform: none;
-  }
+}
+
+/* ── Chip «Estado del sistema» (ADR-0108) ─────────────────────────────────
+   El pie de Oráculo core (.jarvis-status-chip): una píldora abajo al centro
+   con el piloto del estado y la frase. El color del piloto sale de
+   data-state (lo pone StatusChip según /health). */
+.hud-status-chip {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 38px;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: 0.45rem 1.1rem;
+  border-radius: 30px;
+  background: var(--hud-panel);
+  box-shadow:
+    0 0 0 1px rgb(0 210 255 / 0.16),
+    0 8px 28px rgb(0 0 0 / 0.45);
+  color: var(--hud-muted);
+  font: 400 0.62rem/1.2 var(--font-display);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  translate: -50% 0;
+}
+
+a.hud-status-chip:hover {
+  color: var(--hud-ink);
+}
+
+a.hud-status-chip:focus-visible {
+  outline: 2px solid var(--hud-cyan);
+  outline-offset: 2px;
+}
+
+.hud-status-chip[data-state='ok'] {
+  --chip: var(--hud-green);
+}
+.hud-status-chip[data-state='degraded'] {
+  --chip: var(--hud-amber);
+}
+.hud-status-chip[data-state='down'] {
+  --chip: var(--hud-rose);
+}
+/* Mientras llega la primera respuesta, el piloto apagado. */
+.hud-status-chip[data-state='checking'] {
+  --chip: var(--hud-muted);
+}
+.hud-status-chip[data-state='checking'] .hud-dot {
+  box-shadow: none;
 }

@@ -60,6 +60,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
     - Interruptores, selector de opciones y pestañas como los de Oráculo.
     - Títulos de pantalla en cian con su brillo. Las pestañas ya no son letreros de neón.
   - **Ventanas y tablas:** las ventanas (nuevo envío, filtro del expediente, «¿Qué rastrear?»…) son como las de Oráculo: sin borde, con sus dos corchetes, sombra honda y título en cian. Atrás se oscurece en lugar de desenfocarse, para no frenar el globo. Las tablas de Conceptos e Historial de envíos llevan los encabezados y renglones de las tablas de Oráculo.
+  - **Encabezado, chip de estado y fondo:**
+    - Encabezado de Oráculo: a la izquierda su logo, «ORÁCULO» y la etiqueta «NOTICIAS»; al centro las mismas 7 pestañas; a la derecha la sesión. El logo regresa al Hub de Oráculo (antes era el botón «← Oráculo»). Se quitó el letrero de neón «Monitor de Noticias».
+    - La sesión es una píldora como la de Oráculo, con el botón rojo de «Salir». En pantallas medianas se ocultan «ORÁCULO» y el nombre de la persona para que quepan todas las pestañas.
+    - Abajo al centro, fuera de Explorar, el chip «Estado del sistema» con un piloto verde, ámbar o rojo según `/health`. Lleva a la pestaña Estado del sistema.
+    - Fuera de Explorar el fondo es la cuadrícula y la constelación de Oráculo en lugar de las estrellas. Con «reducir animaciones» queda quieta, y se detiene si la pestaña del navegador está oculta. Explorar conserva el globo y su universo, que ya no se carga en las demás pestañas.
 - **«Hoy» ya es solo hoy (11/11/2026, ADR-0048).** «Hoy» se calculaba de ayer a hoy, y «7 días» eran 8. Ahora los últimos N días cuentan el día de hoy.
 - **Radar como cúpula 3D (11/11/2026).** Mientras corre una búsqueda:
   - una cúpula de luz sobre la zona, dibujada en el globo, con rejilla, haz que gira y onda en el piso;
