@@ -46,6 +46,8 @@ import {
   storyItems,
   type TimelineBucket,
   type TimelineUnit,
+  type UndatedItem,
+  undatedItems,
 } from './timelineData';
 import { CategoryTag } from './CategoryTag';
 import { categoryColor } from './categoryColor';
@@ -200,7 +202,8 @@ function Spark({ buckets, unit, max, range, onPick, height = SPARK_HEIGHT, capti
 const DenseRows = createContext(false);
 
 interface EntryProps {
-  item: StoryItem;
+  /** Sin `at` es un hecho sin fecha de publicación: no lleva hora. */
+  item: StoryItem | UndatedItem;
   selected: boolean;
   selectedRef: Ref<HTMLButtonElement>;
   onSelect: (articleId: number) => void;
@@ -232,7 +235,7 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
         <>
           {/* La hora, a la izquierda de la línea. */}
           <span className="absolute left-0 top-[0.55rem] w-10 text-right font-display text-[10px] tabular-nums text-sky-300/90">
-            {HOUR.format(new Date(item.at))}
+            {'at' in item ? HOUR.format(new Date(item.at)) : 's/f'}
           </span>
           {/* El nodo sobre la línea: más grande y brillante si lo publicaron varios medios. */}
           <span
@@ -286,7 +289,7 @@ function Entry({ item, selected, selectedRef, onSelect, showDay = false }: Entry
               dense ? 'flex-nowrap overflow-hidden' : 'flex-wrap'
             }`}
           >
-            {showDay && (
+            {showDay && 'at' in item && (
               <span className="tabular-nums">
                 {shortDay(item.at)} {HOUR.format(new Date(item.at))}
               </span>
@@ -482,10 +485,14 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
     [articles, categoryIds, stateCode, platforms],
   );
   const timeline = useMemo(() => buildTimeline(forSpark), [forSpark]);
-  const items = useMemo(
-    () => storyItems(applyTimeline(articles, { range, categoryIds, stateCode, platforms })),
+  const filteredNotes = useMemo(
+    () => applyTimeline(articles, { range, categoryIds, stateCode, platforms }),
     [articles, range, categoryIds, stateCode, platforms],
   );
+  const items = useMemo(() => storyItems(filteredNotes), [filteredNotes]);
+  // Las de redes casi nunca traen fecha (Google web): van al final, aparte,
+  // en lugar de perderse (revisión del 19/11/2026).
+  const undated = useMemo(() => undatedItems(filteredNotes), [filteredNotes]);
   // Los hechos de la misma persona o caso se juntan en un tema (themes.ts).
   const days = useMemo(() => {
     const groups: { day: string; at: number; rows: ChronologyRow[] }[] = [];
@@ -500,7 +507,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
   const states = useMemo(() => statesIn(articles), [articles]);
   const filtered =
     range !== null || categoryIds.length > 0 || stateCode !== null || platforms.length > 0;
-  const notes = items.reduce((total, item) => total + item.articleIds.length, 0);
+  const notes = [...items, ...undated].reduce((total, item) => total + item.articleIds.length, 0);
 
   // Solo se desplaza la lista: `scrollIntoView` también movía la página entera
   // (el globo se subía y quedaba una franja negra abajo).
@@ -547,7 +554,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               Cronología
             </h2>
             <span className="text-[11px] text-slate-400">
-              {items.length} hechos · {notes} notas
+              {items.length + undated.length} hechos · {notes} notas
             </span>
             <button
               type="button"
@@ -624,7 +631,7 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
 
       <DenseRows.Provider value={dossier}>
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          {days.length === 0 && (
+          {days.length === 0 && undated.length === 0 && (
             <p className="px-1 py-4 text-xs text-slate-400">No hay notas con estos filtros.</p>
           )}
           {days.map((group) => (
@@ -666,6 +673,27 @@ export function Chronology({ articles, variant = 'column' }: ChronologyProps) {
               </ol>
             </div>
           ))}
+          {undated.length > 0 && (
+            <div className="relative">
+              <p className="sticky top-0 z-10 -mx-3 border-b border-sky-400/10 bg-[#050505]/95 px-4 py-1.5 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-sky-200/90">
+                Sin fecha de publicación
+                <span className="ml-2 font-sans text-[10px] font-normal normal-case tracking-normal text-slate-500">
+                  {undated.length} {undated.length === 1 ? 'entrada' : 'entradas'}
+                </span>
+              </p>
+              <ol className="space-y-0.5" aria-label="Notas sin fecha de publicación">
+                {undated.map((item) => (
+                  <Entry
+                    key={item.lead.article_id}
+                    item={item}
+                    selected={selectedId !== null && item.articleIds.includes(selectedId)}
+                    selectedRef={selectedRef}
+                    onSelect={selectArticle}
+                  />
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       </DenseRows.Provider>
     </section>
