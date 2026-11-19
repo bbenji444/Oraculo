@@ -100,6 +100,10 @@ class NoticedSearchStore:
         """Ver ``SearchStorePort.set_progress``; agrega el aviso si hay."""
         await self._inner.set_progress(search_id, self._notices.stamp(search_id, progress))
 
+    async def is_cancelled(self, search_id: UUID) -> bool:
+        """Ver ``SearchStorePort.is_cancelled``."""
+        return await self._inner.is_cancelled(search_id)
+
     async def record_error(self, error: ProcessingErrorRecord) -> None:
         """Ver ``SearchStorePort.record_error``."""
         await self._inner.record_error(error)

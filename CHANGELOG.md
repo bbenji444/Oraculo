@@ -8,6 +8,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **«Cancelar búsqueda» mientras corre (19/11/2026, ADR-0118).** Benji: «tiene que estar la opción de cancelar búsqueda por si me equivoqué en algo o necesito regresar y editar».
+  - Botón en la consola del Centro de mando mientras dura el barrido. Al cancelar, la consola vuelve a «Ajustar consulta» con lo mismo que se pidió; en la búsqueda rápida, con el texto que se escribió.
+  - El worker se detiene entre etapas o antes de la siguiente nota de la IA y guarda lo gastado. La búsqueda queda en Historial como «Cancelada».
+  - Solo quien la lanzó, y solo las manuales: las corridas automáticas del monitor FGR no se cancelan.
+  - API: `POST /searches/{id}/cancel`, estado nuevo `cancelled` (migración 0050) y bitácora `search.cancelled`.
+
 - **La esfera de «Todo el mundo» se enciende en todo el planeta y el globo gira mientras busca (19/11/2026, revisión del ADR-0116).** Benji: «esos puntos de la esfera solo aparecen en una parte del globo. Quiero que aparezcan en todo el globo y aparte esté girando mientras hacemos la búsqueda».
   - 40 lugares fijos repartidos entre 55° N y 55° S. Cada nota enciende uno cuando el giro lo trae al frente; antes eran 18 a menos de 50° del centro de la vista.
   - Mientras busca, el globo gira 3 veces más rápido (una vuelta en 50 s), aunque se haya recargado la página. Tocarlo lo detiene y con «Menos movimiento» no gira.

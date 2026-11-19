@@ -627,7 +627,10 @@ export function ScanOverlay({ search, notice, right, bottom, map, regionBbox }: 
                     : 'text-rose-300'
               }`}
             >
-              <DecodeText text={BANNER_TITLE[notice.tone].toUpperCase()} onHover={false} />
+              <DecodeText
+                text={(notice.title ?? BANNER_TITLE[notice.tone]).toUpperCase()}
+                onHover={false}
+              />
             </p>
             <div aria-hidden="true" className="mando-banner-line" />
             <p className="font-display text-[11px] tracking-[0.3em] text-sky-200 uppercase">

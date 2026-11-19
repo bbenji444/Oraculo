@@ -154,7 +154,7 @@ class SearchClosing:
     """Cómo terminó una búsqueda, para cerrar su fila y la bitácora.
 
     Attributes:
-        status: ``completed``, ``partial`` o ``failed``.
+        status: ``completed``, ``partial``, ``failed`` o ``cancelled``.
         progress: Avance final (conteos por etapa).
         credits_used: Créditos de SearchApi gastados.
         llm_usage: Tokens de la IA.
@@ -203,6 +203,8 @@ class SearchStorePort(Protocol):
     async def start(self, search_id: UUID) -> None:
         """Pasa la búsqueda a ``running`` y anota la hora de inicio.
 
+        Una búsqueda ya cancelada se queda cancelada.
+
         Args:
             search_id: Id.
         """
@@ -217,6 +219,17 @@ class SearchStorePort(Protocol):
         """
         ...
 
+    async def is_cancelled(self, search_id: UUID) -> bool:
+        """Si quien la lanzó la canceló: el pipeline lo revisa entre etapas.
+
+        Args:
+            search_id: Id.
+
+        Returns:
+            ``True`` si está en ``cancelled``.
+        """
+        ...
+
     async def record_error(self, error: ProcessingErrorRecord) -> None:
         """Anota un error sin detener la búsqueda.
 
@@ -227,6 +240,9 @@ class SearchStorePort(Protocol):
 
     async def finish(self, search_id: UUID, closing: SearchClosing, actor: Actor) -> None:
         """Cierra la búsqueda y la anota en la bitácora, en una transacción.
+
+        Si la cancelaron después de la última revisión del pipeline, se queda
+        cancelada: guarda lo gastado y la bitácora dice ``cancelled``.
 
         Args:
             search_id: Id.

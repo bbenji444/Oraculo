@@ -1,6 +1,6 @@
 """RunSearch: las 8 etapas del pipeline con piezas en memoria (sin red, base ni gasto)."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -128,6 +128,9 @@ class Searches:
         self.errors: list[ProcessingErrorRecord] = []
         self.closing: SearchClosing | None = None
         self.actor: Actor | None = None
+        # «Cancelar búsqueda»: se cancela al llegar a esta etapa, o a mano.
+        self.cancel_at: str | None = None
+        self.cancelled = False
 
     async def create(self, search: NewSearch) -> UUID:
         raise NotImplementedError
@@ -140,6 +143,11 @@ class Searches:
 
     async def set_progress(self, search_id: UUID, progress: Mapping[str, object]) -> None:
         self.progress.append(progress)
+        if progress["stage"] == self.cancel_at:
+            self.cancelled = True
+
+    async def is_cancelled(self, search_id: UUID) -> bool:
+        return self.cancelled
 
     async def record_error(self, error: ProcessingErrorRecord) -> None:
         self.errors.append(error)
@@ -232,6 +240,8 @@ class LLM:
     def __init__(self, replies: Mapping[str, Enrichment | Exception]) -> None:
         self.replies = replies
         self.requests: list[EnrichmentRequest] = []
+        # Se llama al responder (la prueba de «cancelar durante la IA»).
+        self.after_reply: Callable[[], None] = lambda: None
 
     @property
     def model(self) -> str:
@@ -250,6 +260,7 @@ class LLM:
         if isinstance(reply, Exception):
             raise reply
         # Como el adaptador real: un juicio por cada concepto que se le pidió.
+        self.after_reply()
         judged = reply.concepts[0]
         concepts = tuple(replace(judged, concept_id=c.concept_id) for c in request.concepts)
         return EnrichmentResult(
@@ -622,6 +633,86 @@ async def test_busqueda_inexistente() -> None:
 
     with pytest.raises(SearchNotFoundError):
         await use_case.run(uuid4())
+
+
+async def test_cancelada_antes_de_consultar_no_gasta_nada() -> None:
+    # Benji, 19/11/2026: «por si me equivoqué en algo o necesito regresar y editar».
+    use_case, searches, _a, llm, _e = pipeline()
+    searches.cancelled = True
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.CANCELLED
+    assert (report.articles, report.credits_used) == (0, 0)
+    assert llm.requests == []
+    assert searches.progress == []
+    closing = searches.closing
+    assert closing is not None
+    assert closing.status is SearchStatus.CANCELLED
+    assert closing.queries_executed == ()
+    assert searches.actor == Actor("benji")
+
+
+async def test_cancelada_a_medio_camino_guarda_lo_gastado_y_no_sigue() -> None:
+    use_case, searches, articles, llm, _e = pipeline()
+    searches.cancel_at = "extract"
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.CANCELLED
+    # Las consultas ya salieron: el crédito se cobró y queda en la bitácora.
+    assert report.credits_used == 1
+    assert llm.requests == []
+    assert "geocode" not in searches.stages
+    closing = searches.closing
+    assert closing is not None
+    assert (closing.status, closing.credits_used, closing.results_count) == (
+        SearchStatus.CANCELLED,
+        1,
+        0,
+    )
+    assert [q["provider"] for q in closing.queries_executed] == ["searchapi", "indice_local"]
+    assert closing.error_summary == "Cancelada por quien la lanzó."
+    # Las notas a medias no se ligan a la búsqueda.
+    assert articles.rows == []
+
+
+async def test_cancelada_al_quitar_repetidas_no_guarda_notas() -> None:
+    use_case, searches, articles, _l, _e = pipeline()
+    searches.cancel_at = "dedupe"
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.CANCELLED
+    assert report.credits_used == 1
+    assert articles.ids == {}
+
+
+async def test_cancelada_durante_la_ia_no_manda_mas_notas_y_cuenta_sus_tokens() -> None:
+    many = [
+        raw(Provider.LOCAL_INDEX, i, f"https://milenio.com/n{i}", f"Nota número {i}")
+        for i in range(1, 13)
+    ]
+    replies: dict[str, Enrichment | Exception] = {a.title: enrichment() for a in many}
+    use_case, searches, _a, llm, _e = pipeline(
+        sources=[Source(Provider.LOCAL_INDEX, many)], replies=replies
+    )
+
+    def cancel() -> None:
+        searches.cancelled = True
+
+    llm.after_reply = cancel
+
+    report = await use_case.run(uuid4())
+
+    assert report.status is SearchStatus.CANCELLED
+    # Con 2 a la vez, a lo más las 2 que ya iban; las otras 10 no se mandan.
+    sent = len(llm.requests)
+    assert 1 <= sent <= 2
+    assert report.llm_usage == LLMUsage(1000 * sent, 100 * sent)
+    closing = searches.closing
+    assert closing is not None
+    assert closing.llm_usage == LLMUsage(1000 * sent, 100 * sent)
 
 
 async def test_el_avance_se_actualiza_durante_la_ia() -> None:

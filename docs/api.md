@@ -101,7 +101,7 @@ Reglas (`409 access_rule`):
 0. `GET /sources`: las fuentes para los switches (cuáles hay, cuáles cuestan, cuáles van encendidas).
 1. `POST /searches/estimate`: muestra cuánto costaría. **No gasta.**
 2. `POST /searches`: la lanza (`202`). **Gasta** créditos de SearchApi y tokens de la IA.
-3. `GET /searches/{id}`: su avance (consúltala cada 2 s hasta que `status` sea `completed`, `partial` o `failed`).
+3. `GET /searches/{id}`: su avance (consúltala cada 2 s hasta que `status` sea `completed`, `partial`, `failed` o `cancelled`). Mientras corre, `POST /searches/{id}/cancel` la detiene.
 4. `GET /searches/{id}/articles`: las notas, y `GET /searches/{id}/aggregates`: el mapa de calor.
 5. `GET /articles/{id}`: el detalle de una nota.
 6. `POST /searches/{id}/report` y `GET /searches/{id}/export`: el reporte en PDF o HTML y las notas en CSV o GeoJSON.
@@ -347,6 +347,13 @@ curl -s 'http://localhost:8080/api/v1/searches?limit=1'
 - **Quién:** quien la lanzó. Las corridas automáticas las puede quitar un superusuario. La búsqueda de otra persona no se ve: responde `404`.
 - **Después:** una búsqueda eliminada ya no sale en el historial y `GET /searches/{id}` responde `404`. Sus notas siguen en el índice y en los casos donde se agregaron.
 - **Bitácora:** `search.deleted` y `search.restored`.
+
+**Cancelar una búsqueda que corre (19/11/2026, ADR-0118).** `POST /searches/{id}/cancel` responde `204` y la pasa a `cancelled` en el momento.
+
+- **Quién:** quien la lanzó, y solo búsquedas manuales. Una corrida automática, o la de otra persona que un superusuario alcanza a ver, responde `403` (`search_forbidden`). La de otra persona que no se ve responde `404`.
+- **Si ya terminó:** `409` (`search_already_finished`).
+- **Después:** el worker la revisa entre etapas y antes de cada nota de la IA, se detiene y guarda lo que alcanzó a gastar (`credits_used`, tokens y costo); al hacerlo pone `finished_at`. Mientras `finished_at` siga vacío, lo gastado todavía no está: sigue consultando `GET /searches/{id}`. `results_count` queda en 0 y no se liga ninguna nota: lo que la IA ya leyó se guarda en el índice y la siguiente búsqueda lo reutiliza sin pagar otra vez. Si se cancela cuando ya está cerrando, queda `cancelled` con las notas que encontró. Una consulta que ya salió al proveedor se cobra igual. `error_summary` dice «Cancelada por quien la lanzó.».
+- **Bitácora:** `search.cancelled` (quién y desde dónde) y, al detenerse el worker, `search.finished` con `estado: cancelled` y lo gastado.
 
 ## Notas de una búsqueda
 

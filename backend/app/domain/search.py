@@ -2,7 +2,8 @@
 
 - **Estado final:** ``completed`` si todo salió; ``partial`` si alguna etapa
   falló en más de la mitad de las notas o algún proveedor falló;
-  ``failed`` si no se pudo consultar a ningún proveedor.
+  ``failed`` si no se pudo consultar a ningún proveedor; ``cancelled`` si
+  quien la lanzó la detuvo a medio camino (19/11/2026).
 - **Dentro de la región:** una nota está dentro si su ubicación principal
   cae en la región buscada (por el prefijo de la clave INEGI, §6). Las de
   fuera **no se borran**: se muestran aparte.
@@ -29,11 +30,19 @@ class SearchStatus(StrEnum):
     COMPLETED = "completed"
     PARTIAL = "partial"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+    """Quien la lanzó la detuvo (Benji, 19/11/2026: «por si me equivoqué en
+    algo o necesito regresar y editar»). Se queda lo que alcanzó a encontrar."""
 
     @property
     def is_finished(self) -> bool:
-        """Si ya no va a cambiar (bien, a medias o con falla): tiene reporte."""
-        return self in (SearchStatus.COMPLETED, SearchStatus.PARTIAL, SearchStatus.FAILED)
+        """Si ya no va a cambiar (bien, a medias, con falla o cancelada): tiene reporte."""
+        return self in (
+            SearchStatus.COMPLETED,
+            SearchStatus.PARTIAL,
+            SearchStatus.FAILED,
+            SearchStatus.CANCELLED,
+        )
 
 
 class SearchTrigger(StrEnum):
@@ -61,6 +70,24 @@ def can_delete_search(owner_id: str, trigger: SearchTrigger, user_id: str) -> bo
         ``True`` si puede.
     """
     return trigger is SearchTrigger.AUTOMATIC or owner_id == user_id
+
+
+def can_cancel_search(owner_id: str, trigger: SearchTrigger, user_id: str) -> bool:
+    """Si una persona puede detener una búsqueda que todavía corre.
+
+    Solo quien la lanzó, y solo las manuales: una corrida automática del monitor
+    FGR es la que alimenta el reporte y los envíos programados de todos
+    (ADR-0031), y cancelarla dejaría ese horario sin reporte.
+
+    Args:
+        owner_id: Quién la lanzó (``searches.user_id``).
+        trigger: Manual o automática.
+        user_id: Quién quiere cancelarla.
+
+    Returns:
+        ``True`` si puede.
+    """
+    return trigger is SearchTrigger.MANUAL and owner_id == user_id
 
 
 class Stage(StrEnum):

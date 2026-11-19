@@ -34,6 +34,7 @@ import { useSearchHistory } from '../../hooks/useSearches';
 import { isFinished, type Search, subdivisionsOf } from '../../services/searches';
 import { useExplorerStore } from '../../store/explorer';
 import { type MissionSlot, useMandoStore } from '../../store/mando';
+import { useQuickSearchStore } from '../../store/quickSearch';
 import { latestRun, stageProgress } from '../Explore/format';
 import { RegionPicker } from '../Explore/RegionPicker';
 import { DateRange } from '../Explore/SearchPanel';
@@ -41,6 +42,7 @@ import { SourceSwitches } from '../Explore/SourceSwitches';
 import { KeepQuickSearch, QuickSearchBar } from '../Explore/QuickSearchBar';
 import { useSearchLauncher } from '../Explore/useSearchLauncher';
 import { CountUp } from '../ui/CountUp';
+import { CancelSearchButton } from './CancelSearchButton';
 import { MissionProgress } from './MissionProgress';
 import { TrackPicker } from './TrackPicker';
 import { MANDO_GLASS } from './ui';
@@ -504,6 +506,10 @@ export function MissionDock({ active }: MissionDockProps) {
   const editing = useMandoStore((s) => s.editing);
   const minimized = useMandoStore((s) => s.dockMinimized);
   const composing = !search || (finished && editing);
+  const lastQuick = useQuickSearchStore((s) => s.last);
+  // Al ajustar una búsqueda rápida, su texto vuelve a la barra para corregirlo.
+  const quickText =
+    editing && lastQuick && lastQuick.searchId === search?.search_id ? lastQuick.text : '';
 
   // Atajos de la consola.
   useEffect(() => {
@@ -563,6 +569,7 @@ export function MissionDock({ active }: MissionDockProps) {
           <span className="ml-auto">
             <MissionClock />
           </span>
+          <CancelSearchButton search={search} />
           <MinimizeButton />
         </header>
         <MissionProgress search={search} />
@@ -578,7 +585,9 @@ export function MissionDock({ active }: MissionDockProps) {
       >
         <span aria-hidden="true" className="mando-beam" />
         <span aria-hidden="true" className="hud-dot hud-dot--live" />
-        <span className="mando-kicker">Consulta activa</span>
+        <span className="mando-kicker">
+          {search.status === 'cancelled' ? 'Consulta cancelada' : 'Consulta activa'}
+        </span>
         <p className="min-w-0 flex-1 truncate text-[13px] text-slate-100">
           {missionLabel(search)} · {search.results_count} notas
         </p>
@@ -647,7 +656,13 @@ export function MissionDock({ active }: MissionDockProps) {
         </header>
         {/* ADR-0110: o escribir lo que se busca, como en Google, sin concepto. */}
         <div className="mando-console-quick">
-          <QuickSearchBar providers={launcher.quickProviders} busy={launcher.busy} />
+          <QuickSearchBar
+            // Otra búsqueda rápida que ajustar: la barra arranca con su texto.
+            key={quickText}
+            providers={launcher.quickProviders}
+            busy={launcher.busy}
+            initialText={quickText}
+          />
         </div>
         <div className="mando-console-grid">
           <MissionScope ready={Boolean(launcher.input) && !launcher.blocked} />

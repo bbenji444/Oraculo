@@ -44,6 +44,7 @@ const STATUS_LABEL: Record<Search['status'], { text: string; tone: ChipTone; liv
   completed: { text: 'Terminada', tone: 'green' },
   partial: { text: 'Parcial', tone: 'amber' },
   failed: { text: 'Falló', tone: 'rose' },
+  cancelled: { text: 'Cancelada', tone: 'slate' },
 };
 
 // Las entradas escalonadas se cortan aquí: una lista larga no debe tardar en aparecer.

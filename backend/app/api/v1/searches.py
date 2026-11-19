@@ -41,10 +41,12 @@ from app.application.ports.search_queue import SearchQueuePort
 from app.application.ports.search_reads import (
     ArticleFilters,
     InRegion,
+    SearchCancelPort,
     SearchReaderPort,
     SearchTrashPort,
 )
 from app.application.ports.search_store import SearchStorePort
+from app.application.use_cases.cancel_search import CancelSearch
 from app.application.use_cases.plan_search import PlanSearch, SearchRequest
 from app.application.use_cases.quick_search import (
     QUICK_DEFAULT_SOURCES,
@@ -329,6 +331,37 @@ Trash = Annotated[SearchTrashPort, Depends(get_search_trash)]
 async def delete_search(trash: Trash, actor: CurrentActor, search_id: SearchId) -> Response:
     """La quita del historial de forma reversible; sus notas siguen en el sistema."""
     await DeleteSearch(trash).execute(search_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def get_search_canceller(request: Request) -> SearchCancelPort:
+    """Cancelar búsquedas (el mismo repositorio de búsquedas).
+
+    Args:
+        request: Petición actual.
+
+    Returns:
+        El repositorio compartido.
+    """
+    searches: SearchCancelPort = request.app.state.search_store
+    return searches
+
+
+Canceller = Annotated[SearchCancelPort, Depends(get_search_canceller)]
+
+
+@router.post(
+    "/{search_id}/cancel",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Cancelar una búsqueda que todavía corre",
+    responses=error_responses(403, 404, 409),
+)
+async def cancel_search(canceller: Canceller, actor: CurrentActor, search_id: SearchId) -> Response:
+    """La detiene: el worker para en su siguiente revisión y guarda lo gastado.
+
+    Solo quien la lanzó, y solo búsquedas manuales. Si ya terminó, 409.
+    """
+    await CancelSearch(canceller).execute(search_id, actor)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

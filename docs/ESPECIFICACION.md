@@ -292,7 +292,7 @@ Todas las tablas tienen `created_at` y `updated_at` (`timestamptz`, UTC) salvo q
 - `user_id`
 - `region_id`
 - `date_from`, `date_to`
-- `status` enum(`pending`, `running`, `completed`, `partial`, `failed`)
+- `status` enum(`pending`, `running`, `completed`, `partial`, `failed`, `cancelled`). `cancelled`: quien la lanzó la detuvo (ADR-0118).
 - `progress` jsonb (etapa actual y conteos)
 - `queries_planned`
 - `credits_estimated`, `credits_used`

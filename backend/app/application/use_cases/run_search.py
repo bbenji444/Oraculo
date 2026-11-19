@@ -130,6 +130,10 @@ class SearchNotFoundError(NotFoundError):
     code = "search_not_found"
 
 
+class _SearchCancelledError(Exception):
+    """Quien lanzó la búsqueda la canceló: el pipeline deja de trabajar."""
+
+
 def strict_window(search: StoredSearch) -> RunWindow:
     """El periodo estricto de una búsqueda: lo publicado fuera no cuenta.
 
@@ -435,6 +439,8 @@ class _Tally:
     errors: list[str] = field(default_factory=list)
     # Títulos de muestra junto a un conteo de ``extra`` (``off_core_samples``).
     samples: dict[str, list[str]] = field(default_factory=dict)
+    # Lo que respondieron los proveedores: si se cancela, sus créditos se cobran.
+    execution: ExecutionResult | None = None
 
     def as_json(self) -> dict[str, object]:
         return {
@@ -531,6 +537,10 @@ class RunSearch:
         Returns:
             El resumen.
 
+        Si quien la lanzó la cancela, se detiene en la siguiente etapa o antes de
+        la siguiente nota de la IA, y la cierra como ``cancelled`` con lo que
+        alcanzó a gastar.
+
         Raises:
             SearchNotFoundError: Si no existe.
         """
@@ -540,9 +550,17 @@ class RunSearch:
         await self._searches.start(search_id)
         tally = _Tally()
         try:
+            return await self._stages(search, tally)
+        except _SearchCancelledError:
+            return await self._close_cancelled(search, tally)
+
+    async def _stages(self, search: StoredSearch, tally: _Tally) -> SearchReport:
+        search_id = search.search_id
+        try:
             searched, queries = await self._plan(search)
             await self._progress(search_id, tally, Stage.QUERY)
             execution = await self._executor.execute(queries, search_id)
+            tally.execution = execution
         except DomainError as error:
             tally.errors.append(error.message)
             await self._searches.record_error(
@@ -559,16 +577,30 @@ class RunSearch:
         work = await self._dedupe(search, tally, execution)
         _trace_origins(work, execution)
         pending = await self._extract(search, tally, work)
-        await self._enrich(search, tally, pending, work)
+        try:
+            await self._enrich(search, tally, pending, work)
+        except _SearchCancelledError:
+            # Lo que la IA ya leyó está pagado: se guarda (con sus lugares) para
+            # que la búsqueda corregida lo reutilice sin pagarlo otra vez.
+            await self._save_enriched(pending, searched)
+            raise
         work = self._drop_older_events(search, tally, work)
         await self._geolocate(search, tally, work, searched)
         return await self._close(search, tally, execution, work, searched)
 
-    async def _progress(self, search_id: UUID, tally: _Tally, stage: Stage) -> None:
+    async def _progress(
+        self, search_id: UUID, tally: _Tally, stage: Stage, *, check: bool = True
+    ) -> None:
+        if check:
+            await self._stop_if_cancelled(search_id)
         tally.stage = stage
         progress = tally.as_json()
         await self._searches.set_progress(search_id, progress)
         self._log_progress(search_id, progress)
+
+    async def _stop_if_cancelled(self, search_id: UUID) -> None:
+        if await self._searches.is_cancelled(search_id):
+            raise _SearchCancelledError
 
     async def _plan(self, search: StoredSearch) -> tuple[Place, list[PlannedQuery]]:
         facts = await self._regions.place_facts(search.region_id)
@@ -609,9 +641,13 @@ class RunSearch:
             )
             tally.extra["outside_window"] = before - len(found)
         unique = dedupe(found, self._similarity)
+        # En «Todo el mundo» esta etapa tardó 80 s (PC de desarrollo, 19/11/2026): se
+        # revisa la cancelación entre sus pasos, antes de guardar nada.
+        await self._stop_if_cancelled(search.search_id)
         # Nivel 2 de duplicados (ADR-0025): la misma nota que ya se guardó en
         # otra búsqueda con otro link se reutiliza, con su IA ya pagada.
         candidates = await self._articles.known_like(unique)
+        await self._stop_if_cancelled(search.search_id)
         for item, known in zip(unique, candidates, strict=True):
             match = match_known(item, known, self._similarity)
             item.known_id = match.article_id if match else None
@@ -824,8 +860,15 @@ class RunSearch:
         semaphore = asyncio.Semaphore(self._limits.llm_concurrency)
         failures: list[str] = []
         done = 0
+        stop = asyncio.Event()
 
         async def one(w: _Work, text: ArticleText) -> None:
+            try:
+                await judge(w, text)
+            except _SearchCancelledError:
+                stop.set()
+
+        async def judge(w: _Work, text: ArticleText) -> None:
             nonlocal done
             article = w.item.article
             unconfirmed, context = judge_hints(entities, article.title, article.snippet, notes)
@@ -841,6 +884,11 @@ class RunSearch:
             )
             try:
                 async with semaphore:
+                    # Una nota de la IA tarda segundos y cuesta: se revisa antes
+                    # de cada una, no solo entre etapas.
+                    if stop.is_set():
+                        return
+                    await self._stop_if_cancelled(search.search_id)
                     w.result = await self._llm.enrich(request)
             except EnrichmentError as error:
                 tally.usage += error.usage
@@ -856,6 +904,9 @@ class RunSearch:
                 await self._progress(search.search_id, tally, Stage.ENRICH)
 
         await asyncio.gather(*(one(w, w.text) for w in pending if w.text is not None))
+        if stop.is_set():
+            tally.extra["enriched"] = done
+            raise _SearchCancelledError
         tally.extra["enriched"] = done
         tally.stages[Stage.ENRICH] = StageCount(Stage.ENRICH, len(pending), len(failures))
         if failures:
@@ -890,16 +941,22 @@ class RunSearch:
     ) -> None:
         """Resuelve los lugares de las notas recién enriquecidas y lee los de las reutilizadas."""
         await self._progress(search.search_id, tally, Stage.GEOCODE)
-        geocoded = 0
+        geocoded = await self._save_enriched(work, searched)
+        for w in work:
+            if w.result is None and w.stored.primary_code is not None:
+                w.primary = await self._gazetteer.by_code(w.stored.primary_code)
+        tally.stages[Stage.GEOCODE] = StageCount(Stage.GEOCODE, geocoded, 0)
+
+    async def _save_enriched(self, work: Sequence[_Work], searched: Place) -> int:
+        """Ubica y guarda las notas que la IA acaba de leer; devuelve cuántas."""
+        saved = 0
         for w in work:
             if w.result is not None:
                 w.resolutions = await self._geocoder.run(w.result.enrichment.locations, searched)
                 await self._articles.save_enrichment(w.stored.article_id, w.result, w.resolutions)
                 w.primary = next((r.place for r in w.resolutions if r.is_primary), None)
-                geocoded += 1
-            elif w.stored.primary_code is not None:
-                w.primary = await self._gazetteer.by_code(w.stored.primary_code)
-        tally.stages[Stage.GEOCODE] = StageCount(Stage.GEOCODE, geocoded, 0)
+                saved += 1
+        return saved
 
     async def _classify(self, search: StoredSearch, tally: _Tally, work: list[_Work]) -> None:
         """Clasifica por categoría las notas encontradas (F12.4, ADR-0029).
@@ -948,6 +1005,51 @@ class RunSearch:
                 )
             )
 
+    async def _close_cancelled(self, search: StoredSearch, tally: _Tally) -> SearchReport:
+        """Cierra como ``cancelled``: guarda lo gastado, no las notas a medias.
+
+        Las notas que ya se guardaron y enriquecieron se quedan en el índice
+        (sirven para la siguiente búsqueda sin pagar otra vez), pero la
+        búsqueda no las liga: no tienen ubicación ni juicio completo.
+        """
+        outcomes = tally.execution.outcomes if tally.execution else ()
+        spent = tally.execution.credits_used if tally.execution else 0
+        cost = tally.usage.cost_usd(
+            self._limits.price_input_per_million, self._limits.price_output_per_million
+        )
+        summary = "Cancelada por quien la lanzó."
+        await self._searches.finish(
+            search.search_id,
+            SearchClosing(
+                status=SearchStatus.CANCELLED,
+                progress=tally.as_json(),
+                credits_used=spent,
+                llm_usage=tally.usage,
+                llm_cost_usd=cost,
+                results_count=0,
+                error_summary=summary,
+                queries_executed=_queries_executed(outcomes),
+            ),
+            Actor(search.user_id),
+        )
+        return SearchReport(
+            search_id=search.search_id,
+            status=SearchStatus.CANCELLED,
+            articles=0,
+            reused=tally.extra.get("reused", 0),
+            enriched=tally.extra.get("enriched", 0),
+            enrich_failed=0,
+            fallback=tally.extra.get("fallback", 0),
+            skipped_by_cap=tally.extra.get("skipped_by_cap", 0),
+            in_region=0,
+            out_of_region=0,
+            unlocated=0,
+            credits_used=spent,
+            llm_usage=tally.usage,
+            llm_cost_usd=cost,
+            error_summary=summary,
+        )
+
     async def _close(
         self,
         search: StoredSearch,
@@ -988,7 +1090,10 @@ class RunSearch:
             self._limits.price_input_per_million, self._limits.price_output_per_million
         )
         summary = " ".join(tally.errors) or None
-        await self._progress(search.search_id, tally, Stage.CLOSE)
+        # Desde «filter» ya no se revisa la cancelación: la IA está pagada y las
+        # notas ligadas; cortar aquí dejaría vínculos con 0 notas (revisión del
+        # 19/11/2026). Si la cancelan ahora, queda cancelada con lo que encontró.
+        await self._progress(search.search_id, tally, Stage.CLOSE, check=False)
         spent = execution.credits_used if execution else 0
         await self._searches.finish(
             search.search_id,
@@ -1000,19 +1105,12 @@ class RunSearch:
                 llm_cost_usd=cost,
                 results_count=len(work),
                 error_summary=summary,
-                queries_executed=tuple(
-                    {
-                        "provider": o.query.provider.value,
-                        "text": o.query.text,
-                        "status": o.status,
-                        "credits": o.credits,
-                        "results": len(o.articles),
-                    }
-                    for o in outcomes
-                ),
+                queries_executed=_queries_executed(outcomes),
             ),
             Actor(search.user_id),
         )
+        if await self._searches.is_cancelled(search.search_id):
+            status = SearchStatus.CANCELLED
         return SearchReport(
             search_id=search.search_id,
             status=status,
@@ -1030,3 +1128,17 @@ class RunSearch:
             llm_cost_usd=cost,
             error_summary=summary,
         )
+
+
+def _queries_executed(outcomes: Sequence[QueryOutcome]) -> tuple[Mapping[str, object], ...]:
+    """Las consultas enviadas, para la bitácora (CLAUDE.md §8)."""
+    return tuple(
+        {
+            "provider": o.query.provider.value,
+            "text": o.query.text,
+            "status": o.status,
+            "credits": o.credits,
+            "results": len(o.articles),
+        }
+        for o in outcomes
+    )

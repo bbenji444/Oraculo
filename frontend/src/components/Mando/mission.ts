@@ -346,7 +346,8 @@ export function recentMissions(history: readonly Search[], limit = RECENT_MISSIO
   const result: Search[] = [];
   for (const search of history) {
     if (search.trigger === 'automatic') continue;
-    if (search.status === 'failed' || !isFinished(search.status)) continue;
+    if (search.status === 'failed' || search.status === 'cancelled') continue;
+    if (!isFinished(search.status)) continue;
     if (search.results_count === 0) continue;
     const key = [
       search.region_id,
@@ -432,7 +433,9 @@ export function missionLog(
     lines.push(
       search.status === 'failed'
         ? 'Barrido interrumpido'
-        : `Barrido completo: ${String(search.results_count)} notas`,
+        : search.status === 'cancelled'
+          ? 'Barrido cancelado'
+          : `Barrido completo: ${String(search.results_count)} notas`,
     );
   }
   return lines;

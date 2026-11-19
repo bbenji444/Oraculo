@@ -9,6 +9,7 @@ import {
   getArticle,
   getSearch,
   isFinished,
+  isSettled,
   listAllArticles,
   listSearches,
   type Search,
@@ -186,12 +187,21 @@ describe('servicio de búsquedas', () => {
     await expect(listAllArticles('x', {})).rejects.toMatchObject({ code: 'bad_format' });
   });
 
+  it('una cancelada se sigue leyendo hasta que el worker guarda lo gastado', () => {
+    expect(isSettled({ status: 'cancelled', finished_at: null })).toBe(false);
+    expect(isSettled({ status: 'cancelled', finished_at: '2026-11-19T17:19:20Z' })).toBe(true);
+    expect(isSettled({ status: 'completed', finished_at: '2026-11-19T17:19:20Z' })).toBe(true);
+    expect(isSettled({ status: 'running', finished_at: null })).toBe(false);
+  });
+
   it('sabe cuándo terminó una búsqueda', () => {
     expect(isFinished('running')).toBe(false);
     expect(isFinished('pending')).toBe(false);
-    expect(['completed', 'partial', 'failed'].every((s) => isFinished(s as Search['status']))).toBe(
-      true,
-    );
+    expect(
+      ['completed', 'partial', 'failed', 'cancelled'].every((s) =>
+        isFinished(s as Search['status']),
+      ),
+    ).toBe(true);
   });
 
   it('junta los avisos de Google web: el del lanzamiento y el del worker, sin repetir', () => {

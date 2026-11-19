@@ -26,6 +26,9 @@ REPORT_GENERATED = "report.generated"
 # Quitar una búsqueda del historial (reversible) y devolverla (27/10/2026).
 SEARCH_DELETED = "search.deleted"
 SEARCH_RESTORED = "search.restored"
+# Quien la lanzó detuvo la búsqueda a medio camino (19/11/2026). Lo gastado
+# queda en su ``search.finished``, con estado ``cancelled``.
+SEARCH_CANCELLED = "search.cancelled"
 # Cambio del horario único de las corridas (ADR-0040).
 SCHEDULE_UPDATED = "schedule.updated"
 

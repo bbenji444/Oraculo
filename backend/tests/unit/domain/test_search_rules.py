@@ -6,8 +6,10 @@ from app.domain.geocoding import seat_area
 from app.domain.region import RegionLevel
 from app.domain.search import (
     SearchStatus,
+    SearchTrigger,
     Stage,
     StageCount,
+    can_cancel_search,
     final_status,
     in_region,
     outlet_country,
@@ -104,3 +106,16 @@ def test_en_el_mundo_toda_nota_ubicada_esta_dentro() -> None:
     assert in_region(None, world, "chilevision.cl") is None
     assert world.contains(cat.SPAIN)
     assert not world.contains(world)
+
+
+def test_una_busqueda_cancelada_ya_termino() -> None:
+    assert SearchStatus.CANCELLED.is_finished
+    assert not SearchStatus.RUNNING.is_finished
+    assert not SearchStatus.PENDING.is_finished
+
+
+def test_solo_quien_lanzo_una_busqueda_manual_la_cancela() -> None:
+    assert can_cancel_search("benji", SearchTrigger.MANUAL, "benji")
+    assert not can_cancel_search("benji", SearchTrigger.MANUAL, "otra-analista")
+    # La corrida automática alimenta el reporte y los envíos de todos.
+    assert not can_cancel_search("benji", SearchTrigger.AUTOMATIC, "benji")

@@ -102,6 +102,7 @@ export function stageProgress(progress: SearchProgress, status: Search['status']
   if (status === 'completed' || status === 'partial')
     return { label: 'Terminada', percent: PERCENT };
   if (status === 'failed') return { label: 'No se pudo completar', percent: PERCENT };
+  if (status === 'cancelled') return { label: 'Cancelada', percent: PERCENT };
   const stage = progress.stage ?? 'plan';
   const index = Math.max(0, STAGES.indexOf(stage));
   let within = 0;
@@ -207,6 +208,8 @@ export function formatRange(from: string, to: string): string {
 export interface FinishNotice {
   tone: 'ok' | 'warn' | 'error';
   text: string;
+  /** Título del letrero sobre el globo cuando el tono no basta («Barrido cancelado»). */
+  title?: string;
 }
 
 /**
@@ -219,6 +222,12 @@ export interface FinishNotice {
 export function finishNotice(search: Pick<Search, 'status' | 'results_count'>): FinishNotice {
   const notes = `${String(search.results_count)} ${search.results_count === 1 ? 'nota' : 'notas'}`;
   if (search.status === 'failed') return { tone: 'error', text: 'La búsqueda falló' };
+  if (search.status === 'cancelled')
+    return {
+      tone: 'warn',
+      title: 'Barrido cancelado',
+      text: 'Búsqueda cancelada: ajusta la consulta y lánzala de nuevo',
+    };
   if (search.status === 'partial')
     return { tone: 'warn', text: `Búsqueda lista con avisos: ${notes}` };
   return { tone: 'ok', text: `Búsqueda lista: ${notes}` };
