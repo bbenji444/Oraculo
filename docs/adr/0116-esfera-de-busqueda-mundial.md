@@ -1,6 +1,6 @@
 # ADR-0116: Esfera de búsqueda en «Todo el mundo»
 
-- **Estado:** propuesto (18/11/2026), en espera de que Benji lo vea en pantalla.
+- **Estado:** aceptado (19/11/2026, Benji: «Sí, apruébalos»; propuesto el 18/11/2026).
 - **Fase:** F12.
 
 ## Contexto

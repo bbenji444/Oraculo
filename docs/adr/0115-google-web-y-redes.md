@@ -1,6 +1,6 @@
 # ADR-0115: Google web y redes sociales, con la plataforma de cada nota
 
-- **Estado:** propuesto (18/11/2026), falta el visto bueno de Benji.
+- **Estado:** aceptado (19/11/2026, Benji: «Sí, apruébalos»; propuesto el 18/11/2026).
 - **Fase:** F12 (búsqueda «casi tan natural como Google», punto 3, parte del servidor). La pantalla está en el [ADR-0117](0117-plataformas-y-no-relevantes-en-pantalla.md).
 
 ## Contexto

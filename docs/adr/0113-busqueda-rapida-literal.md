@@ -1,6 +1,6 @@
 # ADR-0113: La búsqueda rápida busca lo que escribió el analista
 
-- **Estado:** propuesto (18/11/2026, falta que Benji lo apruebe).
+- **Estado:** aceptado (19/11/2026, Benji: «Sí, apruébalos»; propuesto el 18/11/2026).
 - **Fase:** F12.
 - **Ajusta:** ADR-0110 (D2, el nombre y las frases del concepto oculto los ponía la IA) y ADR-0109 (prompt `terms_v2`).
 

@@ -1,6 +1,6 @@
 # ADR-0117: Plataformas y «No relevantes» en pantalla
 
-- **Estado:** propuesto (18/11/2026), falta el visto bueno de Benji.
+- **Estado:** aceptado (19/11/2026, Benji: «Sí, apruébalos»; propuesto el 18/11/2026).
 - **Fase:** F12 (búsqueda «casi tan natural como Google», puntos 3 y 4, parte de la pantalla).
 
 ## Contexto
