@@ -32,8 +32,17 @@ La cúpula (`map/radar/dome.ts`, 11/11/2026) se pensó para una zona. Con «Mund
      - el borde «respira»;
      - cada nota encendida enciende un ping (un anillo que se abre, con un destello al nacer).
    - **Al terminar (0.9 s):** destello, la esfera se expande a 1.5 veces su altura y se desvanece. Luego se quita la capa y queda el letrero «BARRIDO COMPLETO», que ya existía y aparece al mismo tiempo, con su propio desvanecido.
-4. **Los pings nacen en la cara visible**, a menos de 50° del centro de la vista en el momento en que llega la nota. Siguen una espiral de girasol con lugares fijos: no brincan al llegar más y quedan a 15.7° entre sí como mínimo (medido). Son decorativos: van sobre el vidrio y no bajan columnas al suelo, para que no parezcan ubicaciones de notas.
-5. **La cámara no se toca:** nada de vuelo, nada de inclinación a 60° y nada de enderezar al final. El globo sigue en su vista general y gira dentro de la esfera.
+4. **Los pings cubren todo el planeta** (revisión del 19/11/2026). Benji: «esos puntos de la esfera solo aparecen en una parte del globo. Quiero que aparezcan en todo el globo».
+   - Antes nacían a menos de 50° del centro de la vista: el 18 % del planeta, y con un tope de 18.
+   - Ahora hay 40 lugares fijos (`SHELL_SPOTS`) en una espiral de Fibonacci entre 55° N y 55° S (`globeSpots`). Desde cualquier punto de esa franja, el lugar más cercano queda a menos de 30°, y entre dos lugares hay más de 15°, así que los discos no se enciman.
+   - Hay un ping por nota encontrada, hasta 40. Cada ping se enciende cuando el giro trae su lugar a menos de 60° de longitud del centro de la vista (`spotsInView`, en cada `move` de la cámara), empezando por el más cercano al centro. Así se ve nacer, que era la razón para ponerlos al frente, y una vuelta los enciende todos.
+   - Los que ya están no se mueven.
+   - Son decorativos: van sobre el vidrio y no bajan columnas al suelo, para que no parezcan ubicaciones de notas.
+5. **La cámara no vuela ni se inclina:** nada de vuelo, nada de inclinación a 60° y nada de enderezar al final. El globo sigue en su vista general y gira dentro de la esfera.
+   - **El giro está garantizado mientras busca** (revisión del 19/11/2026; Benji: «aparte esté girando mientras hacemos la búsqueda»). El radar prende el giro de siempre una vez por búsqueda, porque elegir «Mundo», tocar el globo o recargar la página lo detenían.
+   - Mientras busca, el globo gira 3 veces más rápido (`SEARCH_SPIN_BOOST`, `searchSpin` en el store): una vuelta en 50 s con «movimiento lento».
+   - Tocar el globo lo sigue deteniendo, y con «Menos movimiento» no gira.
+   - El overlay no mueve la cámara: la mueve el mismo giro de `ExploreGlobe`.
 6. **Letreros:**
    - sobre el borde de arriba de la esfera, «Barrido en curso · Todo el mundo» con «Cobertura global · noticias en español» en lugar de coordenadas (se oculta en celular, como las coordenadas);
    - debajo, la etapa y las notas detectadas;
@@ -62,7 +71,7 @@ La cúpula (`map/radar/dome.ts`, 11/11/2026) se pensó para una zona. Con «Mund
 - En «Todo el mundo» el analista ve que se busca en el planeta entero, sin que la cámara se mueva a un lugar que no significa nada.
 - Rendimiento, medido el 18/11/2026 en Intel UHD Graphics (video integrado, D3D11) con el lienzo a 1600 × 1000:
   - `map.redraw()` más `gl.finish()`, 400 cuadros con la esfera y 18 pings contra 400 sin ella: mediana de 2.5 ms en ambos casos (60 fps son 16.7 ms por cuadro);
-  - la malla tiene ~4,700 vértices, más ~300 por ping;
+  - la malla tiene ~4,700 vértices, más ~300 por ping (con 40 pings, ~12,000 más; revisión del 19/11/2026);
   - en «Mundo» el globo ya redibuja cada cuadro por el giro, así que la esfera casi no suma.
 - La capa depende de dos convenciones internas de maplibre-gl 6.14.0, documentadas en el código y en `shell.test.ts`: la esfera unitaria con `y` al norte y la longitud 0 en `+z`, y el plano de recorte `[n, −1/D]`. Hay que revisarlas al actualizar maplibre-gl.
 - Si el estilo se recarga por completo a media búsqueda (no un cambio con `diff`), MapLibre quita las capas propias y la esfera no vuelve hasta la siguiente búsqueda. Con la cúpula pasa lo mismo. El cambio día/noche usa `diff` y se comprobó que la esfera sigue.

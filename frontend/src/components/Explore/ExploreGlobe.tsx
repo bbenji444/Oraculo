@@ -82,6 +82,7 @@ import {
   GLOBE_BEARING,
   REGION_BEARING,
   SPIN_STEP_MS,
+  spinBoost,
   spinDegrees,
   spinStepMs,
 } from '../../map/spin';
@@ -355,6 +356,7 @@ export function ExploreGlobe({
   const articleId = useExplorerStore((s) => s.articleId);
   const articleRequest = useExplorerStore((s) => s.articleRequest);
   const spinning = useExplorerStore((s) => s.spinning);
+  const searchSpin = useExplorerStore((s) => s.searchSpin);
   const earth = useExplorerStore((s) => s.earth);
   const motion = useExplorerStore((s) => s.motion);
   const homeRequest = useExplorerStore((s) => s.homeRequest);
@@ -371,6 +373,7 @@ export function ExploreGlobe({
   // El mapa vive fuera de React: lee estos refs dentro de sus eventos.
   const motionRef = useRef<MotionPreset>(motion);
   const spinningRef = useRef(spinning);
+  const searchSpinRef = useRef(searchSpin);
   const activeRef = useRef(active);
   const spinStartRef = useRef(0);
   // Si el movimiento en curso es un paso del giro (para pausarlo al instante).
@@ -416,6 +419,10 @@ export function ExploreGlobe({
     motionRef.current = motion;
     selectedRef.current = selected;
   }, [motion, selected]);
+  // El siguiente paso del giro ya toma el ritmo de búsqueda (o lo deja).
+  useEffect(() => {
+    searchSpinRef.current = searchSpin;
+  }, [searchSpin]);
 
   // --- Creación del mapa ---------------------------------------------------
   useEffect(() => {
@@ -482,7 +489,11 @@ export function ExploreGlobe({
       const elapsed = performance.now() - spinStartRef.current;
       const ramp = Math.max(MIN_SPIN_RAMP, spinRamp(elapsed));
       const stepMs = spinStepMs(elapsed, SPIN_RAMP_MS);
-      const degrees = spinDegrees(map.getZoom(), stepMs) * spinFactor(motionRef.current) * ramp;
+      const degrees =
+        spinDegrees(map.getZoom(), stepMs) *
+        spinFactor(motionRef.current) *
+        spinBoost(searchSpinRef.current) *
+        ramp;
       if (degrees === 0) return;
       const center = map.getCenter();
       spinAnimatingRef.current = true;

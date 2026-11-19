@@ -24,6 +24,14 @@ export const MAX_SPIN_ZOOM = 4;
 // detenerse de golpe.
 export const SLOW_SPIN_ZOOM = 3;
 
+/**
+ * Mientras busca en «Todo el mundo», el globo gira este número de veces más
+ * rápido (Benji, 19/11/2026: «que esté girando mientras hacemos la
+ * búsqueda»). Con «movimiento lento» (×0.6) da una vuelta en 50 s, así una
+ * búsqueda normal alcanza a encender los pings de todo el planeta.
+ */
+export const SEARCH_SPIN_BOOST = 3;
+
 const DEGREES_PER_REVOLUTION = 360;
 const MS_PER_SECOND = 1000;
 
@@ -81,3 +89,14 @@ export const GLOBE_TILT_DEGREES = 15;
 export const GLOBE_BEARING = -GLOBE_TILT_DEGREES;
 // Al acercarse a una región el mapa se endereza: así se lee con el norte arriba.
 export const REGION_BEARING = 0;
+
+/**
+ * Cuánto se acelera el giro.
+ *
+ * @param searching Si hay una búsqueda en «Todo el mundo» corriendo.
+ * @returns {@link SEARCH_SPIN_BOOST} mientras busca; 1 si no.
+ * @example spinBoost(true) // 3
+ */
+export function spinBoost(searching: boolean): number {
+  return searching ? SEARCH_SPIN_BOOST : 1;
+}

@@ -99,7 +99,7 @@ const RIPPLE_RADIUS_SHARE = 0.09;
 const RIPPLE_SEGMENTS = 32;
 const RIPPLE_RINGS = 6;
 // Si llegan varias notas de golpe, se encienden una tras otra (segundos).
-const CONTACT_STAGGER_S = 0.18;
+export const CONTACT_STAGGER_S = 0.18;
 
 // Qué es cada vértice (va en el shader como número).
 const KIND_DOME = 0;

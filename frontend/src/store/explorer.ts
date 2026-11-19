@@ -65,6 +65,11 @@ export interface ExplorerState {
   earth: EarthMode;
   motion: MotionPreset;
   spinning: boolean;
+  /**
+   * Hay una búsqueda en «Todo el mundo» corriendo: el globo gira más rápido
+   * (`spinBoost`). No se guarda: lo prende y apaga el radar de la búsqueda.
+   */
+  searchSpin: boolean;
   /** Último caso al que se agregó una nota: va primero en «Agregar al caso» (9.3). */
   lastCaseId: string | null;
   /**
@@ -129,6 +134,7 @@ export interface ExplorerState {
   setEarth: (earth: EarthMode) => void;
   setMotion: (motion: MotionPreset) => void;
   setSpinning: (spinning: boolean) => void;
+  setSearchSpin: (searchSpin: boolean) => void;
   setLastCaseId: (caseId: string) => void;
   /** Elige las fuentes encendidas (la lista completa ya calculada). */
   setSources: (sources: string[]) => void;
@@ -261,6 +267,7 @@ export const useExplorerStore = create<ExplorerState>()(
       // "Menos movimiento" del sistema la apaga.
       motion: prefersReducedMotion() ? 'off' : 'slow',
       spinning: !prefersReducedMotion(),
+      searchSpin: false,
       lastCaseId: null,
       sources: null,
       sourcesChosen: false,
@@ -364,6 +371,9 @@ export const useExplorerStore = create<ExplorerState>()(
       },
       setSpinning: (spinning) => {
         set({ spinning });
+      },
+      setSearchSpin: (searchSpin) => {
+        set({ searchSpin });
       },
       setLastCaseId: (lastCaseId) => {
         set({ lastCaseId });

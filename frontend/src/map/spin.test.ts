@@ -7,7 +7,9 @@ import {
   MAX_SPIN_ZOOM,
   prefersReducedMotion,
   REGION_BEARING,
+  SEARCH_SPIN_BOOST,
   SLOW_SPIN_ZOOM,
+  spinBoost,
   spinDegrees,
   SPIN_CRUISE_STEP_MS,
   SPIN_STEP_MS,
@@ -71,5 +73,14 @@ describe('spinStepMs', () => {
     const perSecondShort = spinDegrees(1.8, SPIN_STEP_MS) / (SPIN_STEP_MS / 1000);
     const perSecondLong = spinDegrees(1.8, SPIN_CRUISE_STEP_MS) / (SPIN_CRUISE_STEP_MS / 1000);
     expect(perSecondLong).toBeCloseTo(perSecondShort);
+  });
+});
+
+describe('spinBoost', () => {
+  it('mientras busca en el mundo, el globo gira más rápido', () => {
+    expect(spinBoost(false)).toBe(1);
+    expect(spinBoost(true)).toBe(SEARCH_SPIN_BOOST);
+    // Con «movimiento lento» (×0.6) da una vuelta en menos de un minuto.
+    expect(90 / (0.6 * SEARCH_SPIN_BOOST)).toBeLessThan(60);
   });
 });
