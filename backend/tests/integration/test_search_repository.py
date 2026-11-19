@@ -25,7 +25,7 @@ from app.adapters.llm.factory import LLMSetup, MissingLLMKeyError
 from app.adapters.persistence.gazetteer_repository import PostgresGazetteer
 from app.adapters.persistence.regions_repository import PostgresRegionRepository
 from app.adapters.persistence.search_repository import PostgresArticleStore, PostgresSearchStore
-from app.application.ports.llm import EnrichmentError
+from app.application.ports.llm import EnrichmentError, EnrichmentRequest, EnrichmentResult
 from app.application.ports.search_reads import ArticleFilters, ArticleItem, HistoryScope
 from app.application.ports.search_store import NewSearch, SearchConcept
 from app.application.use_cases.execute_queries import ExecuteQueries, ExecutionLimits
@@ -892,3 +892,72 @@ async def test_la_corrida_guarda_sus_horas_y_sabe_desde_cuando_cubrir(
     assert loaded is not None
     assert loaded.time_window == window
     assert (detail.window_start, detail.window_end) == (night, morning)
+
+
+async def test_cancelar_detiene_la_busqueda_y_guarda_lo_gastado(
+    test_engine: AsyncEngine,
+    stores: tuple[PostgresSearchStore, PostgresArticleStore],
+    concept_id: int,
+) -> None:
+    # Benji, 19/11/2026: «por si me equivoqué en algo o necesito regresar y editar».
+    searches, articles = stores
+    search_id = await new_search(searches, test_engine, concept_id)
+
+    class CancelOnFirstNote(LLM):
+        async def enrich(self, request: EnrichmentRequest) -> EnrichmentResult:
+            # Cancela mientras la IA lee: las que siguen ya no se mandan.
+            await searches.cancel(search_id, actor_id="prueba", ip="127.0.0.1")
+            return await super().enrich(request)
+
+    report = await run_search(test_engine, searches, articles, CancelOnFirstNote(REPLIES)).run(
+        search_id
+    )
+
+    assert report.status is SearchStatus.CANCELLED
+    # Cancelar otra vez, o lo que hiciera el worker después, no la cambia.
+    assert not await searches.cancel(search_id, actor_id="prueba", ip=None)
+    await searches.start(search_id)
+    await searches.fail(search_id, "El worker se cayó.")
+    async with test_engine.connect() as conn:
+        row = (
+            (
+                await conn.execute(
+                    text(
+                        "SELECT status, credits_used, llm_tokens_in > 0 AS paid_ai, "
+                        "results_count, finished_at IS NOT NULL AS finished, error_summary "
+                        "FROM searches WHERE id = :id"
+                    ),
+                    {"id": search_id},
+                )
+            )
+            .mappings()
+            .one()
+        )
+        audit = (
+            await conn.execute(
+                text(
+                    "SELECT action, user_id, payload->>'estado', payload->>'creditos' "
+                    "FROM audit_log WHERE entity_type = 'search' AND entity_id = :id ORDER BY id"
+                ),
+                {"id": str(search_id)},
+            )
+        ).all()
+        linked = (
+            await conn.execute(
+                text("SELECT count(*) FROM search_results WHERE search_id = :id"),
+                {"id": search_id},
+            )
+        ).scalar_one()
+    assert dict(row) == {
+        "status": "cancelled",
+        "credits_used": 1,
+        "paid_ai": True,
+        "results_count": 0,
+        "finished": True,
+        "error_summary": "Cancelada por quien la lanzó.",
+    }
+    assert [tuple(a) for a in audit] == [
+        ("search.cancelled", "prueba", None, None),
+        ("search.finished", "prueba", "cancelled", "1"),
+    ]
+    assert linked == 0

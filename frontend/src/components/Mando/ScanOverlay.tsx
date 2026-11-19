@@ -516,8 +516,11 @@ function WorldRadar({
   fallback: CSSProperties;
 }) {
   const outline = useGlobeOnScreen(map);
-  const found = Math.min(search.progress.articles ?? 0, MAX_BLIPS);
-  const shell = useWorldShell(map, found);
+  const articles = search.progress.articles ?? 0;
+  const found = Math.min(articles, MAX_BLIPS);
+  // La esfera recibe todas: enciende un ping por nota hasta llenar sus
+  // lugares en todo el planeta (shell.ts, SHELL_SPOTS).
+  const shell = useWorldShell(map, articles);
   // Como en RegionRadar: si la región elegida no es «Mundo» (por ejemplo, al
   // volver con la búsqueda ya corriendo), se elige y el globo va a su vista general.
   const regionId = search.region_id;
@@ -525,6 +528,20 @@ function WorldRadar({
     const store = useExplorerStore.getState();
     if (store.regionId !== regionId) store.selectRegion(regionId);
   }, [regionId]);
+  // El globo gira mientras busca, más rápido que en reposo (Benji,
+  // 19/11/2026). Va después de elegir la región, que detiene el giro. Se
+  // prende una vez por búsqueda: si el analista toca el globo, se queda quieto;
+  // con «Menos movimiento», no gira. La cámara no se toca aquí: la mueve el
+  // giro de siempre (ExploreGlobe).
+  const searchId = search.search_id;
+  useEffect(() => {
+    const store = useExplorerStore.getState();
+    store.setSearchSpin(true);
+    if (store.motion !== 'off' && !store.spinning) store.setSpinning(true);
+    return () => {
+      useExplorerStore.getState().setSearchSpin(false);
+    };
+  }, [searchId]);
   const stage = STAGE_LABEL[search.progress.stage ?? 'plan'] ?? 'Preparando el barrido';
   const detected =
     found > 0 ? ` · ${String(search.progress.articles ?? found)} notas detectadas` : '';
@@ -610,7 +627,10 @@ export function ScanOverlay({ search, notice, right, bottom, map, regionBbox }: 
                     : 'text-rose-300'
               }`}
             >
-              <DecodeText text={BANNER_TITLE[notice.tone].toUpperCase()} onHover={false} />
+              <DecodeText
+                text={(notice.title ?? BANNER_TITLE[notice.tone]).toUpperCase()}
+                onHover={false}
+              />
             </p>
             <div aria-hidden="true" className="mando-banner-line" />
             <p className="font-display text-[11px] tracking-[0.3em] text-sky-200 uppercase">

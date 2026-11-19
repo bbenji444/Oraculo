@@ -169,12 +169,13 @@ describe('consultas recientes', () => {
     expect(missionLabel(search({ date_from: '2026-10-27' }))).toBe('FGR · Jalisco · 1 día');
   });
 
-  it('deja fuera las automáticas, las fallidas, las vacías y las repetidas', () => {
+  it('deja fuera las automáticas, las fallidas, las canceladas, las vacías y las repetidas', () => {
     const history = [
       search({ search_id: 'auto', trigger: 'automatic' }),
       search({ search_id: 'nueva' }),
       search({ search_id: 'repetida' }),
       search({ search_id: 'fallo', status: 'failed', region_id: 9 }),
+      search({ search_id: 'cancelada', status: 'cancelled', region_id: 21 }),
       search({ search_id: 'vacia', results_count: 0, region_id: 15 }),
       search({ search_id: 'corriendo', status: 'running', region_id: 16 }),
       search({ search_id: 'otra', region_id: 9, region_name: 'CDMX' }),

@@ -2,7 +2,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { angularDistance, MAX_CONTACTS } from './dome';
+import { angularDistance } from './dome';
 import {
   addWorldShell,
   CAMERA_FADE_FAR,
@@ -11,17 +11,20 @@ import {
   cameraFade,
   DISSOLVE_LIFT,
   DISSOLVE_S,
-  PING_SPREAD_DEG,
+  globeSpots,
+  type Ping,
   pingMesh,
-  pingSpot,
   REVEAL_S,
   SHELL_DAY_SHARE,
   SHELL_INTENSITY,
   SHELL_LAYER,
+  SHELL_SPOTS,
   shellEnvelope,
   shellIntensity,
   shellMesh,
   spherePoint,
+  SPOT_MAX_LAT_DEG,
+  VISIBLE_LNG_DEG,
 } from './shell';
 
 // Números por vértice: lng, lat, u, t, tipo, nacimiento y semilla.
@@ -59,33 +62,36 @@ describe('malla de la esfera', () => {
 });
 
 describe('pings (uno por nota encontrada)', () => {
-  it('nacen en la cara que se ve y no cambian de lugar al llegar más', () => {
-    const spots = Array.from({ length: MAX_CONTACTS }, (_, i) => pingSpot(ATLANTIC, i));
+  // Benji, 19/11/2026: «esos puntos de la esfera solo aparecen en una parte
+  // del globo. Quiero que aparezcan en todo el globo».
+  it('sus lugares cubren todo el planeta, no solo la cara que se ve', () => {
+    const spots = globeSpots();
 
-    expect(spots.slice(0, 5)).toEqual(Array.from({ length: 5 }, (_, i) => pingSpot(ATLANTIC, i)));
-    for (const spot of spots) {
-      expect(angularDistance(spot, ATLANTIC)).toBeLessThanOrEqual(PING_SPREAD_DEG + 1e-6);
-    }
-    // El primero nace casi al centro de la vista.
-    expect(angularDistance(spots[0] ?? ATLANTIC, ATLANTIC)).toBeLessThan(PING_SPREAD_DEG / 4);
-  });
-
-  it('no se amontonan, aunque la vista mire cerca de un polo', () => {
-    for (const center of [ATLANTIC, [0, 80], [120, -45]] as [number, number][]) {
-      const spots = Array.from({ length: MAX_CONTACTS }, (_, i) => pingSpot(center, i));
-      let closest = Number.POSITIVE_INFINITY;
-      spots.forEach((a, i) => {
-        spots.slice(i + 1).forEach((b) => {
-          closest = Math.min(closest, angularDistance(a, b));
-        });
-      });
-      // Medido: 15.7° entre los dos más cercanos (cada disco mide ~6° de radio).
-      expect(closest).toBeGreaterThan(12);
-      for (const spot of spots) {
-        // Siguen en la cara que se ve (el borde del globo queda a ~78° del centro).
-        expect(angularDistance(spot, center)).toBeLessThanOrEqual(PING_SPREAD_DEG + 1e-6);
+    expect(spots).toHaveLength(SHELL_SPOTS);
+    // Ningún punto de la franja queda lejos de un ping.
+    let farthest = 0;
+    for (let lat = -SPOT_MAX_LAT_DEG; lat <= SPOT_MAX_LAT_DEG; lat += 5) {
+      for (let lng = -180; lng < 180; lng += 5) {
+        const nearest = Math.min(...spots.map((spot) => angularDistance(spot, [lng, lat])));
+        farthest = Math.max(farthest, nearest);
       }
     }
+    expect(farthest).toBeLessThan(30);
+    for (const spot of spots) {
+      expect(Math.abs(spot[1])).toBeLessThanOrEqual(SPOT_MAX_LAT_DEG + 1e-6);
+    }
+  });
+
+  it('no se amontonan', () => {
+    const spots = globeSpots();
+    let closest = Number.POSITIVE_INFINITY;
+    spots.forEach((a, i) => {
+      spots.slice(i + 1).forEach((b) => {
+        closest = Math.min(closest, angularDistance(a, b));
+      });
+    });
+    // Cada disco mide ~6° de radio: a más de 15° no se enciman.
+    expect(closest).toBeGreaterThan(15);
   });
 
   it('cada disco lleva el segundo en que se encendió su ping', () => {
@@ -168,9 +174,34 @@ function toyMap() {
     }),
     getLayer: vi.fn((id: string) => layers.get(id)),
     triggerRepaint: vi.fn(),
-    getCenter: vi.fn(() => ({ lng: ATLANTIC[0], lat: ATLANTIC[1] })),
+    getCenter: vi.fn(() => ({ lng: center[0], lat: center[1] })),
+    on: vi.fn((event: string, handler: () => void) => {
+      handlers.set(event, handler);
+    }),
+    off: vi.fn((event: string) => {
+      handlers.delete(event);
+    }),
   };
-  return { map, asMap: map as unknown as MapLibreMap };
+  let center: [number, number] = ATLANTIC;
+  const handlers = new Map<string, () => void>();
+  /** Gira el globo hasta `next` (MapLibre avisa con «move»). */
+  const turnTo = (next: [number, number]) => {
+    center = next;
+    handlers.get('move')?.();
+  };
+  return { map, asMap: map as unknown as MapLibreMap, turnTo, handlers };
+}
+
+/** Los pings que la esfera le pasó a su capa la última vez. */
+function lastPings(map: ReturnType<typeof toyMap>['map']): readonly Ping[] {
+  const layer = map.layers.get(SHELL_LAYER) as { setPings: (pings: readonly Ping[]) => void };
+  const spy = vi.mocked(layer.setPings);
+  return spy.mock.calls.at(-1)?.[0] ?? [];
+}
+
+function spyPings(map: ReturnType<typeof toyMap>['map']): void {
+  const layer = map.layers.get(SHELL_LAYER) as { setPings: (pings: readonly Ping[]) => void };
+  vi.spyOn(layer, 'setPings');
 }
 
 describe('addWorldShell', () => {
@@ -229,5 +260,53 @@ describe('addWorldShell', () => {
     shell.remove();
     shell.setBlips(5);
     expect(map.getCenter).toHaveBeenCalledTimes(1);
+  });
+
+  it('solo enciende los lugares a la vista; los demás, cuando el giro los trae', () => {
+    const { map, asMap, turnTo, handlers } = toyMap();
+    const shell = addWorldShell(asMap);
+    spyPings(map);
+    // Llegan de golpe cientos de notas (la etapa «Fuentes»).
+    shell.setBlips(500);
+
+    const first = lastPings(map);
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.length).toBeLessThan(SHELL_SPOTS);
+    const lngGap = (spot: [number, number], lng: number) =>
+      Math.abs(((spot[0] - lng + 540) % 360) - 180);
+    for (const ping of first) {
+      expect(lngGap(ping.point, ATLANTIC[0])).toBeLessThanOrEqual(VISIBLE_LNG_DEG + 1e-6);
+    }
+    // El primero nace cerca del centro de la vista, para que se vea nacer.
+    expect(angularDistance(first[0]?.point ?? [0, -90], ATLANTIC)).toBeLessThan(25);
+
+    // Media vuelta: se encienden los del otro lado y los de antes no se mueven.
+    turnTo([145, 20]);
+    const later = lastPings(map);
+    expect(later.length).toBeGreaterThan(first.length);
+    expect(later.slice(0, first.length)).toEqual(first);
+    for (const ping of later.slice(first.length)) {
+      expect(lngGap(ping.point, 145)).toBeLessThanOrEqual(VISIBLE_LNG_DEG + 1e-6);
+    }
+
+    // Una vuelta completa los enciende todos, repartidos por el planeta.
+    for (let lng = 145; lng > -215; lng -= 30) turnTo([lng, 20]);
+    const all = lastPings(map);
+    expect(all).toHaveLength(SHELL_SPOTS);
+    expect(new Set(all.map((p) => p.point.join()))).toHaveProperty('size', SHELL_SPOTS);
+
+    shell.remove();
+    expect(handlers.has('move')).toBe(false);
+  });
+
+  it('nunca enciende más pings que notas encontradas', () => {
+    const { map, asMap, turnTo } = toyMap();
+    const shell = addWorldShell(asMap);
+    spyPings(map);
+    shell.setBlips(3);
+    for (let lng = 145; lng > -215; lng -= 30) turnTo([lng, 20]);
+
+    expect(lastPings(map)).toHaveLength(3);
+    shell.remove();
   });
 });

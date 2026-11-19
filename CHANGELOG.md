@@ -8,6 +8,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **«Cancelar búsqueda» mientras corre (19/11/2026, ADR-0118).** Benji: «tiene que estar la opción de cancelar búsqueda por si me equivoqué en algo o necesito regresar y editar».
+  - Botón en la consola del Centro de mando mientras dura el barrido. Al cancelar, la consola vuelve a «Ajustar consulta» con lo mismo que se pidió; en la búsqueda rápida, con el texto que se escribió.
+  - El worker se detiene entre etapas o antes de la siguiente nota de la IA y guarda lo gastado. La búsqueda queda en Historial como «Cancelada».
+  - Solo quien la lanzó, y solo las manuales: las corridas automáticas del monitor FGR no se cancelan.
+  - API: `POST /searches/{id}/cancel`, estado nuevo `cancelled` (migración 0050) y bitácora `search.cancelled`.
+
+- **La esfera de «Todo el mundo» se enciende en todo el planeta y el globo gira mientras busca (19/11/2026, revisión del ADR-0116).** Benji: «esos puntos de la esfera solo aparecen en una parte del globo. Quiero que aparezcan en todo el globo y aparte esté girando mientras hacemos la búsqueda».
+  - 40 lugares fijos repartidos entre 55° N y 55° S. Cada nota enciende uno cuando el giro lo trae al frente; antes eran 18 a menos de 50° del centro de la vista.
+  - Mientras busca, el globo gira 3 veces más rápido (una vuelta en 50 s), aunque se haya recargado la página. Tocarlo lo detiene y con «Menos movimiento» no gira.
+
 - **La búsqueda rápida busca lo que escribiste, tal cual (18/11/2026, ADR-0113, migración 0049).** Benji: «me cambia de Hacker Eternal a Hackeo Eternal, es decir, modifica mi búsqueda lo cual no debería de pasar».
   - Lo escrito es la primera consulta y el nombre de la búsqueda. Solo se le quita el lugar («en Jalisco»), «en todo el mundo», las fechas y las comillas. La IA agrega frases después (prompt `terms_v3`), sin cambiar el texto.
   - Los nombres propios del texto («Eternal», «LockBit», «Pemex») quedan como **términos obligatorios** (`required_terms`, columna nueva en conceptos y búsquedas). Las frases de la IA que no los llevan se tiran. Un lugar no cuenta como nombre.
@@ -149,6 +159,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
   - **Prueba real:** de 14 notas «relevantes» de una búsqueda quedaron 5, todas correctas, y se quitaron 8 notas basura.
 
 ### Corregido
+
+- **Las publicaciones de redes sin fecha ya se ven en la cronología (19/11/2026).** En la VM, «hackeo a bases de datos» en Mundo: la pestaña decía «Instagram 1» y la cronología «No hay notas con estos filtros». Google web casi no fecha las publicaciones de redes (0 de 4 de Facebook) y la cronología se saltaba las notas sin fecha. Ahora van al final, en «Sin fecha de publicación».
 
 - **Los menús desplegables se deslizan con fluidez (18/11/2026).** Benji: «no baja ni sube de manera fluida». Al girar la rueda o deslizar el dedo, el menú se recolocaba y regresaba la lista a la opción marcada. Ahora solo se recoloca si se mueve la página o un panel, no la propia lista. Pasaba en todos los menús de la consola (Estado, Municipio, filtros).
 

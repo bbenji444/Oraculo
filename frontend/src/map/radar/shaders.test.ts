@@ -86,6 +86,8 @@ function toyMap() {
     removeLayer: vi.fn(),
     triggerRepaint: vi.fn(),
     getCenter: vi.fn(() => ({ lng: -35, lat: 20 })),
+    on: vi.fn(),
+    off: vi.fn(),
   };
   return { asMap: map as unknown as MapLibreMap, layers };
 }

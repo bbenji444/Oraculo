@@ -141,6 +141,37 @@ class SearchTrashPort(Protocol):
         ...
 
 
+class SearchCancelPort(Protocol):
+    """Detener una búsqueda que todavía corre (19/11/2026)."""
+
+    async def ownership(self, search_id: UUID) -> SearchOwnership | None:
+        """De quién es la búsqueda (ver ``SearchTrashPort.ownership``).
+
+        Args:
+            search_id: Id.
+
+        Returns:
+            Dueño, origen y si está eliminada; ``None`` si no existe.
+        """
+        ...
+
+    async def cancel(self, search_id: UUID, *, actor_id: str, ip: str | None) -> bool:
+        """La pasa a ``cancelled`` si sigue en ``pending`` o ``running``.
+
+        Deja la bitácora en la misma transacción. El worker lo nota en su
+        siguiente revisión y se detiene.
+
+        Args:
+            search_id: Id.
+            actor_id: Quién la cancela.
+            ip: Desde dónde, si vino por HTTP.
+
+        Returns:
+            ``True`` si la canceló; ``False`` si ya había terminado.
+        """
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class HistoryScope:
     """Qué búsquedas muestra el historial.

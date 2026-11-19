@@ -34,10 +34,12 @@ interface QuickSearchBarProps {
   providers: string[] | undefined;
   /** Si ya hay una búsqueda corriendo: no se lanza otra encima. */
   busy: boolean;
+  /** Texto con que arranca: el de la búsqueda que se ajusta (cancelada o no). */
+  initialText?: string;
 }
 
-export function QuickSearchBar({ providers, busy }: QuickSearchBarProps) {
-  const [text, setText] = useState('');
+export function QuickSearchBar({ providers, busy, initialText = '' }: QuickSearchBarProps) {
+  const [text, setText] = useState(initialText);
   const regionId = useExplorerStore((s) => s.regionId);
   const range = useExplorerStore((s) => s.range);
   const openSearch = useExplorerStore((s) => s.openSearch);

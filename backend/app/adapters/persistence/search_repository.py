@@ -32,7 +32,7 @@ from app.adapters.persistence.article_rows import (
     article_item,
     location_view,
 )
-from app.application.audit import SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
+from app.application.audit import SEARCH_CANCELLED, SEARCH_FINISHED, SEARCH_REPROCESSED, Actor
 from app.application.pagination import TimeCursor
 from app.application.ports.llm import EnrichmentResult
 from app.application.ports.search_reads import (
@@ -250,7 +250,7 @@ class PostgresSearchStore:
             await conn.execute(
                 text(
                     "UPDATE searches SET status = 'running', started_at = now(), "
-                    "updated_at = now() WHERE id = :id"
+                    "updated_at = now() WHERE id = :id AND status <> 'cancelled'"
                 ),
                 {"id": search_id},
             )
@@ -265,6 +265,16 @@ class PostgresSearchStore:
                 ),
                 {"id": search_id, "p": _json(progress)},
             )
+
+    async def is_cancelled(self, search_id: UUID) -> bool:
+        """Ver ``SearchStorePort.is_cancelled``."""
+        async with self._engine.connect() as conn:
+            status = (
+                await conn.execute(
+                    text("SELECT status FROM searches WHERE id = :id"), {"id": search_id}
+                )
+            ).scalar()
+        return bool(status == SearchStatus.CANCELLED.value)
 
     async def record_error(self, error: ProcessingErrorRecord) -> None:
         """Ver ``SearchStorePort.record_error``."""
@@ -292,12 +302,16 @@ class PostgresSearchStore:
                 (
                     await conn.execute(
                         text(
-                            "UPDATE searches SET status = :status, progress = CAST(:p AS jsonb), "
+                            # Si la cancelaron después de la última revisión del
+                            # pipeline, gana la cancelación: en el SET, «status»
+                            # es el valor de antes.
+                            "UPDATE searches SET status = CASE WHEN status = 'cancelled' "
+                            "THEN status ELSE :status END, progress = CAST(:p AS jsonb), "
                             "credits_used = :credits, llm_tokens_in = :tin, "
                             "llm_tokens_out = :tout, llm_cost_usd = :cost, "
                             "results_count = :results, error_summary = :summary, "
                             "finished_at = now(), updated_at = now() WHERE id = :id "
-                            "RETURNING region_id, date_from, date_to, providers"
+                            "RETURNING status, region_id, date_from, date_to, providers"
                         ),
                         {
                             "id": search_id,
@@ -315,6 +329,8 @@ class PostgresSearchStore:
                 .mappings()
                 .one()
             )
+            if params["status"] != closing.status.value:
+                closing = replace(closing, status=SearchStatus(params["status"]))
             await _audit(conn, search_id, closing, actor, dict(params))
 
     async def fail(self, search_id: UUID, message: str) -> None:
@@ -328,7 +344,8 @@ class PostgresSearchStore:
             await conn.execute(
                 text(
                     "UPDATE searches SET status = 'failed', error_summary = :m, "
-                    "finished_at = now(), updated_at = now() WHERE id = :id"
+                    "finished_at = now(), updated_at = now() "
+                    "WHERE id = :id AND status <> 'cancelled'"
                 ),
                 {"id": search_id, "m": message[:MAX_ERROR_CHARS]},
             )
@@ -457,6 +474,36 @@ class PostgresSearchStore:
                     "ip": ip,
                 },
             )
+
+    async def cancel(self, search_id: UUID, *, actor_id: str, ip: str | None) -> bool:
+        """Ver ``SearchCancelPort.cancel``."""
+        async with self._engine.begin() as conn:
+            changed = (
+                await conn.execute(
+                    text(
+                        # Sin finished_at: lo pone el worker al detenerse y
+                        # guardar lo gastado; la pantalla espera a verlo.
+                        "UPDATE searches SET status = 'cancelled', "
+                        "updated_at = now() WHERE id = :id AND deleted_at IS NULL "
+                        "AND status IN ('pending', 'running') RETURNING id"
+                    ),
+                    {"id": search_id},
+                )
+            ).first()
+            if changed is None:
+                return False
+            await conn.execute(
+                text(_INSERT_AUDIT),
+                {
+                    "user_id": actor_id,
+                    "action": SEARCH_CANCELLED,
+                    "entity_type": AUDIT_ENTITY,
+                    "entity_id": str(search_id),
+                    "payload": _json({}),
+                    "ip": ip,
+                },
+            )
+        return True
 
     async def last_search_id(self) -> UUID | None:
         """La búsqueda más reciente (para ``make reubicar`` sin id).

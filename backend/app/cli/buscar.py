@@ -64,7 +64,6 @@ POLL_SECONDS = 2.0
 # hasta 15 s y la IA tardan unos minutos; 20 minutos sobra.
 WAIT_LIMIT_SECONDS = 1200.0
 SUMMARY_CHARS = 280
-_FINISHED = {SearchStatus.COMPLETED, SearchStatus.PARTIAL, SearchStatus.FAILED}
 STAGE_LABELS = {
     Stage.PLAN.value: "Planeando consultas",
     Stage.QUERY.value: "Consultando proveedores",
@@ -204,7 +203,7 @@ async def wait_for(
             if snapshot.progress and line != last:
                 logger.info(f"… {line}")
                 last = line
-            if snapshot.status in _FINISHED:
+            if snapshot.status.is_finished:
                 return snapshot
         await sleep(POLL_SECONDS)
     return None

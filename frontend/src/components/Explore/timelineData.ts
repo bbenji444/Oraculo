@@ -369,6 +369,32 @@ export function storyItems(articles: readonly Article[]): StoryItem[] {
   return items.sort((a, b) => b.at - a.at || b.lead.article_id - a.lead.article_id);
 }
 
+/** Un hecho sin fecha de publicación: no tiene hora ni día en la cronología. */
+export type UndatedItem = Pick<StoryItem, 'lead' | 'articleIds' | 'notes'>;
+
+/**
+ * Los hechos cuyas notas no traen fecha de publicación, que `storyItems`
+ * deja fuera. Google web no fecha casi ninguna publicación de redes (en la
+ * VM, 0 de 4 de Facebook el 19/11/2026): sin esto, la pestaña decía
+ * «Instagram 1» y la cronología «No hay notas con estos filtros».
+ *
+ * @param articles Notas ya filtradas.
+ * @returns Un hecho por historia (o por nota suelta), en el orden de llegada.
+ * @example undatedItems([conFecha, sinFecha]) // [{ lead: sinFecha, articleIds: [sinFecha.article_id], ... }]
+ */
+export function undatedItems(articles: readonly Article[]): UndatedItem[] {
+  const byStory = new Map<number, Article[]>();
+  for (const article of articles) {
+    if (publishedAt(article) !== null) continue;
+    const key = article.story_id ?? -article.article_id;
+    byStory.set(key, [...(byStory.get(key) ?? []), article]);
+  }
+  return [...byStory.values()].flatMap((notes) => {
+    const [lead] = notes;
+    return lead ? [{ lead, articleIds: notes.map((n) => n.article_id), notes }] : [];
+  });
+}
+
 // De más a menos preciso: a cuál nota de un hecho conviene volar en el globo.
 const PRECISION_RANK: Readonly<Record<string, number>> = {
   locality: 4,

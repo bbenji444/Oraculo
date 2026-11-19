@@ -177,6 +177,12 @@ class SearchNotFinishedError(ConflictError):
     code = "search_not_finished"
 
 
+class SearchAlreadyFinishedError(ConflictError):
+    """La búsqueda ya terminó: no hay nada que cancelar."""
+
+    code = "search_already_finished"
+
+
 class ForbiddenError(DomainError):
     """La persona no tiene permiso para esa acción (responde 403)."""
 
@@ -216,7 +222,7 @@ class CaseForbiddenError(ForbiddenError):
 
 
 class SearchForbiddenError(ForbiddenError):
-    """La búsqueda es de otra persona: no se puede quitar de su historial."""
+    """La búsqueda es de otra persona (no se quita ni se cancela) o es automática."""
 
     code = "search_forbidden"
 

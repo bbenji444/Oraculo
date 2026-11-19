@@ -9,7 +9,7 @@ import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
@@ -783,3 +783,60 @@ def test_busqueda_rapida_con_concepto_oculto_que_se_puede_guardar(
     assert kept.status_code == 200
     assert kept.json()["is_quick"] is False
     assert concept_id in [c["id"] for c in listed_after]
+
+
+def test_cancelar_la_busqueda_que_corre(
+    client: TestClient, ids: dict[str, int], engine: Engine, filled: tuple[str, dict[str, int]]
+) -> None:
+    # Benji, 19/11/2026: «por si me equivoqué en algo o necesito regresar y editar».
+    search_id = client.post(URL, json=body(ids)).json()["search_id"]
+
+    cancelled = client.post(f"{URL}/{search_id}/cancel")
+
+    assert cancelled.status_code == 204
+    assert client.get(f"{URL}/{search_id}").json()["status"] == "cancelled"
+    with engine.connect() as conn:
+        action = conn.execute(
+            text(
+                "SELECT action FROM audit_log WHERE entity_type = 'search' "
+                "AND entity_id = :id ORDER BY id DESC LIMIT 1"
+            ),
+            {"id": search_id},
+        ).scalar_one()
+    assert action == "search.cancelled"
+    # Ya no corre: cancelarla otra vez, o una que ya terminó, es 409.
+    again = client.post(f"{URL}/{search_id}/cancel")
+    assert again.status_code == 409
+    assert again.json()["error"]["code"] == "search_already_finished"
+    finished_id, _ = filled
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE searches SET user_id = 'analista-prueba' WHERE id = :id"),
+            {"id": finished_id},
+        )
+    assert client.post(f"{URL}/{finished_id}/cancel").status_code == 409
+
+
+def test_no_se_cancela_la_de_otra_persona_ni_la_automatica(
+    client: TestClient, ids: dict[str, int], engine: Engine
+) -> None:
+    search_id = client.post(URL, json=body(ids)).json()["search_id"]
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE searches SET user_id = 'otra-analista' WHERE id = :id"), {"id": search_id}
+        )
+
+    response = client.post(f"{URL}/{search_id}/cancel")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "search_forbidden"
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE searches SET user_id = 'analista-prueba', trigger = 'automatic' "
+                "WHERE id = :id"
+            ),
+            {"id": search_id},
+        )
+    assert client.post(f"{URL}/{search_id}/cancel").status_code == 403
+    assert client.post(f"{URL}/{uuid4()}/cancel").status_code == 404

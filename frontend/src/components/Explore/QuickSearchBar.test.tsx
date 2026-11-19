@@ -138,6 +138,17 @@ describe('QuickSearchBar', () => {
     });
   });
 
+  it('al ajustar una búsqueda arranca con lo que se escribió (ADR-0118)', () => {
+    stubApi();
+    renderWith(
+      <QuickSearchBar providers={['google_news_rss']} busy={false} initialText="hackeo a bases" />,
+    );
+
+    expect(screen.getByLabelText<HTMLInputElement>('Busca noticias como en Google').value).toBe(
+      'hackeo a bases',
+    );
+  });
+
   it('sin texto o con otra búsqueda corriendo no se puede buscar', () => {
     stubApi();
     renderWith(<QuickSearchBar providers={undefined} busy />);

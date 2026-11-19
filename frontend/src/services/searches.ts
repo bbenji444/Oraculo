@@ -56,7 +56,8 @@ export interface SearchEstimate {
   providers?: string[];
 }
 
-export type SearchStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed';
+/** `cancelled`: quien la lanzó la detuvo (19/11/2026, ADR-0118). */
+export type SearchStatus = 'pending' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled';
 
 export interface SearchProgress {
   stage?: string;
@@ -492,9 +493,11 @@ export async function getArticle(articleId: number, signal?: AbortSignal): Promi
   return data as ArticleDetail;
 }
 
-/** Una búsqueda ya no cambia cuando terminó (bien, a medias o con falla). */
+/** Una búsqueda ya no cambia cuando terminó (bien, a medias, con falla o cancelada). */
 export function isFinished(status: SearchStatus): boolean {
-  return status === 'completed' || status === 'partial' || status === 'failed';
+  return (
+    status === 'completed' || status === 'partial' || status === 'failed' || status === 'cancelled'
+  );
 }
 
 /**
@@ -514,6 +517,27 @@ export function subdivisionsOf(search: Pick<Search, 'concepts'>): number[] {
  */
 export async function deleteSearch(searchId: string): Promise<void> {
   await requestJson(apiUrl(`searches/${encodeURIComponent(searchId)}`), { method: 'DELETE' });
+}
+
+/**
+ * Si ya no hay nada que volver a leer: terminó y, si se canceló, el worker ya
+ * se detuvo y guardó lo gastado (pone `finished_at`; ADR-0118).
+ */
+export function isSettled(search: Pick<Search, 'status' | 'finished_at'>): boolean {
+  if (search.status === 'cancelled') return search.finished_at !== null;
+  return isFinished(search.status);
+}
+
+/**
+ * Detiene una búsqueda que todavía corre (ADR-0118). El worker para en su
+ * siguiente revisión y guarda lo que alcanzó a gastar.
+ *
+ * @throws ApiError 403 si es de otra persona o automática; 409 si ya terminó.
+ */
+export async function cancelSearch(searchId: string): Promise<void> {
+  await requestJson(apiUrl(`searches/${encodeURIComponent(searchId)}/cancel`), {
+    method: 'POST',
+  });
 }
 
 /** Devuelve una búsqueda al historial («Deshacer»). */

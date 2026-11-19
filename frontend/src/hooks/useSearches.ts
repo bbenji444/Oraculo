@@ -16,11 +16,12 @@ import {
 } from '@tanstack/react-query';
 
 import {
+  cancelSearch,
   deleteSearch,
   estimateSearch,
   getArticle,
   getSearch,
-  isFinished,
+  isSettled,
   listAllArticles,
   type HistoryScope,
   type QuickSearchInput,
@@ -71,8 +72,9 @@ export function useSearch(searchId: string | null) {
     queryKey: ['searches', 'detail', searchId],
     queryFn: ({ signal }) => getSearch(searchId ?? '', signal),
     enabled: searchId !== null,
+    // Una cancelada se sigue leyendo hasta que el worker guarda lo gastado.
     refetchInterval: (query) =>
-      query.state.data && isFinished(query.state.data.status) ? false : PROGRESS_POLL_MS,
+      query.state.data && isSettled(query.state.data) ? false : PROGRESS_POLL_MS,
   });
 }
 
@@ -118,6 +120,24 @@ export function useDeleteSearch() {
   return useMutation({
     mutationFn: (searchId: string) => deleteSearch(searchId),
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * Cancela la búsqueda que corre; su estado se vuelve a leer en el momento.
+ *
+ * `onCancelled` va en la mutación y no en `mutate()`: el sondeo puede ver
+ * «cancelled» antes que la respuesta, el botón se desmonta y los callbacks de
+ * `mutate()` ya no corren (revisión del 19/11/2026).
+ */
+export function useCancelSearch(onCancelled: () => void) {
+  const invalidate = useInvalidateHistory();
+  return useMutation({
+    mutationFn: (searchId: string) => cancelSearch(searchId),
+    onSuccess: async () => {
+      onCancelled();
+      await invalidate();
+    },
   });
 }
 

@@ -13,7 +13,8 @@
  *   luz la recorre de sur a norte y va descubriendo la rejilla.
  * - **Mientras se busca:** un meridiano de luz le da la vuelta al planeta (el
  *   haz del radar), un anillo de latitud va y viene de polo a polo, el borde
- *   «respira» y cada nota encontrada enciende un ping en la cara visible.
+ *   «respira» y cada nota encontrada enciende un ping en su lugar del
+ *   planeta cuando el giro lo trae al frente.
  * - **Al terminar:** destello, la esfera se expande y se disuelve; luego se
  *   quita la capa.
  * - **«Menos movimiento»:** quieta, aparece y se quita al instante y nunca
@@ -37,14 +38,13 @@ import type {
 
 import { easeOutCubic } from '../motion';
 import {
+  angularDistance,
   BEAM_SPEED_RAD_S,
   BEAM_TAIL,
-  contactBirths,
+  CONTACT_STAGGER_S,
   destination,
-  EARTH_RADIUS_M,
   GOLDEN_ANGLE,
   GOLDEN_FRACTION,
-  MAX_CONTACTS,
 } from './dome';
 import {
   type Attribute,
@@ -100,10 +100,25 @@ const DISSOLVE_MARGIN_MS = 120;
 const FLASH_POWER = 3;
 
 /**
- * Cada ping cae a menos de estos grados del centro de la vista, para que se
- * vea nacer: el borde del globo queda a ~78° del centro a zoom 2.
+ * Lugares de los pings, repartidos por todo el planeta (Benji, 19/11/2026:
+ * «esos puntos de la esfera solo aparecen en una parte del globo. Quiero que
+ * aparezcan en todo el globo»). Con 40, el más cercano a cualquier punto de
+ * la franja queda a menos de 30° y los discos (~6° de radio) no se enciman.
  */
-export const PING_SPREAD_DEG = 50;
+export const SHELL_SPOTS = 40;
+/**
+ * Latitud máxima de los lugares. La vista general mira a 20° N y su borde
+ * queda a ~78° del centro: un ping a 55° S todavía se ve; más al sur quedaría
+ * de canto o detrás.
+ */
+export const SPOT_MAX_LAT_DEG = 55;
+/**
+ * Un lugar se enciende cuando el giro lo trae a menos de estos grados de
+ * longitud del centro de la vista: así se ve nacer, en lugar de encenderse
+ * detrás del planeta (la razón por la que el ADR-0116 los ponía todos al
+ * frente). Con el globo girando, una vuelta los enciende todos.
+ */
+export const VISIBLE_LNG_DEG = 60;
 // Radio del disco de cada ping sobre el vidrio (~6°): a zoom 2, unos 35 px.
 const PING_RADIUS_M = 700_000;
 const PING_RINGS = 8;
@@ -211,27 +226,53 @@ export interface Ping {
 }
 
 /**
- * Dónde cae el ping número `index`: cerca del centro de la vista en el
- * momento en que llega la nota, para que se vea nacer. Es una espiral de
- * girasol (Vogel) de {@link MAX_CONTACTS} lugares: los primeros quedan al
- * centro, cada número tiene su lugar fijo y quedan parejos (medido: 15.7°
- * entre los dos más cercanos; con la razón áurea en el radio, como la
- * cúpula, había pares a 2.7° y sus discos se encimaban).
+ * Los lugares fijos de los pings: una espiral de Fibonacci sobre la franja de
+ * latitudes, que reparte {@link SHELL_SPOTS} puntos con la misma área cada
+ * uno, en todo el planeta.
  *
- * Sin tope de latitud: el disco de cada ping se arma con distancias sobre la
- * esfera, así que pasar por un polo no lo deforma, y recortar la latitud
- * encimaba los pings de la orilla (medido: 0.9°).
+ * @param count Cuántos lugares.
+ * @returns `[lng, lat]` de cada uno, de norte a sur.
  *
- * @param center Centro de la cámara `[lng, lat]` al encenderse.
- * @param index Número del ping (0, 1, 2…).
- * @returns `[lng, lat]`, a menos de {@link PING_SPREAD_DEG} del centro.
- *
- * @example pingSpot([-35, 20], 0) // cerca de [-35, 20]
+ * @example globeSpots(40).length // 40
  */
-export function pingSpot(center: [number, number], index: number): [number, number] {
-  const share = Math.sqrt(Math.min(1, (index + 0.5) / MAX_CONTACTS));
-  const distanceM = share * PING_SPREAD_DEG * DEG * EARTH_RADIUS_M;
-  return destination(center, distanceM, index * GOLDEN_ANGLE);
+export function globeSpots(count: number = SHELL_SPOTS): [number, number][] {
+  const top = Math.sin(SPOT_MAX_LAT_DEG * DEG);
+  return Array.from({ length: count }, (_, i) => {
+    const z = top * (1 - (2 * (i + 0.5)) / count);
+    const lng = (((i * GOLDEN_ANGLE) / DEG + 180) % 360) - 180;
+    return [lng, Math.asin(z) / DEG];
+  });
+}
+
+/** Grados de longitud entre dos meridianos, de 0 a 180. */
+function lngGap(a: number, b: number): number {
+  return Math.abs(((a - b + 540) % 360) - 180);
+}
+
+/**
+ * Qué lugares libres se encienden ahora: los que el giro ya trajo al frente
+ * (a menos de {@link VISIBLE_LNG_DEG} de longitud del centro), del más
+ * cercano al centro al más lejano, hasta `wanted`.
+ *
+ * @param spots Todos los lugares ({@link globeSpots}).
+ * @param taken Los que ya tienen ping.
+ * @param center Centro de la cámara `[lng, lat]`.
+ * @param wanted Cuántos pings faltan.
+ * @returns Los lugares a encender, en orden.
+ *
+ * @example spotsInView(globeSpots(), new Set(), [-35, 20], 3) // los 3 más cercanos al Atlántico
+ */
+export function spotsInView(
+  spots: readonly [number, number][],
+  taken: ReadonlySet<string>,
+  center: [number, number],
+  wanted: number,
+): [number, number][] {
+  if (wanted <= 0) return [];
+  return spots
+    .filter((spot) => !taken.has(spot.join()) && lngGap(spot[0], center[0]) <= VISIBLE_LNG_DEG)
+    .sort((a, b) => angularDistance(a, center) - angularDistance(b, center))
+    .slice(0, wanted);
 }
 
 /**
@@ -629,7 +670,7 @@ class WorldShellLayer implements CustomLayerInterface {
 
 /** Cómo actualizar, cerrar o quitar la esfera. */
 export interface WorldShell {
-  /** Enciende un ping por nota encontrada (hasta MAX_CONTACTS de dome.ts). */
+  /** Enciende un ping por nota encontrada, hasta {@link SHELL_SPOTS}; los de atrás, al girar. */
   setBlips(count: number): void;
   /** Modo día de la Tierra: brillo más bajo. */
   setDaylight(daylight: boolean): void;
@@ -684,34 +725,48 @@ export function addWorldShell(map: MapLibreMap, options: WorldShellOptions = {})
   const layer = new WorldShellLayer(animate, daylight, onFailure);
   map.addLayer(layer);
   current.set(map, layer);
-  let births: number[] = [];
+  const spots = globeSpots();
+  let wanted = 0;
   let pings: Ping[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   let removed = false;
+  // Enciende los pings que faltan en los lugares que ya están al frente; lo
+  // demás espera a que el giro los traiga (cada «move» de la cámara).
+  const fill = () => {
+    if (removed || pings.length >= wanted) return;
+    const center = map.getCenter();
+    const taken = new Set(pings.map((ping) => ping.point.join()));
+    const fresh = spotsInView(spots, taken, [center.lng, center.lat], wanted - pings.length);
+    if (fresh.length === 0) return;
+    const now = performance.now() / 1000;
+    // Escalonados, como los contactos de la cúpula: no se encienden de golpe.
+    const offset = pings.length > 0 ? 1 : 0;
+    pings = [
+      ...pings,
+      ...fresh.map((point, i) => ({
+        point,
+        birth: now + (i + offset) * CONTACT_STAGGER_S,
+        seed: ((pings.length + i) * GOLDEN_FRACTION) % 1,
+      })),
+    ];
+    layer.setPings(pings);
+    map.triggerRepaint();
+  };
+  map.on('move', fill);
   const remove = () => {
     if (removed) return;
     removed = true;
     if (timer !== null) clearTimeout(timer);
+    map.off('move', fill);
     detach(map, layer);
   };
   return {
     setBlips(count) {
       if (removed) return;
-      const next = contactBirths(births, count, performance.now() / 1000);
-      if (next.length === births.length) return;
-      // Los que ya estaban no se mueven; los nuevos nacen en la cara visible.
-      const center = map.getCenter();
-      pings = next.map(
-        (birth, index) =>
-          pings[index] ?? {
-            point: pingSpot([center.lng, center.lat], index),
-            birth,
-            seed: (index * GOLDEN_FRACTION) % 1,
-          },
-      );
-      births = next;
-      layer.setPings(pings);
-      map.triggerRepaint();
+      // Uno por nota encontrada, hasta llenar los lugares del planeta. Los que
+      // ya estaban no se mueven.
+      wanted = Math.min(SHELL_SPOTS, Math.max(0, count));
+      fill();
     },
     setDaylight(day) {
       layer.daylight = day;

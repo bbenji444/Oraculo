@@ -125,6 +125,15 @@ describe('aviso al terminar', () => {
       tone: 'error',
       text: 'La búsqueda falló',
     });
+    // ADR-0118: la detuvo quien la lanzó; no es una falla.
+    expect(finishNotice({ status: 'cancelled', results_count: 0 })).toMatchObject({
+      tone: 'warn',
+      title: 'Barrido cancelado',
+    });
+    expect(stageProgress({ stage: 'enrich' }, 'cancelled')).toEqual({
+      label: 'Cancelada',
+      percent: 100,
+    });
   });
 });
 

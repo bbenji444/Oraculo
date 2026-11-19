@@ -11,6 +11,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Search } from '../../services/searches';
+import { useExplorerStore } from '../../store/explorer';
 import { ScanOverlay } from './ScanOverlay';
 
 const radar = vi.hoisted(() => {
@@ -150,6 +151,43 @@ describe('ScanOverlay en «Todo el mundo» (ADR-0116)', () => {
     expect(Number.parseFloat(labels?.style.left ?? '')).toBeCloseTo(640, 0);
     // Borde de arriba de la esfera: 400 − 300 × 1.06 = 82 px (sin subir al encabezado).
     expect(labels?.getAttribute('style')).toContain('max(82px');
+  });
+
+  // Benji, 19/11/2026: «aparte esté girando mientras hacemos la búsqueda».
+  it('el globo gira, a ritmo de búsqueda, mientras busca; al terminar vuelve a su ritmo', async () => {
+    useExplorerStore.setState({ spinning: false, searchSpin: false, motion: 'slow' });
+    const { asMap } = toyMap();
+    const many = world({ progress: { stage: 'enrich', articles: 372, reused: 0, enriched: 30 } });
+    const { rerender } = render(
+      <ScanOverlay search={many} notice={null} right={0} bottom={120} map={asMap} />,
+    );
+    await settle();
+
+    expect(useExplorerStore.getState().spinning).toBe(true);
+    expect(useExplorerStore.getState().searchSpin).toBe(true);
+    // La esfera recibe todas las notas: ella decide cuántos lugares enciende.
+    expect(radar.shell.setBlips).toHaveBeenLastCalledWith(372);
+
+    rerender(
+      <ScanOverlay
+        search={world({ status: 'completed', results_count: 90 })}
+        notice={null}
+        right={0}
+        bottom={120}
+        map={asMap}
+      />,
+    );
+    await settle();
+    expect(useExplorerStore.getState().searchSpin).toBe(false);
+  });
+
+  it('con «Menos movimiento» el globo no se pone a girar', async () => {
+    useExplorerStore.setState({ spinning: false, searchSpin: false, motion: 'off' });
+    const { asMap } = toyMap();
+    render(<ScanOverlay search={world()} notice={null} right={0} bottom={120} map={asMap} />);
+    await settle();
+
+    expect(useExplorerStore.getState().spinning).toBe(false);
   });
 
   it('al terminar la esfera se disuelve sola y la cámara no se toca', async () => {
