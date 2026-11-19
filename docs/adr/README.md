@@ -75,8 +75,8 @@ Sirven para que alguien nuevo entienda _por qué_ el proyecto es como es, no sol
 | [0110](0110-concepto-en-una-pantalla-y-busqueda-rapida.md) | Concepto en una pantalla (basta con escribir qué noticias seguir; sin selector de modo) y búsqueda rápida con un concepto oculto que se puede guardar (F12) | Aceptado |
 | [0111](0111-reporte-en-pantalla.md) | Reporte en pantalla: la misma plantilla del PDF con índice, pliegues, filtro y ayudas, en un iframe con política propia y nonce (F12) | Aceptado |
 | [0112](0112-buscar-en-todo-el-mundo.md) | Buscar en todo el mundo, en español: región «Mundo» de nivel propio (`world`, `WLD`) que no filtra por país en ningún proveedor (F12) | Aceptado |
-| [0113](0113-busqueda-rapida-literal.md) | La búsqueda rápida busca lo que escribió el analista: el literal va primero y sus nombres propios quedan como términos obligatorios (F12) | Propuesto |
-| [0114](0114-relevancia-estricta.md) | Relevancia estricta en los conceptos «como en Google»: filtro de palabras según cómo llegó la nota y juez con región, procedencia y contexto (F12) | Propuesto |
-| [0115](0115-google-web-y-redes.md) | Google web y redes sociales: fuente `searchapi_web`, plataforma de cada nota y saldo real de SearchApi; por defecto solo en la búsqueda rápida (F12) | Propuesto |
-| [0116](0116-esfera-de-busqueda-mundial.md) | Esfera de búsqueda en «Todo el mundo»: capa WebGL propia en lugar de la cúpula, sin mover la cámara (F12) | Propuesto |
-| [0117](0117-plataformas-y-no-relevantes-en-pantalla.md) | Plataformas y «No relevantes» en pantalla: pestañas y filtro por plataforma, cuatro bandas y botón de las descartadas (F12) | Propuesto |
+| [0113](0113-busqueda-rapida-literal.md) | La búsqueda rápida busca lo que escribió el analista: el literal va primero y sus nombres propios quedan como términos obligatorios (F12) | Aceptado |
+| [0114](0114-relevancia-estricta.md) | Relevancia estricta en los conceptos «como en Google»: filtro de palabras según cómo llegó la nota y juez con región, procedencia y contexto (F12) | Aceptado |
+| [0115](0115-google-web-y-redes.md) | Google web y redes sociales: fuente `searchapi_web`, plataforma de cada nota y saldo real de SearchApi; por defecto solo en la búsqueda rápida (F12) | Aceptado |
+| [0116](0116-esfera-de-busqueda-mundial.md) | Esfera de búsqueda en «Todo el mundo»: capa WebGL propia en lugar de la cúpula, sin mover la cámara (F12) | Aceptado |
+| [0117](0117-plataformas-y-no-relevantes-en-pantalla.md) | Plataformas y «No relevantes» en pantalla: pestañas y filtro por plataforma, cuatro bandas y botón de las descartadas (F12) | Aceptado |

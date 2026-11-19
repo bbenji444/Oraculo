@@ -1,6 +1,6 @@
 # ADR-0114: Relevancia estricta en los conceptos «como en Google» y la búsqueda rápida
 
-- **Estado:** propuesto (18/11/2026), falta que Benji lo apruebe.
+- **Estado:** aceptado (19/11/2026, Benji: «Sí, apruébalos»; propuesto el 18/11/2026).
 - **Fase:** F12 (búsqueda «casi tan natural como Google», punto 4).
 - **Ajusta:** ADR-0109 (D4, juicio de los conceptos abiertos con `enrich_v5`) y ADR-0113 (D5, los términos obligatorios todavía no se usaban para juzgar).
 - **Relacionados:** ADR-0115 (Google web, `searchapi_web`) y ADR-0117 (la pantalla de las no relevantes).
