@@ -127,9 +127,9 @@ instalar_sitio_nginx() {
   # Gateway de Oráculo (ADR-0119): cada IP de ORACULO_GATEWAY_IPS se vuelve
   # una entrada de las listas de confianza y un set_real_ip_from. Sin IP, no
   # se confía en ningún X-Forwarded-For ni en ningún X-Oraculo-*.
+  # Los valores ya los validó revisar_gateway al empezar make up.
   local geo_lines="" real_ip_lines="" ip
   for ip in ${ORACULO_GATEWAY_IPS:-}; do
-    [[ "${ip}" =~ ${IP_O_RED_RE} ]] || fallo "ORACULO_GATEWAY_IPS tiene un valor que no es IP: ${ip}"
     geo_lines+="    ${ip} 1;"$'\n'
     real_ip_lines+="    set_real_ip_from ${ip};"$'\n'
   done
@@ -137,11 +137,6 @@ instalar_sitio_nginx() {
     real_ip_lines+="    real_ip_header X-Forwarded-For;"$'\n'
   fi
   local gateway_only="${GATEWAY_ONLY:-no}"
-  case "${gateway_only}" in
-    si) [[ -n "${geo_lines}" ]] || fallo "GATEWAY_ONLY=si necesita ORACULO_GATEWAY_IPS: sin ellas nadie podría entrar." ;;
-    no) ;;
-    *) fallo "GATEWAY_ONLY debe ser 'si' o 'no' (vale '${gateway_only}')." ;;
-  esac
   LISTEN_LINES="${listen_lines}" GEO_LINES="${geo_lines}" REAL_IP_LINES="${real_ip_lines}" \
     awk -v root="${ROOT_DIR}" -v sendfile="${NGINX_SENDFILE:-off}" -v only="${gateway_only}" '
     /^[[:space:]]*__LISTEN__[[:space:]]*$/ { printf "%s", ENVIRON["LISTEN_LINES"]; next }
@@ -157,6 +152,22 @@ instalar_sitio_nginx() {
 }
 
 # --- Comandos ------------------------------------------------------------------
+
+# Las variables del gateway se revisan antes de arrancar nada: si fallaran
+# hasta instalar nginx, la API y el worker ya estarían corriendo y nginx
+# seguiría con la configuración anterior (ADR-0119).
+revisar_gateway() {
+  local ip hay_ip=no
+  for ip in ${ORACULO_GATEWAY_IPS:-}; do
+    [[ "${ip}" =~ ${IP_O_RED_RE} ]] || fallo "ORACULO_GATEWAY_IPS tiene un valor que no es IP: ${ip}"
+    hay_ip=si
+  done
+  case "${GATEWAY_ONLY:-no}" in
+    si) [[ "${hay_ip}" == si ]] || fallo "GATEWAY_ONLY=si necesita ORACULO_GATEWAY_IPS: sin ellas nadie podría entrar." ;;
+    no) ;;
+    *) fallo "GATEWAY_ONLY debe ser 'si' o 'no' (vale '${GATEWAY_ONLY}')." ;;
+  esac
+}
 
 # Si nginx escucha fuera de la propia máquina, la API no puede quedar en
 # AUTH_MODE=dev: ahí entra cualquiera como superusuario, sin llave. Pasaría
@@ -175,6 +186,7 @@ revisar_candado() {
 cmd_up() {
   cargar_env
   revisar_candado
+  revisar_gateway
   mkdir -p "${RUN_DIR}"
   [[ -x "${UV_BIN}" ]] || fallo "No se encontró uv. Ejecuta primero: wsl make bootstrap"
 

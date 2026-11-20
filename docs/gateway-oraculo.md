@@ -101,13 +101,13 @@ Salud del servicio (sin llave): `GET http://<vm>:8080/api/v1/health` → 200 o 5
 1. **En el monitor**, un superusuario entra por acceso directo → pestaña **«Accesos»**.
 2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Copiar»**. Si dice «Sin llave todavía», primero **«Generar llave»**.
    - La llave se puede volver a copiar cuando se necesite: el monitor guarda una copia cifrada que solo ve un superusuario.
-   - Por consola, en la VM: `make crear-llave ARGS="--usuario jperez --archivo ~/llave_jperez.txt"`. El archivo solo lo lee su dueño.
+   - **Para Oráculo usa siempre esta «Llave de API».** `make crear-llave` (consola) crea otra cosa: una *llave de sistema* que no aparece en ese renglón, no se puede volver a copiar y que «Generar nueva» no mata.
 3. **En Oráculo** → Usuarios → Editar → **Módulos externos**: pegar la llave para el módulo `noticias` (una línea, sin espacios).
 4. Sin llave pegada → el usuario no debe poder abrir el módulo.
 
 El usuario final **nunca** ve ni pega la llave.
 
-**Renovar:** «Generar nueva» en «Accesos» mata la llave anterior al instante. Hay que pegar la nueva en Oráculo; mientras tanto el usuario ve «Tu acceso lo da Oráculo».
+**Renovar:** «Generar nueva» en «Accesos» mata la «Llave de API» anterior al instante. Hay que pegar la nueva en Oráculo; mientras tanto el usuario ve «Tu acceso lo da Oráculo».
 
 ---
 
@@ -221,7 +221,7 @@ El rol vive en la base del monitor. Oráculo no necesita conocerlo: solo manda l
 ## 8. Seguridad (acuerdo operativo)
 
 - **Una llave robada** da acceso al monitor como esa persona (si es superusuario, incluye «Accesos»). No abre la sesión de Oráculo.
-- **Si una llave se filtra,** se pulsa «Generar nueva» en «Accesos» y se pega la nueva en Oráculo. La anterior muere al instante.
+- **Si una llave se filtra,** se pulsa «Generar nueva» en «Accesos» y se pega la nueva en Oráculo. La «Llave de API» anterior muere al instante. (Si por error se pegó una llave de sistema de `make crear-llave`, hay que revocarla aparte en «Accesos».)
 - **Lista de IP** (`.env` de la VM):
   - `ORACULO_GATEWAY_IPS=<IP del proxy de Oráculo>`: solo a esas IP se les cree `X-Forwarded-For` y `X-Oraculo-*`.
   - `GATEWAY_ONLY=si`: nadie más entra (403), ni a la API ni a la pantalla ni a los mapas. **Hoy está en `no`**, para no cortar el acceso directo, y se enciende cuando Oráculo ya entre.
