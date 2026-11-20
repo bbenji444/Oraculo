@@ -173,9 +173,10 @@ __GATEWAY_REAL_IP__
 
     location = /index.html {
         # Sin caché: así el navegador siempre ve qué archivos con hash cargar
-        # tras una actualización, en lugar de seguir con la versión vieja.
+        # tras una actualización. no-store además evita que «atrás» muestre
+        # la pantalla de memoria después de salir de Oráculo (ADR-0123).
         include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
-        add_header Cache-Control "no-cache" always;
+        add_header Cache-Control "no-store" always;
     }
 
     location / {

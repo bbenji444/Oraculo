@@ -82,6 +82,7 @@ Sirven para que alguien nuevo entienda _por qué_ el proyecto es como es, no sol
 | [0117](0117-plataformas-y-no-relevantes-en-pantalla.md) | Plataformas y «No relevantes» en pantalla: pestañas y filtro por plataforma, cuatro bandas y botón de las descartadas (F12) | Aceptado |
 | [0118](0118-cancelar-busqueda.md) | Cancelar una búsqueda que corre: estado `cancelled`, revisión del worker entre etapas y antes de cada nota de la IA, y vuelta a «Ajustar consulta» (F12) | Propuesto |
 | [0119](0119-gateway-oraculo.md) | Monitor detrás del gateway de Oráculo (`/m/noticias/`): rutas relativas, confianza solo en las IP del gateway, 240 s en rutas largas y aviso «Tu acceso lo da Oráculo» (F12) | Propuesto |
+| [0123](0123-cerrar-sesion-con-oraculo.md) | Al salir de Oráculo el monitor se cierra: sin cookie propia, la pantalla detecta la salida y `index.html` sin caché (F12) | Propuesto |
 | [0122](0122-mount-nativo-noticias.md) | El monitor también vive en `/noticias/`: mount nativo del gateway de Oráculo (`href` = `http://10.244.214.144:8080/noticias/`) (F12) | Propuesto |
 | [0121](0121-sin-entrada-con-contrasena.md) | Sin entrada con contraseña: `PASSWORD_LOGIN` apagado por defecto, solo se entra por Oráculo con llave de API (F12) | Propuesto |
 | [0120](0120-llave-de-api-una-sola-vez.md) | La llave de API se ve una sola vez, al generarla: sin copia cifrada (migración 0051), sin «Ver» ni «Copiar»; si se pierde, «Generar nueva» (F12) | Propuesto |

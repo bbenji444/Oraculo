@@ -188,7 +188,8 @@ Las búsquedas **no** necesitan tiempo largo: responden 202 al instante y la pan
 - **Todas las URLs son relativas** (`./assets/…`, `api/v1/…`, `tiles/…`). Oráculo no tiene que reescribir JavaScript.
 - **No hay llave en el navegador**: ni en el HTML, ni en `localStorage`, ni en URLs. El Bearer lo pone Oráculo.
 - **No se asume el Host del navegador.** El mapa arma sus URLs a partir de la dirección de la página: `https://oraculo/noticias/tiles/…`.
-- **Sin cookies del monitor**: no hay sesión propia; cada petición trae Bearer.
+- **Sin cookies del monitor**: no hay sesión propia; cada petición trae Bearer. Una cookie vieja de cuando había contraseña ya no sirve (ADR-0123).
+- **Cerrar sesión en Oráculo cierra el monitor** (ADR-0123): la siguiente petición recibe la pantalla de entrada de Oráculo y el monitor recarga la página; al volver a la pestaña también se revisa. `index.html` va con `no-store` y la API con `no-store`, así que «atrás» no muestra nada guardado.
 - **Encabezados de seguridad:** CSP con `'self'` y `X-Frame-Options: DENY`. Funciona como página completa; **en un iframe no abre**.
 - **Descargas** (PDF, CSV, GeoJSON) traen `Content-Disposition`: hay que conservarlo.
 
@@ -236,7 +237,8 @@ El rol vive en la base del monitor. Cada persona ve **solo lo suyo** (seguridad 
 4. El globo carga sus mapas: las teselas responden 206 y **ninguna** petición sale de `/noticias/`.
 5. Una búsqueda termina y su reporte en pantalla abre.
 6. Usuario con llave mala → «Tu acceso lo da Oráculo». Usuario sin llave → no entra.
-7. El navegador **no** muestra la IP de la VM ni la llave.
+7. Cerrar sesión en Oráculo → el monitor ya no responde ni con «atrás»; al volver a su pestaña aparece la entrada de Oráculo.
+8. El navegador **no** muestra la IP de la VM ni la llave.
 
 ---
 

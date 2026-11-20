@@ -12,7 +12,7 @@ import {
   saveAuthSettings,
 } from './access';
 import { looksLikeCode, qrImageSrc, startLogin } from './auth';
-import { ApiError, SESSION_EXPIRED_EVENT } from './http';
+import { ApiError, page, SESSION_EXPIRED_EVENT } from './http';
 
 const KEY: AccessKey = {
   id: 1,
@@ -126,6 +126,29 @@ describe('entrar', () => {
 });
 
 describe('sesión', () => {
+  it('al salir de Oráculo se olvida a la persona y se recarga (ADR-0123)', async () => {
+    // El gateway redirige a su pantalla de entrada: llega HTML, no la API.
+    const login = new Response('<html>Entrar a Oráculo</html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+    Object.defineProperty(login, 'redirected', { value: true });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.resolve(login)),
+    );
+    const reload = vi.spyOn(page, 'reload').mockImplementation(() => undefined);
+    const heard = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, heard);
+
+    await expect(listUsers()).rejects.toMatchObject({ code: 'auth_required' });
+
+    expect(heard).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
+    window.removeEventListener(SESSION_EXPIRED_EVENT, heard);
+    reload.mockRestore();
+  });
+
   it('un 401 avisa que la sesión terminó', async () => {
     vi.stubGlobal(
       'fetch',

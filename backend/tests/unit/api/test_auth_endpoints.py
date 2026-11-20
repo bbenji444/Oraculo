@@ -554,12 +554,28 @@ def test_app_config_dice_si_se_entro_por_oraculo(app: FastAPI, client: TestClien
     assert app.state.app_config.via_gateway is False
 
 
-def test_sin_entrada_con_contrasena_solo_entra_la_llave(
+def test_sin_entrada_con_contrasena_la_cookie_vieja_ya_no_sirve(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    """El jefe de Benji, 20/11/2026: al cerrar sesión, la sesión debe morir (ADR-0123)."""
+    _enter(client, world, "benji", secret)
+    assert client.get(ME).status_code == 200
+    del app.state.password_login
+
+    after = client.get(ME)
+
+    assert after.status_code == 401
+    # Además se le pide al navegador que la olvide.
+    assert f"{SESSION_COOKIE}=" in after.headers.get("set-cookie", "")
+
+
+def test_sin_entrada_con_contrasena_solo_entra_la_llave(
+    app: FastAPI, client: TestClient, world: AccessWorld
 ) -> None:
     """Benji, 20/11/2026: «quita la opción de la contraseña» (ADR-0121)."""
     pepe = world.store.add_user("pepe")
-    _enter(client, world, "benji", secret)
+    # El superusuario entra como por Oráculo: con su llave en cada petición.
+    admin = {"Authorization": f"Bearer {_system_key(world, BENJI.user_id)}"}
     del app.state.password_login
 
     refused = [
@@ -567,13 +583,13 @@ def test_sin_entrada_con_contrasena_solo_entra_la_llave(
         client.post(
             "/api/v1/auth/password",
             json={"current_password": "x", "new_password": "y" * 16},
-            headers=SAME_ORIGIN,
+            headers=admin,
         ),
-        client.post(f"{USERS}/{pepe}/reset-password", headers=SAME_ORIGIN),
-        client.post(f"{USERS}/{pepe}/reset-totp", headers=SAME_ORIGIN),
-        client.put("/api/v1/access/settings", json={"totp_required": True}, headers=SAME_ORIGIN),
+        client.post(f"{USERS}/{pepe}/reset-password", headers=admin),
+        client.post(f"{USERS}/{pepe}/reset-totp", headers=admin),
+        client.put("/api/v1/access/settings", json={"totp_required": True}, headers=admin),
     ]
-    issued = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+    issued = client.post(f"{USERS}/{pepe}/api-key", headers=admin)
 
     assert [r.status_code for r in refused] == [409] * len(refused)
     assert all("Oráculo" in r.json()["error"]["message"] for r in refused)
