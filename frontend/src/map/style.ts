@@ -326,8 +326,10 @@ function earthLayer(mode: EarthMode, visible: boolean): LayerSpecification {
  * NASA (que los tapa en la vista de globo y se desvanece al acercarse), el
  * detalle de México, las capas de INEGI y, al final, las etiquetas.
  *
- * @param origin Origen del sitio (por ejemplo `http://localhost:8080`); las
- *   teselas, fuentes y sprite se piden al mismo origen, nunca a terceros.
+ * @param origin Dirección absoluta de la carpeta de la página, sin diagonal
+ *   final (`pageBase()`: `http://localhost:8080` o, detrás del gateway de
+ *   Oráculo, `https://oraculo/m/noticias`); las teselas, fuentes y sprite se
+ *   piden al mismo sitio, nunca a terceros (ADR-0119).
  * @param earth Cara de la Tierra visible; también decide si el mapa de calles
  *   es claro (día) u oscuro (noche).
  * @returns El estilo listo para `new maplibregl.Map({ style })`.

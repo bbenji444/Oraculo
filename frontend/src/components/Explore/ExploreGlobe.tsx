@@ -24,6 +24,7 @@ import {
 } from 'maplibre-gl';
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 
+import { pageBase } from '../../config/api';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useRegionDetail } from '../../hooks/useRegions';
 import {
@@ -432,7 +433,7 @@ export function ExploreGlobe({
     const intro = motionRef.current !== 'off';
     const map = new MapLibreMap({
       container,
-      style: buildMapStyle(window.location.origin, earthRef.current),
+      style: buildMapStyle(pageBase(), earthRef.current),
       center: intro
         ? [INTRO_CENTER[0] + INTRO_LNG_OFFSET_DEGREES, INTRO_CENTER[1]]
         : INITIAL_CENTER,
@@ -800,7 +801,7 @@ export function ExploreGlobe({
     earthRef.current = earth;
     const map = mapRef.current;
     if (!map || !ready || previous === earth) return;
-    map.setStyle(buildMapStyle(window.location.origin, earth), {
+    map.setStyle(buildMapStyle(pageBase(), earth), {
       diff: true,
       transformStyle: keepNewsLayers,
     });

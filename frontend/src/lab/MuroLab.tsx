@@ -21,6 +21,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { GLASS, PANEL_TITLE, SMALL_BUTTON } from '../components/Explore/ui';
+import { pageBase } from '../config/api';
 import { SpaceBackground } from '../components/Space/SpaceBackground';
 import { setupMapLibre } from '../map/setup';
 import { buildMapStyle } from '../map/style';
@@ -88,7 +89,7 @@ export default function MuroLab() {
     setupMapLibre();
     const map = new MapLibreMap({
       container,
-      style: buildMapStyle(window.location.origin, 'night'),
+      style: buildMapStyle(pageBase(), 'night'),
       center: [-102, 23.5],
       zoom: 2.2,
       attributionControl: { compact: true },
