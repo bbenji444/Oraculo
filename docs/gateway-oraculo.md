@@ -1,11 +1,11 @@
 # Monitor de Noticias listo como módulo externo de Oráculo
 
-**Para:** programador del core Oráculo (gateway `/go/<slug>/` → `/m/<slug>/`) y agentes de IA del equipo
+**Para:** programador del core Oráculo y agentes de IA del equipo
 **De:** módulo Monitor de Noticias (VM 108, nginx en `:8080`)
 **Fecha:** 2026-11-20
-**Estado:** lado módulo **implementado y probado** con un Oráculo simulado (ADR-0119). Falta cablear el proxy en Oráculo.
+**Estado:** lado módulo **implementado y publicado** en la VM. Sigue el contrato vigente de `gateway_modulos_agentes.md` (commit `5b30686` del core: *mount nativo*, como OSINT en `/osint/…`). Ver ADR-0119 y ADR-0122.
 
-Este documento confirma que el monitor cumple el contrato de `gateway_modulos_agentes.md` y detalla **cómo debe hablar Oráculo** con él.
+Este documento confirma que el monitor cumple el contrato del gateway y detalla **cómo debe configurarse en Oráculo**.
 
 ---
 
@@ -13,49 +13,50 @@ Este documento confirma que el monitor cumple el contrato de `gateway_modulos_ag
 
 | Pieza | Valor |
 |---|---|
-| Slug sugerido en Oráculo | `noticias` → público `/m/noticias/` |
-| Upstream interno (`href`) | `http://10.244.214.144:8080/` (ZeroTier) o `http://192.168.0.42:8080/` (red de la oficina). Es nginx; **no** uses el puerto 8000 (la API solo escucha en `127.0.0.1`) |
-| Prefijo de rutas del módulo | **Ninguno**: el monitor vive en la raíz del upstream. Oráculo quita `/m/noticias` y reenvía el resto tal cual |
+| Slug en Oráculo | `Noticias` (el que ya existe). El slug no cambia rutas: solo va en `X-Oraculo-Module` |
+| **`href` (upstream)** | **`http://10.244.214.144:8080/noticias/`** (ZeroTier). Es nginx; **no** uses el puerto 8000 |
+| Mount nativo | **`/noticias`**: el navegador navega en `https://oraculo/noticias/…` y Oráculo reenvía la misma ruta al upstream |
+| Apertura | `GET /go/Noticias/` → `302 /noticias/` |
 | Auth hacia el módulo | `Authorization: Bearer orc_live_…` (58 caracteres, una llave por persona) |
-| Cabeceras opcionales | `X-Oraculo-User`, `X-Oraculo-User-Id`, `X-Oraculo-Module` (solo bitácora y aviso en pantalla) |
+| Cabeceras opcionales | `X-Oraculo-User`, `X-Oraculo-User-Id`, `X-Oraculo-Module` (bitácora y aviso en pantalla) |
 | Llave en la URL (`?api_key=`) | **No existe**: la llave solo se acepta en el encabezado |
-| Quién genera la llave | **El monitor** (pestaña «Accesos» o consola). Oráculo solo la **guarda y reenvía** |
-| Dónde viven usuarios y llaves | **PostgreSQL del monitor** (tabla `access_keys`): solo la huella HMAC para validar. **La llave completa se ve una sola vez**, al generarla; el monitor no la puede volver a mostrar. **No** en `apis_control` ni en la base de Oráculo |
-| Tiempo de espera | **240 s** en las rutas largas (sección 5.3); el resto cabe en los 30 s por defecto |
+| Quién genera la llave | **El monitor** (pestaña «Accesos»). Oráculo solo la **guarda y reenvía** |
+| Dónde viven usuarios y llaves | **PostgreSQL del monitor**: solo la huella HMAC. **La llave completa se ve una sola vez**, al generarla (ADR-0120). **No** en `apis_control` ni en la base de Oráculo |
+| Login propio del monitor | **No existe**: la entrada con contraseña está apagada (ADR-0121). Solo se entra con la llave |
+| Tiempo de espera | **240 s** en las rutas largas (sección 5.3); el `MODULE_PROXY_TIMEOUT` de 300 s ya alcanza |
 
-El navegador del usuario final **no** debe ver la IP de la VM ni la llave.
-La llave viaja solo **Oráculo → monitor** (servidor a servidor).
+El navegador del usuario final **no** ve la IP de la VM ni la llave. La llave viaja solo **Oráculo → monitor** (servidor a servidor).
 
 ### Qué Oráculo **no** tiene que construir
 
 - Altas de usuarios del monitor ni sus llaves (ya está en «Accesos»).
-- Login propio del monitor: **no existe**. La entrada con usuario y contraseña está apagada (`PASSWORD_LOGIN=false`, ADR-0121); solo se entra por Oráculo con la llave de API.
-- Roles del monitor: los decide el monitor según la llave.
+- Login del monitor ni roles: los decide el monitor según la llave.
+- Reescribir JavaScript: la pantalla usa rutas relativas y funciona igual en `/noticias/`.
 
-Oráculo solo necesita: **proxy + Bearer en cada petición + campo «llave del módulo» por usuario**.
+Oráculo solo necesita: **el `href` con `/noticias/` + la llave de cada usuario en «Módulos externos»**.
 
 ---
 
-## 2. Flujo esperado (producción)
+## 2. Flujo (producción)
 
 ```
-Usuario se loguea en Oráculo
+Usuario logueado en Oráculo
   → Clic en «Noticias Intelligence» en el hub
-  → GET /go/noticias/
-  → Oráculo valida sesión + UserModuleCredential (llave pegada)
-  → 302 /m/noticias/          ← siempre con diagonal final
+  → GET /go/Noticias/
+  → Oráculo valida la llave pegada (UserModuleCredential)
+  → 302 /noticias/                ← mismo host Oráculo, mount nativo
 
 Navegador (solo host Oráculo)
-  → GET|POST /m/noticias/…
+  → GET|POST /noticias/…
 
-Oráculo (proxy)
-  → Quita /m/noticias y reenvía a http://<vm>:8080/…
+Oráculo (middleware del mount)
+  → Reenvía la MISMA ruta a http://10.244.214.144:8080/noticias/…
        Authorization: Bearer orc_live_…
-       X-Oraculo-User: <username Oráculo>
-       X-Oraculo-User-Id: <id Oráculo>
-       X-Oraculo-Module: noticias
-       X-Forwarded-For: <IP del navegador>
-  → Responde al navegador
+       X-Oraculo-User / X-Oraculo-User-Id / X-Oraculo-Module
+  → Responde al navegador (HTML reescrito, el resto en streaming)
+
+nginx del monitor
+  → /noticias/… se atiende igual que /… (API, mapas con Range, pantalla)
 ```
 
 ```mermaid
@@ -64,52 +65,49 @@ sequenceDiagram
   participant O as Oráculo
   participant N as Monitor (nginx :8080)
 
-  U->>O: GET /go/noticias/
-  O-->>U: 302 /m/noticias/
-  U->>O: GET /m/noticias/
-  O->>N: GET / + Bearer + X-Oraculo-*
+  U->>O: GET /go/Noticias/
+  O-->>U: 302 /noticias/
+  U->>O: GET /noticias/
+  O->>N: GET /noticias/ + Bearer + X-Oraculo-*
   N-->>O: index.html (rutas relativas, sin secretos)
   O-->>U: HTML
-  U->>O: GET /m/noticias/api/v1/auth/me
-  O->>N: GET /api/v1/auth/me + Bearer
+  U->>O: GET /noticias/api/v1/auth/me
+  O->>N: GET /noticias/api/v1/auth/me + Bearer
   N->>N: Valida la huella de la llave en PostgreSQL
   N-->>O: {"username": "jperez", "role": "user", ...}
-  U->>O: GET /m/noticias/tiles/states.pmtiles (Range: bytes=0-16383)
+  U->>O: GET /noticias/tiles/states.pmtiles (Range: bytes=0-16383)
   O->>N: mismo Range
   N-->>O: 206 Partial Content
-  O-->>U: 206 (sin juntar ni comprimir)
+  O-->>U: 206 (streaming)
 ```
 
 ---
 
 ## 3. Qué debe configurar el admin en Oráculo
 
-### 3.1 Módulo del hub
+### 3.1 Módulo del hub (Configuraciones → Módulos del hub)
 
 | Campo | Valor |
 |---|---|
-| `slug` | `noticias` |
-| `href` (upstream) | `http://10.244.214.144:8080/` o `http://192.168.0.42:8080/`, la que alcance el servidor de Oráculo |
-| Timeout del proxy | **240 s** para las rutas de la sección 5.3 (o para todo el módulo, si el proxy no distingue rutas) |
+| `slug` | `Noticias` (se queda igual) |
+| **`href`** | **`http://10.244.214.144:8080/noticias/`** — con `/noticias/` al final. Sin token ni `api_key` |
+| Externo / activo | Sí / Sí |
 
-La petición final al monitor debe quedar así: `/m/noticias/api/v1/auth/me` → `http://<vm>:8080/api/v1/auth/me`.
+> **Por qué importa `/noticias/`:** el gateway toma el *mount* de la ruta del `href`. Con `http://10.244.214.144:8080` (sin ruta) el mount queda vacío, `/go/Noticias/` manda al usuario a `/` y vuelve al tablero de Oráculo. Fue lo que pasó el 20/11/2026.
 
-Salud del servicio (sin llave): `GET http://<vm>:8080/api/v1/health` → 200 o 503, con `auth_mode` (`keys` = pide llave).
+Salud del servicio (sin llave): `GET http://10.244.214.144:8080/noticias/api/v1/health` → 200, con `"auth_mode": "keys"`.
 
 ### 3.2 Llave por usuario (paso a paso)
 
 1. **En el monitor**, un superusuario entra **por Oráculo** (con su propia llave ya pegada) → pestaña **«Accesos»**.
-   - **Primera vez** (el superusuario aún no tiene llave en Oráculo): en la VM, `make crear-llave ARGS="--usuario benji"` la muestra una vez; se pega en Oráculo para ese usuario y ya se puede entrar a «Accesos».
-2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Generar llave»** (o **«Generar nueva»** si ya tiene una).
-   - Sale un aviso con la llave completa y **«Copiar llave»**. **Es la única vez que se ve**: el monitor solo guarda su huella y no la puede volver a mostrar bajo ningún motivo (ADR-0120).
-   - Si se pierde, no se recupera: **«Generar nueva»**, que deja sin servir la anterior.
-   - **Para Oráculo usa siempre esta «Llave de API».** `make crear-llave` (consola) crea otra cosa: una *llave de sistema* que no aparece en ese renglón y que «Generar nueva» no mata.
-3. **En Oráculo** → Usuarios → Editar → **Módulos externos**: pegar la llave para el módulo `noticias` (una línea, sin espacios).
-4. Sin llave pegada → el usuario no debe poder abrir el módulo.
+   - **Primera vez** (el superusuario aún no tiene llave en Oráculo): en la VM, `make crear-llave ARGS="--usuario benji"` la muestra una vez; se pega en Oráculo para ese usuario.
+2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Generar llave»** (o **«Generar nueva»**).
+   - Sale un aviso con la llave completa y **«Copiar llave»**. **Es la única vez que se ve** (ADR-0120).
+   - Si se pierde, **«Generar nueva»**: la anterior deja de servir al instante.
+3. **En Oráculo** → Usuarios → Editar → **Módulos externos** → «Noticias Intelligence»: pegar la llave (una línea, sin espacios) y **Guardar**.
+4. Sin llave pegada → Oráculo responde «No tienes acceso asignado a este módulo».
 
 El usuario final **nunca** ve ni pega la llave.
-
-**Renovar:** «Generar nueva» en «Accesos» mata la «Llave de API» anterior al instante. Hay que pegar la nueva en Oráculo; mientras tanto el usuario ve «Tu acceso lo da Oráculo».
 
 ---
 
@@ -118,93 +116,80 @@ El usuario final **nunca** ve ni pega la llave.
 ### 4.1 Cabeceras
 
 ```http
-GET /api/v1/auth/me HTTP/1.1
-Host: <host-upstream>
+GET /noticias/api/v1/auth/me HTTP/1.1
+Host: 10.244.214.144:8080
 Authorization: Bearer orc_live_…
 X-Oraculo-User: jperez
 X-Oraculo-User-Id: 42
-X-Oraculo-Module: noticias
-X-Forwarded-For: <IP del navegador>
+X-Oraculo-Module: Noticias
 ```
 
 | Cabecera | Obligatoria | Uso en el monitor |
 |---|---|---|
 | `Authorization: Bearer …` | **Sí** | Quién es la persona y su rol. Es lo único que decide la identidad |
-| `X-Oraculo-Module` | Recomendada | Marca que se entró por Oráculo: la pantalla no ofrece usuario y contraseña, y no muestra «Salir» ni «Mi contraseña» |
-| `X-Oraculo-User` | No | Log. Si no coincide con el dueño de la llave, queda una advertencia (una vez por pareja) |
+| `X-Oraculo-Module` | Recomendada | Marca que se entró por Oráculo (`via_gateway`) |
+| `X-Oraculo-User` | No | Log. Si no coincide con el dueño de la llave, queda una advertencia |
 | `X-Oraculo-User-Id` | No | Log, para cruzar con la bitácora de Oráculo |
-| `X-Forwarded-For` | Recomendada | IP real del analista para la bitácora y el bloqueo por intentos fallidos. Sin ella, todos parecen la misma persona |
+| `X-Forwarded-For` | Recomendada | IP real del analista para la bitácora y el bloqueo por intentos fallidos |
 
 Reglas:
 
 - **No** mandar la llave en la URL ni en el cuerpo.
-- Sin llave, o con una llave mala, vencida o reemplazada → **401** `auth_required`. Detrás del gateway, el mensaje dice «Oráculo no mandó una llave válida para el monitor…».
-- Llave válida, pero sin permiso para esa ruta → **403**.
-- Algo de otra persona → **404** (la seguridad por filas lo oculta).
+- Sin llave, o con una mala, vencida o reemplazada → **401** `auth_required`.
+- Llave válida sin permiso para esa ruta → **403**. Algo de otra persona → **404**.
 - Demasiadas llaves malas desde la misma IP → **429**.
-- Los `X-Oraculo-*` y el `X-Forwarded-For` solo se creen si llegan desde las IP de `ORACULO_GATEWAY_IPS`. De cualquier otra IP se ignoran.
+- Los `X-Oraculo-*` y `X-Forwarded-For` solo se creen si llegan desde las IP de `ORACULO_GATEWAY_IPS` (sección 8).
 
 ### 4.2 Prueba mínima desde el servidor de Oráculo (curl al upstream)
 
 ```bash
-U=http://10.244.214.144:8080     # o http://192.168.0.42:8080
+U=http://10.244.214.144:8080/noticias
 # Sustituye LLAVE por la llave del usuario
-curl -sS -o /dev/null -w "%{http_code}\n" \
-  -H "Authorization: Bearer LLAVE" -H "X-Oraculo-Module: noticias" \
-  "$U/api/v1/auth/me"
-# esperado: 200
-
-curl -sS -o /dev/null -w "%{http_code}\n" "$U/api/v1/auth/me"
-# esperado: 401
-
-curl -sS -o /dev/null -w "%{http_code}\n" -r 0-16383 "$U/tiles/countries.pmtiles"
-# esperado: 206
+curl -sS -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer LLAVE" "$U/api/v1/auth/me"   # 200
+curl -sS -o /dev/null -w "%{http_code}\n" "$U/api/v1/auth/me"                                     # 401
+curl -sS -o /dev/null -w "%{http_code}\n" -r 0-16383 "$U/tiles/countries.pmtiles"                 # 206
 ```
 
 ---
 
 ## 5. Rutas del módulo
 
-### 5.1 Lo que pide el navegador
+### 5.1 Lo que pide el navegador (todo bajo `/noticias/`)
 
-| Ruta (tras quitar `/m/noticias`) | Qué es | Pide llave |
+| Ruta | Qué es | Pide llave |
 |---|---|---|
-| `/` | La pantalla (`index.html`, sin caché) | No (es estática; ver 8) |
-| `/assets/…` | JavaScript, CSS, fuentes, worker del mapa (con hash en el nombre) | No |
-| `/globo.svg` | Ícono | No |
-| `/tiles/…` | Mapas PMTiles por pedazos (`Range` → **206**). Hasta **1.3 GB** por archivo (`basemap_mexico.pmtiles`) | No |
-| `/api/v1/…` | La API | **Sí**, salvo las públicas de 5.2 |
+| `/noticias/` | La pantalla (`index.html`, sin caché) | No (es estática) |
+| `/noticias/assets/…` | JavaScript, CSS, fuentes, worker del mapa | No |
+| `/noticias/tiles/…` | Mapas PMTiles por pedazos (`Range` → **206**). Hasta **1.3 GB** por archivo | No |
+| `/noticias/api/v1/…` | La API | **Sí**, salvo las públicas de 5.2 |
 
-La pantalla navega con `#/explorar`, `#/casos`, etc. El prefijo no le afecta y no hace falta ningún comodín de rutas.
+`/noticias` sin diagonal redirige (301) a `/noticias/`. La pantalla navega con `#/explorar`, `#/casos`, etc.
 
 ### 5.2 Rutas públicas de la API (sin llave)
 
-`GET /api/v1/health`, `GET /api/v1/app-config` (dirección de Oráculo, `via_gateway` y `password_login`) y `POST /api/v1/auth/logout`. Las de entrar con contraseña (`POST /api/v1/auth/login…`) responden **409**: la entrada con contraseña está apagada (ADR-0121).
+`GET /noticias/api/v1/health` y `GET /noticias/api/v1/app-config` (`oraculo_url`, `via_gateway`, `password_login`). Las de entrar con contraseña responden **409** (ADR-0121).
 
-### 5.3 Rutas que necesitan 240 s
-
-Esperan a la IA o a un proveedor de correo dentro de la petición. El nginx del monitor ya les da 240 s; el proxy de Oráculo debe esperar lo mismo.
+### 5.3 Rutas que necesitan hasta 240 s
 
 | Método | Ruta | Por qué tarda |
 |---|---|---|
-| POST | `/api/v1/searches/{id}/report` | PDF; la primera vez la IA escribe el resumen ejecutivo |
-| GET | `/api/v1/searches/{id}/report/view` | Reporte en pantalla (igual que el anterior) |
-| POST | `/api/v1/concepts/suggest` | La IA propone frases de búsqueda |
-| POST | `/api/v1/deliveries/test` | Manda un correo de prueba |
-| POST | `/api/v1/deliveries/history/{id}/retry` | Reintenta un envío |
+| POST | `/noticias/api/v1/searches/{id}/report` | PDF; la primera vez la IA escribe el resumen |
+| GET | `/noticias/api/v1/searches/{id}/report/view` | Reporte en pantalla |
+| POST | `/noticias/api/v1/concepts/suggest` | La IA propone frases de búsqueda |
+| POST | `/noticias/api/v1/deliveries/test` | Correo de prueba |
+| POST | `/noticias/api/v1/deliveries/history/{id}/retry` | Reintento de envío |
 
 Las búsquedas **no** necesitan tiempo largo: responden 202 al instante y la pantalla consulta el avance cada 2 s.
 
 ---
 
-## 6. Comportamiento de la pantalla (importante para el proxy)
+## 6. Comportamiento de la pantalla
 
-- **Todas las URLs son relativas** (`./assets/…`, `api/v1/…`, `tiles/…`). Oráculo no tiene que reescribir nada en el HTML ni en el JavaScript.
-- **La diagonal final es obligatoria.** Sin ella, el navegador resuelve las rutas relativas contra `/m/` y todo falla. Oráculo debe redirigir `/m/noticias` → `/m/noticias/` (301).
-- **No hay llave en el navegador:** ni en el HTML, ni en `localStorage`, ni en URLs. Las peticiones salen sin `Authorization` y el Bearer lo pone Oráculo.
-- **No se asume el Host del navegador.** El mapa arma sus URLs absolutas a partir de la dirección de la página, así que pide `https://oraculo/m/noticias/tiles/…`.
-- **Cookie:** solo existe en acceso directo (`monitor_sesion`, `Path=/api`, `HttpOnly`, `SameSite=Strict`). Detrás del gateway no hace falta, porque cada petición trae Bearer.
-- **Encabezados de seguridad:** `Content-Security-Policy` con `'self'` y `X-Frame-Options: DENY`. Todo es del mismo origen (`https://oraculo/m/noticias/…`), así que funciona como página completa. **En un iframe no abre** (ver 10).
+- **Todas las URLs son relativas** (`./assets/…`, `api/v1/…`, `tiles/…`). Oráculo no tiene que reescribir JavaScript.
+- **No hay llave en el navegador**: ni en el HTML, ni en `localStorage`, ni en URLs. El Bearer lo pone Oráculo.
+- **No se asume el Host del navegador.** El mapa arma sus URLs a partir de la dirección de la página: `https://oraculo/noticias/tiles/…`.
+- **Sin cookies del monitor**: no hay sesión propia; cada petición trae Bearer.
+- **Encabezados de seguridad:** CSP con `'self'` y `X-Frame-Options: DENY`. Funciona como página completa; **en un iframe no abre**.
 - **Descargas** (PDF, CSV, GeoJSON) traen `Content-Disposition`: hay que conservarlo.
 
 ---
@@ -216,97 +201,66 @@ Las búsquedas **no** necesitan tiempo largo: responden 202 al instante y la pan
 | `user` | Explorar, casos, conceptos, historial y envíos **propios** |
 | `superuser` | Además: «Estado del sistema» y «Accesos» (personas y llaves) |
 
-El rol vive en la base del monitor. Oráculo no necesita conocerlo: solo manda la llave correcta. Cada persona ve **solo lo suyo**, porque la base aplica seguridad por filas.
+El rol vive en la base del monitor. Cada persona ve **solo lo suyo** (seguridad por filas).
 
 ---
 
-## 8. Seguridad (acuerdo operativo)
+## 8. Seguridad
 
-- **Una llave robada** da acceso al monitor como esa persona (si es superusuario, incluye «Accesos»). No abre la sesión de Oráculo.
-- **Si una llave se filtra,** se pulsa «Generar nueva» en «Accesos» y se pega la nueva en Oráculo. La «Llave de API» anterior muere al instante. (Si por error se pegó una llave de sistema de `make crear-llave`, hay que revocarla aparte en «Accesos».)
+- **Una llave robada** da acceso al monitor como esa persona. Se corta con «Generar nueva» en «Accesos» y se pega la nueva en Oráculo.
 - **Lista de IP** (`.env` de la VM):
-  - `ORACULO_GATEWAY_IPS=<IP del proxy de Oráculo>`: solo a esas IP se les cree `X-Forwarded-For` y `X-Oraculo-*`.
-  - `GATEWAY_ONLY=si`: nadie más entra (403), ni a la API ni a la pantalla ni a los mapas. **Hoy está en `no`**, para no cortar el acceso directo, y se enciende cuando Oráculo ya entre.
-- **Candado obligatorio:** la VM no arranca en modo desarrollo (`AUTH_MODE=dev`) si escucha hacia la red. `GET /api/v1/health` dice `"auth_mode": "keys"`.
-- **Nunca** poner la llave en la URL del navegador ni en logs. El monitor nunca la escribe en sus logs.
+  - `ORACULO_GATEWAY_IPS=10.244.83.211` (IP ZeroTier del servidor de Oráculo): solo a ella se le creen `X-Forwarded-For` y `X-Oraculo-*`.
+  - `GATEWAY_ONLY=si`: nadie más entra (403). Se enciende cuando todos entren por Oráculo, con OK del responsable.
+- **Candado obligatorio:** la VM no arranca sin llaves (`AUTH_MODE=dev`) si escucha hacia la red. `/health` dice `"auth_mode": "keys"`.
+- **Nunca** poner la llave en la URL ni en logs.
 
 ---
 
-## 9. Requisitos para el proxy de Oráculo (checklist)
+## 9. Requisitos para el gateway de Oráculo (ya los cumple `proxy.py`)
 
-- [ ] Quitar `/m/noticias` y reenviar el resto, **con el query string** (`?laboratorio`, etc.).
-- [ ] Redirigir `/m/noticias` → `/m/noticias/`.
-- [ ] Inyectar `Authorization: Bearer <llave>` y `X-Oraculo-*` en **cada** petición.
-- [ ] Mandar `X-Forwarded-For` con la IP del navegador.
-- [ ] **Range sin tocar:** reenviar el `Range` de la petición y devolver tal cual `206`, `Content-Range`, `Accept-Ranges`, `Content-Length` y `ETag`.
-  - Sin juntar la respuesta en memoria (en Django: `requests` con `stream=True` + `StreamingHttpResponse`).
-  - Sin comprimir los `.pmtiles`.
-  - Un archivo pesa hasta 1.3 GB y nunca se pide completo.
-- [ ] Conservar `Content-Type`, `Content-Disposition` y `Cache-Control`. Las respuestas de la API dicen `no-store`: **no** guardarlas en caché.
-- [ ] 240 s en las rutas de la sección 5.3.
-- [ ] Abrir el módulo como **página completa**, no en iframe.
-- [ ] Usuario sin llave pegada → no entra.
+- [x] Reenviar la misma ruta del mount con su query string.
+- [x] Inyectar `Authorization: Bearer <llave>` y `X-Oraculo-*` en cada petición.
+- [x] Reenviar `Range` y devolver `206` en streaming (sin juntar ni comprimir).
+- [x] Conservar `Content-Type`, `Content-Disposition` y `Cache-Control`.
+- [x] Timeout ≥ 240 s (`MODULE_PROXY_TIMEOUT` = 300 s).
+- [ ] **Configurar `href` = `http://10.244.214.144:8080/noticias/`** (único pendiente).
+- [ ] Opcional: mandar `X-Forwarded-For` con la IP del navegador.
 
 ---
 
-## 10. Preguntas abiertas para Oráculo
-
-1. ¿El módulo se abre como página completa o dentro de un iframe? Con iframe hay que cambiar encabezados del monitor (ADR nuevo).
-2. ¿El proxy quita el prefijo `/m/noticias` antes de reenviar?
-3. ¿Desde qué IP sale el proxy hacia la VM? Va en `ORACULO_GATEWAY_IPS`.
-4. ¿El servidor de Oráculo alcanza `10.244.214.144` (ZeroTier) o `192.168.0.42`?
-5. ¿El proxy ya transmite por pedazos (streaming) o junta la respuesta completa?
-
----
-
-## 11. Criterio de aceptación (lado Oráculo)
-
-Cuando el gateway esté listo, esto debe funcionar:
+## 10. Criterio de aceptación
 
 1. Usuario de Oráculo con su llave del monitor pegada.
-2. Clic en el hub → barra `…/m/noticias/` (mismo host Oráculo).
+2. Clic en el hub → barra `…/noticias/` (mismo host Oráculo).
 3. El monitor abre **sin pedir usuario ni contraseña**, con el nombre de la persona arriba a la derecha.
-4. El globo carga sus mapas: en la pestaña Red del navegador, las teselas responden 206 y **ninguna** petición sale de `/m/noticias/`.
-5. Una búsqueda completa termina y su reporte en pantalla abre (tiempo largo).
-6. Usuario con una llave mala → ve «Tu acceso lo da Oráculo».
-7. Usuario **sin** llave en Oráculo → no entra.
-8. El navegador **no** muestra la IP de la VM ni la llave.
-
-Prueba de humo a través del gateway, desde cualquier máquina con sesión de Oráculo:
-
-```bash
-curl -sS -b cookies-oraculo.txt -o /dev/null -w "%{http_code}\n" https://oraculo/m/noticias/            # 200
-curl -sS -b cookies-oraculo.txt https://oraculo/m/noticias/api/v1/app-config                            # "via_gateway": true
-curl -sS -b cookies-oraculo.txt -o /dev/null -w "%{http_code}\n" -r 0-16383 https://oraculo/m/noticias/tiles/countries.pmtiles  # 206
-```
+4. El globo carga sus mapas: las teselas responden 206 y **ninguna** petición sale de `/noticias/`.
+5. Una búsqueda termina y su reporte en pantalla abre.
+6. Usuario con llave mala → «Tu acceso lo da Oráculo». Usuario sin llave → no entra.
+7. El navegador **no** muestra la IP de la VM ni la llave.
 
 ---
 
-## 12. Checklist del módulo (cumplido en el monitor)
+## 11. Checklist del módulo (cumplido en el monitor)
 
-- [x] Aceptar `Authorization: Bearer <llave>`
-- [x] Sin llave → 401 (con mensaje propio detrás del gateway)
+- [x] Aceptar `Authorization: Bearer <llave>`; sin llave → 401
+- [x] Servir todo bajo el mount nativo `/noticias/` (y también en la raíz)
+- [x] URLs relativas en HTML, JS, CSS y mapas; no asumir el Host del navegador
 - [x] Leer `X-Oraculo-*` para el log, solo si vienen del gateway
-- [x] URLs relativas en HTML, JS, CSS y mapas
-- [x] No asumir que el Host del navegador es el del módulo
-- [x] Panel para crear personas y emitir llaves para pegar en Oráculo («Accesos»)
-- [x] Llaves en la base del monitor: solo la huella HMAC; la llave se ve una sola vez al generarla y renovar mata la anterior
-- [x] IP real del analista desde el gateway; lista de IP lista para encenderse
-- [x] 240 s en las rutas largas
-- [x] Probado con un Oráculo simulado (nginx que quita el prefijo e inyecta la llave): pantalla, API, 206 en mapas, IP real en la bitácora, aviso con llave mala
+- [x] «Accesos» para crear personas y emitir llaves (se ven una sola vez)
+- [x] Sin login propio: solo llave (ADR-0121)
+- [x] 240 s en las rutas largas; Range/206 en mapas
+- [x] Probado: todas las peticiones de la pantalla quedan dentro de `/noticias/`
 
 ---
 
-## 13. Dónde está cada cosa
+## 12. Dónde está cada cosa
 
 | Qué | Dónde |
 |---|---|
 | Servicio | VM 108 · nginx `:8080` · `make up` / `make status` |
-| Decisión | [ADR-0119](adr/0119-gateway-oraculo.md) |
-| Rutas relativas de la pantalla | `frontend/src/config/api.ts` (`apiUrl`, `pageBase`), `frontend/vite.config.ts` (`base: './'`) |
-| Candado y encabezados de Oráculo | `backend/app/api/auth.py` |
-| `via_gateway` | `backend/app/api/v1/app_config.py` |
-| Lista de IP, IP real y 240 s | `nginx/monitor-noticias.conf.template`, `nginx/proxy-api.conf`, `scripts/dev/servicios.sh` |
-| Llaves por persona | ADR-0047, [guia-integracion-api.md](guia-integracion-api.md) |
-| Rutas de la API | [api.md](api.md) y `/api/v1/docs` (solo en acceso directo) |
-| Contrato original de Oráculo | `gateway_modulos_agentes.md` (core) |
+| Decisiones | [ADR-0119](adr/0119-gateway-oraculo.md), [ADR-0120](adr/0120-llave-de-api-una-sola-vez.md), [ADR-0121](adr/0121-sin-entrada-con-contrasena.md), [ADR-0122](adr/0122-mount-nativo-noticias.md) |
+| Mount `/noticias/`, lista de IP y 240 s | `nginx/monitor-noticias.conf.template`, `nginx/proxy-api.conf`, `scripts/dev/servicios.sh` |
+| Rutas relativas de la pantalla | `frontend/src/config/api.ts`, `frontend/vite.config.ts` (`base: './'`) |
+| Llaves y candado | `backend/app/api/auth.py`, ADR-0047 |
+| Rutas de la API | [api.md](api.md) |
+| Contrato de Oráculo | `docs/gateway_modulos_agentes.md` (core) |

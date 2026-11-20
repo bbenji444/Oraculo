@@ -6,6 +6,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Corregido
+
+- **Entrar al monitor desde Oráculo (20/11/2026, ADR-0122).** Benji pegó su llave en Oráculo y el clic en «Noticias Intelligence» lo regresaba al tablero. El gateway de Oráculo cambió ese día a *mount nativo*: cada módulo vive bajo su propia ruta (OSINT en `/osint/…`). El monitor ahora también responde en `/noticias/…` y en Oráculo el `href` del módulo debe ser `http://10.244.214.144:8080/noticias/`.
+
 ### Cambiado
 
 - **Sin entrada con contraseña: solo por Oráculo con la llave de API (20/11/2026, ADR-0121).** Benji: «quiero que quites la opción de la contraseña… solamente se van a comunicar los módulos mediante esta API».

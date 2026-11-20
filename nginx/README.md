@@ -17,7 +17,7 @@ Configuración de nginx, el servidor web que une todo en un solo punto de entrad
 
 ## Detrás del gateway de Oráculo
 
-Oráculo abre el monitor en `/m/noticias/` y le reenvía cada petición ([ADR-0119](../docs/adr/0119-gateway-oraculo.md), [docs/gateway-oraculo.md](../docs/gateway-oraculo.md)). Dos variables del `.env` lo controlan:
+Oráculo abre el monitor en `/noticias/` (mount nativo, [ADR-0122](../docs/adr/0122-mount-nativo-noticias.md)): nginx atiende `/noticias/…` igual que `/…`. Oráculo le reenvía cada petición ([ADR-0119](../docs/adr/0119-gateway-oraculo.md), [docs/gateway-oraculo.md](../docs/gateway-oraculo.md)). Dos variables del `.env` lo controlan:
 
 | Variable | Qué hace |
 |---|---|
