@@ -35,6 +35,8 @@ Se entra con usuario y contraseña y, si el superusuario lo prende en «Accesos�
 
 Rutas públicas (sin sesión): `GET /health`, `GET /app-config`, los pasos de `POST /auth/login…` y `POST /auth/logout`. Todas las demás, también `/docs` y `/openapi.json`, piden sesión o llave de sistema.
 
+**Por el gateway de Oráculo** (ADR-0119, [gateway-oraculo.md](gateway-oraculo.md)): Oráculo manda la llave de la persona en `Authorization: Bearer` y agrega `X-Oraculo-User`, `X-Oraculo-User-Id` y `X-Oraculo-Module`. Esos encabezados nunca cambian quién es la persona (lo dice la llave). Sin llave válida, el 401 dice «Oráculo no mandó una llave válida para el monitor…» en lugar de pedir usuario y contraseña, y si la llave es de otra persona queda una advertencia en el log.
+
 **Entrar, en pasos.** Cada paso responde un `ticket` (vence en 10 min) que va en el siguiente, y `next` dice qué sigue: `code`, `change_password`, `enroll` o `done`. Con el código apagado (lo normal desde ADR-0047), `POST /auth/login` ya responde `{"ticket": "", "next": "done", "me": {...}}` y deja la sesión en la cookie; solo una contraseña temporal pide antes `change_password`.
 
 ```bash
@@ -732,7 +734,9 @@ Las escrituras piden editor o dueño con el caso abierto.
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker.
-- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url}`, la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
+- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url, via_gateway}`.
+  - `oraculo_url`: la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
+  - `via_gateway`: `true` si la petición llegó por el gateway de Oráculo (`/m/noticias/`, ADR-0119). Entonces la pantalla no ofrece entrar con usuario y contraseña: el acceso lo da Oráculo.
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
   - Cada concepto trae `required_terms`: los nombres propios que la nota tiene que mencionar («Eternal»), de solo lectura. Hoy solo los llena la búsqueda rápida (ADR-0113). En los demás conceptos es `[]`.

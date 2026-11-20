@@ -14,6 +14,7 @@ Revisa lo que ve un navegador o un sistema:
   un superusuario.
 """
 
+import logging
 from collections.abc import Iterator
 
 import anyio
@@ -22,6 +23,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import SESSION_COOKIE
+from app.api.v1.app_config import AppConfigOut
 from app.application.use_cases.access import AccessAdmin
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role
@@ -470,3 +472,86 @@ def test_un_usuario_normal_no_abre_la_bitacora(client: TestClient, world: Access
     _enter(client, world, "ana", ana_secret)
 
     assert client.get(AUDIT).status_code == 403
+
+
+# --- Detrás del gateway de Oráculo (ADR-0119) ----------------------------------
+
+GATEWAY = {"X-Oraculo-Module": "noticias", "X-Oraculo-User": "benji", "X-Oraculo-User-Id": "42"}
+
+
+def test_por_oraculo_sin_llave_el_401_manda_con_el_administrador(client: TestClient) -> None:
+    response = client.get(ME, headers=GATEWAY)
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "auth_required"
+    message = response.json()["error"]["message"]
+    assert "Oráculo" in message
+    assert "usuario y contraseña" not in message
+
+
+def test_por_oraculo_con_llave_mala_el_401_dice_quien_era(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {**GATEWAY, "Authorization": "Bearer orc_live_nada"}
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        response = client.get(ME, headers=headers)
+
+    assert response.status_code == 401
+    assert "Oráculo" in response.json()["error"]["message"]
+    record = next(r for r in caplog.records if "sin llave válida" in r.getMessage())
+    assert record.__dict__["oraculo_user"] == "benji"
+    assert record.__dict__["oraculo_user_id"] == "42"
+
+
+def test_por_oraculo_con_la_llave_de_la_persona_entra_sin_aviso(
+    client: TestClient, world: AccessWorld, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {**GATEWAY, "Authorization": f"Bearer {_system_key(world, 1)}"}
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        me = client.get(ME, headers=headers)
+
+    assert me.status_code == 200
+    assert me.json()["username"] == "benji"
+    assert caplog.records == []
+
+
+def test_por_oraculo_la_llave_de_otra_persona_deja_un_aviso_una_vez(
+    client: TestClient, world: AccessWorld, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {
+        **GATEWAY,
+        "X-Oraculo-User": "jperez",
+        "Authorization": f"Bearer {_system_key(world, 1)}",
+    }
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        first = client.get(ME, headers=headers)
+        second = client.get(ME, headers=headers)
+
+    # La identidad sale de la llave, nunca del encabezado.
+    assert first.json()["username"] == "benji"
+    assert second.status_code == 200
+    warnings = [r for r in caplog.records if "otra persona" in r.getMessage()]
+    assert len(warnings) == 1
+    assert warnings[0].__dict__["oraculo_user"] == "jperez"
+    assert warnings[0].__dict__["monitor_user"] == "benji"
+
+
+def test_sin_gateway_el_401_sigue_pidiendo_usuario_y_contrasena(client: TestClient) -> None:
+    response = client.get(ME, headers={"X-Oraculo-User": "benji"})
+
+    assert "usuario y contraseña" in response.json()["error"]["message"]
+
+
+def test_app_config_dice_si_se_entro_por_oraculo(app: FastAPI, client: TestClient) -> None:
+    app.state.app_config = AppConfigOut(oraculo_url="http://oraculo.local")
+
+    direct = client.get("/api/v1/app-config").json()
+    gateway = client.get("/api/v1/app-config", headers=GATEWAY).json()
+
+    assert direct == {"oraculo_url": "http://oraculo.local", "via_gateway": False}
+    assert gateway == {"oraculo_url": "http://oraculo.local", "via_gateway": True}
+    # El valor guardado al arrancar no se toca: cada petición arma el suyo.
+    assert app.state.app_config.via_gateway is False
