@@ -36,17 +36,22 @@ describe('getAppConfig', () => {
   };
 
   it('dice si se entró por el gateway de Oráculo (ADR-0119)', async () => {
-    serve({ oraculo_url: null, via_gateway: true });
+    serve({ oraculo_url: null, via_gateway: true, password_login: false });
 
-    expect(await getAppConfig()).toEqual({ oraculo_url: null, via_gateway: true });
+    expect(await getAppConfig()).toEqual({
+      oraculo_url: null,
+      via_gateway: true,
+      password_login: false,
+    });
   });
 
-  it('un servidor anterior sin via_gateway cuenta como acceso directo', async () => {
+  it('un servidor anterior: acceso directo y con contraseña', async () => {
     serve({ oraculo_url: 'http://172.25.18.234' });
 
     expect(await getAppConfig()).toEqual({
       oraculo_url: 'http://172.25.18.234',
       via_gateway: false,
+      password_login: true,
     });
   });
 

@@ -18,6 +18,11 @@ export interface AppConfig {
    * acceso lo da Oráculo, así que no se pide usuario ni contraseña.
    */
   via_gateway: boolean;
+  /**
+   * Si se puede entrar con usuario y contraseña (ADR-0121). Apagado, el
+   * acceso es solo por Oráculo con la llave de API de cada persona.
+   */
+  password_login: boolean;
 }
 
 /** Lee la configuración pública. */
@@ -29,7 +34,10 @@ export async function getAppConfig(signal?: AbortSignal): Promise<AppConfig> {
   // Un servidor anterior no lo manda: entonces no se entró por Oráculo.
   const viaGateway = 'via_gateway' in body ? body.via_gateway : false;
   if (typeof viaGateway !== 'boolean') throw badFormat();
-  return { oraculo_url: url, via_gateway: viaGateway };
+  // Un servidor anterior no lo manda: entonces sí había contraseña.
+  const passwordLogin = 'password_login' in body ? body.password_login : true;
+  if (typeof passwordLogin !== 'boolean') throw badFormat();
+  return { oraculo_url: url, via_gateway: viaGateway, password_login: passwordLogin };
 }
 
 /**

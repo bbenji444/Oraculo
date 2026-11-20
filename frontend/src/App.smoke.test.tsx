@@ -701,6 +701,32 @@ describe('acceso con usuario, contraseña y código (ADR-0043)', () => {
     }
   });
 
+  it('sin entrada con contraseña, ni el acceso directo pide usuario (ADR-0121)', async () => {
+    ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234', password_login: false };
+    try {
+      renderApp(null);
+
+      expect(await screen.findByRole('heading', { name: 'Tu acceso lo da Oráculo' })).toBeTruthy();
+      expect(screen.queryByLabelText('Usuario')).toBeNull();
+      expect(screen.queryByLabelText('Contraseña')).toBeNull();
+    } finally {
+      ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234' };
+    }
+  });
+
+  it('sin entrada con contraseña y con sesión, no hay «Salir» ni «Mi contraseña»', async () => {
+    ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234', password_login: false };
+    try {
+      renderApp();
+
+      expect(await screen.findByText('Benjamin')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Salir' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Mi contraseña' })).toBeNull();
+    } finally {
+      ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234' };
+    }
+  });
+
   it('por Oráculo con sesión, no ofrece «Salir» ni «Mi contraseña» del monitor', async () => {
     ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234', via_gateway: true };
     try {

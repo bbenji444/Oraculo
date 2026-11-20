@@ -547,7 +547,37 @@ def test_app_config_dice_si_se_entro_por_oraculo(app: FastAPI, client: TestClien
     direct = client.get("/api/v1/app-config").json()
     gateway = client.get("/api/v1/app-config", headers=GATEWAY).json()
 
-    assert direct == {"oraculo_url": "http://oraculo.local", "via_gateway": False}
-    assert gateway == {"oraculo_url": "http://oraculo.local", "via_gateway": True}
+    base = {"oraculo_url": "http://oraculo.local", "password_login": False}
+    assert direct == {**base, "via_gateway": False}
+    assert gateway == {**base, "via_gateway": True}
     # El valor guardado al arrancar no se toca: cada petición arma el suyo.
     assert app.state.app_config.via_gateway is False
+
+
+def test_sin_entrada_con_contrasena_solo_entra_la_llave(
+    app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    """Benji, 20/11/2026: «quita la opción de la contraseña» (ADR-0121)."""
+    pepe = world.store.add_user("pepe")
+    _enter(client, world, "benji", secret)
+    del app.state.password_login
+
+    refused = [
+        client.post(LOGIN, json={"username": "benji", "password": "x"}, headers=SAME_ORIGIN),
+        client.post(
+            "/api/v1/auth/password",
+            json={"current_password": "x", "new_password": "y" * 16},
+            headers=SAME_ORIGIN,
+        ),
+        client.post(f"{USERS}/{pepe}/reset-password", headers=SAME_ORIGIN),
+        client.post(f"{USERS}/{pepe}/reset-totp", headers=SAME_ORIGIN),
+        client.put("/api/v1/access/settings", json={"totp_required": True}, headers=SAME_ORIGIN),
+    ]
+    issued = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+
+    assert [r.status_code for r in refused] == [409] * len(refused)
+    assert all("Oráculo" in r.json()["error"]["message"] for r in refused)
+    # Lo que no es contraseña sigue igual: la llave de API se genera y sirve.
+    assert issued.status_code == 201
+    bearer = {"Authorization": f"Bearer {issued.json()['key']}"}
+    assert client.get(ME, headers=bearer).json()["username"] == "pepe"

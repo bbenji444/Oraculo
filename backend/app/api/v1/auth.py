@@ -161,14 +161,20 @@ def get_authenticator(request: Request) -> Authenticator:
 
 
 def get_password_login(request: Request) -> PasswordLogin:
-    """El ingreso en pasos armado al arrancar (solo en modo ``keys``).
+    """El ingreso en pasos armado al arrancar (``keys`` con ``PASSWORD_LOGIN``).
+
+    También cuida las rutas de «Accesos» que solo sirven con contraseña
+    (restablecerla, reiniciar el Authenticator, pedir el código).
 
     Raises:
-        ConflictError: En modo ``dev``.
+        ConflictError: En modo ``dev`` o con la entrada con contraseña apagada
+            (ADR-0121): el acceso es por Oráculo con la llave de API.
     """
     login: PasswordLogin | None = getattr(request.app.state, "password_login", None)
     if login is None:
-        raise ConflictError("En modo de desarrollo no se entra con contraseña.")
+        raise ConflictError(
+            "La entrada con contraseña está apagada: el acceso es por Oráculo con la llave de API."
+        )
     return login
 
 

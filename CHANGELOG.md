@@ -8,6 +8,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Cambiado
 
+- **Sin entrada con contraseña: solo por Oráculo con la llave de API (20/11/2026, ADR-0121).** Benji: «quiero que quites la opción de la contraseña… solamente se van a comunicar los módulos mediante esta API».
+  - Sin sesión, la pantalla solo muestra «Tu acceso lo da Oráculo», también en el acceso directo. Ya no hay usuario, contraseña, código, «Salir» ni «Mi contraseña».
+  - En «Accesos» se ocultan el interruptor del código, «Restablecer contraseña», «Reiniciar autenticador» y la contraseña temporal.
+  - Las rutas de entrar con contraseña responden 409. `/app-config` suma `password_login`. Se puede volver a prender con `PASSWORD_LOGIN=true`.
+
 - **La llave de API se ve una sola vez (20/11/2026, ADR-0120, migración 0051).** Benji: «necesito que me permitas ver una sola vez la api key y después no se pueda ver de nuevo bajo ningún motivo, solo generar una nueva».
   - Al «Generar llave» o «Generar nueva» sale un aviso con la llave completa y «Copiar llave». Al cerrarlo ya no se puede volver a ver: el monitor solo guarda su huella.
   - Se quitaron «Ver» y «Copiar» del renglón «Llave de API», la ruta `GET /access/users/{id}/api-key` y la copia cifrada (`access_keys.secret_sealed`).

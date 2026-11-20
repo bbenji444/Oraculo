@@ -213,6 +213,10 @@ class Settings(BaseSettings):
     # Solo true cuando el monitor se sirva por HTTPS: con true el navegador no
     # manda la cookie por http://.
     auth_cookie_secure: bool = False
+    # Entrar a la pantalla con usuario y contraseña (ADR-0121). Apagado: el
+    # monitor solo se abre por el gateway de Oráculo, que manda la llave de
+    # API de cada persona; las rutas de contraseña y código responden 409.
+    password_login: bool = False
     # Usuario con el que se entra en AUTH_MODE=dev (y que firma en la bitácora).
     dev_user: str = Field(default=_DEFAULT_DEV_USER, min_length=1)
 

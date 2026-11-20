@@ -157,15 +157,17 @@ function Gate({ children }: { children?: ReactNode }) {
 }
 
 /**
- * Sin sesión: el formulario de entrada o, si se abrió desde Oráculo, el
- * aviso de que el acceso lo da Oráculo (ADR-0119).
+ * Sin sesión: el aviso de que el acceso lo da Oráculo (ADR-0119). El
+ * formulario de usuario y contraseña solo sale si el servidor lo tiene
+ * prendido (`PASSWORD_LOGIN`, ADR-0121) y no se entró por Oráculo.
  */
 function SignIn() {
   const config = useAppConfig();
   // Mientras se sabe por dónde se entró, el universo solo, sin un formulario
   // que luego desaparezca. Si la configuración falla, se ofrece entrar.
   if (config.isPending) return null;
-  return config.data?.via_gateway ? <GatewayNotice /> : <LoginScreen />;
+  const withPassword = config.data?.password_login === true && !config.data.via_gateway;
+  return withPassword ? <LoginScreen /> : <GatewayNotice />;
 }
 
 export function App() {

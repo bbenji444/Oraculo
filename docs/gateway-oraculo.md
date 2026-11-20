@@ -29,7 +29,7 @@ La llave viaja solo **Oráculo → monitor** (servidor a servidor).
 ### Qué Oráculo **no** tiene que construir
 
 - Altas de usuarios del monitor ni sus llaves (ya está en «Accesos»).
-- Login propio del monitor para el usuario final: entra por el hub de Oráculo.
+- Login propio del monitor: **no existe**. La entrada con usuario y contraseña está apagada (`PASSWORD_LOGIN=false`, ADR-0121); solo se entra por Oráculo con la llave de API.
 - Roles del monitor: los decide el monitor según la llave.
 
 Oráculo solo necesita: **proxy + Bearer en cada petición + campo «llave del módulo» por usuario**.
@@ -98,7 +98,8 @@ Salud del servicio (sin llave): `GET http://<vm>:8080/api/v1/health` → 200 o 5
 
 ### 3.2 Llave por usuario (paso a paso)
 
-1. **En el monitor**, un superusuario entra por acceso directo → pestaña **«Accesos»**.
+1. **En el monitor**, un superusuario entra **por Oráculo** (con su propia llave ya pegada) → pestaña **«Accesos»**.
+   - **Primera vez** (el superusuario aún no tiene llave en Oráculo): en la VM, `make crear-llave ARGS="--usuario benji"` la muestra una vez; se pega en Oráculo para ese usuario y ya se puede entrar a «Accesos».
 2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Generar llave»** (o **«Generar nueva»** si ya tiene una).
    - Sale un aviso con la llave completa y **«Copiar llave»**. **Es la única vez que se ve**: el monitor solo guarda su huella y no la puede volver a mostrar bajo ningún motivo (ADR-0120).
    - Si se pierde, no se recupera: **«Generar nueva»**, que deja sin servir la anterior.
@@ -178,7 +179,7 @@ La pantalla navega con `#/explorar`, `#/casos`, etc. El prefijo no le afecta y n
 
 ### 5.2 Rutas públicas de la API (sin llave)
 
-`GET /api/v1/health`, `GET /api/v1/app-config` (dirección de Oráculo y `via_gateway`), los pasos de `POST /api/v1/auth/login…` y `POST /api/v1/auth/logout`. Las de entrar solo sirven en acceso directo.
+`GET /api/v1/health`, `GET /api/v1/app-config` (dirección de Oráculo, `via_gateway` y `password_login`) y `POST /api/v1/auth/logout`. Las de entrar con contraseña (`POST /api/v1/auth/login…`) responden **409**: la entrada con contraseña está apagada (ADR-0121).
 
 ### 5.3 Rutas que necesitan 240 s
 

@@ -32,7 +32,9 @@ export function UserCapsule({ me }: { me: Me }) {
   // Mientras no se sabe, sin botones: así no aparecen y desaparecen al entrar
   // por Oráculo. Si la configuración falla, se muestran (acceso directo).
   const viaGateway = config.data?.via_gateway ?? config.isPending;
-  const withSession = me.auth_mode === 'keys' && !viaGateway;
+  // Sin entrada con contraseña no hay «Mi contraseña» ni «Salir» (ADR-0121).
+  const withSession =
+    me.auth_mode === 'keys' && !viaGateway && config.data?.password_login === true;
 
   return (
     <div className="user-capsule" role="group" aria-label="Tu sesión">

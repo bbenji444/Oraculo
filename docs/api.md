@@ -80,6 +80,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
 | `GET /access/settings` · `PUT /access/settings` | `{"totp_required": true \| false}`: si al entrar se pide el código de 6 dígitos. Aplica desde el siguiente ingreso; queda en la bitácora (ADR-0047) |
+| (ADR-0121) | Con `PASSWORD_LOGIN` apagado (el valor por defecto), `POST /auth/login…`, `POST /auth/password`, `reset-password`, `reset-totp` y `PUT /access/settings` responden `409`: solo se entra con llave |
 | `POST /access/users/{id}/api-key` | Genera su **llave de API** (`201`, `{"key", "info"}`, `Cache-Control: no-store`); la anterior deja de servir al instante. **Es la única vez que sale completa**: no hay ruta para volver a leerla (ADR-0120). La persona nueva nace sin llave. En `GET /access/users` cada persona trae `api_key` enmascarada |
 | `DELETE /access/users/{id}` | Borra a la persona (`204`, borrado lógico): sale de la lista, ya no entra, se revocan sus llaves, se apagan sus envíos programados (la bitácora dice cuáles en `envios_apagados`) y se cierran sus sesiones. Sus búsquedas y la bitácora se quedan y su usuario queda reservado. No te puedes borrar a ti mismo ni al último superusuario (`409`) |
 | `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
@@ -733,7 +734,7 @@ Las escrituras piden editor o dueño con el caso abierto.
 ## Otras rutas
 
 - **`/health`:** estado de la API, la base, Redis y el worker, y `auth_mode` (`keys` si pide llave; `dev` si entra cualquiera, solo en la PC). `make up` se niega a arrancar en `dev` si nginx escucha fuera de la propia máquina (ADR-0119).
-- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url, via_gateway}`.
+- **`/app-config`:** configuración pública de la pantalla: `{oraculo_url, via_gateway, password_login}`. `password_login` (ADR-0121) dice si la pantalla ofrece usuario y contraseña; por defecto `false`.
   - `oraculo_url`: la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
   - `via_gateway`: `true` si la petición llegó por el gateway de Oráculo (`/m/noticias/`, ADR-0119). Entonces la pantalla no ofrece entrar con usuario y contraseña: el acceso lo da Oráculo.
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.

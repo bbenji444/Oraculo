@@ -19,3 +19,11 @@ export function useAppConfig() {
     retry: 1,
   });
 }
+
+/**
+ * Si la pantalla ofrece contraseña y código (ADR-0121). Mientras no se sabe,
+ * no: así no aparecen y desaparecen opciones que casi siempre están apagadas.
+ */
+export function usePasswordLogin(): boolean {
+  return useAppConfig().data?.password_login ?? false;
+}

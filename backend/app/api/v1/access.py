@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from app.api.auth import SuperUser, client_ip
 from app.api.errors import ERROR_RESPONSES, error_responses
+from app.api.v1.auth import get_password_login
 from app.application.ports.access import UserChanges
 from app.application.use_cases.access import AccessAdmin
 from app.application.use_cases.audit_trail import ReadAuditTrail
@@ -303,7 +304,9 @@ async def delete_user(request: Request, admin: Admin, user: SuperUser, user_id: 
     "/users/{user_id}/reset-password",
     response_model=TemporaryPasswordOut,
     summary="Restablecer la contraseña (la olvidó)",
-    responses=error_responses(404),
+    responses=error_responses(404, 409),
+    # Solo con la entrada con contraseña prendida (ADR-0121).
+    dependencies=[Depends(get_password_login)],
 )
 async def reset_password(
     request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
@@ -318,7 +321,8 @@ async def reset_password(
     "/users/{user_id}/reset-totp",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Reiniciar su Microsoft Authenticator (cambió de celular)",
-    responses=error_responses(404),
+    responses=error_responses(404, 409),
+    dependencies=[Depends(get_password_login)],
 )
 async def reset_totp(request: Request, admin: Admin, user: SuperUser, user_id: UserId) -> Response:
     """Borra su código; al volver a entrar escanea un QR nuevo. Cierra sus sesiones."""
@@ -408,6 +412,8 @@ async def auth_settings(admin: Admin, user: SuperUser) -> AuthSettingsOut:
     "/settings",
     response_model=AuthSettingsOut,
     summary="Prender o apagar el código al entrar",
+    responses=error_responses(409),
+    dependencies=[Depends(get_password_login)],
 )
 async def save_auth_settings(
     body: AuthSettingsIn, request: Request, admin: Admin, user: SuperUser

@@ -26,6 +26,13 @@ class AppConfigOut(BaseModel):
         description="Sistema principal de Oráculo; sin valor, no hay botón para regresar.",
         examples=["http://172.25.18.234"],
     )
+    password_login: bool = Field(
+        default=False,
+        description=(
+            "Si se puede entrar con usuario y contraseña (PASSWORD_LOGIN, ADR-0121). "
+            "Apagado, el acceso es solo por Oráculo con la llave de API de cada persona."
+        ),
+    )
     via_gateway: bool = Field(
         default=False,
         description=(
