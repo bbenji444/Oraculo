@@ -1,47 +1,41 @@
 /**
  * La llave de API de una persona en «Accesos» (ADR-0047): para conectarla con
- * el resto de Oráculo.
+ * el resto de Oráculo (el gateway la manda en cada petición, ADR-0119).
  *
- * Benji, 11/11/2026: «cada usuario debe tener su propia API key… que tú puedas
- * copiar». Se ve enmascarada (orc_live_a1b2c3d4…) y tiene tres botones:
- * - «Ver»: la muestra completa ahí mismo (y otra vez la oculta);
- * - «Copiar»: la copia al portapapeles;
- * - «Generar nueva»: crea otra; la anterior deja de servir al instante, así
- *   que pide confirmar.
+ * Se ve enmascarada (orc_live_a1b2c3d4…). La completa aparece **una sola vez**,
+ * en el aviso que sale al generarla (ADR-0120). Benji, 20/11/2026: «ver una sola
+ * vez la api key y después no se pueda ver de nuevo bajo ningún motivo, solo
+ * generar una nueva». El servidor solo guarda su huella, así que no hay botón
+ * para volver a verla: si se pierde, «Generar nueva», que deja sin servir la
+ * anterior al instante y por eso pide confirmar.
  *
- * Cada vez que se trae la llave completa queda en la bitácora del servidor.
  * La llave nunca se guarda en la caché ni en el navegador: solo vive en el
- * estado de este renglón mientras está a la vista.
+ * estado de este renglón mientras el aviso está abierto.
  *
- * No hace: no decide quién puede verla (eso es del servidor: solo superusuarios).
+ * No hace: no decide quién puede generarla (eso es del servidor: solo superusuarios).
  */
 import { useState } from 'react';
 
-import { useNewApiKey, useShowApiKey } from '../../hooks/useAccess';
+import { useNewApiKey } from '../../hooks/useAccess';
 import type { AccessUser } from '../../services/access';
-import { copyText } from '../../ui/copyText';
 import { HudButton } from '../ui/HudButton';
-import { Icon } from '../ui/Icon';
+import { NewKeyNotice } from './NewKeyNotice';
 
-// Cuánto se queda el aviso «Copiada».
-const COPIED_MS = 2000;
+// La llave de API es una por persona: generar otra ya revoca la anterior.
+const API_KEY_LOST_HINT = 'Si se pierde, genera una nueva: esta dejará de servir.';
 
 export function ApiKeyRow({ user }: { user: AccessUser }) {
-  const show = useShowApiKey();
   const create = useNewApiKey();
-  const [visible, setVisible] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [fresh, setFresh] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const error = show.error ?? create.error;
 
-  const copy = async () => {
-    const key = visible ?? (await show.mutateAsync(user.id)).key;
-    if (await copyText(key)) {
-      setCopied(true);
-      window.setTimeout(() => {
-        setCopied(false);
-      }, COPIED_MS);
-    }
+  const generate = () => {
+    create.mutate(user.id, {
+      onSuccess: (issued) => {
+        setFresh(issued.key);
+        setConfirming(false);
+      },
+    });
   };
 
   return (
@@ -50,62 +44,12 @@ export function ApiKeyRow({ user }: { user: AccessUser }) {
         Llave de API
       </span>
       <code className="min-w-0 flex-1 break-all font-mono text-xs text-slate-200">
-        {visible ?? user.api_key ?? 'Sin llave todavía'}
+        {user.api_key ?? 'Sin llave todavía'}
       </code>
-      {user.api_key && (
-        <>
-          <HudButton
-            size="sm"
-            variant="ghost"
-            disabled={show.isPending}
-            onClick={() => {
-              if (visible) {
-                setVisible(null);
-                return;
-              }
-              show.mutate(user.id, {
-                onSuccess: (issued) => {
-                  setVisible(issued.key);
-                },
-              });
-            }}
-          >
-            {visible ? 'Ocultar' : 'Ver'}
-          </HudButton>
-          <HudButton
-            size="sm"
-            variant="ghost"
-            disabled={show.isPending}
-            onClick={() => {
-              void copy();
-            }}
-          >
-            {copied ? (
-              <>
-                Copiada <Icon name="check" />
-              </>
-            ) : (
-              'Copiar'
-            )}
-          </HudButton>
-        </>
-      )}
       {confirming ? (
         <span className="flex items-center gap-2 text-xs text-amber-200">
           La llave actual dejará de servir.
-          <HudButton
-            size="sm"
-            variant="danger"
-            disabled={create.isPending}
-            onClick={() => {
-              create.mutate(user.id, {
-                onSuccess: (issued) => {
-                  setVisible(issued.key);
-                  setConfirming(false);
-                },
-              });
-            }}
-          >
+          <HudButton size="sm" variant="danger" disabled={create.isPending} onClick={generate}>
             Sí, generar
           </HudButton>
           <HudButton
@@ -124,21 +68,26 @@ export function ApiKeyRow({ user }: { user: AccessUser }) {
           disabled={create.isPending || !user.is_active}
           onClick={() => {
             if (user.api_key) setConfirming(true);
-            else
-              create.mutate(user.id, {
-                onSuccess: (issued) => {
-                  setVisible(issued.key);
-                },
-              });
+            else generate();
           }}
         >
           {user.api_key ? 'Generar nueva' : 'Generar llave'}
         </HudButton>
       )}
-      {error && (
+      {create.error && (
         <p role="alert" className="basis-full text-xs text-rose-300">
-          {error.message}
+          {create.error.message}
         </p>
+      )}
+      {fresh && (
+        <NewKeyNotice
+          fullKey={fresh}
+          owner={user.display_name}
+          lostHint={API_KEY_LOST_HINT}
+          onClose={() => {
+            setFresh(null);
+          }}
+        />
       )}
     </div>
   );

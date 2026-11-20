@@ -64,8 +64,8 @@ class NewKeyRow:
         key_hash: Huella HMAC.
         label: Para qué es.
         expires_at: Vencimiento.
-        secret_sealed: La llave completa cifrada, si se debe poder volver a
-            ver (llave de API del usuario, ADR-0047); ``None`` en las demás.
+        is_api_key: Si es la llave de API de la persona (ADR-0047). Nunca se
+            guarda la llave completa: solo se ve al crearla (ADR-0120).
     """
 
     user_id: int
@@ -73,7 +73,7 @@ class NewKeyRow:
     key_hash: str
     label: str
     expires_at: datetime | None
-    secret_sealed: str | None = None
+    is_api_key: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,10 +237,6 @@ class AccessStorePort(Protocol):
 
     async def create_key(self, key: NewKeyRow, audit: AuditEntry) -> KeyInfo:
         """Guarda la huella de una llave nueva."""
-        ...
-
-    async def api_key(self, user_id: int) -> tuple[KeyInfo, str] | None:
-        """La llave de API visible más nueva y vigente, con su texto cifrado (ADR-0047)."""
         ...
 
     async def totp_required(self) -> bool:

@@ -37,10 +37,10 @@ _USER_COLUMNS = """
            u.must_change_password, u.totp_secret IS NOT NULL AS totp_enrolled,
            CASE WHEN u.locked_until > now() THEN u.locked_until END AS locked_until,
            (SELECT count(*) FROM access_keys k WHERE k.user_id = u.id AND k.revoked_at IS NULL
-              AND k.secret_sealed IS NULL
+              AND NOT k.is_api_key
               AND (k.expires_at IS NULL OR k.expires_at > now())) AS active_keys,
            (SELECT k.key_prefix FROM access_keys k WHERE k.user_id = u.id
-              AND k.revoked_at IS NULL AND k.secret_sealed IS NOT NULL
+              AND k.revoked_at IS NULL AND k.is_api_key
               AND (k.expires_at IS NULL OR k.expires_at > now())
               ORDER BY k.created_at DESC, k.id DESC LIMIT 1) AS api_key_prefix
     FROM users u
@@ -94,12 +94,12 @@ _REVOKE_USER_KEYS = text(
 )
 _KEY_COLUMNS = (
     "id, user_id, key_prefix, label, created_by, created_at, expires_at, revoked_at, "
-    "last_used_at, host(last_used_ip) AS last_used_ip, secret_sealed IS NOT NULL AS revealable"
+    "last_used_at, host(last_used_ip) AS last_used_ip, is_api_key"
 )
 # Las columnas son la lista fija de arriba; los valores van como parámetros.
 _INSERT_KEY = text(
     "INSERT INTO access_keys (user_id, key_prefix, key_hash, label, created_by, expires_at, "  # noqa: S608 — columnas fijas
-    f"secret_sealed) VALUES (:u, :p, :h, :l, :by, :x, :sealed) RETURNING {_KEY_COLUMNS}"
+    f"is_api_key) VALUES (:u, :p, :h, :l, :by, :x, :api) RETURNING {_KEY_COLUMNS}"
 )
 _REVOKE_KEY = text(
     "UPDATE access_keys SET revoked_at = coalesce(revoked_at, now()) "  # noqa: S608 — columnas fijas
@@ -178,7 +178,7 @@ def _key(row: RowMapping) -> KeyInfo:
         revoked_at=row["revoked_at"],
         last_used_at=row["last_used_at"],
         last_used_ip=row["last_used_ip"],
-        revealable=row["revealable"],
+        is_api_key=row["is_api_key"],
     )
 
 
@@ -441,7 +441,7 @@ class PostgresAccessStore:
                             "l": key.label,
                             "by": audit.actor.user_id,
                             "x": key.expires_at,
-                            "sealed": key.secret_sealed,
+                            "api": key.is_api_key,
                         },
                     )
                 )
@@ -450,27 +450,6 @@ class PostgresAccessStore:
             )
             await _audit(conn, audit, "access_key", str(row["id"]))
         return _key(row)
-
-    async def api_key(self, user_id: int) -> tuple[KeyInfo, str] | None:
-        """Ver ``AccessStorePort.api_key``."""
-        async with self._engine.connect() as conn:
-            row = (
-                (
-                    await conn.execute(
-                        text(
-                            f"SELECT {_KEY_COLUMNS}, secret_sealed FROM access_keys "  # noqa: S608 — columnas fijas
-                            "WHERE user_id = :u AND revoked_at IS NULL "
-                            "AND secret_sealed IS NOT NULL "
-                            "AND (expires_at IS NULL OR expires_at > now()) "
-                            "ORDER BY created_at DESC, id DESC LIMIT 1"
-                        ),
-                        {"u": user_id},
-                    )
-                )
-                .mappings()
-                .first()
-            )
-        return (_key(row), str(row["secret_sealed"])) if row else None
 
     async def totp_required(self) -> bool:
         """Ver ``AccessStorePort.totp_required``."""

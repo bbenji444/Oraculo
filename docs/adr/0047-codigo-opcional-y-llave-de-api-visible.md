@@ -1,6 +1,6 @@
 # ADR-0047: Código de 6 dígitos opcional y llave de API visible por usuario
 
-- **Estado:** aceptada
+- **Estado:** aceptada. La copia cifrada y «Ver»/«Copiar» los reemplaza el ADR-0120 (20/11/2026): la llave se ve una sola vez
 - **Fecha:** 2026-11-11
 - **Fase:** F12
 - **Relacionadas:** ADR-0042 (llaves y seguridad por filas), ADR-0043 (contraseña, código y token interno)

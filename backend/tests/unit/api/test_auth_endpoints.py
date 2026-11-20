@@ -371,12 +371,10 @@ def test_sin_codigo_la_contrasena_abre_la_sesion(client: TestClient, world: Acce
     assert client.get(ME).json()["username"] == "benji"
 
 
-def test_el_superusuario_prende_el_codigo_y_copia_llaves(
+def test_el_superusuario_prende_el_codigo_y_ve_la_llave_una_vez(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
 
@@ -384,14 +382,18 @@ def test_el_superusuario_prende_el_codigo_y_copia_llaves(
         "/api/v1/access/settings", json={"totp_required": False}, headers=SAME_ORIGIN
     )
     created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+    # Benji, 20/11/2026: «ver una sola vez la api key y después no se pueda ver
+    # de nuevo bajo ningún motivo» (ADR-0120). Ya no hay ruta para leerla.
     shown = client.get(f"{USERS}/{pepe}/api-key")
     listed = client.get(USERS).json()["items"]
 
     assert switched.json() == {"totp_required": False}
     assert client.get("/api/v1/access/settings").json() == {"totp_required": False}
     assert created.status_code == 201
-    assert shown.json()["key"] == created.json()["key"]
-    assert shown.headers["Cache-Control"] == "no-store"
+    assert created.json()["key"].startswith("orc_live_")
+    assert created.headers["Cache-Control"] == "no-store"
+    assert shown.status_code == 405
+    assert created.json()["key"] not in shown.text
     pepe_row = next(u for u in listed if u["username"] == "pepe")
     assert pepe_row["api_key"].endswith("…")
     assert created.json()["key"] not in pepe_row["api_key"]
@@ -401,9 +403,7 @@ def test_las_llaves_de_sistema_no_cuentan_la_llave_de_api(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
     """Benji, 12/11/2026: «¿por qué yo tengo dos llaves?» (una era la de API)."""
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
     client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
@@ -429,18 +429,15 @@ def test_las_llaves_de_sistema_no_cuentan_la_llave_de_api(
     assert [k["label"] for k in keys_with_system] == ["Servidor de reportes"]
 
 
-def test_la_bitacora_dice_quien_vio_la_llave(
+def test_la_bitacora_dice_quien_genero_la_llave(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
     created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN).json()
-    client.get(f"{USERS}/{pepe}/api-key")
 
-    response = client.get(AUDIT, params={"group": "access", "limit": 2})
+    response = client.get(AUDIT, params={"group": "access", "limit": 1})
     page = response.json()
     rest = client.get(AUDIT, params={"group": "access", "before": page["next_before"]}).json()
     searches = client.get(AUDIT, params={"group": "searches"}).json()
@@ -449,15 +446,14 @@ def test_la_bitacora_dice_quien_vio_la_llave(
     assert response.headers["Cache-Control"] == "no-store"
     newest = page["items"][0]
     assert (newest["action"], newest["actor"], newest["actor_name"]) == (
-        "access_key.revealed",
+        "access_key.created",
         "benji",
         "Benji",
     )
-    assert newest["details"]["de"] == "pepe"
+    assert newest["details"]["para"] == "pepe"
     # La llave va enmascarada: nunca completa en la bitácora.
     assert created["key"] not in response.text
     assert newest["details"]["llave"].endswith("…")
-    assert [i["action"] for i in page["items"]][1] == "access_key.created"
     assert page["next_before"] is not None
     assert rest["items"][0]["action"] == "auth.login"
     assert rest["next_before"] is None

@@ -197,15 +197,11 @@ function apiKeyOf(data: unknown): IssuedKey {
 }
 
 /**
- * La llave de API completa de una persona, para verla o copiarla.
+ * Genera la llave de API de una persona; la anterior deja de servir al instante.
  *
- * @throws {ApiError} `access_key_not_found` si todavía no tiene una.
+ * Es la única vez que llega completa: el servidor no la puede volver a
+ * mostrar (ADR-0120).
  */
-export async function showApiKey(userId: number): Promise<IssuedKey> {
-  return apiKeyOf(await requestJson(apiUrl(`access/users/${String(userId)}/api-key`)));
-}
-
-/** Genera la llave de API de una persona; la anterior deja de servir al instante. */
 export async function newApiKey(userId: number): Promise<IssuedKey> {
   return apiKeyOf(
     await requestJson(apiUrl(`access/users/${String(userId)}/api-key`), { method: 'POST' }),

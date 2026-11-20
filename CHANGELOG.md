@@ -6,6 +6,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **La llave de API se ve una sola vez (20/11/2026, ADR-0120, migración 0051).** Benji: «necesito que me permitas ver una sola vez la api key y después no se pueda ver de nuevo bajo ningún motivo, solo generar una nueva».
+  - Al «Generar llave» o «Generar nueva» sale un aviso con la llave completa y «Copiar llave». Al cerrarlo ya no se puede volver a ver: el monitor solo guarda su huella.
+  - Se quitaron «Ver» y «Copiar» del renglón «Llave de API», la ruta `GET /access/users/{id}/api-key` y la copia cifrada (`access_keys.secret_sealed`).
+  - La persona nueva nace sin llave: se genera cuando se va a copiar.
+  - Las llaves que ya existen siguen sirviendo, incluidas las pegadas en Oráculo.
+
 ### Agregado
 
 - **El monitor, listo para abrirse dentro de Oráculo (20/11/2026, ADR-0119).** Benji: «vamos a dejar el monitor listo igual que OSINT». La entrega para Oráculo y los agentes de IA del equipo está en `docs/gateway-oraculo.md`.

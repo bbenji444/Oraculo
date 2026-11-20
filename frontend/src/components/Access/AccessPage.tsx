@@ -5,7 +5,7 @@
  * - Arriba, el interruptor «Pedir código de Microsoft Authenticator al entrar»
  *   (`LoginSettings`): apagado, basta usuario y contraseña.
  * - Cada persona trae su **llave de API** (`ApiKeyRow`) para conectarla con
- *   el resto de Oráculo: ver, copiar o generar otra.
+ *   el resto de Oráculo: se ve completa una sola vez, al generarla (ADR-0120).
  *
  * - «+ Nueva persona» da de alta a alguien con una contraseña temporal, que
  *   se muestra una sola vez; al entrar la cambia y conecta su Authenticator.
@@ -14,7 +14,7 @@
  * - «Editar» cambia nombre, correo, rol o la desactiva, y tiene la sección
  *   «Seguridad»: restablecer contraseña o reiniciar autenticador.
  * - «Llaves de sistema» son para otros programas (no para personas).
- * - «Bitácora» (`AuditTrail`): quién entró, quién vio o generó cada llave y
+ * - «Bitácora» (`AuditTrail`): quién entró, quién generó cada llave y
  *   quién buscó o cambió algo, con la hora y desde dónde.
  *
  * No hace: no aplica reglas (el servidor impide, por ejemplo, quitarte tu

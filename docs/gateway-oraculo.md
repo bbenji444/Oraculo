@@ -20,7 +20,7 @@ Este documento confirma que el monitor cumple el contrato de `gateway_modulos_ag
 | Cabeceras opcionales | `X-Oraculo-User`, `X-Oraculo-User-Id`, `X-Oraculo-Module` (solo bitácora y aviso en pantalla) |
 | Llave en la URL (`?api_key=`) | **No existe**: la llave solo se acepta en el encabezado |
 | Quién genera la llave | **El monitor** (pestaña «Accesos» o consola). Oráculo solo la **guarda y reenvía** |
-| Dónde viven usuarios y llaves | **PostgreSQL del monitor** (tabla `access_keys`): huella HMAC para validar y copia cifrada (AES-256-GCM) para poder volver a mostrarla. **No** en `apis_control` ni en la base de Oráculo |
+| Dónde viven usuarios y llaves | **PostgreSQL del monitor** (tabla `access_keys`): solo la huella HMAC para validar. **La llave completa se ve una sola vez**, al generarla; el monitor no la puede volver a mostrar. **No** en `apis_control` ni en la base de Oráculo |
 | Tiempo de espera | **240 s** en las rutas largas (sección 5.3); el resto cabe en los 30 s por defecto |
 
 El navegador del usuario final **no** debe ver la IP de la VM ni la llave.
@@ -99,9 +99,10 @@ Salud del servicio (sin llave): `GET http://<vm>:8080/api/v1/health` → 200 o 5
 ### 3.2 Llave por usuario (paso a paso)
 
 1. **En el monitor**, un superusuario entra por acceso directo → pestaña **«Accesos»**.
-2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Copiar»**. Si dice «Sin llave todavía», primero **«Generar llave»**.
-   - La llave se puede volver a copiar cuando se necesite: el monitor guarda una copia cifrada que solo ve un superusuario.
-   - **Para Oráculo usa siempre esta «Llave de API».** `make crear-llave` (consola) crea otra cosa: una *llave de sistema* que no aparece en ese renglón, no se puede volver a copiar y que «Generar nueva» no mata.
+2. En la persona (si no existe, **«Nueva persona»**), renglón **«Llave de API»** → **«Generar llave»** (o **«Generar nueva»** si ya tiene una).
+   - Sale un aviso con la llave completa y **«Copiar llave»**. **Es la única vez que se ve**: el monitor solo guarda su huella y no la puede volver a mostrar bajo ningún motivo (ADR-0120).
+   - Si se pierde, no se recupera: **«Generar nueva»**, que deja sin servir la anterior.
+   - **Para Oráculo usa siempre esta «Llave de API».** `make crear-llave` (consola) crea otra cosa: una *llave de sistema* que no aparece en ese renglón y que «Generar nueva» no mata.
 3. **En Oráculo** → Usuarios → Editar → **Módulos externos**: pegar la llave para el módulo `noticias` (una línea, sin espacios).
 4. Sin llave pegada → el usuario no debe poder abrir el módulo.
 
@@ -288,7 +289,7 @@ curl -sS -b cookies-oraculo.txt -o /dev/null -w "%{http_code}\n" -r 0-16383 http
 - [x] URLs relativas en HTML, JS, CSS y mapas
 - [x] No asumir que el Host del navegador es el del módulo
 - [x] Panel para crear personas y emitir llaves para pegar en Oráculo («Accesos»)
-- [x] Llaves en la base del monitor: huella HMAC y copia cifrada; renovar mata la anterior
+- [x] Llaves en la base del monitor: solo la huella HMAC; la llave se ve una sola vez al generarla y renovar mata la anterior
 - [x] IP real del analista desde el gateway; lista de IP lista para encenderse
 - [x] 240 s en las rutas largas
 - [x] Probado con un Oráculo simulado (nginx que quita el prefijo e inyecta la llave): pantalla, API, 206 en mapas, IP real en la bitácora, aviso con llave mala

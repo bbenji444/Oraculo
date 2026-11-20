@@ -417,21 +417,6 @@ async def save_auth_settings(
     return AuthSettingsOut(totp_required=required)
 
 
-@router.get(
-    "/users/{user_id}/api-key",
-    response_model=ApiKeyOut,
-    summary="Ver la llave de API de una persona",
-    responses=error_responses(404),
-)
-async def show_api_key(
-    request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
-) -> ApiKeyOut:
-    """La llave completa, para copiarla; queda en la bitácora quién la vio."""
-    shown = await admin.show_api_key(user, client_ip(request), user_id)
-    response.headers["Cache-Control"] = "no-store"
-    return ApiKeyOut(key=shown.key.full, info=KeyOut.of(shown.info))
-
-
 @router.post(
     "/users/{user_id}/api-key",
     response_model=ApiKeyOut,
@@ -442,7 +427,11 @@ async def show_api_key(
 async def new_api_key(
     request: Request, response: Response, admin: Admin, user: SuperUser, user_id: UserId
 ) -> ApiKeyOut:
-    """Crea una llave nueva; la anterior deja de servir al instante."""
+    """Crea una llave nueva y la entrega completa por única vez (ADR-0120).
+
+    La anterior deja de servir al instante. El servidor solo guarda su huella:
+    nunca la puede volver a mostrar.
+    """
     issued = await admin.new_api_key(user, client_ip(request), user_id)
     response.headers["Cache-Control"] = "no-store"
     return ApiKeyOut(key=issued.key.full, info=KeyOut.of(issued.info))

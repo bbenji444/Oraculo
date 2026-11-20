@@ -16,7 +16,6 @@ import {
   listAudit,
   newApiKey,
   saveAuthSettings,
-  showApiKey,
   issueKey,
   listKeys,
   listUsers,
@@ -122,11 +121,7 @@ export function useSaveAuthSettings() {
   });
 }
 
-/** Trae la llave de API completa (no se guarda en la caché: cada vista queda en la bitácora). */
-export function useShowApiKey() {
-  return useMutation({ mutationFn: (userId: number) => showApiKey(userId) });
-}
-
+/** Genera la llave de API; la completa solo viene en esta respuesta (ADR-0120). */
 export function useNewApiKey() {
   const refresh = useRefresh();
   return useMutation({ mutationFn: (userId: number) => newApiKey(userId), onSuccess: refresh });

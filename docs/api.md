@@ -80,8 +80,7 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 | `POST /access/users` | Alta: `{"username": "ana.lopez", "display_name": "Ana López", "email": null, "role": "user"}` → `{"user", "temporary_password"}` (**única vez que sale**) |
 | `PATCH /access/users/{id}` | Cambia `display_name`, `email` (`""` lo borra), `role` o `is_active`. Desactivar o cambiar el rol cierra sus sesiones |
 | `GET /access/settings` · `PUT /access/settings` | `{"totp_required": true \| false}`: si al entrar se pide el código de 6 dígitos. Aplica desde el siguiente ingreso; queda en la bitácora (ADR-0047) |
-| `GET /access/users/{id}/api-key` | La **llave de API** completa de la persona `{"key", "info"}`, para copiarla. Cada vista queda en la bitácora; `404` si todavía no tiene. En `GET /access/users` cada persona trae `api_key` enmascarada |
-| `POST /access/users/{id}/api-key` | Genera su llave de API (`201`); la anterior deja de servir al instante. Cada persona nueva ya nace con una |
+| `POST /access/users/{id}/api-key` | Genera su **llave de API** (`201`, `{"key", "info"}`, `Cache-Control: no-store`); la anterior deja de servir al instante. **Es la única vez que sale completa**: no hay ruta para volver a leerla (ADR-0120). La persona nueva nace sin llave. En `GET /access/users` cada persona trae `api_key` enmascarada |
 | `DELETE /access/users/{id}` | Borra a la persona (`204`, borrado lógico): sale de la lista, ya no entra, se revocan sus llaves, se apagan sus envíos programados (la bitácora dice cuáles en `envios_apagados`) y se cierran sus sesiones. Sus búsquedas y la bitácora se quedan y su usuario queda reservado. No te puedes borrar a ti mismo ni al último superusuario (`409`) |
 | `POST /access/users/{id}/reset-password` | Contraseña temporal nueva (`{"temporary_password"}`); cierra sus sesiones |
 | `POST /access/users/{id}/reset-totp` | Borra su Authenticator (`204`); escaneará un QR nuevo. Cierra sus sesiones |
