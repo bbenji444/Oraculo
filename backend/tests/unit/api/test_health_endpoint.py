@@ -53,6 +53,20 @@ def test_todo_ok_responde_200_con_cada_componente(app: FastAPI) -> None:
     assert [c["name"] for c in body["components"]] == ["api", "database"]
     assert body["components"][1]["info"] == {"postgis": "3.6"}
     assert body["components"][0]["latency_ms"] is not None
+    # create_app() sin ajustes toma AUTH_MODE del entorno de pruebas.
+    assert body["auth_mode"] in {"dev", "keys"}
+
+
+def test_dice_si_la_api_pide_llave(app: FastAPI) -> None:
+    client = use_probes(app, ComponentHealth.ok("api"))
+
+    app.state.auth_mode = "keys"
+    locked = client.get("/api/v1/health").json()
+    app.state.auth_mode = "dev"
+    opened = client.get("/api/v1/health").json()
+
+    assert locked["auth_mode"] == "keys"
+    assert opened["auth_mode"] == "dev"
 
 
 def test_un_componente_con_error_responde_503_y_explica_que_fallo(app: FastAPI) -> None:

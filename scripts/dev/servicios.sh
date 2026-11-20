@@ -158,8 +158,23 @@ instalar_sitio_nginx() {
 
 # --- Comandos ------------------------------------------------------------------
 
+# Si nginx escucha fuera de la propia máquina, la API no puede quedar en
+# AUTH_MODE=dev: ahí entra cualquiera como superusuario, sin llave. Pasaría
+# si al .env de la VM le falta AUTH_MODE=keys (ADR-0119).
+revisar_candado() {
+  local direccion
+  [[ "${AUTH_MODE:-keys}" == "dev" ]] || return 0
+  for direccion in ${NGINX_LISTEN:-${DEFAULT_NGINX_LISTEN}}; do
+    case "${direccion}" in
+      127.0.0.1:* | localhost:* | "[::1]:"*) ;;
+      *) fallo "AUTH_MODE=dev deja entrar a cualquiera sin llave y nginx escucha en ${direccion}. Pon AUTH_MODE=keys en .env (o NGINX_LISTEN=127.0.0.1:${NGINX_PORT})." ;;
+    esac
+  done
+}
+
 cmd_up() {
   cargar_env
+  revisar_candado
   mkdir -p "${RUN_DIR}"
   [[ -x "${UV_BIN}" ]] || fallo "No se encontró uv. Ejecuta primero: wsl make bootstrap"
 
