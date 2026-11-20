@@ -1,5 +1,6 @@
 /**
  * Aviso con la llave recién creada: se muestra **una sola vez** (ADR-0042).
+ * Lo usan las llaves de sistema y la llave de API de cada persona (ADR-0120).
  *
  * Trae un botón para copiarla y el recordatorio de entregarla por un medio
  * seguro. Al cerrarlo, la llave desaparece de la pantalla y ya no se puede
@@ -17,16 +18,25 @@ interface NewKeyNoticeProps {
   fullKey: string;
   owner: string;
   onClose: () => void;
+  /** Qué hacer si se pierde; cambia entre las llaves de sistema y la de API. */
+  lostHint?: string;
 }
 
-export function NewKeyNotice({ fullKey, owner, onClose }: NewKeyNoticeProps) {
+// Las llaves de sistema conviven (hasta 5): la perdida se revoca a mano.
+const SYSTEM_KEY_LOST_HINT = 'Si se pierde, crea otra y revoca esta.';
+
+export function NewKeyNotice({
+  fullKey,
+  owner,
+  onClose,
+  lostHint = SYSTEM_KEY_LOST_HINT,
+}: NewKeyNoticeProps) {
   const [copied, setCopied] = useState<'si' | 'no' | null>(null);
 
   return (
     <Modal title={`Llave nueva de ${owner}`} onClose={onClose}>
       <p className="text-sm text-amber-200">
-        Cópiala ahora: <strong>no se vuelve a mostrar</strong>. Si se pierde, crea otra y revoca
-        esta.
+        Cópiala ahora: <strong>no se vuelve a mostrar</strong>. {lostHint}
       </p>
       <code
         className="block rounded-lg border border-sky-400/30 bg-black/40 p-3 font-mono text-sm break-all text-sky-100 select-all"

@@ -10,7 +10,6 @@ import {
   listUsers,
   newApiKey,
   saveAuthSettings,
-  showApiKey,
 } from './access';
 import { looksLikeCode, qrImageSrc, startLogin } from './auth';
 import { ApiError, SESSION_EXPIRED_EVENT } from './http';
@@ -173,17 +172,15 @@ describe('código opcional y llave de API (ADR-0047)', () => {
     expect(step.me?.username).toBe('benji');
   });
 
-  it('trae, genera la llave y cambia el interruptor', async () => {
+  it('genera la llave y cambia el interruptor', async () => {
     const issued = { key: 'orc_live_AbCd1234_secreto', info: KEY };
     const spy = reply(issued, 201);
     vi.stubGlobal('fetch', spy);
 
-    expect((await showApiKey(2)).key).toBe(issued.key);
     expect((await newApiKey(2)).key).toBe(issued.key);
 
     const calls = spy.mock.calls as unknown as [string, RequestInit | undefined][];
     expect(calls.map(([url, init]) => [url, init?.method ?? 'GET'])).toEqual([
-      ['/api/v1/access/users/2/api-key', 'GET'],
       ['/api/v1/access/users/2/api-key', 'POST'],
     ]);
     vi.stubGlobal('fetch', reply({ totp_required: true }));

@@ -14,6 +14,7 @@ Revisa lo que ve un navegador o un sistema:
   un superusuario.
 """
 
+import logging
 from collections.abc import Iterator
 
 import anyio
@@ -22,6 +23,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import SESSION_COOKIE
+from app.api.v1.app_config import AppConfigOut
 from app.application.use_cases.access import AccessAdmin
 from app.core.config import Settings
 from app.domain.access import AuthUser, Role
@@ -369,12 +371,10 @@ def test_sin_codigo_la_contrasena_abre_la_sesion(client: TestClient, world: Acce
     assert client.get(ME).json()["username"] == "benji"
 
 
-def test_el_superusuario_prende_el_codigo_y_copia_llaves(
+def test_el_superusuario_prende_el_codigo_y_ve_la_llave_una_vez(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
 
@@ -382,14 +382,18 @@ def test_el_superusuario_prende_el_codigo_y_copia_llaves(
         "/api/v1/access/settings", json={"totp_required": False}, headers=SAME_ORIGIN
     )
     created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+    # Benji, 20/11/2026: «ver una sola vez la api key y después no se pueda ver
+    # de nuevo bajo ningún motivo» (ADR-0120). Ya no hay ruta para leerla.
     shown = client.get(f"{USERS}/{pepe}/api-key")
     listed = client.get(USERS).json()["items"]
 
     assert switched.json() == {"totp_required": False}
     assert client.get("/api/v1/access/settings").json() == {"totp_required": False}
     assert created.status_code == 201
-    assert shown.json()["key"] == created.json()["key"]
-    assert shown.headers["Cache-Control"] == "no-store"
+    assert created.json()["key"].startswith("orc_live_")
+    assert created.headers["Cache-Control"] == "no-store"
+    assert shown.status_code == 405
+    assert created.json()["key"] not in shown.text
     pepe_row = next(u for u in listed if u["username"] == "pepe")
     assert pepe_row["api_key"].endswith("…")
     assert created.json()["key"] not in pepe_row["api_key"]
@@ -399,9 +403,7 @@ def test_las_llaves_de_sistema_no_cuentan_la_llave_de_api(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
     """Benji, 12/11/2026: «¿por qué yo tengo dos llaves?» (una era la de API)."""
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
     client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
@@ -427,18 +429,15 @@ def test_las_llaves_de_sistema_no_cuentan_la_llave_de_api(
     assert [k["label"] for k in keys_with_system] == ["Servidor de reportes"]
 
 
-def test_la_bitacora_dice_quien_vio_la_llave(
+def test_la_bitacora_dice_quien_genero_la_llave(
     app: FastAPI, client: TestClient, world: AccessWorld, secret: str
 ) -> None:
-    app.state.access_admin = AccessAdmin(
-        world.store, world.sessions, PEPPER, world.clock, box=FakeBox()
-    )
+    app.state.access_admin = AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
     pepe = world.store.add_user("pepe")
     _enter(client, world, "benji", secret)
     created = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN).json()
-    client.get(f"{USERS}/{pepe}/api-key")
 
-    response = client.get(AUDIT, params={"group": "access", "limit": 2})
+    response = client.get(AUDIT, params={"group": "access", "limit": 1})
     page = response.json()
     rest = client.get(AUDIT, params={"group": "access", "before": page["next_before"]}).json()
     searches = client.get(AUDIT, params={"group": "searches"}).json()
@@ -447,15 +446,14 @@ def test_la_bitacora_dice_quien_vio_la_llave(
     assert response.headers["Cache-Control"] == "no-store"
     newest = page["items"][0]
     assert (newest["action"], newest["actor"], newest["actor_name"]) == (
-        "access_key.revealed",
+        "access_key.created",
         "benji",
         "Benji",
     )
-    assert newest["details"]["de"] == "pepe"
+    assert newest["details"]["para"] == "pepe"
     # La llave va enmascarada: nunca completa en la bitácora.
     assert created["key"] not in response.text
     assert newest["details"]["llave"].endswith("…")
-    assert [i["action"] for i in page["items"]][1] == "access_key.created"
     assert page["next_before"] is not None
     assert rest["items"][0]["action"] == "auth.login"
     assert rest["next_before"] is None
@@ -470,3 +468,116 @@ def test_un_usuario_normal_no_abre_la_bitacora(client: TestClient, world: Access
     _enter(client, world, "ana", ana_secret)
 
     assert client.get(AUDIT).status_code == 403
+
+
+# --- Detrás del gateway de Oráculo (ADR-0119) ----------------------------------
+
+GATEWAY = {"X-Oraculo-Module": "noticias", "X-Oraculo-User": "benji", "X-Oraculo-User-Id": "42"}
+
+
+def test_por_oraculo_sin_llave_el_401_manda_con_el_administrador(client: TestClient) -> None:
+    response = client.get(ME, headers=GATEWAY)
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "auth_required"
+    message = response.json()["error"]["message"]
+    assert "Oráculo" in message
+    assert "usuario y contraseña" not in message
+
+
+def test_por_oraculo_con_llave_mala_el_401_dice_quien_era(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {**GATEWAY, "Authorization": "Bearer orc_live_nada"}
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        response = client.get(ME, headers=headers)
+
+    assert response.status_code == 401
+    assert "Oráculo" in response.json()["error"]["message"]
+    record = next(r for r in caplog.records if "sin llave válida" in r.getMessage())
+    assert record.__dict__["oraculo_user"] == "benji"
+    assert record.__dict__["oraculo_user_id"] == "42"
+
+
+def test_por_oraculo_con_la_llave_de_la_persona_entra_sin_aviso(
+    client: TestClient, world: AccessWorld, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {**GATEWAY, "Authorization": f"Bearer {_system_key(world, 1)}"}
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        me = client.get(ME, headers=headers)
+
+    assert me.status_code == 200
+    assert me.json()["username"] == "benji"
+    assert caplog.records == []
+
+
+def test_por_oraculo_la_llave_de_otra_persona_deja_un_aviso_una_vez(
+    client: TestClient, world: AccessWorld, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {
+        **GATEWAY,
+        "X-Oraculo-User": "jperez",
+        "Authorization": f"Bearer {_system_key(world, 1)}",
+    }
+
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        first = client.get(ME, headers=headers)
+        second = client.get(ME, headers=headers)
+
+    # La identidad sale de la llave, nunca del encabezado.
+    assert first.json()["username"] == "benji"
+    assert second.status_code == 200
+    warnings = [r for r in caplog.records if "otra persona" in r.getMessage()]
+    assert len(warnings) == 1
+    assert warnings[0].__dict__["oraculo_user"] == "jperez"
+    assert warnings[0].__dict__["monitor_user"] == "benji"
+
+
+def test_sin_gateway_el_401_sigue_pidiendo_usuario_y_contrasena(client: TestClient) -> None:
+    response = client.get(ME, headers={"X-Oraculo-User": "benji"})
+
+    assert "usuario y contraseña" in response.json()["error"]["message"]
+
+
+def test_app_config_dice_si_se_entro_por_oraculo(app: FastAPI, client: TestClient) -> None:
+    app.state.app_config = AppConfigOut(oraculo_url="http://oraculo.local")
+
+    direct = client.get("/api/v1/app-config").json()
+    gateway = client.get("/api/v1/app-config", headers=GATEWAY).json()
+
+    base = {"oraculo_url": "http://oraculo.local", "password_login": False}
+    assert direct == {**base, "via_gateway": False}
+    assert gateway == {**base, "via_gateway": True}
+    # El valor guardado al arrancar no se toca: cada petición arma el suyo.
+    assert app.state.app_config.via_gateway is False
+
+
+def test_sin_entrada_con_contrasena_solo_entra_la_llave(
+    app: FastAPI, client: TestClient, world: AccessWorld, secret: str
+) -> None:
+    """Benji, 20/11/2026: «quita la opción de la contraseña» (ADR-0121)."""
+    pepe = world.store.add_user("pepe")
+    _enter(client, world, "benji", secret)
+    del app.state.password_login
+
+    refused = [
+        client.post(LOGIN, json={"username": "benji", "password": "x"}, headers=SAME_ORIGIN),
+        client.post(
+            "/api/v1/auth/password",
+            json={"current_password": "x", "new_password": "y" * 16},
+            headers=SAME_ORIGIN,
+        ),
+        client.post(f"{USERS}/{pepe}/reset-password", headers=SAME_ORIGIN),
+        client.post(f"{USERS}/{pepe}/reset-totp", headers=SAME_ORIGIN),
+        client.put("/api/v1/access/settings", json={"totp_required": True}, headers=SAME_ORIGIN),
+    ]
+    issued = client.post(f"{USERS}/{pepe}/api-key", headers=SAME_ORIGIN)
+
+    assert [r.status_code for r in refused] == [409] * len(refused)
+    assert all("Oráculo" in r.json()["error"]["message"] for r in refused)
+    # Lo que no es contraseña sigue igual: la llave de API se genera y sirve.
+    assert issued.status_code == 201
+    bearer = {"Authorization": f"Bearer {issued.json()['key']}"}
+    assert client.get(ME, headers=bearer).json()["username"] == "pepe"

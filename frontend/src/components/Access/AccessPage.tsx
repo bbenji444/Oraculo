@@ -5,7 +5,7 @@
  * - Arriba, el interruptor «Pedir código de Microsoft Authenticator al entrar»
  *   (`LoginSettings`): apagado, basta usuario y contraseña.
  * - Cada persona trae su **llave de API** (`ApiKeyRow`) para conectarla con
- *   el resto de Oráculo: ver, copiar o generar otra.
+ *   el resto de Oráculo: se ve completa una sola vez, al generarla (ADR-0120).
  *
  * - «+ Nueva persona» da de alta a alguien con una contraseña temporal, que
  *   se muestra una sola vez; al entrar la cambia y conecta su Authenticator.
@@ -14,7 +14,7 @@
  * - «Editar» cambia nombre, correo, rol o la desactiva, y tiene la sección
  *   «Seguridad»: restablecer contraseña o reiniciar autenticador.
  * - «Llaves de sistema» son para otros programas (no para personas).
- * - «Bitácora» (`AuditTrail`): quién entró, quién vio o generó cada llave y
+ * - «Bitácora» (`AuditTrail`): quién entró, quién generó cada llave y
  *   quién buscó o cambió algo, con la hora y desde dónde.
  *
  * No hace: no aplica reglas (el servidor impide, por ejemplo, quitarte tu
@@ -28,6 +28,7 @@ import {
   useCreateUser,
   useUpdateUser,
 } from '../../hooks/useAccess';
+import { usePasswordLogin } from '../../hooks/useAppConfig';
 import { useMe } from '../../hooks/useAuth';
 import type { AccessUser } from '../../services/access';
 import { Modal } from '../Deliveries/Modal';
@@ -69,8 +70,11 @@ function UserItem({
   onToggle: () => void;
   onEdit: () => void;
 }) {
+  // Contraseña y código solo importan con la entrada con contraseña (ADR-0121).
+  const passwordLogin = usePasswordLogin();
   // «Sin Authenticator» solo importa si al entrar se pide el código.
-  const totpRequired = useAuthSettings().data?.totp_required ?? false;
+  const totpSetting = useAuthSettings().data?.totp_required ?? false;
+  const totpRequired = passwordLogin && totpSetting;
   return (
     <li className="hud-reveal" style={{ '--i': Math.min(index, MAX_STAGGER) } as CSSProperties}>
       <HudPanel className={`px-5 py-4 ${user.is_active ? '' : 'opacity-70'}`}>
@@ -97,7 +101,9 @@ function UserItem({
             <HudChip tone={user.is_active ? 'green' : 'slate'} dot>
               {user.is_active ? 'Activa' : 'Desactivada'}
             </HudChip>
-            {user.must_change_password && <HudChip tone="amber">Contraseña temporal</HudChip>}
+            {passwordLogin && user.must_change_password && (
+              <HudChip tone="amber">Contraseña temporal</HudChip>
+            )}
             {totpRequired && !user.totp_enrolled && (
               <HudChip tone="slate">Sin Authenticator</HudChip>
             )}
@@ -132,6 +138,7 @@ function toValues(user: AccessUser): UserFormValues {
 }
 
 export function AccessPage() {
+  const passwordLogin = usePasswordLogin();
   const me = useMe().data;
   const users = useAccessUsers();
   const create = useCreateUser();
@@ -177,7 +184,7 @@ export function AccessPage() {
           <AuditTrail people={list} />
         ) : (
           <>
-            <LoginSettings />
+            {passwordLogin && <LoginSettings />}
             {users.isPending && <p className="mt-6 text-sm text-slate-400">Cargando…</p>}
             {users.error && <p className="mt-6 text-sm text-rose-300">{users.error.message}</p>}
             <ul className="mt-6 space-y-3">
@@ -226,6 +233,8 @@ export function AccessPage() {
                 {
                   onSuccess: (created) => {
                     setCreating(false);
+                    // Sin contraseña, lo que sigue es «Generar llave» en su renglón.
+                    if (!passwordLogin) return;
                     setTemporary({
                       password: created.temporary_password,
                       owner: created.user.display_name,
@@ -276,6 +285,7 @@ export function AccessPage() {
           <SecurityActions
             user={editing}
             isSelf={editing.username === me?.username}
+            passwordLogin={passwordLogin}
             onDeleted={() => {
               setEditing(null);
             }}

@@ -6,7 +6,27 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **Sin entrada con contraseña: solo por Oráculo con la llave de API (20/11/2026, ADR-0121).** Benji: «quiero que quites la opción de la contraseña… solamente se van a comunicar los módulos mediante esta API».
+  - Sin sesión, la pantalla solo muestra «Tu acceso lo da Oráculo», también en el acceso directo. Ya no hay usuario, contraseña, código, «Salir» ni «Mi contraseña».
+  - En «Accesos» se ocultan el interruptor del código, «Restablecer contraseña», «Reiniciar autenticador» y la contraseña temporal.
+  - Las rutas de entrar con contraseña responden 409. `/app-config` suma `password_login`. Se puede volver a prender con `PASSWORD_LOGIN=true`.
+
+- **La llave de API se ve una sola vez (20/11/2026, ADR-0120, migración 0051).** Benji: «necesito que me permitas ver una sola vez la api key y después no se pueda ver de nuevo bajo ningún motivo, solo generar una nueva».
+  - Al «Generar llave» o «Generar nueva» sale un aviso con la llave completa y «Copiar llave». Al cerrarlo ya no se puede volver a ver: el monitor solo guarda su huella.
+  - Se quitaron «Ver» y «Copiar» del renglón «Llave de API», la ruta `GET /access/users/{id}/api-key` y la copia cifrada (`access_keys.secret_sealed`).
+  - La persona nueva nace sin llave: se genera cuando se va a copiar.
+  - Las llaves que ya existen siguen sirviendo, incluidas las pegadas en Oráculo.
+
 ### Agregado
+
+- **El monitor, listo para abrirse dentro de Oráculo (20/11/2026, ADR-0119).** Benji: «vamos a dejar el monitor listo igual que OSINT». La entrega para Oráculo y los agentes de IA del equipo está en `docs/gateway-oraculo.md`.
+  - La pantalla pide todo junto a la página (rutas relativas): funciona igual en el acceso directo que bajo `/m/noticias/`.
+  - Al entrar por Oráculo no se pide usuario ni contraseña. Si la llave que manda Oráculo no sirve, se muestra «Tu acceso lo da Oráculo» y no se ofrecen «Salir» ni «Mi contraseña». `/app-config` suma `via_gateway`.
+  - nginx confía solo en las IP del gateway (`ORACULO_GATEWAY_IPS`): de ahí toma la IP real del analista y los encabezados `X-Oraculo-*`. Con `GATEWAY_ONLY=si` nadie más entra; por defecto sigue el acceso directo.
+  - 240 s (antes 60) para el reporte, las sugerencias de la IA y los envíos de prueba o reintento.
+  - `make up` no arranca en modo desarrollo si el monitor se ve desde la red, y `/health` dice `auth_mode`.
 
 - **«Cancelar búsqueda» mientras corre (19/11/2026, ADR-0118).** Benji: «tiene que estar la opción de cancelar búsqueda por si me equivoqué en algo o necesito regresar y editar».
   - Botón en la consola del Centro de mando mientras dura el barrido. Al cancelar, la consola vuelve a «Ajustar consulta» con lo mismo que se pidió; en la búsqueda rápida, con el texto que se escribió.

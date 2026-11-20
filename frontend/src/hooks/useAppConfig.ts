@@ -2,7 +2,10 @@
  * Configuración pública del servidor con TanStack Query.
  *
  * Cambia muy rara vez (solo al reiniciar el servidor): se pide una vez por
- * sesión.
+ * sesión. Un solo reintento: mientras se espera, la pantalla sin sesión no
+ * muestra nada (decide entre el formulario y el aviso de Oráculo, ADR-0119),
+ * y con los 3 reintentos de siempre un servidor caído la dejaba en blanco
+ * varios segundos.
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -13,5 +16,14 @@ export function useAppConfig() {
     queryKey: ['app-config'],
     queryFn: ({ signal }) => getAppConfig(signal),
     staleTime: Infinity,
+    retry: 1,
   });
+}
+
+/**
+ * Si la pantalla ofrece contraseña y código (ADR-0121). Mientras no se sabe,
+ * no: así no aparecen y desaparecen opciones que casi siempre están apagadas.
+ */
+export function usePasswordLogin(): boolean {
+  return useAppConfig().data?.password_login ?? false;
 }

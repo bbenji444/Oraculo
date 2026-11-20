@@ -14,6 +14,10 @@ const API_DEV_TARGET = 'http://localhost:8000';
 const NGINX_DEV_TARGET = 'http://localhost:8080';
 
 export default defineConfig({
+  // Rutas relativas en el build: la pantalla funciona igual en la raíz
+  // (acceso directo) que bajo /m/noticias/ detrás del gateway de Oráculo,
+  // que no reescribe las URLs metidas en el JavaScript (ADR-0119).
+  base: './',
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,

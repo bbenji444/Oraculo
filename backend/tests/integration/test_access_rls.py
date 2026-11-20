@@ -517,10 +517,9 @@ def test_la_migracion_0045_apaga_los_envios_de_los_ya_borrados(clean: Engine) ->
     assert active == {"rls-borrada": False, "rls-viva": True}
 
 
-async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncEngine) -> None:
-    # ADR-0047: la llave de API se guarda cifrada y solo un superusuario la lee.
+async def test_llave_de_api_sin_copia_e_interruptor_del_codigo(api_engine: AsyncEngine) -> None:
+    # ADR-0120: de la llave de API solo queda su huella; no hay copia que leer.
     store = PostgresAccessStore(api_engine)
-    box = AesGcmSecretBox(PEPPER)
     key = new_key()
     with as_user(JEFA):
         ana = await store.create_user(NewUser(ANA.username, "Ana", None, Role.USER), AUDIT)
@@ -531,11 +530,16 @@ async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncE
                 key_digest(key.full, PEPPER),
                 "Llave de API",
                 None,
-                box.seal(key.full),
+                is_api_key=True,
             ),
             AUDIT,
         )
-        found = await store.api_key(ana.user_id)
+        keys = await store.user_keys(ana.user_id)
+        sealed_columns = await _visible(
+            api_engine,
+            "SELECT count(*) FROM information_schema.columns "
+            "WHERE table_name = 'access_keys' AND column_name = 'secret_sealed'",
+        )
         listed = await store.get_user(ana.user_id)
         before = await store.totp_required()
         await store.set_totp_required(True, AUDIT)
@@ -543,14 +547,12 @@ async def test_llave_visible_cifrada_e_interruptor_del_codigo(api_engine: AsyncE
         await store.set_totp_required(before, AUDIT)
     with as_user(ANA):
         # Un usuario normal no lee llaves (seguridad por filas de access_keys).
-        hidden = await store.api_key(ana.user_id)
+        hidden = await store.user_keys(ana.user_id)
 
-    assert found is not None
-    info, sealed = found
-    assert (box.open(sealed), info.revealable) == (key.full, True)
-    assert key.full not in sealed
+    assert [k.is_api_key for k in keys] == [True]
+    assert sealed_columns == 0
     assert listed is not None and listed.api_key_prefix == key.public_id
     # La llave de API no cuenta como «llave de sistema» (12/11/2026).
     assert listed.active_keys == 0
     assert (before, after) == (False, True)
-    assert hidden is None
+    assert hidden == []

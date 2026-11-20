@@ -2,6 +2,8 @@
 
 Para el desarrollador que conecta el resto de Oráculo con el Monitor de Noticias. Diseño en ADR-0047.
 
+> **¿Vas a abrir el monitor dentro de Oráculo (`/m/noticias/`)?** Usa la entrega del gateway: [gateway-oraculo.md](gateway-oraculo.md) (ADR-0119). Esta guía es para llamar a la API desde el backend de otro sistema; la llave es la misma.
+
 ## Qué es la llave
 
 - Cada persona del monitor tiene **su propia llave de API**: `orc_live_<parte pública>_<secreto>`, de 58 caracteres.
@@ -15,7 +17,7 @@ Para el desarrollador que conecta el resto de Oráculo con el Monitor de Noticia
 ## De dónde sale
 
 1. Un superusuario entra al monitor → pestaña **«Accesos»**.
-2. En la persona, renglón **«Llave de API»** → **«Copiar»**. Si dice «Sin llave todavía», primero **«Generar llave»**.
+2. En la persona, renglón **«Llave de API»** → **«Generar llave»** (o **«Generar nueva»**). La llave completa sale **una sola vez**, en un aviso con **«Copiar llave»**; después no se puede volver a ver (ADR-0120). Si se pierde, se genera otra y la anterior deja de servir.
 3. Te la pasa por un canal privado (nunca por correo abierto ni en un chat de grupo).
 
 ## Cómo usarla

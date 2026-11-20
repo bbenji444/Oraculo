@@ -1,8 +1,9 @@
 /**
  * Configuración pública del servidor (`/api/v1/app-config`).
  *
- * Hoy solo trae la dirección del sistema principal de Oráculo, para el botón
- * del encabezado que regresa a él. Nunca trae llaves.
+ * Trae la dirección del sistema principal de Oráculo, para el botón del
+ * encabezado que regresa a él, y si la pantalla se abrió por el gateway de
+ * Oráculo (ADR-0119). Nunca trae llaves.
  *
  * Los componentes nunca llaman a fetch directamente (CLAUDE.md §6.2).
  */
@@ -12,6 +13,16 @@ import { badFormat, requestJson } from './http';
 export interface AppConfig {
   /** Sistema principal de Oráculo; `null` = sin botón para regresar. */
   oraculo_url: string | null;
+  /**
+   * La pantalla se abrió por el gateway de Oráculo (`/m/noticias/`): el
+   * acceso lo da Oráculo, así que no se pide usuario ni contraseña.
+   */
+  via_gateway: boolean;
+  /**
+   * Si se puede entrar con usuario y contraseña (ADR-0121). Apagado, el
+   * acceso es solo por Oráculo con la llave de API de cada persona.
+   */
+  password_login: boolean;
 }
 
 /** Lee la configuración pública. */
@@ -20,7 +31,13 @@ export async function getAppConfig(signal?: AbortSignal): Promise<AppConfig> {
   if (typeof body !== 'object' || body === null || !('oraculo_url' in body)) throw badFormat();
   const url = body.oraculo_url;
   if (url !== null && typeof url !== 'string') throw badFormat();
-  return { oraculo_url: url };
+  // Un servidor anterior no lo manda: entonces no se entró por Oráculo.
+  const viaGateway = 'via_gateway' in body ? body.via_gateway : false;
+  if (typeof viaGateway !== 'boolean') throw badFormat();
+  // Un servidor anterior no lo manda: entonces sí había contraseña.
+  const passwordLogin = 'password_login' in body ? body.password_login : true;
+  if (typeof passwordLogin !== 'boolean') throw badFormat();
+  return { oraculo_url: url, via_gateway: viaGateway, password_login: passwordLogin };
 }
 
 /**

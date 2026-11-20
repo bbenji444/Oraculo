@@ -2,6 +2,8 @@
 
 Responde 200 si todo está bien y 503 si algún componente falla, para que
 herramientas de monitoreo (y nginx más adelante) lo detecten sin leer el JSON.
+También dice si la API pide llave (``auth_mode``), para comprobar de un
+vistazo que el servidor no quedó abierto (ADR-0119).
 
 No hace: no revisa nada por su cuenta; delega en ``CheckSystemHealth``.
 """
@@ -39,6 +41,7 @@ def get_check_health(request: Request) -> CheckSystemHealth:
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": HealthOut}},
 )
 async def health(
+    request: Request,
     response: Response,
     check_health: Annotated[CheckSystemHealth, Depends(get_check_health)],
 ) -> HealthOut:
@@ -46,4 +49,4 @@ async def health(
     result = await check_health.execute()
     if not result.is_healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return HealthOut.from_domain(result)
+    return HealthOut.from_domain(result, request.app.state.auth_mode)

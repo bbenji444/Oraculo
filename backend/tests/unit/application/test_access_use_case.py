@@ -18,7 +18,7 @@ from app.domain.errors import (
     UsernameTakenError,
     UserNotFoundError,
 )
-from tests.unit.fake_access import PEPPER, POLICY, AccessWorld, FakeBox, access_world
+from tests.unit.fake_access import PEPPER, POLICY, AccessWorld, access_world
 
 pytestmark = pytest.mark.anyio
 
@@ -421,59 +421,60 @@ async def test_una_persona_nueva_recibe_su_envio_inicial(world: AccessWorld) -> 
     assert given == ["pepe"]
 
 
-# --- Llave de API visible por persona (ADR-0047) ---
+# --- Llave de API por persona (ADR-0047), visible una sola vez (ADR-0120) ---
 
 
-def _admin_with_box(world: AccessWorld) -> AccessAdmin:
-    return AccessAdmin(world.store, world.sessions, PEPPER, world.clock, box=FakeBox())
+def _api_admin(world: AccessWorld) -> AccessAdmin:
+    return AccessAdmin(world.store, world.sessions, PEPPER, world.clock)
 
 
-async def test_cada_persona_nace_con_su_llave_y_el_superusuario_la_ve(world: AccessWorld) -> None:
-    admin = _admin_with_box(world)
+async def test_la_persona_nace_sin_llave_y_la_llave_solo_se_ve_al_generarla(
+    world: AccessWorld,
+) -> None:
+    """Benji, 20/11/2026: «ver una sola vez la api key [...] solo generar una nueva»."""
+    admin = _api_admin(world)
     benji = await _admin(world)
 
     created = await admin.create_user(
         benji, IP, username="pepe", display_name="Pepe", email=None, role=Role.USER
     )
-    shown = await admin.show_api_key(benji, IP, created.account.user_id)
-    again = await admin.show_api_key(benji, IP, created.account.user_id)
+    issued = await admin.new_api_key(benji, IP, created.account.user_id)
+    listed = await world.store.get_user(created.account.user_id)
 
-    assert shown.key.full == again.key.full and shown.key.full.startswith("orc_live_")
-    # Guardada cifrada, nunca en claro.
-    stored = world.store.keys[shown.info.key_id].sealed or ""
-    assert shown.key.full not in stored
+    # Sin llave al nacer: la genera el superusuario cuando la va a copiar.
+    assert created.account.api_key_prefix is None
+    assert issued.key.full.startswith("orc_live_") and issued.info.is_api_key
+    # El servidor solo guarda la huella: no hay de dónde volver a leerla.
+    stored = world.store.keys[issued.info.key_id]
+    assert issued.key.full not in repr(stored)
+    assert not hasattr(admin, "show_api_key")
     # Y sirve para entrar al API como esa persona.
-    assert (await world.auth.from_bearer(shown.key.full, IP)).username == "pepe"
-    assert (created.account.api_key_prefix, world.store.events[-1][0].action) == (
-        shown.info.public_id,
-        "access_key.revealed",
-    )
+    assert (await world.auth.from_bearer(issued.key.full, IP)).username == "pepe"
+    assert listed is not None and listed.api_key_prefix == issued.info.public_id
 
 
 async def test_generar_otra_llave_deja_sin_servir_la_anterior(world: AccessWorld) -> None:
-    admin = _admin_with_box(world)
+    admin = _api_admin(world)
     benji = await _admin(world)
     pepe = world.store.add_user("pepe")
 
     first = await admin.new_api_key(benji, IP, pepe)
     second = await admin.new_api_key(benji, IP, pepe)
 
-    assert (await admin.show_api_key(benji, IP, pepe)).key.full == second.key.full
+    assert (await world.auth.from_bearer(second.key.full, IP)).username == "pepe"
     with pytest.raises(AuthenticationRequiredError):
         await world.auth.from_bearer(first.key.full, IP)
 
 
-async def test_solo_el_superusuario_ve_llaves_y_cambia_el_codigo(world: AccessWorld) -> None:
-    admin = _admin_with_box(world)
+async def test_solo_el_superusuario_genera_llaves_y_cambia_el_codigo(world: AccessWorld) -> None:
+    admin = _api_admin(world)
     pepe_id = world.store.add_user("pepe")
     pepe = AuthUser(pepe_id, "pepe", "Pepe", Role.USER)
 
     with pytest.raises(ForbiddenError):
-        await admin.show_api_key(pepe, IP, pepe_id)
+        await admin.new_api_key(pepe, IP, pepe_id)
     with pytest.raises(ForbiddenError):
         await admin.set_totp_required(pepe, IP, False)
-    with pytest.raises(AccessKeyNotFoundError):
-        await admin.show_api_key(await _admin(world), IP, pepe_id)
 
     assert await admin.set_totp_required(await _admin(world), IP, False) is False
     assert world.store.totp is False

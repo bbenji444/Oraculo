@@ -2,13 +2,56 @@
 #
 # Es una plantilla: `make up` reemplaza __PROJECT_ROOT__ por la ruta real del
 # proyecto, __LISTEN__ por las direcciones de NGINX_LISTEN (en WSL, solo
-# 127.0.0.1:8080) y __SENDFILE__ por NGINX_SENDFILE (en WSL, off), y la
+# 127.0.0.1:8080), __SENDFILE__ por NGINX_SENDFILE (en WSL, off) y las marcas
+# __GATEWAY_*__ por lo que digan ORACULO_GATEWAY_IPS y GATEWAY_ONLY, y la
 # instala en /etc/nginx/sites-available/monitor-noticias.
 #
 # Qué hace: sirve el frontend compilado (frontend/dist), reenvía /api a la API
 # (uvicorn en el puerto 8000) y sirve los PMTiles de geodata/output con
 # soporte de peticiones Range (ADR-0004). Agrega encabezados de seguridad.
+# Detrás del gateway de Oráculo (ADR-0119) confía solo en sus IP: de ahí toma
+# la IP real del analista y los encabezados X-Oraculo-*, y con GATEWAY_ONLY=si
+# no deja entrar a nadie más.
 # Qué NO hace: no termina HTTPS; eso se define en el despliegue (F8).
+
+# --- Gateway de Oráculo (ADR-0119) ---------------------------------------------
+# $realip_remote_addr es quien abrió la conexión, antes de que real_ip la
+# cambie por la IP del analista: así se sabe si la petición viene del gateway.
+geo $realip_remote_addr $monitor_from_gateway {
+    default 0;
+__GATEWAY_GEO__
+}
+
+# Quién puede entrar con GATEWAY_ONLY=si: el gateway y la propia máquina
+# (make status y la espera de make up preguntan por 127.0.0.1).
+geo $realip_remote_addr $monitor_trusted_peer {
+    default 0;
+    127.0.0.1 1;
+    ::1 1;
+__GATEWAY_GEO__
+}
+
+# 1 = se rechaza. Solo pasa con GATEWAY_ONLY=si y alguien que no es de confianza.
+map "__GATEWAY_ONLY__:$monitor_trusted_peer" $monitor_gateway_block {
+    "si:0" 1;
+    default 0;
+}
+
+# Los encabezados de Oráculo solo valen si los manda el gateway: si vienen de
+# otro lado se borran (un valor vacío hace que nginx no los reenvíe). Son
+# datos para la bitácora; la identidad sale siempre de la llave Bearer.
+map $monitor_from_gateway $monitor_oraculo_user {
+    1 $http_x_oraculo_user;
+    default "";
+}
+map $monitor_from_gateway $monitor_oraculo_user_id {
+    1 $http_x_oraculo_user_id;
+    default "";
+}
+map $monitor_from_gateway $monitor_oraculo_module {
+    1 $http_x_oraculo_module;
+    default "";
+}
 
 server {
     # En WSL solo localhost: WSL2 lo reenvía a Windows y no queda expuesto a la
@@ -24,6 +67,15 @@ server {
     # el servidor (NGINX_SENDFILE=on) los archivos están en su propio disco y
     # sendfile los manda sin copiarlos por la memoria de nginx.
     sendfile __SENDFILE__;
+
+    # Detrás del gateway todos llegan con la IP de Oráculo: sin esto, la
+    # bitácora y el bloqueo por intentos fallidos verían a una sola persona y
+    # diez llaves malas de cualquiera bloquearían a todos. Solo se cree el
+    # X-Forwarded-For que mande el gateway; sin ORACULO_GATEWAY_IPS no aplica.
+__GATEWAY_REAL_IP__
+    if ($monitor_gateway_block) {
+        return 403;
+    }
 
     # Comprimir lo que es texto. El JavaScript de la pantalla pesa 2.1 MB y
     # viajaba sin comprimir (nginx.conf solo comprime HTML): por ZeroTier
@@ -41,28 +93,27 @@ server {
     include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        # $http_host conserva el puerto (:8080): la API compara el Origin del
-        # navegador con este Host para frenar peticiones de otros sitios (CSRF).
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include __PROJECT_ROOT__/nginx/proxy-api.conf;
         # Las búsquedas son asíncronas (202 + consulta de estado): ninguna
         # petición debería tardar más que esto.
         proxy_read_timeout 60s;
     }
 
+    # Las rutas que esperan a la IA o a un proveedor dentro de la petición: el
+    # reporte (la primera vez escribe el resumen ejecutivo), las sugerencias de
+    # términos y los envíos de prueba o reintento. La IA tiene 60 s por intento
+    # y reintenta; 240 s es lo mismo que pide OSINT al gateway (ADR-0119).
+    location ~ ^/api/v1/(searches/[^/]+/report|concepts/suggest|deliveries/test|deliveries/history/[^/]+/retry)$ {
+        include __PROJECT_ROOT__/nginx/proxy-api.conf;
+        proxy_read_timeout 240s;
+    }
+
     # La vista del reporte en pantalla se incrusta en el monitor: su política
     # de contenido y X-Frame-Options los pone la API (ADR-0111).
     location ~ ^/api/v1/searches/[^/]+/report/view$ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include __PROJECT_ROOT__/nginx/proxy-api.conf;
         # La primera vez se escribe el resumen ejecutivo con la IA.
-        proxy_read_timeout 60s;
+        proxy_read_timeout 240s;
         include __PROJECT_ROOT__/nginx/encabezados-reporte.conf;
     }
 

@@ -159,7 +159,10 @@ def _wire_deliveries(app: FastAPI, settings: Settings, engine: AsyncEngine) -> N
         parse_run_hours(settings.automatic_run_hours)
     )
     app.state.automatic_runs_enabled = settings.automatic_runs_enabled
-    app.state.app_config = AppConfigOut(oraculo_url=settings.oraculo_url)
+    app.state.app_config = AppConfigOut(
+        oraculo_url=settings.oraculo_url,
+        password_login=settings.auth_mode == "keys" and settings.password_login,
+    )
 
 
 def _wire_search_planner(app: FastAPI, settings: Settings, engine: AsyncEngine) -> None:
@@ -211,9 +214,7 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
             schedule=RunSchedule.from_hours(parse_run_hours(settings.automatic_run_hours)),
         ),
     )
-    app.state.access_admin = AccessAdmin(
-        store, sessions, pepper, _utc_now, starter.give, box=AesGcmSecretBox(pepper)
-    )
+    app.state.access_admin = AccessAdmin(store, sessions, pepper, _utc_now, starter.give)
     app.state.audit_trail = ReadAuditTrail(PostgresAuditTrail(engine))
     if settings.auth_mode == "keys":
         limiter = RedisLoginLimiter(
@@ -234,6 +235,9 @@ def _wire_access(app: FastAPI, settings: Settings, engine: AsyncEngine, redis: R
             policy=policy,
             clock=_utc_now,
         )
+    # Sin PASSWORD_LOGIN no se arma: entrar solo con la llave que manda
+    # Oráculo (ADR-0121).
+    if settings.auth_mode == "keys" and settings.password_login:
         app.state.password_login = PasswordLogin(
             store=store,
             sessions=sessions,

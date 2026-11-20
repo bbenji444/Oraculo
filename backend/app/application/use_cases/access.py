@@ -31,7 +31,6 @@ from app.application.ports.access import (
     LoginLimiterPort,
     NewKeyRow,
     NewUser,
-    SecretBoxPort,
     SessionData,
     SessionStorePort,
     UserChanges,
@@ -70,6 +69,8 @@ USER_UPDATED = "user.updated"
 KEY_CREATED = "access_key.created"
 KEY_REVOKED = "access_key.revoked"
 # ADR-0047: ver la llave de API de alguien y prender o apagar el código.
+# Ya no se registra (ADR-0120: la llave no se puede volver a ver); queda por
+# las bitácoras anteriores.
 KEY_REVEALED = "access_key.revealed"
 TOTP_SETTING = "auth.totp_setting"
 # Etiqueta de la llave de API de cada persona (la que se puede volver a ver).
@@ -271,15 +272,13 @@ class CreatedUser:
 class AccessAdmin:
     """Administración de personas y llaves (solo superusuarios)."""
 
-    def __init__(  # noqa: PLR0913 — cada colaborador por nombre
+    def __init__(
         self,
         store: AccessStorePort,
         sessions: SessionStorePort,
         pepper: bytes,
         clock: Callable[[], datetime],
         on_user_created: Callable[[str], Awaitable[object]] | None = None,
-        *,
-        box: SecretBoxPort | None = None,
     ) -> None:
         """Recibe sus colaboradores.
 
@@ -290,15 +289,12 @@ class AccessAdmin:
             clock: Hora actual (UTC).
             on_user_created: Qué más darle a una persona nueva (su envío
                 inicial de la FGR, ADR-0046); recibe su ``username``.
-            box: Cifra la llave de API de cada persona para poder volver a
-                mostrarla (ADR-0047). Sin ella, no hay llaves visibles.
         """
         self._store = store
         self._sessions = sessions
         self._pepper = pepper
         self._clock = clock
         self._on_user_created = on_user_created
-        self._box = box
 
     async def list_users(self, admin: AuthUser) -> list[UserAccount]:
         """Todas las personas.
@@ -354,9 +350,8 @@ class AccessAdmin:
         )
         if self._on_user_created is not None:
             await self._on_user_created(user.username)
-        # Cada persona nace con su llave de API (ADR-0047).
-        if self._box is not None:
-            await self._new_api_key(admin, ip, account)
+        # Sin llave de API todavía: solo se ve una vez, al generarla, así que
+        # la genera el superusuario cuando la va a copiar (ADR-0120).
         refreshed = await self._store.get_user(account.user_id)
         return CreatedUser(refreshed or account, temporary)
 
@@ -519,7 +514,7 @@ class AccessAdmin:
         require_superuser(admin)
         if await self._store.get_user(user_id) is None:
             raise UserNotFoundError("No existe esa persona.", {"id": user_id})
-        return [key for key in await self._store.user_keys(user_id) if not key.revealable]
+        return [key for key in await self._store.user_keys(user_id) if not key.is_api_key]
 
     async def issue_key(
         self,
@@ -575,45 +570,16 @@ class AccessAdmin:
         )
         return IssuedKey(key, info)
 
-    async def show_api_key(self, admin: AuthUser, ip: str | None, user_id: int) -> IssuedKey:
-        """La llave de API de una persona, completa, para verla o copiarla (ADR-0047).
-
-        Cada vez queda en la bitácora (``key.revealed``).
-
-        Raises:
-            ForbiddenError: Si quien pide no es superusuario.
-            UserNotFoundError: Si no existe la persona.
-            AccessKeyNotFoundError: Si todavía no tiene una llave visible.
-        """
-        require_superuser(admin)
-        user = await self._store.get_user(user_id)
-        if user is None:
-            raise UserNotFoundError("No existe esa persona.", {"id": user_id})
-        found = await self._store.api_key(user_id) if self._box else None
-        if found is None:
-            raise AccessKeyNotFoundError(
-                "Esta persona todavía no tiene llave de API: genera una.", {"id": user_id}
-            )
-        info, sealed = found
-        full = self._box.open(sealed) if self._box else ""
-        await self._store.record_event(
-            AuditEntry(
-                Actor(admin.username, ip),
-                KEY_REVEALED,
-                {"de": user.username, "llave": info.masked},
-            ),
-            str(info.key_id),
-        )
-        return IssuedKey(NewKey(full, info.public_id), info)
-
     async def new_api_key(self, admin: AuthUser, ip: str | None, user_id: int) -> IssuedKey:
         """Genera la llave de API de una persona; la anterior deja de servir (ADR-0047).
 
+        La llave completa solo viaja en esta respuesta: el servidor guarda su
+        huella y nunca la puede volver a mostrar (ADR-0120).
+
         Raises:
             ForbiddenError: Si quien pide no es superusuario.
             UserNotFoundError: Si no existe la persona.
-            AccessRuleError: Si la persona está desactivada o el servidor no
-                puede cifrar llaves.
+            AccessRuleError: Si la persona está desactivada.
         """
         require_superuser(admin)
         user = await self._store.get_user(user_id)
@@ -624,14 +590,10 @@ class AccessAdmin:
         return await self._new_api_key(admin, ip, user)
 
     async def _new_api_key(self, admin: AuthUser, ip: str | None, user: UserAccount) -> IssuedKey:
-        if self._box is None:
-            raise AccessRuleError(
-                "El servidor no puede guardar llaves visibles (falta la pimienta)."
-            )
         actor = Actor(admin.username, ip)
         # La anterior se revoca: una sola llave de API por persona.
         for old in await self._store.user_keys(user.user_id):
-            if old.revealable and old.revoked_at is None:
+            if old.is_api_key and old.revoked_at is None:
                 await self._store.revoke_key(
                     old.key_id, AuditEntry(actor, KEY_REVOKED, {"llave_id": old.key_id})
                 )
@@ -644,7 +606,7 @@ class AccessAdmin:
                 key_digest(key.full, self._pepper),
                 API_KEY_LABEL,
                 None,
-                self._box.seal(key.full),
+                is_api_key=True,
             ),
             AuditEntry(
                 actor,

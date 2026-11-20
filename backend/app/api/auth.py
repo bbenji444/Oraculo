@@ -17,12 +17,18 @@ nombre de ``DEV_USER`` como superusuario.
 Al reconocer a la persona, la guarda en ``request.state.user`` y en el
 contexto de la base (seguridad por filas, ``access_scope``).
 
+Detrás del gateway de Oráculo (ADR-0119) cada petición llega con la llave
+de la persona en ``Bearer`` y con ``X-Oraculo-*``: un 401 explica que la
+llave la da Oráculo, y si la llave no es de quien dice Oráculo queda una
+advertencia en el log.
+
 No hace: no revisa llaves ni sesiones por sí mismo (eso es de
 ``Authenticator``) ni decide qué puede hacer cada rol en cada ruta (lo
 piden las rutas con ``require_superuser_user``).
 """
 
 import ipaddress
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 from urllib.parse import urlsplit
@@ -60,6 +66,22 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _BEARER = "bearer "
 _NEED_KEY = "Entra con tu usuario y contraseña."
 _BAD_ORIGIN = "Petición rechazada: no viene de la pantalla del monitor."
+_GATEWAY_NEED_KEY = (
+    "Oráculo no mandó una llave válida para el monitor. "
+    "Pide al administrador que revise tu llave en Oráculo."
+)
+# Encabezados que pone el gateway de Oráculo (ADR-0119). nginx los borra si
+# la petición no viene de sus IP. Solo sirven para la bitácora y para saber
+# que se entró por Oráculo: quién es la persona lo dice siempre la llave.
+ORACULO_USER_HEADER = "x-oraculo-user"
+ORACULO_USER_ID_HEADER = "x-oraculo-user-id"
+ORACULO_MODULE_HEADER = "x-oraculo-module"
+# Parejas (usuario de Oráculo, dueño de la llave) distintas que se recuerdan
+# para avisar una sola vez. Con el tope, una avalancha de nombres inventados
+# no hace crecer la memoria sin fin; pasado el tope se vuelve a avisar.
+_MAX_REPORTED_MISMATCHES = 1000
+
+logger = logging.getLogger(__name__)
 
 
 def dev_user(username: str) -> AuthUser:
@@ -110,6 +132,7 @@ def install_auth(app: FastAPI) -> None:
         app: La aplicación; debe tener ``app.state.auth_mode`` y, en modo
             ``keys``, ``app.state.authenticator``.
     """
+    app.state.gateway_mismatches = set()
 
     @app.middleware("http")
     async def auth_guard(
@@ -124,13 +147,79 @@ def install_auth(app: FastAPI) -> None:
             try:
                 user = await _identify(request)
             except (AuthenticationRequiredError, TooManyAttemptsError, ForbiddenError) as error:
-                return _refusal(error)
+                return _refusal(_gateway_refusal(request, error))
+            _check_gateway_user(request, user)
         request.state.user = user
         # El resto de la petición corre en otra tarea que hereda este contexto.
         set_user_scope(user)
         response = await call_next(request)
         response.headers.setdefault("Cache-Control", "no-store")
         return response
+
+
+def via_gateway(request: Request) -> bool:
+    """Si la petición llegó por el gateway de Oráculo (``/m/noticias/``).
+
+    Lo dice ``X-Oraculo-Module``, que nginx solo deja pasar cuando la
+    petición viene de las IP de ``ORACULO_GATEWAY_IPS`` (ADR-0119).
+
+    Args:
+        request: La petición.
+
+    Returns:
+        ``True`` si trae el encabezado del gateway.
+    """
+    return bool(request.headers.get(ORACULO_MODULE_HEADER, "").strip())
+
+
+def _oraculo_fields(request: Request) -> dict[str, str]:
+    return {
+        "oraculo_user": request.headers.get(ORACULO_USER_HEADER, ""),
+        "oraculo_user_id": request.headers.get(ORACULO_USER_ID_HEADER, ""),
+        "oraculo_module": request.headers.get(ORACULO_MODULE_HEADER, ""),
+    }
+
+
+def _gateway_refusal(request: Request, error: DomainError) -> DomainError:
+    """Detrás del gateway, un 401 es culpa de la llave que pegó Oráculo.
+
+    El analista no tiene usuario ni contraseña del monitor que escribir: el
+    mensaje lo manda con el administrador de Oráculo. El log dice de quién
+    era la petición para que el administrador sepa qué llave revisar.
+    """
+    if not via_gateway(request) or not isinstance(error, AuthenticationRequiredError):
+        return error
+    logger.warning(
+        "Oráculo mandó una petición sin llave válida del monitor",
+        extra={**_oraculo_fields(request), "path": request.url.path},
+    )
+    return AuthenticationRequiredError(_GATEWAY_NEED_KEY)
+
+
+def _check_gateway_user(request: Request, user: AuthUser) -> None:
+    """Avisa en el log si la llave no es de quien dice Oráculo.
+
+    Si el administrador pegó en Oráculo la llave de otra persona, el monitor
+    actuaría a nombre de esa otra persona sin que nadie lo note. Quién es la
+    persona lo sigue diciendo la llave (los encabezados no la cambian); esto
+    solo deja rastro. Se avisa una vez por pareja para no llenar el log con
+    cada consulta de avance de una búsqueda.
+    """
+    oraculo_user = request.headers.get(ORACULO_USER_HEADER, "").strip()
+    if not via_gateway(request) or not oraculo_user:
+        return
+    if oraculo_user.casefold() == user.username.casefold():
+        return
+    reported: set[tuple[str, str]] = request.app.state.gateway_mismatches
+    pair = (oraculo_user, user.username)
+    if pair in reported:
+        return
+    if len(reported) < _MAX_REPORTED_MISMATCHES:
+        reported.add(pair)
+    logger.warning(
+        "La llave que mandó Oráculo es de otra persona del monitor",
+        extra={**_oraculo_fields(request), "monitor_user": user.username},
+    )
 
 
 def _refusal(error: DomainError) -> Response:

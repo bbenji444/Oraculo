@@ -246,7 +246,7 @@ export function SpaceBackground({ mode = 'camera' }: SpaceBackgroundProps) {
     // tarjeta en piezas, una por cuadro (ver SKY_TILE_PX).
     const addTiles = async () => {
       const name = starTextureFor(renderer.capabilities.maxTextureSize);
-      const response = await fetch(`/tiles/space/${name}`);
+      const response = await fetch(`${import.meta.env.BASE_URL}tiles/space/${name}`);
       const full = await createImageBitmap(await response.blob());
       const pieces = skyTiles(full.width, full.height);
       for (const piece of pieces) {

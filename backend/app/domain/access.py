@@ -177,8 +177,10 @@ class KeyInfo:
         revoked_at: Cuándo se revocó.
         last_used_at: Último uso.
         last_used_ip: Desde dónde.
-        revealable: Si se guardó cifrada y el superusuario la puede volver a
-            ver (las llaves de API de cada usuario, ADR-0047).
+        is_api_key: Si es la llave de API de la persona (la de su renglón en
+            «Accesos», que «Generar nueva» reemplaza); si no, es una llave de
+            sistema. Ninguna se puede volver a ver después de crearla
+            (ADR-0120).
     """
 
     key_id: int
@@ -191,7 +193,7 @@ class KeyInfo:
     revoked_at: datetime | None
     last_used_at: datetime | None
     last_used_ip: str | None
-    revealable: bool = False
+    is_api_key: bool = False
 
     @property
     def masked(self) -> str:

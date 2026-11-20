@@ -46,13 +46,20 @@ class HealthOut(BaseModel):
         description="`ok` si todos los componentes están bien; `degraded` si alguno falla."
     )
     components: list[ComponentHealthOut]
+    auth_mode: Literal["dev", "keys"] = Field(
+        description=(
+            "`keys`: la API pide sesión o llave. `dev`: entra cualquiera como superusuario; "
+            "solo para la PC de desarrollo, nunca detrás del gateway de Oráculo (ADR-0119)."
+        )
+    )
 
     @classmethod
-    def from_domain(cls, health: SystemHealth) -> "HealthOut":
+    def from_domain(cls, health: SystemHealth, auth_mode: Literal["dev", "keys"]) -> "HealthOut":
         """Convierte un ``SystemHealth`` del dominio.
 
         Args:
             health: Estado del sistema.
+            auth_mode: Si la API pide llave (``AUTH_MODE``).
 
         Returns:
             El esquema listo para serializar.
@@ -60,4 +67,5 @@ class HealthOut(BaseModel):
         return cls(
             status=health.status.value,
             components=[ComponentHealthOut.from_domain(c) for c in health.components],
+            auth_mode=auth_mode,
         )

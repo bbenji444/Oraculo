@@ -43,7 +43,6 @@ class Clock:
 class _Key:
     info: KeyInfo
     key_hash: str
-    sealed: str | None = None
 
 
 @dataclass
@@ -152,7 +151,7 @@ class FakeAccessStore:
             1
             for k in self.keys.values()
             if k.info.user_id == user_id
-            and k.sealed is None
+            and not k.info.is_api_key
             and k.info.revoked_at is None
             and (k.info.expires_at is None or k.info.expires_at > now)
         )
@@ -168,7 +167,7 @@ class FakeAccessStore:
                 (
                     k.info.public_id
                     for k in reversed(self.keys.values())
-                    if k.info.user_id == user_id and k.sealed and k.info.revoked_at is None
+                    if k.info.user_id == user_id and k.info.is_api_key and k.info.revoked_at is None
                 ),
                 None,
             ),
@@ -250,26 +249,11 @@ class FakeAccessStore:
             None,
             None,
             None,
-            key.secret_sealed is not None,
+            key.is_api_key,
         )
-        self.keys[key_id] = _Key(info, key.key_hash, key.secret_sealed)
+        self.keys[key_id] = _Key(info, key.key_hash)
         self.events.append((audit, str(key_id)))
         return info
-
-    async def api_key(self, user_id: int) -> tuple[KeyInfo, str] | None:
-        now = self.clock()
-        visible = [
-            k
-            for k in self.keys.values()
-            if k.info.user_id == user_id
-            and k.sealed is not None
-            and k.info.revoked_at is None
-            and (k.info.expires_at is None or k.info.expires_at > now)
-        ]
-        if not visible:
-            return None
-        newest = visible[-1]
-        return newest.info, newest.sealed or ""
 
     async def totp_required(self) -> bool:
         return self.totp
