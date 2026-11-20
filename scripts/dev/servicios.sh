@@ -3,10 +3,12 @@
 # (la VM de Proxmox, docs/migracion-proxmox.md): PostgreSQL, Redis, la API
 # (uvicorn), el worker y el reloj de Celery, y nginx.
 #
-# Dos variables del .env cambian el comportamiento en el servidor:
+# Estas variables del .env cambian el comportamiento en el servidor:
 # - API_RELOAD=false: la API no se reinicia sola al cambiar el código.
 # - NGINX_LISTEN: dónde escucha nginx (en WSL, solo 127.0.0.1:8080).
 # - NGINX_SENDFILE=on: nginx manda los archivos sin copiarlos (en WSL, off).
+# - ORACULO_GATEWAY_IPS: IP del gateway de Oráculo, en quien nginx confía.
+# - GATEWAY_ONLY=si: solo el gateway (y la propia máquina) pueden entrar.
 #
 # Quién lo usa: `make up`, `make down`, `make status` y `make logs`.
 # Uso directo: bash scripts/dev/servicios.sh {up|down|status|logs}
@@ -109,6 +111,11 @@ detener_proceso() {
 
 # --- nginx ---------------------------------------------------------------------
 
+# Una IP o red (IPv4 o IPv6, con /máscara opcional). Se valida antes de
+# meterla a la configuración de nginx para que un error en el .env no la
+# rompa ni le agregue directivas.
+readonly IP_O_RED_RE='^[0-9A-Fa-f:.]+(/[0-9]{1,3})?$'
+
 instalar_sitio_nginx() {
   # Se regenera en cada arranque para que los cambios a la plantilla apliquen.
   # NGINX_LISTEN admite varias direcciones separadas por espacio; cada una se
@@ -117,9 +124,30 @@ instalar_sitio_nginx() {
   for direccion in ${NGINX_LISTEN:-${DEFAULT_NGINX_LISTEN}}; do
     listen_lines+="    listen ${direccion};"$'\n'
   done
-  LISTEN_LINES="${listen_lines}" awk -v root="${ROOT_DIR}" -v sendfile="${NGINX_SENDFILE:-off}" '
+  # Gateway de Oráculo (ADR-0119): cada IP de ORACULO_GATEWAY_IPS se vuelve
+  # una entrada de las listas de confianza y un set_real_ip_from. Sin IP, no
+  # se confía en ningún X-Forwarded-For ni en ningún X-Oraculo-*.
+  local geo_lines="" real_ip_lines="" ip
+  for ip in ${ORACULO_GATEWAY_IPS:-}; do
+    [[ "${ip}" =~ ${IP_O_RED_RE} ]] || fallo "ORACULO_GATEWAY_IPS tiene un valor que no es IP: ${ip}"
+    geo_lines+="    ${ip} 1;"$'\n'
+    real_ip_lines+="    set_real_ip_from ${ip};"$'\n'
+  done
+  if [[ -n "${real_ip_lines}" ]]; then
+    real_ip_lines+="    real_ip_header X-Forwarded-For;"$'\n'
+  fi
+  local gateway_only="${GATEWAY_ONLY:-no}"
+  case "${gateway_only}" in
+    si) [[ -n "${geo_lines}" ]] || fallo "GATEWAY_ONLY=si necesita ORACULO_GATEWAY_IPS: sin ellas nadie podría entrar." ;;
+    no) ;;
+    *) fallo "GATEWAY_ONLY debe ser 'si' o 'no' (vale '${gateway_only}')." ;;
+  esac
+  LISTEN_LINES="${listen_lines}" GEO_LINES="${geo_lines}" REAL_IP_LINES="${real_ip_lines}" \
+    awk -v root="${ROOT_DIR}" -v sendfile="${NGINX_SENDFILE:-off}" -v only="${gateway_only}" '
     /^[[:space:]]*__LISTEN__[[:space:]]*$/ { printf "%s", ENVIRON["LISTEN_LINES"]; next }
-    { gsub(/__PROJECT_ROOT__/, root); gsub(/__SENDFILE__/, sendfile); print }
+    /^[[:space:]]*__GATEWAY_GEO__[[:space:]]*$/ { printf "%s", ENVIRON["GEO_LINES"]; next }
+    /^[[:space:]]*__GATEWAY_REAL_IP__[[:space:]]*$/ { printf "%s", ENVIRON["REAL_IP_LINES"]; next }
+    { gsub(/__PROJECT_ROOT__/, root); gsub(/__SENDFILE__/, sendfile); gsub(/__GATEWAY_ONLY__/, only); print }
   ' "${ROOT_DIR}/nginx/monitor-noticias.conf.template" \
     | como_root tee "${NGINX_SITE}" >/dev/null
   como_root ln -sf "${NGINX_SITE}" "${NGINX_SITE_LINK}"
