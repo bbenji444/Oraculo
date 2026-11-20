@@ -28,6 +28,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useState } from 'react';
 
 import oraculoIcon from './assets/brand/oraculo-icon.svg';
 import { AccessPage } from './components/Access/AccessPage';
+import { GatewayNotice } from './components/Auth/GatewayNotice';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { UserCapsule } from './components/Auth/UserCapsule';
 import { CasesPage } from './components/Cases/CasesPage';
@@ -155,6 +156,18 @@ function Gate({ children }: { children?: ReactNode }) {
   );
 }
 
+/**
+ * Sin sesión: el formulario de entrada o, si se abrió desde Oráculo, el
+ * aviso de que el acceso lo da Oráculo (ADR-0119).
+ */
+function SignIn() {
+  const config = useAppConfig();
+  // Mientras se sabe por dónde se entró, el universo solo, sin un formulario
+  // que luego desaparezca. Si la configuración falla, se ofrece entrar.
+  if (config.isPending) return null;
+  return config.data?.via_gateway ? <GatewayNotice /> : <LoginScreen />;
+}
+
 export function App() {
   const me = useMe();
   if (me.isPending) return <Gate />;
@@ -170,7 +183,7 @@ export function App() {
   if (!me.data) {
     return (
       <Gate>
-        <LoginScreen />
+        <SignIn />
       </Gate>
     );
   }

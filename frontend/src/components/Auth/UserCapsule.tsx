@@ -11,12 +11,15 @@
  * nombre (para lectores de pantalla y al pasar el mouse) es «Mi contraseña» y
  * «Salir».
  *
- * En modo desarrollo (sin sesión real) solo se ve el nombre.
+ * En modo desarrollo (sin sesión real) solo se ve el nombre. Tampoco hay
+ * botones si se entró por el gateway de Oráculo (ADR-0119): la sesión y la
+ * contraseña son las de Oráculo, no las del monitor.
  *
  * No hace: no cambia la contraseña (eso es `ChangePasswordDialog`).
  */
 import { useState } from 'react';
 
+import { useAppConfig } from '../../hooks/useAppConfig';
 import { useLogout } from '../../hooks/useAuth';
 import type { Me } from '../../services/auth';
 import { Icon } from '../ui/Icon';
@@ -25,7 +28,11 @@ import { ChangePasswordDialog } from './ChangePasswordDialog';
 export function UserCapsule({ me }: { me: Me }) {
   const logout = useLogout();
   const [changing, setChanging] = useState(false);
-  const withSession = me.auth_mode === 'keys';
+  const config = useAppConfig();
+  // Mientras no se sabe, sin botones: así no aparecen y desaparecen al entrar
+  // por Oráculo. Si la configuración falla, se muestran (acceso directo).
+  const viaGateway = config.data?.via_gateway ?? config.isPending;
+  const withSession = me.auth_mode === 'keys' && !viaGateway;
 
   return (
     <div className="user-capsule" role="group" aria-label="Tu sesión">

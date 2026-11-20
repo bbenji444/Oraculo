@@ -687,6 +687,34 @@ describe('acceso con usuario, contraseña y código (ADR-0043)', () => {
     expect(within(nav).getByRole('link', { name: 'Accesos' })).toBeTruthy();
   });
 
+  it('por Oráculo y sin llave válida, avisa en lugar de pedir usuario y contraseña', async () => {
+    ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234', via_gateway: true };
+    try {
+      renderApp(null);
+
+      expect(await screen.findByRole('heading', { name: 'Tu acceso lo da Oráculo' })).toBeTruthy();
+      expect(screen.getByRole('alert').textContent).toContain('administrador de Oráculo');
+      expect(screen.queryByLabelText('Usuario')).toBeNull();
+      expect(screen.queryByLabelText('Contraseña')).toBeNull();
+    } finally {
+      ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234' };
+    }
+  });
+
+  it('por Oráculo con sesión, no ofrece «Salir» ni «Mi contraseña» del monitor', async () => {
+    ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234', via_gateway: true };
+    try {
+      renderApp();
+
+      expect(await screen.findByRole('link', { name: 'Regresar a Oráculo' })).toBeTruthy();
+      expect(screen.getByText('Benjamin')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Salir' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Mi contraseña' })).toBeNull();
+    } finally {
+      ROUTES['app-config'] = { oraculo_url: 'http://172.25.18.234' };
+    }
+  });
+
   it('un usuario normal no ve «Estado del sistema» ni «Accesos», ni entrando por la URL', () => {
     window.location.hash = '#/accesos';
     renderApp({
