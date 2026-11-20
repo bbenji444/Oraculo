@@ -8,6 +8,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **El monitor, listo para abrirse dentro de Oráculo (20/11/2026, ADR-0119).** Benji: «vamos a dejar el monitor listo igual que OSINT». La entrega para Oráculo y los agentes de IA del equipo está en `docs/gateway-oraculo.md`.
+  - La pantalla pide todo junto a la página (rutas relativas): funciona igual en el acceso directo que bajo `/m/noticias/`.
+  - Al entrar por Oráculo no se pide usuario ni contraseña. Si la llave que manda Oráculo no sirve, se muestra «Tu acceso lo da Oráculo» y no se ofrecen «Salir» ni «Mi contraseña». `/app-config` suma `via_gateway`.
+  - nginx confía solo en las IP del gateway (`ORACULO_GATEWAY_IPS`): de ahí toma la IP real del analista y los encabezados `X-Oraculo-*`. Con `GATEWAY_ONLY=si` nadie más entra; por defecto sigue el acceso directo.
+  - 240 s (antes 60) para el reporte, las sugerencias de la IA y los envíos de prueba o reintento.
+  - `make up` no arranca en modo desarrollo si el monitor se ve desde la red, y `/health` dice `auth_mode`.
+
 - **«Cancelar búsqueda» mientras corre (19/11/2026, ADR-0118).** Benji: «tiene que estar la opción de cancelar búsqueda por si me equivoqué en algo o necesito regresar y editar».
   - Botón en la consola del Centro de mando mientras dura el barrido. Al cancelar, la consola vuelve a «Ajustar consulta» con lo mismo que se pidió; en la búsqueda rápida, con el texto que se escribió.
   - El worker se detiene entre etapas o antes de la siguiente nota de la IA y guarda lo gastado. La búsqueda queda en Historial como «Cancelada».

@@ -81,3 +81,4 @@ Sirven para que alguien nuevo entienda _por qué_ el proyecto es como es, no sol
 | [0116](0116-esfera-de-busqueda-mundial.md) | Esfera de búsqueda en «Todo el mundo»: capa WebGL propia en lugar de la cúpula, sin mover la cámara (F12) | Aceptado |
 | [0117](0117-plataformas-y-no-relevantes-en-pantalla.md) | Plataformas y «No relevantes» en pantalla: pestañas y filtro por plataforma, cuatro bandas y botón de las descartadas (F12) | Aceptado |
 | [0118](0118-cancelar-busqueda.md) | Cancelar una búsqueda que corre: estado `cancelled`, revisión del worker entre etapas y antes de cada nota de la IA, y vuelta a «Ajustar consulta» (F12) | Propuesto |
+| [0119](0119-gateway-oraculo.md) | Monitor detrás del gateway de Oráculo (`/m/noticias/`): rutas relativas, confianza solo en las IP del gateway, 240 s en rutas largas y aviso «Tu acceso lo da Oráculo» (F12) | Propuesto |
