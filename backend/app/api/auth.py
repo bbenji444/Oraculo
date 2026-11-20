@@ -118,7 +118,10 @@ async def _identify(request: Request) -> AuthUser:
     if header.lower().startswith(_BEARER):
         return await authenticator.from_bearer(header[len(_BEARER) :].strip(), client_ip(request))
     token = request.cookies.get(SESSION_COOKIE)
-    if not token:
+    # Sin entrada con contraseña (ADR-0121) solo vale la llave que manda
+    # Oráculo en cada petición: una cookie de antes no deja la sesión viva
+    # después de salir de Oráculo (ADR-0123). El 401 además la borra.
+    if not token or getattr(request.app.state, "password_login", None) is None:
         raise AuthenticationRequiredError(_NEED_KEY)
     if request.method not in _SAFE_METHODS and not _same_origin(request):
         raise ForbiddenError(_BAD_ORIGIN)

@@ -14,6 +14,34 @@
 /** Evento de `window` cuando la API dice que ya no hay sesión (ADR-0042). */
 export const SESSION_EXPIRED_EVENT = 'monitor:sesion-terminada';
 
+/**
+ * Oráculo cerró la sesión: su gateway redirige a su pantalla de entrada, así
+ * que `fetch` recibe HTML en lugar de la API (ADR-0123).
+ */
+function leftOraculo(response: Response): boolean {
+  const type = response.headers.get('Content-Type') ?? '';
+  return response.redirected && type.includes('text/html');
+}
+
+/** Acciones sobre la página; aparte para poder probarlas sin recargar. */
+export const page = {
+  reload: (): void => {
+    window.location.reload();
+  },
+};
+
+/**
+ * Se olvida a la persona y se recarga la página: así Oráculo muestra su
+ * pantalla de entrada y nada del monitor queda a la vista.
+ */
+function leaveToOraculo(): never {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    page.reload();
+  }
+  throw new ApiError('Tu sesión de Oráculo terminó.', 'auth_required');
+}
+
 function notifyIfLoggedOut(status: number): void {
   // Sin window (pruebas en Node) no hay pantalla a la cual avisar.
   if (status === 401 && typeof window !== 'undefined') {
@@ -71,6 +99,7 @@ export async function requestJson(url: string, options: RequestOptions = {}): Pr
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError('No se pudo contactar a la API.', 'network_error');
   }
+  if (leftOraculo(response)) leaveToOraculo();
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     notifyIfLoggedOut(response.status);
@@ -120,6 +149,7 @@ export async function requestFile(url: string, method: 'GET' | 'POST' = 'GET'): 
   } catch {
     throw new ApiError('No se pudo contactar a la API.', 'network_error');
   }
+  if (leftOraculo(response)) leaveToOraculo();
   if (!response.ok) {
     notifyIfLoggedOut(response.status);
     throw errorFrom(response.status, await response.json().catch(() => null));

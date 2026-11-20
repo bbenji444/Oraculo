@@ -2,7 +2,7 @@
 
 Para el desarrollador que conecta el resto de Oráculo con el Monitor de Noticias. Diseño en ADR-0047.
 
-> **¿Vas a abrir el monitor dentro de Oráculo (`/m/noticias/`)?** Usa la entrega del gateway: [gateway-oraculo.md](gateway-oraculo.md) (ADR-0119). Esta guía es para llamar a la API desde el backend de otro sistema; la llave es la misma.
+> **¿Vas a abrir el monitor dentro de Oráculo (`/noticias/`)?** Usa la entrega del gateway: [gateway-oraculo.md](gateway-oraculo.md) (ADR-0119). Esta guía es para llamar a la API desde el backend de otro sistema; la llave es la misma.
 
 ## Qué es la llave
 

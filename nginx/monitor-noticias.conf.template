@@ -92,6 +92,23 @@ __GATEWAY_REAL_IP__
 
     include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
 
+    # El monitor también vive en /noticias/ (ADR-0122). El gateway de Oráculo
+    # sirve cada módulo bajo su propia ruta, con la misma ruta en el módulo
+    # (OSINT en /osint/…): reenvía /noticias/… sin quitar el prefijo. Aquí se
+    # quita y se vuelve a buscar el location, así /noticias/api/v1/… recibe lo
+    # mismo que /api/v1/… (tiempos de 240 s incluidos) y /noticias/tiles/… lo
+    # mismo que /tiles/… (Range). La pantalla pide todo con rutas relativas,
+    # así que sirve igual en la raíz y aquí.
+    location = /noticias {
+        # Relativa: así no lleva el host ni el puerto de la VM, que el
+        # navegador no debe ver.
+        absolute_redirect off;
+        return 301 /noticias/;
+    }
+    location ^~ /noticias/ {
+        rewrite ^/noticias/(.*)$ /$1 last;
+    }
+
     location /api/ {
         include __PROJECT_ROOT__/nginx/proxy-api.conf;
         # Las búsquedas son asíncronas (202 + consulta de estado): ninguna
@@ -156,9 +173,10 @@ __GATEWAY_REAL_IP__
 
     location = /index.html {
         # Sin caché: así el navegador siempre ve qué archivos con hash cargar
-        # tras una actualización, en lugar de seguir con la versión vieja.
+        # tras una actualización. no-store además evita que «atrás» muestre
+        # la pantalla de memoria después de salir de Oráculo (ADR-0123).
         include __PROJECT_ROOT__/nginx/encabezados-seguridad.conf;
-        add_header Cache-Control "no-cache" always;
+        add_header Cache-Control "no-store" always;
     }
 
     location / {

@@ -56,6 +56,9 @@ export function useMe() {
     queryFn: ({ signal }) => meOrNull(signal),
     retry: false,
     staleTime: Infinity,
+    // Al volver a la pestaña se pregunta otra vez quién es: si ya se salió de
+    // Oráculo en otra pestaña, la pantalla se cierra en ese momento (ADR-0123).
+    refetchOnWindowFocus: 'always',
   });
 }
 

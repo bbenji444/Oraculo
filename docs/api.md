@@ -736,7 +736,7 @@ Las escrituras piden editor o dueño con el caso abierto.
 - **`/health`:** estado de la API, la base, Redis y el worker, y `auth_mode` (`keys` si pide llave; `dev` si entra cualquiera, solo en la PC). `make up` se niega a arrancar en `dev` si nginx escucha fuera de la propia máquina (ADR-0119).
 - **`/app-config`:** configuración pública de la pantalla: `{oraculo_url, via_gateway, password_login}`. `password_login` (ADR-0121) dice si la pantalla ofrece usuario y contraseña; por defecto `false`.
   - `oraculo_url`: la dirección del sistema principal de Oráculo, a la que regresa el logo del encabezado (`ORACULO_URL`; sin valor, el logo no es un enlace).
-  - `via_gateway`: `true` si la petición llegó por el gateway de Oráculo (`/m/noticias/`, ADR-0119). Entonces la pantalla no ofrece entrar con usuario y contraseña: el acceso lo da Oráculo.
+  - `via_gateway`: `true` si la petición llegó por el gateway de Oráculo (`/noticias/`, ADR-0119 y ADR-0122). Entonces la pantalla no ofrece entrar con usuario y contraseña: el acceso lo da Oráculo.
 - **`/regions`:** catálogo geográfico, búsqueda por nombre y región en un punto. Cada región trae `bbox` (todo su territorio) y `focus_bbox` (su parte principal, sin islas ni territorios lejanos): para encuadrar un mapa se usa `focus_bbox`. Ejemplo, Francia: `bbox` `[-61.8, -21.4, 55.9, 51.1]` (de Guadalupe a Reunión) y `focus_bbox` `[-4.8, 41.4, 9.6, 51.1]`.
 - **`/concepts`:** alta, edición, borrado y prueba de conceptos. Un concepto que ya se usó en una búsqueda solo se desactiva.
   - Cada concepto trae `required_terms`: los nombres propios que la nota tiene que mencionar («Eternal»), de solo lectura. Hoy solo los llena la búsqueda rápida (ADR-0113). En los demás conceptos es `[]`.
