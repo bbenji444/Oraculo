@@ -3,7 +3,9 @@
  *
  * De cada llave se ve solo su parte pública (`orc_live_a1b2c3d4…`), para
  * qué es, su estado y su último uso. Revocar pide confirmación y la deja sin
- * servir al instante (cierra las sesiones que entraron con ella).
+ * servir al instante (cierra las sesiones que entraron con ella). Cada
+ * persona tiene una sola llave vigente: crear una nueva revoca todas las
+ * anteriores, incluida su llave de API (ADR-0124).
  *
  * No hace: no muestra la llave completa (eso es de `NewKeyNotice`, una vez).
  */
@@ -17,6 +19,7 @@ import { HudButton } from '../ui/HudButton';
 import { type ChipTone, HudChip } from '../ui/HudChip';
 import { HudSelect } from '../ui/HudSelect';
 import { NewKeyNotice } from './NewKeyNotice';
+import { OWN_KEY_CLOSE_SECONDS, OWN_KEY_HINT, useOwnKeyGuard } from './ownKey';
 
 const STATUS_TONE: Record<ReturnType<typeof keyStatus>, ChipTone> = {
   vigente: 'green',
@@ -81,6 +84,7 @@ export function UserKeys({ user }: { user: AccessUser }) {
   const keys = useAccessKeys(user.id);
   const issue = useIssueKey();
   const revoke = useRevokeKey();
+  const guard = useOwnKeyGuard(user.username);
   const [label, setLabel] = useState('');
   const [validity, setValidity] = useState<Validity>('90');
   const [fullKey, setFullKey] = useState<string | null>(null);
@@ -90,13 +94,14 @@ export function UserKeys({ user }: { user: AccessUser }) {
     <div className="mt-4 rounded-lg border border-white/5 bg-black/20 p-4">
       <p className="mb-3 text-xs text-slate-400">
         Las llaves de sistema son para que <strong>otros programas</strong> consulten el monitor a
-        nombre de esta persona (como las llaves de la API de ChatGPT). Para entrar a la pantalla no
-        se usan: se entra con usuario, contraseña y código.
+        nombre de esta persona. Cada persona tiene <strong>una sola llave vigente</strong>: crear
+        una nueva deja sin servir todas las anteriores, incluida la de API que usa Oráculo.
       </p>
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={(event) => {
           event.preventDefault();
+          guard.beforeIssue();
           issue.mutate(
             {
               userId: user.id,
@@ -108,6 +113,7 @@ export function UserKeys({ user }: { user: AccessUser }) {
                 setLabel('');
                 setFullKey(issued.key);
               },
+              onError: guard.onIssueError,
             },
           );
         }}
@@ -179,8 +185,11 @@ export function UserKeys({ user }: { user: AccessUser }) {
         <NewKeyNotice
           fullKey={fullKey}
           owner={user.display_name}
+          lostHint={guard.isSelf ? OWN_KEY_HINT : undefined}
+          autoCloseSeconds={guard.isSelf ? OWN_KEY_CLOSE_SECONDS : undefined}
           onClose={() => {
             setFullKey(null);
+            guard.afterClose();
           }}
         />
       )}
