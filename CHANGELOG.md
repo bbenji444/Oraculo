@@ -8,6 +8,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Generar tu propia llave ya no te saca antes de copiarla (20/11/2026).** Benji: «le di a generar una nueva llave y me sacó inmediatamente». La llave anterior muere al instante; ahora el aviso con la nueva se queda abierto, pide pegarla en Oráculo y solo al cerrarlo recarga la página.
+
 - **El aviso sin llave dice «Acceso denegado» (20/11/2026).** Benji: «corrígela a Acceso denegado, favor de iniciar sesión». Sale al abrir el monitor directo, al terminar la sesión de Oráculo o con una llave que no sirve, con un botón «Ir a Oráculo».
 
 - **Al salir de Oráculo, el monitor se cierra (20/11/2026, ADR-0123).** Observación del jefe de Benji: la sesión parecía seguir abierta. Sin entrada con contraseña la cookie del monitor ya no sirve, la pantalla detecta cuando Oráculo cerró la sesión y recarga, revisa al volver a la pestaña, y `index.html` ya no se guarda en caché.

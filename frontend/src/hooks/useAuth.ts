@@ -10,7 +10,7 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tansta
 import { useEffect } from 'react';
 
 import { type Me, changePassword, getMe, logout } from '../services/auth';
-import { ApiError, SESSION_EXPIRED_EVENT } from '../services/http';
+import { ApiError, isSessionHeld, SESSION_EXPIRED_EVENT } from '../services/http';
 import { useExplorerStore } from '../store/explorer';
 
 const ME_KEY = ['auth', 'me'] as const;
@@ -33,7 +33,10 @@ async function meOrNull(signal?: AbortSignal): Promise<Me | null> {
   try {
     return await getMe(signal);
   } catch (error) {
-    if (error instanceof ApiError && error.code === 'auth_required') return null;
+    // Mientras copia su propia llave nueva, se queda quien estaba (holdSession).
+    if (error instanceof ApiError && error.code === 'auth_required' && !isSessionHeld()) {
+      return null;
+    }
     throw error;
   }
 }
@@ -66,6 +69,16 @@ export function useMe() {
  * Para el último paso del ingreso: deja entrar a la persona que respondió la
  * API (y olvida todo lo de la anterior).
  */
+/**
+ * Usuario de quien usa la pantalla, leído de lo ya cargado (sin pedirlo).
+ *
+ * Returns:
+ *   El `username`, o `null` si todavía no se sabe quién entró.
+ */
+export function useSignedInUsername(): string | null {
+  return useQueryClient().getQueryData<Me>(ME_KEY)?.username ?? null;
+}
+
 export function useOpenSession(): (me: Me) => void {
   const client = useQueryClient();
   return (me) => {
