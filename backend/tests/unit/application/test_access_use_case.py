@@ -115,15 +115,34 @@ async def test_llave_revocada_vencida_o_de_persona_desactivada(world: AccessWorl
         await world.auth.from_bearer(valid, IP)
 
 
-async def test_demasiados_intentos_bloquean_la_ip(world: AccessWorld) -> None:
+async def test_demasiados_intentos_frenan_las_llaves_falsas_de_esa_ip(world: AccessWorld) -> None:
     key = await _key_for(world, 1)
     for _ in range(world.limiter.max):
         with pytest.raises(AuthenticationRequiredError):
             await world.auth.from_bearer("mala", IP)
 
     with pytest.raises(TooManyAttemptsError):
-        await world.auth.from_bearer(key, IP)
-    assert (await world.auth.from_bearer(key, "10.0.0.9")).username == "benji"
+        await world.auth.from_bearer("otra mala", IP)
+    # Una llave vigente entra aunque la IP esté frenada: detrás del gateway
+    # todos comparten la IP de Oráculo (Benji, 20/11/2026; ADR-0125).
+    assert (await world.auth.from_bearer(key, IP)).username == "benji"
+    with pytest.raises(TooManyAttemptsError):
+        await world.auth.from_bearer("otra mala", IP)
+
+
+async def test_la_llave_revocada_no_suma_fallos(world: AccessWorld) -> None:
+    # Quien acaba de cambiar de llave sigue mandando la vieja unos segundos;
+    # eso no es adivinar y no debe frenar a todos los que entran por Oráculo.
+    ana = world.store.add_user("ana")
+    old = await _key_for(world, ana)
+    await world.admin.new_api_key(await _admin(world), IP, ana)
+
+    for _ in range(world.limiter.max + 5):
+        with pytest.raises(AuthenticationRequiredError):
+            await world.auth.from_bearer(old, IP)
+
+    assert world.limiter.failures.get(IP, 0) == 0
+    assert world.store.events[-1][0].action == "auth.login_failed"
 
 
 # --- Sesiones (el token interno) ----------------------------------------------------------

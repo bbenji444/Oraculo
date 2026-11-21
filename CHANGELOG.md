@@ -8,6 +8,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Cambiar de llave ya no bloquea el monitor 15 minutos a todos (20/11/2026).** Detrás de Oráculo todas las peticiones llegan con la misma IP; la llave vieja, que la pantalla sigue mandando unos segundos, sumaba «intentos fallidos» y frenaba a todos, incluso con llave buena. Ahora una llave revocada o vencida no cuenta como intento y una llave vigente siempre entra (ADR-0125).
+
 - **Solo sirve la llave más nueva (20/11/2026).** Benji: con la llave vieja y la nueva «me sigue dejando entrar con ambos». Una llave de consola sobrevivía a «Generar nueva». Ahora crear una llave, por cualquier camino, revoca todas las anteriores de esa persona (ADR-0124).
 - **Al generar tu propia llave, el aviso se cierra solo a los 10 segundos** y la página se recarga: da tiempo de copiarla y la sesión vieja no queda abierta.
 

@@ -159,14 +159,23 @@ class Authenticator:
         self._clock = clock
 
     async def _verify(self, key: str, ip: str | None) -> tuple[AuthUser, int]:
-        if await self._limiter.blocked(ip):
-            raise TooManyAttemptsError(_TOO_MANY)
+        # Detrás del gateway todas las peticiones llegan con la IP de Oráculo:
+        # el freno es de todos a la vez. Por eso (ADR-0125) una llave vigente
+        # entra aunque la IP esté frenada, y una llave auténtica pero revocada
+        # o vencida no suma fallo (es alguien que cambió de llave, no alguien
+        # adivinando). Benji, 20/11/2026: tras cambiar de llave, el monitor
+        # quedó bloqueado 15 minutos para todos. Adivinar una llave sigue
+        # siendo imposible en la práctica (secreto aleatorio de 40 caracteres).
         public_id = public_id_of(key)
         record = await self._store.find_key(public_id) if public_id else None
         candidate = key_digest(key, self._pepper)
         matches = digests_match(record.key_hash if record else _DUMMY_DIGEST, candidate)
+        genuine = record is not None and matches
         if record is None or not matches or not record.usable(self._clock()):
-            await self._limiter.failure(ip)
+            if await self._limiter.blocked(ip):
+                raise TooManyAttemptsError(_TOO_MANY)
+            if not genuine:
+                await self._limiter.failure(ip)
             await self._store.record_event(
                 AuditEntry(
                     Actor(record.user.username if record and matches else "anonimo", ip),
@@ -176,7 +185,6 @@ class Authenticator:
                 str(record.key_id) if record else "",
             )
             raise AuthenticationRequiredError(_BAD_KEY)
-        await self._limiter.clear(ip)
         await self._store.mark_key_used(record.key_id, ip)
         return record.user, record.key_id
 
