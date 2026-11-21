@@ -3,7 +3,7 @@
 **Para:** programador del core Oráculo y agentes de IA del equipo
 **De:** módulo Monitor de Noticias (VM 108, nginx en `:8080`)
 **Fecha:** 2026-11-20
-**Estado:** lado módulo **implementado y publicado** en la VM. Sigue el contrato vigente de `gateway_modulos_agentes.md` (commit `5b30686` del core: *mount nativo*, como OSINT en `/osint/…`). Ver ADR-0119 y ADR-0122.
+**Estado:** **funcionando en producción** desde el 20/11/2026 (23:16 UTC): Oráculo ya abre el monitor y la API responde 200 con la llave de cada usuario. Sigue el contrato vigente de `gateway_modulos_agentes.md` (core `c0245d9`): módulo en la raíz del upstream → público `/m/<slug>/`. El monitor también responde en `/noticias/…` por si se prefiere el *mount nativo*. Ver ADR-0119 y ADR-0122.
 
 Este documento confirma que el monitor cumple el contrato del gateway y detalla **cómo debe configurarse en Oráculo**.
 
@@ -14,9 +14,10 @@ Este documento confirma que el monitor cumple el contrato del gateway y detalla 
 | Pieza | Valor |
 |---|---|
 | Slug en Oráculo | `Noticias` (el que ya existe). El slug no cambia rutas: solo va en `X-Oraculo-Module` |
-| **`href` (upstream)** | **`http://10.244.214.144:8080/noticias/`** (ZeroTier). Es nginx; **no** uses el puerto 8000 |
-| Mount nativo | **`/noticias`**: el navegador navega en `https://oraculo/noticias/…` y Oráculo reenvía la misma ruta al upstream |
-| Apertura | `GET /go/Noticias/` → `302 /noticias/` |
+| **`href` (upstream)** | **`http://10.244.214.144:8080/`** (ZeroTier, raíz del monitor; es la configuración actual y funciona). Es nginx; **no** uses el puerto 8000 |
+| Ruta pública | **`/m/Noticias/`**: Oráculo quita ese prefijo y reenvía el resto a la raíz del monitor |
+| Alternativa | `href` = `http://10.244.214.144:8080/noticias/` → público `/noticias/…` (*mount nativo*, igual que OSINT). El monitor sirve las dos |
+| Apertura | `GET /go/Noticias/` → `302 /m/Noticias/` |
 | Auth hacia el módulo | `Authorization: Bearer orc_live_…` (58 caracteres, una llave por persona) |
 | Cabeceras opcionales | `X-Oraculo-User`, `X-Oraculo-User-Id`, `X-Oraculo-Module` (bitácora y aviso en pantalla) |
 | Llave en la URL (`?api_key=`) | **No existe**: la llave solo se acepta en el encabezado |
@@ -90,10 +91,10 @@ sequenceDiagram
 | Campo | Valor |
 |---|---|
 | `slug` | `Noticias` (se queda igual) |
-| **`href`** | **`http://10.244.214.144:8080/noticias/`** — con `/noticias/` al final. Sin token ni `api_key` |
+| **`href`** | **`http://10.244.214.144:8080/`** (actual). También sirve `http://10.244.214.144:8080/noticias/`. Sin token, `#/…` ni `api_key` |
 | Externo / activo | Sí / Sí |
 
-> **Por qué importa `/noticias/`:** el gateway toma el *mount* de la ruta del `href`. Con `http://10.244.214.144:8080` (sin ruta) el mount queda vacío, `/go/Noticias/` manda al usuario a `/` y vuelve al tablero de Oráculo. Fue lo que pasó el 20/11/2026.
+> **Historia del 20/11/2026:** a las 11:19 el core pasó a *mount nativo* y un módulo en la raíz regresaba al tablero. A las 17:14 (hora de México) el core agregó `/m/<slug>/` para módulos en la raíz (commit `c0245d9`) y desde entonces el monitor abre con el `href` actual. **Abrir la IP de la VM directo en el navegador no deja entrar** (no lleva llave): muestra «Acceso denegado».
 
 Salud del servicio (sin llave): `GET http://10.244.214.144:8080/noticias/api/v1/health` → 200, con `"auth_mode": "keys"`.
 
@@ -224,7 +225,7 @@ El rol vive en la base del monitor. Cada persona ve **solo lo suyo** (seguridad 
 - [x] Reenviar `Range` y devolver `206` en streaming (sin juntar ni comprimir).
 - [x] Conservar `Content-Type`, `Content-Disposition` y `Cache-Control`.
 - [x] Timeout ≥ 240 s (`MODULE_PROXY_TIMEOUT` = 300 s).
-- [ ] **Configurar `href` = `http://10.244.214.144:8080/noticias/`** (único pendiente).
+- [x] `href` configurado (`http://10.244.214.144:8080/`) y probado: Oráculo entra con la llave de cada usuario.
 - [ ] Opcional: mandar `X-Forwarded-For` con la IP del navegador.
 
 ---
@@ -236,7 +237,7 @@ El rol vive en la base del monitor. Cada persona ve **solo lo suyo** (seguridad 
 3. El monitor abre **sin pedir usuario ni contraseña**, con el nombre de la persona arriba a la derecha.
 4. El globo carga sus mapas: las teselas responden 206 y **ninguna** petición sale de `/noticias/`.
 5. Una búsqueda termina y su reporte en pantalla abre.
-6. Usuario con llave mala → «Tu acceso lo da Oráculo». Usuario sin llave → no entra.
+6. Usuario con llave mala, o quien abre la VM directo → «Acceso denegado · Sesión inválida. Favor de iniciar sesión en Oráculo.» Usuario sin llave en Oráculo → no entra.
 7. Cerrar sesión en Oráculo → el monitor ya no responde ni con «atrás»; al volver a su pestaña aparece la entrada de Oráculo.
 8. El navegador **no** muestra la IP de la VM ni la llave.
 

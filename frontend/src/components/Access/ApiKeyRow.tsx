@@ -12,30 +12,53 @@
  * La llave nunca se guarda en la caché ni en el navegador: solo vive en el
  * estado de este renglón mientras el aviso está abierto.
  *
+ * Si es la llave de quien usa la pantalla, su llave anterior deja de servir en
+ * ese instante: la salida por sesión terminada se detiene mientras el aviso
+ * está abierto y, al cerrarlo, la página se recarga (Benji, 20/11/2026: «le
+ * di a generar una nueva llave y me sacó inmediatamente»).
+ *
  * No hace: no decide quién puede generarla (eso es del servidor: solo superusuarios).
  */
 import { useState } from 'react';
 
 import { useNewApiKey } from '../../hooks/useAccess';
+import { useSignedInUsername } from '../../hooks/useAuth';
 import type { AccessUser } from '../../services/access';
+import { holdSession, page } from '../../services/http';
 import { HudButton } from '../ui/HudButton';
 import { NewKeyNotice } from './NewKeyNotice';
 
 // La llave de API es una por persona: generar otra ya revoca la anterior.
 const API_KEY_LOST_HINT = 'Si se pierde, genera una nueva: esta dejará de servir.';
+// La propia: la anterior ya murió y Oráculo todavía la manda.
+const OWN_KEY_HINT =
+  'Es tu propia llave: pégala ahora en tu usuario de Oráculo («Módulos externos»). Al cerrar este aviso, el monitor te pedirá entrar de nuevo.';
 
 export function ApiKeyRow({ user }: { user: AccessUser }) {
   const create = useNewApiKey();
+  const isSelf = useSignedInUsername() === user.username;
   const [fresh, setFresh] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const generate = () => {
+    if (isSelf) holdSession(true);
     create.mutate(user.id, {
       onSuccess: (issued) => {
         setFresh(issued.key);
         setConfirming(false);
       },
+      onError: () => {
+        holdSession(false);
+      },
     });
+  };
+
+  const close = () => {
+    setFresh(null);
+    if (isSelf) {
+      holdSession(false);
+      page.reload();
+    }
   };
 
   return (
@@ -83,10 +106,8 @@ export function ApiKeyRow({ user }: { user: AccessUser }) {
         <NewKeyNotice
           fullKey={fresh}
           owner={user.display_name}
-          lostHint={API_KEY_LOST_HINT}
-          onClose={() => {
-            setFresh(null);
-          }}
+          lostHint={isSelf ? OWN_KEY_HINT : API_KEY_LOST_HINT}
+          onClose={close}
         />
       )}
     </div>

@@ -36,6 +36,8 @@ Mientras exista la copia cifrada, la llave **sí** se puede volver a ver: con la
 
 ## Consecuencias
 
+- **Llave propia (20/11/2026).** Si quien genera la llave es la misma persona que usa la pantalla, su llave anterior deja de servir en ese instante y la API responde 401. La salida por sesión terminada se detiene (`holdSession`) mientras el aviso está abierto; al cerrarlo, la página se recarga y la persona entra con la llave nueva desde Oráculo.
+
 - **Las llaves que ya existen siguen sirviendo**, incluidas las que ya estén pegadas en Oráculo. Lo único que se pierde es poder volver a verlas; quien no la tenga copiada usa «Generar nueva».
 - **Bajar la migración** recrea `secret_sealed` vacía y quita `is_api_key`. Las llaves de API pasan a contarse como llaves de sistema y siguen sirviendo. Las copias borradas no se recuperan.
 - **Personas nuevas:** después de «Nueva persona» hay que «Generar llave» para Oráculo.

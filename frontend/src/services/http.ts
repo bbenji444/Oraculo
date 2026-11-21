@@ -23,6 +23,25 @@ function leftOraculo(response: Response): boolean {
   return response.redirected && type.includes('text/html');
 }
 
+// Mientras se muestra la llave nueva de quien usa la pantalla, su llave
+// anterior ya no sirve y la API responde 401: sin esto la pantalla lo sacaba
+// antes de que copiara la nueva (Benji, 20/11/2026).
+let sessionHeld = false;
+
+/**
+ * Detiene (o reanuda) la salida por sesión terminada.
+ *
+ * @param held `true` mientras la persona copia su propia llave nueva.
+ */
+export function holdSession(held: boolean): void {
+  sessionHeld = held;
+}
+
+/** Si la salida por sesión terminada está detenida (ver `holdSession`). */
+export function isSessionHeld(): boolean {
+  return sessionHeld;
+}
+
 /** Acciones sobre la página; aparte para poder probarlas sin recargar. */
 export const page = {
   reload: (): void => {
@@ -35,7 +54,7 @@ export const page = {
  * pantalla de entrada y nada del monitor queda a la vista.
  */
 function leaveToOraculo(): never {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && !sessionHeld) {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     page.reload();
   }
@@ -44,7 +63,7 @@ function leaveToOraculo(): never {
 
 function notifyIfLoggedOut(status: number): void {
   // Sin window (pruebas en Node) no hay pantalla a la cual avisar.
-  if (status === 401 && typeof window !== 'undefined') {
+  if (status === 401 && typeof window !== 'undefined' && !sessionHeld) {
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
 }

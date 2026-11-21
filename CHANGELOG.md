@@ -8,6 +8,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Generar tu propia llave ya no te saca antes de copiarla (20/11/2026).** Benji: «le di a generar una nueva llave y me sacó inmediatamente». La llave anterior muere al instante; ahora el aviso con la nueva se queda abierto, pide pegarla en Oráculo y solo al cerrarlo recarga la página.
+
+- **El aviso sin llave dice «Acceso denegado · Sesión inválida» (20/11/2026).** Benji: «corrígela a Acceso denegado, favor de iniciar sesión» y luego «que solo diga acceso denegado, sesión inválida». Sale al abrir el monitor directo, al terminar la sesión de Oráculo o con una llave que no sirve, con un botón «Ir a Oráculo».
+
 - **Al salir de Oráculo, el monitor se cierra (20/11/2026, ADR-0123).** Observación del jefe de Benji: la sesión parecía seguir abierta. Sin entrada con contraseña la cookie del monitor ya no sirve, la pantalla detecta cuando Oráculo cerró la sesión y recarga, revisa al volver a la pestaña, y `index.html` ya no se guarda en caché.
 
 - **Entrar al monitor desde Oráculo (20/11/2026, ADR-0122).** Benji pegó su llave en Oráculo y el clic en «Noticias Intelligence» lo regresaba al tablero. El gateway de Oráculo cambió ese día a *mount nativo*: cada módulo vive bajo su propia ruta (OSINT en `/osint/…`). El monitor ahora también responde en `/noticias/…` y en Oráculo el `href` del módulo debe ser `http://10.244.214.144:8080/noticias/`.

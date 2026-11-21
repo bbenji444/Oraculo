@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AccessUser } from '../../services/access';
+import { isSessionHeld, page } from '../../services/http';
 import { ApiKeyRow } from './ApiKeyRow';
 
 const FULL_KEY = 'orc_live_AbCd1234_secreto';
@@ -59,8 +60,9 @@ function stubIssue() {
   return spy;
 }
 
-function renderRow(user: AccessUser = PEPE) {
+function renderRow(user: AccessUser = PEPE, me: string | null = null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (me) client.setQueryData(['auth', 'me'], { username: me });
   return render(
     <QueryClientProvider client={client}>
       <ApiKeyRow user={user} />
@@ -102,6 +104,26 @@ describe('ApiKeyRow', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.body.textContent).not.toContain(FULL_KEY);
+  });
+
+  it('la propia llave no saca a nadie hasta cerrar el aviso (20/11/2026)', async () => {
+    stubIssue();
+    const reload = vi.spyOn(page, 'reload').mockImplementation(() => undefined);
+    renderRow(PEPE, 'pepe');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generar nueva' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, generar' }));
+
+    const notice = await screen.findByRole('dialog', { name: 'Llave nueva de Pepe' });
+    expect(notice.textContent).toContain('Es tu propia llave');
+    expect(isSessionHeld()).toBe(true);
+    expect(reload).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ya la copié, cerrar' }));
+
+    expect(isSessionHeld()).toBe(false);
+    expect(reload).toHaveBeenCalledOnce();
+    reload.mockRestore();
   });
 
   it('sin llave todavía la genera sin pedir confirmar', async () => {
