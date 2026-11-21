@@ -194,6 +194,7 @@ export function App() {
 }
 
 function Monitor({ me }: { me: Me }) {
+  const oraculoUrl = safeOraculoUrl(useAppConfig().data?.oraculo_url);
   const tabs = tabsFor(me);
   const allowed = tabs.map((t) => t.id);
   const [tab, setTab] = useState<Tab>(() => tabFromHash(allowed));
@@ -253,7 +254,7 @@ function Monitor({ me }: { me: Me }) {
             </div>
           </div>
           <div className="flex w-full min-w-0 justify-center *:pointer-events-auto sm:order-2 sm:flex-1">
-            <HudDock items={tabs} active={tab} label="Secciones" />
+            <HudDock items={tabs} active={tab} label="Secciones" exitHref={oraculoUrl} />
           </div>
         </div>
       </header>

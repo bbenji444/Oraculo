@@ -1063,6 +1063,12 @@
 .hud-dock-link:hover .hud-dock-icon {
   background: rgb(0 210 255 / 0.08);
 }
+/* «Salir» a Oráculo: separado de las secciones por una línea. */
+.hud-dock-exit {
+  border-left: 1px solid rgb(0 210 255 / 0.16);
+  margin-left: 4px;
+  padding-left: 8px;
+}
 /* La sección elegida: el círculo con anillo y brillo cian, como el primer
    botón del dock del Hub de Oráculo. */
 .hud-dock-link[aria-current='page'] {
@@ -1111,6 +1117,12 @@
   .hud-dock-label {
     font-size: 8px;
     letter-spacing: 0.5px;
+  }
+  .hud-dock-exit {
+    margin: 6px 10px 0;
+    border-top: 1px solid rgb(0 210 255 / 0.16);
+    border-left: 0;
+    padding: 10px 2px 4px;
   }
 }
 

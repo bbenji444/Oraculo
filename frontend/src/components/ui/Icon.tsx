@@ -23,7 +23,8 @@
  * newspaper, smart_display, photo_camera, language) se revisaron el
  * 18/11/2026 leyendo las ligaduras de `material-icons-v145.woff2` con
  * fontTools. La letra no trae X, YouTube ni Instagram: X va como letra y los
- * otros dos con un dibujo parecido (`Explore/platforms.ts`).
+ * otros dos con un dibujo parecido (`Explore/platforms.ts`). `logout` («Salir»
+ * del menú) se revisó igual el 20/11/2026.
  */
 export type IconName =
   | 'account_circle'
@@ -47,6 +48,7 @@ export type IconName =
   | 'language'
   | 'light_mode'
   | 'list'
+  | 'logout'
   | 'manage_accounts'
   | 'monitor_heart'
   | 'newspaper'

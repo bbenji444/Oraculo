@@ -36,6 +36,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Agregado
 
+- **«Salir» al final del menú de la izquierda (20/11/2026).** Benji: «para que sea más claro que es regresar a la pestaña de atrás». Lleva a Oráculo, con el mismo icono que su barra.
 - **El monitor, listo para abrirse dentro de Oráculo (20/11/2026, ADR-0119).** Benji: «vamos a dejar el monitor listo igual que OSINT». La entrega para Oráculo y los agentes de IA del equipo está en `docs/gateway-oraculo.md`.
   - La pantalla pide todo junto a la página (rutas relativas): funciona igual en el acceso directo que bajo `/m/noticias/`.
   - Al entrar por Oráculo no se pide usuario ni contraseña. Si la llave que manda Oráculo no sirve, se muestra «Tu acceso lo da Oráculo» y no se ofrecen «Salir» ni «Mi contraseña». `/app-config` suma `via_gateway`.
