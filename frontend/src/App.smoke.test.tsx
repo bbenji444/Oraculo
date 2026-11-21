@@ -693,7 +693,9 @@ describe('acceso con usuario, contraseña y código (ADR-0043)', () => {
       renderApp(null);
 
       expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeTruthy();
-      expect(screen.getByRole('alert').textContent).toContain('iniciar sesión en Oráculo');
+      expect(screen.getByRole('alert').textContent).toBe(
+        'Sesión inválida. Favor de iniciar sesión en Oráculo.',
+      );
       expect(screen.queryByLabelText('Usuario')).toBeNull();
       expect(screen.queryByLabelText('Contraseña')).toBeNull();
     } finally {

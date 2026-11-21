@@ -5,7 +5,8 @@
  * la llave de la persona en cada petición. Este aviso sale si se abre el
  * monitor directo (sin Oráculo), si la sesión de Oráculo terminó o si la
  * llave falta, venció o se renovó sin actualizarla en Oráculo. Benji,
- * 20/11/2026: «Acceso denegado, favor de iniciar sesión».
+ * 20/11/2026: «Acceso denegado, favor de iniciar sesión»; después, «que solo
+ * diga acceso denegado, sesión inválida».
  *
  * No hace: no pide datos ni reintenta por su cuenta.
  */
@@ -21,17 +22,13 @@ export function GatewayNotice() {
         <p className="mando-kicker">Oráculo · Monitor de Noticias</p>
         <h1 className="text-xl font-semibold text-slate-50">Acceso denegado</h1>
         <p role="alert" className="text-sm text-slate-300">
-          Favor de iniciar sesión en Oráculo y entrar desde «Noticias Intelligence».
+          Sesión inválida. Favor de iniciar sesión en Oráculo.
         </p>
         {oraculo && (
           <a className="hud-btn inline-block" href={oraculo}>
             Ir a Oráculo
           </a>
         )}
-        <p className="text-xs text-slate-400">
-          Si ya iniciaste sesión y sigue saliendo este aviso, pide al administrador que revise tu
-          llave del monitor.
-        </p>
       </HudPanel>
     </div>
   );

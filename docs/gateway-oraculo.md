@@ -237,7 +237,7 @@ El rol vive en la base del monitor. Cada persona ve **solo lo suyo** (seguridad 
 3. El monitor abre **sin pedir usuario ni contraseña**, con el nombre de la persona arriba a la derecha.
 4. El globo carga sus mapas: las teselas responden 206 y **ninguna** petición sale de `/noticias/`.
 5. Una búsqueda termina y su reporte en pantalla abre.
-6. Usuario con llave mala, o quien abre la VM directo → «Acceso denegado, favor de iniciar sesión». Usuario sin llave en Oráculo → no entra.
+6. Usuario con llave mala, o quien abre la VM directo → «Acceso denegado · Sesión inválida. Favor de iniciar sesión en Oráculo.» Usuario sin llave en Oráculo → no entra.
 7. Cerrar sesión en Oráculo → el monitor ya no responde ni con «atrás»; al volver a su pestaña aparece la entrada de Oráculo.
 8. El navegador **no** muestra la IP de la VM ni la llave.
 
