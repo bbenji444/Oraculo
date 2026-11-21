@@ -6,7 +6,7 @@ import pytest
 
 from app.application.ports.access import SessionData, UserChanges
 from app.application.use_cases.access import AccessAdmin
-from app.domain.access import MAX_ACTIVE_KEYS_PER_USER, AuthUser, Role
+from app.domain.access import AuthUser, Role
 from app.domain.credentials import verify_password
 from app.domain.errors import (
     AccessKeyNotFoundError,
@@ -318,14 +318,29 @@ async def test_persona_inexistente(world: AccessWorld) -> None:
         await world.admin.user_keys(admin, 99)
 
 
-async def test_tope_de_llaves_vigentes_y_vigencia(world: AccessWorld) -> None:
+async def test_la_llave_nueva_deja_sin_servir_todas_las_anteriores(world: AccessWorld) -> None:
+    # Benji, 20/11/2026: con una llave de consola y la nueva de API entraba
+    # con las dos. Ahora solo sirve la última, sea del tipo que sea (ADR-0124).
     admin = await _admin(world)
     ana = world.store.add_user("ana")
-    for _ in range(MAX_ACTIVE_KEYS_PER_USER):
-        await world.admin.issue_key(admin, IP, ana, "x", 30)
+    console = await world.admin.issue_key(admin, IP, ana, "Creada en la consola", 365)
+    api = await world.admin.new_api_key(admin, IP, ana)
 
-    with pytest.raises(AccessRuleError, match="hasta"):
-        await world.admin.issue_key(admin, IP, ana, "x", 30)
+    with pytest.raises(AuthenticationRequiredError):
+        await world.auth.from_bearer(console.key.full, IP)
+    assert (await world.auth.from_bearer(api.key.full, IP)).username == "ana"
+
+    again = await world.admin.issue_key(admin, IP, ana, "Creada en la consola", 365)
+
+    with pytest.raises(AuthenticationRequiredError):
+        await world.auth.from_bearer(api.key.full, IP)
+    assert (await world.auth.from_bearer(again.key.full, IP)).username == "ana"
+    vigentes = [k for k in await world.admin.user_keys(admin, ana) if k.revoked_at is None]
+    assert [k.key_id for k in vigentes] == [again.info.key_id]
+
+
+async def test_vigencia_y_etiqueta_validas(world: AccessWorld) -> None:
+    admin = await _admin(world)
     with pytest.raises(InvalidRequestError):
         await world.admin.issue_key(admin, IP, 1, "x", 0)
     with pytest.raises(InvalidRequestError):

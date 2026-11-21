@@ -36,7 +36,6 @@ from app.application.ports.access import (
     UserChanges,
 )
 from app.domain.access import (
-    MAX_ACTIVE_KEYS_PER_USER,
     MAX_KEY_DAYS,
     AuthUser,
     KeyInfo,
@@ -526,6 +525,9 @@ class AccessAdmin:
     ) -> IssuedKey:
         """Crea una llave para una persona. El texto completo solo sale aquí.
 
+        Sus llaves anteriores dejan de servir en ese momento: cada persona
+        tiene una sola llave vigente (ADR-0124).
+
         Args:
             admin: Quién la crea.
             ip: Desde dónde.
@@ -537,8 +539,7 @@ class AccessAdmin:
             ForbiddenError: Si quien pide no es superusuario.
             UserNotFoundError: Si no existe la persona.
             InvalidRequestError: Si la vigencia o la etiqueta no son válidas.
-            AccessRuleError: Si la persona está desactivada o ya tiene el tope
-                de llaves vigentes.
+            AccessRuleError: Si la persona está desactivada.
         """
         require_superuser(admin)
         user = await self._store.get_user(user_id)
@@ -546,16 +547,12 @@ class AccessAdmin:
             raise UserNotFoundError("No existe esa persona.", {"id": user_id})
         if not user.is_active:
             raise AccessRuleError("Activa a la persona antes de darle una llave.")
-        if user.active_keys >= MAX_ACTIVE_KEYS_PER_USER:
-            raise AccessRuleError(
-                f"Cada persona puede tener hasta {MAX_ACTIVE_KEYS_PER_USER} llaves vigentes. "
-                "Revoca una antes de crear otra."
-            )
         clean_label = " ".join(label.split())
         if len(clean_label) > MAX_LABEL_CHARS:
             raise InvalidRequestError(f"La etiqueta admite hasta {MAX_LABEL_CHARS} caracteres.")
         if days is not None and not 1 <= days <= MAX_KEY_DAYS:
             raise InvalidRequestError(f"La vigencia va de 1 a {MAX_KEY_DAYS} días.")
+        await self._revoke_all(Actor(admin.username, ip), user_id)
         key = new_key()
         expires_at = self._clock() + timedelta(days=days) if days is not None else None
         info = await self._store.create_key(
@@ -591,13 +588,7 @@ class AccessAdmin:
 
     async def _new_api_key(self, admin: AuthUser, ip: str | None, user: UserAccount) -> IssuedKey:
         actor = Actor(admin.username, ip)
-        # La anterior se revoca: una sola llave de API por persona.
-        for old in await self._store.user_keys(user.user_id):
-            if old.is_api_key and old.revoked_at is None:
-                await self._store.revoke_key(
-                    old.key_id, AuditEntry(actor, KEY_REVOKED, {"llave_id": old.key_id})
-                )
-                await self._sessions.delete_for_user(user.user_id, old.key_id)
+        await self._revoke_all(actor, user.user_id)
         key = new_key()
         info = await self._store.create_key(
             NewKeyRow(
@@ -620,6 +611,18 @@ class AccessAdmin:
             ),
         )
         return IssuedKey(key, info)
+
+    async def _revoke_all(self, actor: Actor, user_id: int) -> None:
+        # Una sola llave vigente por persona, de cualquier tipo (consola o
+        # pantalla). Antes solo se revocaba la de API y una de consola seguía
+        # entrando por Oráculo junto con la nueva (Benji, 20/11/2026: «me sigue
+        # dejando entrar con ambos»). ADR-0124.
+        for old in await self._store.user_keys(user_id):
+            if old.revoked_at is None:
+                await self._store.revoke_key(
+                    old.key_id, AuditEntry(actor, KEY_REVOKED, {"llave_id": old.key_id})
+                )
+                await self._sessions.delete_for_user(user_id, old.key_id)
 
     async def totp_required(self, admin: AuthUser) -> bool:
         """Si al entrar se pide el código de 6 dígitos.

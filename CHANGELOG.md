@@ -8,6 +8,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Corregido
 
+- **Solo sirve la llave más nueva (20/11/2026).** Benji: con la llave vieja y la nueva «me sigue dejando entrar con ambos». Una llave de consola sobrevivía a «Generar nueva». Ahora crear una llave, por cualquier camino, revoca todas las anteriores de esa persona (ADR-0124).
+- **Al generar tu propia llave, el aviso se cierra solo a los 10 segundos** y la página se recarga: da tiempo de copiarla y la sesión vieja no queda abierta.
+
 - **Generar tu propia llave ya no te saca antes de copiarla (20/11/2026).** Benji: «le di a generar una nueva llave y me sacó inmediatamente». La llave anterior muere al instante; ahora el aviso con la nueva se queda abierto, pide pegarla en Oráculo y solo al cerrarlo recarga la página.
 
 - **El aviso sin llave dice «Acceso denegado · Sesión inválida» (20/11/2026).** Benji: «corrígela a Acceso denegado, favor de iniciar sesión» y luego «que solo diga acceso denegado, sesión inválida». Sale al abrir el monitor directo, al terminar la sesión de Oráculo o con una llave que no sirve, con un botón «Ir a Oráculo».
