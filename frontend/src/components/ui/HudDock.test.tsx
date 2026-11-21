@@ -23,6 +23,23 @@ describe('HudDock', () => {
     expect(estado.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('monitor_heart');
   });
 
+  it('«Salir» va al final y regresa a Oráculo (20/11/2026)', () => {
+    render(
+      <HudDock items={ITEMS} active="explorar" label="Secciones" exitHref="http://172.25.18.234" />,
+    );
+    const links = within(screen.getByRole('navigation')).getAllByRole('link');
+    const exit = links[links.length - 1];
+    expect(exit?.getAttribute('aria-label')).toBe('Salir a Oráculo');
+    expect(exit?.getAttribute('href')).toBe('http://172.25.18.234');
+    expect(exit?.textContent).toBe('Salir');
+    expect(exit?.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('logout');
+  });
+
+  it('sin dirección de Oráculo no hay «Salir»', () => {
+    render(<HudDock items={ITEMS} active="explorar" label="Secciones" exitHref={null} />);
+    expect(screen.queryByRole('link', { name: 'Salir a Oráculo' })).toBeNull();
+  });
+
   it('marca solo la sección activa', () => {
     render(<HudDock items={ITEMS} active="estado" label="Secciones" />);
     const current = screen.getByRole('link', { current: 'page' });

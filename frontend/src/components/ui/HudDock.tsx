@@ -11,6 +11,10 @@
  * perderla. El nombre accesible es el completo («Estado del sistema») aunque
  * en la barra se lea el corto («Estado»).
  *
+ * Con `exitHref`, al final va «Salir», que regresa a Oráculo (Benji,
+ * 20/11/2026: «para que sea más claro que es regresar a la pestaña de
+ * atrás»), con el mismo icono que la barra de Oráculo.
+ *
  * No hace: no cambia de pantalla (eso lo hace App con el cambio de `#`).
  */
 import { Icon, type IconName } from './Icon';
@@ -29,9 +33,11 @@ interface HudDockProps<T extends string> {
   active: T;
   /** Nombre de la navegación, para el lector de pantalla. */
   label: string;
+  /** A dónde lleva «Salir» (Oráculo); sin valor no se muestra. */
+  exitHref?: string | null;
 }
 
-export function HudDock<T extends string>({ items, active, label }: HudDockProps<T>) {
+export function HudDock<T extends string>({ items, active, label, exitHref }: HudDockProps<T>) {
   return (
     <nav aria-label={label} className="hud-dock sin-barra">
       {items.map((item) => (
@@ -49,6 +55,19 @@ export function HudDock<T extends string>({ items, active, label }: HudDockProps
           <span className="hud-dock-label">{item.short}</span>
         </a>
       ))}
+      {exitHref && (
+        <a
+          href={exitHref}
+          aria-label="Salir a Oráculo"
+          title="Salir a Oráculo"
+          className="hud-dock-link hud-dock-exit focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          <span className="hud-dock-icon">
+            <Icon name="logout" />
+          </span>
+          <span className="hud-dock-label">Salir</span>
+        </a>
+      )}
     </nav>
   );
 }
