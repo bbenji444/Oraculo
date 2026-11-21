@@ -6,9 +6,12 @@
  * seguro. Al cerrarlo, la llave desaparece de la pantalla y ya no se puede
  * volver a ver (el servidor solo guarda su huella).
  *
+ * Con `autoCloseSeconds` se cierra solo al terminar la cuenta (la llave propia,
+ * ver `ownKey.ts`).
+ *
  * No hace: no la guarda en ningún lado.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { copyText } from '../../ui/copyText';
 import { Modal } from '../Deliveries/Modal';
@@ -20,18 +23,45 @@ interface NewKeyNoticeProps {
   onClose: () => void;
   /** Qué hacer si se pierde; cambia entre las llaves de sistema y la de API. */
   lostHint?: string;
+  /** Si viene, el aviso se cierra solo después de estos segundos. */
+  autoCloseSeconds?: number;
 }
 
-// Las llaves de sistema conviven (hasta 5): la perdida se revoca a mano.
-const SYSTEM_KEY_LOST_HINT = 'Si se pierde, crea otra y revoca esta.';
+// Una sola llave vigente por persona (ADR-0124): crear otra revoca esta.
+const SYSTEM_KEY_LOST_HINT = 'Si se pierde, crea otra: esta dejará de servir.';
+const SECOND_MS = 1000;
 
 export function NewKeyNotice({
   fullKey,
   owner,
   onClose,
   lostHint = SYSTEM_KEY_LOST_HINT,
+  autoCloseSeconds,
 }: NewKeyNoticeProps) {
   const [copied, setCopied] = useState<'si' | 'no' | null>(null);
+  const [left, setLeft] = useState(autoCloseSeconds ?? 0);
+  // La última `onClose`, para que la cuenta no se reinicie en cada render.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (autoCloseSeconds === undefined) return;
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      const remaining = autoCloseSeconds - Math.floor((Date.now() - started) / SECOND_MS);
+      if (remaining <= 0) {
+        window.clearInterval(timer);
+        closeRef.current();
+      } else {
+        setLeft(remaining);
+      }
+    }, SECOND_MS);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [autoCloseSeconds]);
 
   return (
     <Modal title={`Llave nueva de ${owner}`} onClose={onClose}>
@@ -66,6 +96,11 @@ export function NewKeyNotice({
           </span>
         )}
       </div>
+      {autoCloseSeconds !== undefined && (
+        <p role="timer" className="text-sm font-semibold text-rose-300">
+          Este aviso se cierra solo en {left} s.
+        </p>
+      )}
       <p className="text-xs text-slate-500">
         Entrégala en persona o por un canal seguro. No la mandes por WhatsApp ni correo.
       </p>

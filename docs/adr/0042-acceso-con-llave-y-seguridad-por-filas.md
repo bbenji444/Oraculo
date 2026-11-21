@@ -32,7 +32,7 @@ Lo que ya existía en Oráculo (`apis_control.api_keys` en el servidor de APIs) 
 - **Se compara en tiempo constante**, y con una llave inexistente se calcula igual una huella, para no dar pistas por lo que tarda.
 - **El mismo mensaje** para llave inexistente, revocada, vencida o de alguien desactivado.
 - **Vigencia elegible:** 30, 90 (recomendado), 180 o 365 días, o sin vencimiento.
-- **Tope de 5 llaves vigentes por persona.**
+- **Tope de 5 llaves vigentes por persona.** (Reemplazado por ADR-0124: una sola llave vigente por persona.)
 - **Revocación inmediata.**
 
 ### 2. Dos formas de usarla

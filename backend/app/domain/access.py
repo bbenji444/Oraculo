@@ -41,9 +41,6 @@ MAX_DISPLAY_NAME_CHARS = 120
 MAX_EMAIL_CHARS = 254
 _USERNAME = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-# Llaves vigentes por persona: una por equipo (oficina, casa, integración)
-# alcanza; más llaves sueltas son más superficie de ataque.
-MAX_ACTIVE_KEYS_PER_USER = 5
 # Vigencia que puede elegir el superusuario al crear una llave (días).
 MAX_KEY_DAYS = 365
 

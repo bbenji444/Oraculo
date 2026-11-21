@@ -93,8 +93,9 @@ La base aplica la separación con seguridad por filas (RLS): una búsqueda ajena
 Reglas (`409 access_rule`):
 - nadie se quita su propio rol ni se desactiva;
 - siempre queda un superusuario activo;
-- nadie revoca su única llave vigente;
-- máximo 5 llaves vigentes por persona.
+- nadie revoca su única llave vigente.
+
+Cada persona tiene **una sola llave vigente**: crear una (`POST /access/users/{id}/keys`, `POST /access/users/{id}/api-key` o `make crear-llave`) revoca todas las anteriores y cierra sus sesiones (ADR-0124).
 
 **Bitácora:** cada alta, cambio, restablecimiento, entrada y entrada fallida queda registrada (`user.created`, `user.updated`, `user.deleted`, `user.password_reset`, `user.password_changed`, `user.totp_enrolled`, `user.totp_reset`, `access_key.created`, `access_key.revoked`, `auth.login`, `auth.login_failed`).
 

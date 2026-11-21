@@ -6,11 +6,11 @@
  * nuevo bajo ningún motivo, solo generar una nueva».
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AccessUser } from '../../services/access';
-import { isSessionHeld, page } from '../../services/http';
+import { holdSession, isSessionHeld, page } from '../../services/http';
 import { ApiKeyRow } from './ApiKeyRow';
 
 const FULL_KEY = 'orc_live_AbCd1234_secreto';
@@ -72,6 +72,7 @@ function renderRow(user: AccessUser = PEPE, me: string | null = null) {
 
 afterEach(() => {
   cleanup();
+  holdSession(false);
   vi.unstubAllGlobals();
 });
 
@@ -104,6 +105,46 @@ describe('ApiKeyRow', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.body.textContent).not.toContain(FULL_KEY);
+  });
+
+  it('la propia llave se cierra sola a los 10 s y recarga (20/11/2026)', async () => {
+    // shouldAdvanceTime: deja correr las promesas de la petición simulada.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    stubIssue();
+    const reload = vi.spyOn(page, 'reload').mockImplementation(() => undefined);
+    renderRow(PEPE, 'pepe');
+    fireEvent.click(screen.getByRole('button', { name: 'Generar nueva' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, generar' }));
+    await screen.findByRole('dialog', { name: 'Llave nueva de Pepe' });
+
+    try {
+      act(() => {
+        vi.advanceTimersByTime(9_000);
+      });
+      expect(screen.getByRole('timer').textContent).toContain('1 s');
+      expect(reload).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(isSessionHeld()).toBe(false);
+    expect(reload).toHaveBeenCalledOnce();
+    reload.mockRestore();
+  });
+
+  it('la llave de otra persona no se cierra sola', async () => {
+    stubIssue();
+    renderRow(PEPE, 'benji');
+    fireEvent.click(screen.getByRole('button', { name: 'Generar nueva' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, generar' }));
+
+    await screen.findByRole('dialog', { name: 'Llave nueva de Pepe' });
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(isSessionHeld()).toBe(false);
   });
 
   it('la propia llave no saca a nadie hasta cerrar el aviso (20/11/2026)', async () => {
